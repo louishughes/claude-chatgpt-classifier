@@ -17,6 +17,7 @@ The specs assume the input is an official ChatGPT export ZIP (`conversations.jso
 - `raw/conversations/`: 1,160 JSON files. 1,158 are per-conversation "split-wrapper" files (wrapper fields such as title/date/counts plus the embedded native conversation object). 2 are derived outputs from an earlier classifier attempt, not conversations.
 - `raw/images/`: 913 images (png/webp/jpg/jpeg, about 1.15 GB) flattened into one folder and named by ChatGPT file ID, plus an empty `unknown_origin/` folder.
 - The original sharded JSON, audio and video are **not** present in `raw/`.
+- **Provenance (owner, 2026-10-27):** the split-wrapper files, flattened images and manifest were produced by an earlier extraction step run with Hermes. Not an OpenAI format, so its rules (which fields it dropped, how images were renamed, why some are missing) are undocumented and must be inferred and reported.
 - In a 50-file sample, mapping nodes had `parent` but no `children`, and messages lacked several fields the official export normally carries. So the split format may have lost fields compared with the original.
 
 ## Decision (proposed)

@@ -58,6 +58,7 @@ Recorded so later decisions can be read against what already failed. These are t
 - **Codex-built version:** used a model the owner calls "Luna" for part of the classification. Results were inconsistent.
 - **Root cause as the owner sees it:** local models were weak at extracting key information, and their output was not type-safe, so results varied between runs.
 - **Smoke tests:** one conversation at a time gave inconsistent output; API/model timeouts occurred via OpenRouter; batches of 20–50 conversations had many failures.
+- **Raw extraction:** the current contents of `raw/` (per-conversation split JSON, flattened `images/`, `export_manifest.json`) were produced from the original export by an earlier extraction step run with Hermes (owner, 2026-10-27). See ADR-0002.
 - **Leftovers in `raw/`:** two small derived JSON files (a classification output and an archive validation result) sit inside `raw/conversations/`. They look like outputs of the earlier attempt (inferred from their key structure only) and are excluded from import (ADR-0002, OD-09).
 - **Responses in this plan:** ADR-0007 (cloud-capable models with schema-enforced output and measured stability), TR-16, FND-009, EVAL-010/EVAL-011 batch smoke gates at 50 and 100.
 

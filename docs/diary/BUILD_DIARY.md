@@ -118,3 +118,9 @@ A running, timestamped log of what is being worked on, the problems hit, how the
 **What:** Ran document checks: ticket IDs unique, CSV and Markdown in sync, no dependency cycles, every new ticket traced to a requirement, `raw/` listing unchanged before and after, no private names in any doc. Wrote the handoff and open decisions. Stopped for approval before writing any code.
 **Talking points:**
 - "Verify, then report what actually ran, including what didn't."
+
+### 19:03 — Where the raw data came from
+**What:** Louis confirmed the split JSON files, flattened image folder and manifest in `raw/` came from an earlier extraction run with Hermes, not straight from OpenAI. Recorded in ADR-0002 and the project history.
+**Why it matters:** an intermediate format made by an older tool has undocumented rules. The importer treats it as a lower-fidelity source and reports what it can't prove, and the original export ZIP (if still available) becomes the preferred input.
+**Talking points:**
+- "Know your data lineage: which tool produced the files you're importing?"
