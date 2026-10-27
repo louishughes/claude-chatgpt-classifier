@@ -50,6 +50,7 @@ Treat research prose as context, not as a substitute for contracts. The latest e
 1. Agents must not change existing tests, acceptance criteria or the gold set (human-labelled reference data) without the owner's explicit approval. Adding new tests is fine; weakening, deleting, skipping or re-baselining existing ones is not.
 2. Each ticket gets at most **3 fix attempts** for a genuine failure. After the third, mark it `BLOCKED` with the failing command and output, stop, and ask the owner.
 3. Vocabulary is frozen during a run: the taxonomy/category version is fixed at the start of a classification run and nothing may add, rename or promote terms until the run ends. Changes go through review and a versioned re-run.
+4. A PR carries at most **two tickets**, and one by default. An exception needs the owner's OK in the thread first. Why: the owner is the reviewer and is learning Python; a PR he can't read in one sitting gets approved unread, which is how the earlier attempts lost control (added 2026-10-27, REV-005; decided under delegated owner authority, revisitable).
 
 ## Specification audit requirements
 
