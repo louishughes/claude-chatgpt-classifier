@@ -218,3 +218,11 @@ Tests went from 43 to 47. Three existing tests had their expected call counts ch
 - "Seven cents to find out exactly where the AI is weak. That's the point of a spike."
 - "Don't reject an answer for being too long. Trim it in code and save the retry for real errors."
 - "Make the model cite message numbers, then check them with plain code. Trust, but verify."
+
+### 20:45 — "Too simplistic": rethinking the process
+**What:** Louis looked at the results and said the labels were too simplistic. He was right. Reading the chats showed that one subject and one purpose per chat can't describe conversations that drift, a single "games" bucket swallowed 40% of the sample, and only decisions were kept, while the chats are full of ideas, preferences, frameworks and things that were made. The checking was also anchored on the model's answer.
+**New plan (spike v3, `docs/plans/SPIKE_V3_PROCESS.md`):** build a blind answer key for 10 chats first, then let Haiku *discover* segments, projects and typed knowledge with no fixed list. Then consolidate that into a two-level taxonomy and a project registry that Louis approves and we freeze. Only then classify segments against it, and score everything against the answer key. Expected cost is still under $1.
+**Talking points:**
+- "Cheap runs aren't the goal. Useful knowledge is. Seven cents told me my categories were the problem, not the model."
+- "Discover first, classify second. You can't pick the categories before you've seen the data."
+- "Write the answer key before you look at the model's answers."
