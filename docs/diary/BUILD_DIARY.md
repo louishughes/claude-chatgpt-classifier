@@ -415,6 +415,18 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "My repo checks itself before every commit. Staging a private file gets the commit refused."
 - "'.gitignore' is a suggestion. 'git add -f' ignores it. So I check the index."
 
+### 21:50 — DOC-002: Markdown notes for Obsidian, and a review says "smaller PRs"
+**What:** Built the note renderer. It takes a note described as data and writes Markdown with Obsidian properties at the top. The same data gives the same bytes. Files are written safely, and an unchanged note isn't rewritten. 47 new tests, 278 in total.
+**The interesting part, safety:** text from chats is *untrusted*. A message containing `[[something]]` would create a link in the vault, `%%...%%` would hide text, `#word` would create a tag, and HTML could do worse. The renderer escapes all of these, so chat text always shows up as text. A property-based test threw 5,000 random strings at it. It found one real bug: an obscure Unicode "next line" character that broke the properties block. Fixed.
+**Also:** file names work on Windows, so there are no `CON.md` or `:` characters. Notes can't be written outside the vault folder. Notes are written to a temporary file first and then swapped in, so a crash can't leave half a note.
+**Review feedback:** an independent review said PR #3 has become too big to read and explain (over 8,000 lines). Fair. So no more tickets go into it, and new work comes in small PRs. I've asked Louis how he'd like that done, and for permission to run the tests on his Windows PC and to check the real field names in his split files (names only, no content).
+**What I learned:** YAML quirks, why rename-into-place is atomic, and that property-based tests find bugs you'd never think to write a test for.
+**Talking points:**
+- "Chat text is untrusted input, even when it's my own chats. My renderer makes sure it can't create links, tags or hidden text in my notes."
+- "A random-input test found a Unicode character I'd never heard of that broke my output."
+- "Feedback said my PR was too big to explain. That's a portfolio problem as much as a review problem, so I'm splitting the work up."
+**Teach-back (`rendering/markdown.py`, added at 23:18 when the PR was opened):** "A note is built as data first, then turned into Markdown the same way every time, so the same data always gives byte-for-byte the same file. Anything that came from a chat is escaped so it can't become a link, tag or hidden text in Obsidian. Files are written to a temporary file and swapped in, and an unchanged note isn't touched, so a crash can't leave half a note."
+
 ### 21:51 — The backlog moves into GitHub Issues
 **What:** Louis said yes to turning every planned ticket into a GitHub Issue, across all milestones. The spec had 122 tickets, but they only lived in two docs (`docs/ROADMAP_AND_TICKETS.md` and `docs/TICKETS.csv`), even though we had picked GitHub Issues as the tracker. Now there are six milestone issues, M1 to M6 (#4–#9), with 122 ticket issues under them as sub-issues (#10–#132; #113 is a pull request from another thread). Each ticket's title starts with its ID, for example "FND-005: Domain models and stable identifiers". Each one has a summary, a checklist of acceptance criteria, its priority and phase, and a link back to its section in the roadmap. The first line lists its blockers as issue numbers, like "Blocked by: #12, #14". FND-001 to FND-005 (#10–#14) are marked as built in PR #3, waiting for review, rather than closed.
 **Challenges:**
