@@ -24,6 +24,10 @@ dependencies = [
     "alembic>=1.14,<2",           # versioned schema migrations (FND-004)
 ]
 
+[project.scripts]
+# Installing the package creates a `ke` command that runs this function.
+ke = "knowledge_engine.cli.main:run"
+
 [project.optional-dependencies]
 # Tools needed to develop and test, but not to run the package.
 # Install with: pip install -e ".[dev]"

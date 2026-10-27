@@ -363,7 +363,7 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "I designed the AI step behind an interface, so switching from a paid API to a subscription workflow changed a policy, not the code."
 - "Zero marginal cost was a deliberate constraint, not an afterthought."
 
-### 21:47 — FND-006: never do the same work twice
+### 21:42 — FND-006: never do the same work twice
 **What:** Added a jobs table and a "stage key". Every piece of work gets a fingerprint made from its input and the versions of everything that could change the result. Same fingerprint means the saved result is reused. 21 new tests, 202 in total.
 **Key decisions and why:**
 - **Retries follow Louis's guardrails exactly.** Errors that might go away (a timeout, broken JSON) get up to 3 attempts in total. A doubtful *answer* goes straight to review and is never retried. A real bug fails at once.
@@ -375,3 +375,15 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "Whether to redo work is a lookup: same fingerprint, same answer."
 - "Retry what might be temporary, review what might be wrong, never loop."
+
+### 21:49 — FND-008: the `ke` command
+**What:** Installing the package now gives a `ke` command. `ke status` shows the settings and database state, `ke db upgrade` sets up or updates the database, and `ke import` exists as a placeholder that says "not built yet" and exits with its own code. 19 new tests, 221 in total.
+**Key decisions and why:**
+- **Two output modes with a contract.** Plain text for people, and `--json` for scripts: exactly one line with sorted keys. Tests check the exact shape, so later scripts and smoke tests can rely on it.
+- **Fixed exit codes.** 0 OK, 2 typo, 3 bad config, 4 not built yet, 5 blocked by a privacy switch. A script can react without reading the message.
+- **Status never prints private paths or keys.** Raw folders show up by their account label only, and the key shows as yes or no. A test plants a fake key and a private-looking folder name and checks neither appears.
+- Used Python's built-in `argparse` instead of a CLI library: one less dependency, and it's easy to explain.
+**What I learned:** console scripts in `pyproject.toml`, exit codes, and why machine-readable output needs a fixed schema.
+**Talking points:**
+- "My CLI has a contract: text for people, one line of sorted JSON for scripts, and exit codes that never change meaning."
+- "Unbuilt commands are honest placeholders with their own exit code, not silent no-ops."

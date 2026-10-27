@@ -13,5 +13,6 @@ Live ticket status for the build. The full ticket list is `docs/TICKETS.csv` (ke
 | FND-005 Domain models and stable identifiers | VERIFIED (scope note: Segment/KnowledgeRecord deferred to M3) | SESSION_LOG 2026-10-27 FND-005 |
 | EVAL-009 Synthetic source-fidelity fixture suite and scale generator | VERIFIED (M2 link/YouTube/social cases deferred to their tickets) | SESSION_LOG 2026-10-27 EVAL-009 |
 | FND-006 Processing jobs and fingerprint keys | VERIFIED | SESSION_LOG 2026-10-27 FND-006 |
+| FND-008 CLI skeleton and error/exit contracts | VERIFIED | SESSION_LOG 2026-10-27 FND-008 |
 
-**Next unblocked:** FND-008 (CLI skeleton), OPS-008 (git guard), then ING-001, SRC-001, DOC-002 (unaffected by the pending architecture proposal).
+**Next unblocked:** OPS-008 (git guard), then ING-001, SRC-001, DOC-002 (unaffected by the pending architecture proposal).

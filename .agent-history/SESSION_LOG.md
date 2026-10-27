@@ -216,3 +216,28 @@ Fix attempt 1 of 3: starting a job that had already failed after 3 attempts rais
 **Note:** an architecture-review proposal (pending owner decision) may merge the import, graph and identity classes. FND-006 is not affected. Until Louis decides, the next tickets are the ones the proposal doesn't touch: FND-008, OPS-008, ING-001, SRC-001, DOC-002.
 
 **Next exact task:** FND-008 — CLI skeleton (`ke`) with JSON/text output and exit codes.
+
+## 2026-10-27 · FND-008 — CLI skeleton and error/exit contracts
+
+**Dependencies:** FND-002, FND-006 (both VERIFIED). **Status:** VERIFIED.
+
+**Changed files:** `src/knowledge_engine/cli/__init__.py`, `cli/main.py` (new), `tests/unit/test_cli.py` (new), `pyproject.toml` (`[project.scripts] ke = "knowledge_engine.cli.main:run"`), `STATUS.md`, `docs/TICKETS.csv` (FND-008 → VERIFIED), diary (FND-006 entry time corrected from 21:47 to 21:42).
+
+**Design choices:**
+- Standard-library `argparse` (no new dependency; easy to read). The parser raises instead of exiting, so usage errors are reported in JSON mode too.
+- Commands: `ke status`, `ke db upgrade` (real: runs migrations, idempotent), `ke import <source> [--format ...]` (placeholder → exit 4, names ING-003). Global `--config`, `--json`, `--version`.
+- Output contract: `--json` prints exactly one line, a JSON object with sorted keys `schema_version, command, ok, exit_code, data, message, error`. Text mode goes to stdout on success and stderr on failure.
+- Exit codes (`ExitCode`, fixed): 0 OK, 1 ERROR, 2 USAGE, 3 CONFIG, 4 NOT_IMPLEMENTED, 5 BLOCKED.
+- Privacy: `status` shows raw roots by account label only (never paths), egress switches that are on, and whether a key is configured (never the key). Config errors list field names and reasons, not input values. `status` doesn't create the workspace.
+
+**Commands run:**
+```
+ruff check .            # All checks passed! (after ruff --fix sorted two local imports)
+ruff format --check .   # 36 files already formatted
+mypy                    # Success: no issues found in 29 source files (fix attempt 1: typed the status data dict)
+pytest -q               # 221 passed (19 new for FND-008)
+ke --help / ke --json status / ke import x / ke frob   # exit 0 / 0 / 4 / 2
+```
+The tests include running the installed `ke` console script in a subprocess.
+
+**Next exact task:** OPS-008 — raw/private Git guard and fixture marker check.
