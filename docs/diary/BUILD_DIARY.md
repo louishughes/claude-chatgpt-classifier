@@ -503,7 +503,7 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "An AI can write eight thousand lines in an hour. My rule: if I can't explain a module in three sentences, it doesn't merge."
 - "Small PRs aren't about tidiness. They're the only way the reviewer actually reviews."
 
-### 23:20 — Windows check, the real file shapes, and PR #3's teach-back (REV-007)
+### 23:15 — Windows check, the real file shapes, and PR #3's teach-back (REV-007)
 **What:** A read-only check on Louis's PC ran the whole test suite on Windows (230 of 231 passed) and listed the key *names* in his real split files (no values, no titles). Both findings are fixed on PR #3.
 **Challenges:**
 - The one Windows failure: rebuilding the test ZIP gave different bytes. Everything inside was identical except one header field that records which operating system built the ZIP (0 for Windows, 3 for Unix). The builder now pins it to 3, so the fixture is byte-identical everywhere.
