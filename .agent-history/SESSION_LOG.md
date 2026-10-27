@@ -441,3 +441,26 @@ pytest -q               # 431 passed, 6 skipped (11 new for A2)
 Finish line: `split_wrapper` natives equal `export_single` natives (children removed); the derived file and the one wrong count are warnings, not records. Fix attempts: 0.
 
 **Next exact task:** slice I1 (ING-001 archive store + IMP-001 import batch and snapshot ledger) in `importer/`.
+
+## 2026-10-27 · ING-001 + IMP-001 — Archive store and import ledger (slice I1)
+
+**Dependencies:** FND-003, FND-004, FND-005, FND-006 (VERIFIED). **Status:** both VERIFIED. **Branch:** `claude/project-thread-q0du34-import-i1`. Replaces the earlier stand-alone ING-001 branch (`…-ing-001`, never merged): the store moved to `importer/archive.py` per M1_CONSOLIDATION and gained `put_bytes` for ZIP members.
+
+**Changed files:** `src/knowledge_engine/importer/__init__.py`, `importer/archive.py` (new), `importer/ledger.py` (new: `ImportBatchRow`, `SourceSnapshotRow`, `ImportBatchFileRow`, `ImportLedger`, `root_fingerprint`, `stored_blob`), `infrastructure/migrations/versions/0003_import_ledger.py` (new), `migrations/env.py` (imports the ledger models), `tests/unit/test_archive_store.py`, `tests/unit/test_import_ledger.py` (new), `STATUS.md`, diary.
+
+**Design choices:**
+- Archive: content-addressed, read-only blobs, never overwritten, corrupt copies reported not repaired; copy mode for conversation JSON, reference mode for media (OD-02).
+- Ledger: one `import_batches` row per attempt (status CHECK, transitions via `check_transition`), `source_snapshots` keyed by `snapshot_id(sha256)` with unique sha256, `import_batch_files` linking batch + relative path → snapshot. A reused snapshot's stored copy is re-verified; a damaged copy raises and the transaction rolls back.
+- Raw root stored only as a SHA-256 fingerprint of its resolved path. Relative file paths live only in the private workspace DB.
+- Crash handling per consolidation §5: `start()` first marks stale `running` batches `abandoned`. No separate lock table; the write transaction (BEGIN IMMEDIATE) is the lock.
+
+**Commands run:**
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 56 source files
+pytest -q               # 462 passed, 6 skipped (21 archive + 7 ledger tests)
+python -m knowledge_engine.devtools.git_guard   # OK
+```
+Mutation check: deleting a column from 0003 makes the existing drift test fail. Fix attempts: 0.
+
+**Next exact task:** slice I2 (`import_source`, logical keys, idempotent re-import test).

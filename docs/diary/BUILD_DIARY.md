@@ -604,3 +604,15 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "When a summary and the source disagree, report it and trust the source."
 - "Two formats, one result: the test proves both adapters produce identical conversations."
+
+### 23:33 — ING-001 and IMP-001: an archive and a ledger
+**What:** Two building blocks inside the new Import module. The archive keeps an exact copy of every imported file, named by its fingerprint. The ledger records every import attempt and every file it read. 28 tests, 462 in total.
+**Key decisions and why:**
+- **Same bytes, one copy.** Importing the same export twice gives two ledger rows (two attempts happened) but one stored copy of each file.
+- **Stored copies are re-checked.** When a file comes back, the old copy is checked too. If someone damaged it, the import stops and nothing is "repaired".
+- **A crash is never a success.** An import that died halfway stays marked "running" until the next import marks it "abandoned".
+- **No private paths.** The ledger stores a fingerprint of the raw folder's location, not the path.
+**Teach-back (`importer/ledger.py`):** "Every import is one row in a ledger that's never rewritten, saying when it ran, with which code, and how it ended. Every file it read is stored once, under its fingerprint, and a file seen again reuses that copy after checking it's still intact. If an import crashed, the next one marks it abandoned, so it can never be mistaken for a successful import."
+**Talking points:**
+- "My import history is append-only: attempts are never overwritten, only added."
+- "A crash leaves an honest 'abandoned' record, not a fake success."
