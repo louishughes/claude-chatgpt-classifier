@@ -9,6 +9,10 @@ private/
 workspace/
 
 # Python build and tool caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
 *.egg-info/
 build/
 dist/
