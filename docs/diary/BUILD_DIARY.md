@@ -525,3 +525,14 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "Test on the machine you ship to. One header byte broke a 'byte-identical' test on Windows."
 - "I checked my fake data against the real files' structure, names only, before building on it."
+
+### 23:16 — SRC-001: look before you import
+**What:** `ke raw inventory <folder or zip>` lists every file in a raw folder by metadata: size, fingerprint and what kind of file it is. It never opens anything for writing, and proves it: it fingerprints the whole folder before and after, and if anything changed the report says "don't trust me". 33 new tests, 264 in total. This is the first ticket built to the new, simpler module plan (Louis's overnight decision 1).
+**Key decisions and why:**
+- **A chat is anything with a message tree.** Leftover files from the old classifier mention conversations but have no tree, so they're set aside, never imported by mistake.
+- **File names are hidden by default.** In this export the file names *are* the chat titles. The report shows a short code per file instead.
+- **Images are recognised by their first bytes, not their extension,** so a renamed file is still found.
+**Teach-back (`ingestion/inventory.py`):** "Before importing, I list every file in the raw folder with its size, fingerprint and type, reading it but never writing. I fingerprint the whole folder before and after, so if anything changed during the run the report flags itself as untrustworthy. File names are replaced by short codes, because in a chat export the names are private chat titles."
+**Talking points:**
+- "My importer proves it's read-only: same folder fingerprint before and after, or the report refuses to be trusted."
+- "Recognise files by what's inside them, not by what they're called."
