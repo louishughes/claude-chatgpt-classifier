@@ -339,6 +339,19 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "Make the expensive path opt-in and the free path the default."
 - "Fail loudly and early: the lock trips before any client exists that could spend money."
 
+### 22:35 — How the AI step works without paying for an API (ADR-0009)
+**What:** At 21:38 Louis decided no more paid API calls: the AI work has to happen locally or with Claude on his Claude subscription. The plans still assumed a paid API (structured output, cost caps, scripted batch runs), so this entry turns his rule into a design. It's written up as ADR-0009 (`docs/adr/0009-model-step-without-paid-api.md`), ticket REV-002 (#136).
+**The design, in one line:** batch file in, batch file out. The app writes a request file of chat sections plus a JSON Schema into the private folder on Louis's PC. A Claude Code session fills a response file. The app checks every answer with the same code it would use for an API answer, and throws away anything that doesn't fit. The session is just another "provider", so swapping the API back in later changes one setting, not the pipeline.
+**Challenges:**
+- **Time, not money, is the real cost.** The spike's numbers say a full pass over all 1,158 chats is roughly 20 million tokens. Through the API that's a few dollars and an hour. Through subscription sessions it's hundreds of small batch files and probably days of sessions. So M3 works on samples (10, then 50, then 100 chats), and the first 50-chat run measures the real throughput before anyone plans a full pass.
+- **You can't pin the model on a subscription.** For stability tests the model has to stay the same between runs. Each answer now records which model served it, and a stability report says so up front if two runs used different models.
+- **Who marks the homework.** The session that labels chats is never allowed to read or edit the answer key. Scoring is done by code, not by a Claude session.
+**Decision:** taken under the authority Louis delegated for the night (22:10), so it's marked "proposed, revisitable". The paid option is written down as a fallback with its cost (about $0.80 a pass for labels, about $3 for discovery) and clear triggers for bringing it back to him. No code was written; the ticket issues for the provider (#52, #53) and the batch smoke test (#82) got one comment each saying what changes.
+**Talking points:**
+- "I made the AI a file format. The app doesn't care whether an API or a person running Claude filled in the answers. It checks them the same way."
+- "Saving $3 cost me days of throughput. I wrote that trade-off down, with the numbers, so the choice can be revisited."
+- "The labeller never sees the answer key. Code does the marking."
+
 ### 23:12 — Designing fewer, deeper import modules (REV-004)
 **What:** Wrote `docs/plans/M1_CONSOLIDATION.md`, the design note that turns the architecture review's advice into a concrete shape for the first milestone. Design only: no code or tests changed. Instead of about fifteen small classes that the caller has to call in the right order, M1 becomes four modules: a pure *conversation graph* (active path, message numbers, branches and broken-tree checks, worked out in one place), one *Import* module whose whole interface is `import_source(path, account_ns) -> ImportReport`, a narrow adapter seam where the two export formats really differ (finding the conversations), and rendering as planned.
 **Why:** the most important promise of the slice, "importing the same export again adds nothing and costs nothing", had no single owner. Now it does: one named test, `test_identical_reimport_adds_nothing`, calls one function twice and checks that every table has the same row count.
