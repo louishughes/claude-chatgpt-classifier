@@ -593,3 +593,14 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "Formats differ in one way, so the seam between them is one method wide."
 - "Python's JSON parser silently drops duplicate keys. Mine reports them."
+
+### 23:30 — ING-011: reading Louis's split files
+**What:** The second adapter, for the format Louis's real data is in: one JSON file per chat, each a small "wrapper" around the original conversation. 11 new tests, 431 in total.
+**Key decisions and why:**
+- **The wrapper is a hint, the conversation is the evidence.** The wrapper's title, ID and message counts are compared with the conversation inside; disagreements become warnings, and the conversation inside wins.
+- **Same chats, same result.** The test that matters: the three fake chats in split files come out identical to the same chats in the official format.
+- **No mixing versions.** Each file is fingerprinted when listed and checked again when read. If it changed in between, the import stops.
+**Teach-back (`ingestion/chatgpt_split.py`):** "Louis's data has one file per chat, where a small wrapper with a title and counts surrounds the original conversation. I import the original conversation and only use the wrapper as a cross-check, reporting any disagreement as a warning. Files that aren't chats, like an old tool's output, are skipped with a warning, and a file that changes mid-import stops the import."
+**Talking points:**
+- "When a summary and the source disagree, report it and trust the source."
+- "Two formats, one result: the test proves both adapters produce identical conversations."
