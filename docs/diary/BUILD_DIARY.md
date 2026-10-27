@@ -632,3 +632,15 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "One test owns the promise 'importing twice adds nothing', and it counts every table, including ones that don't exist yet."
 - "Crash recovery is just running it again, because the import is idempotent."
+
+### 23:40 — IMP-003: what changed between two exports
+**What:** Importing a newer export now reports exactly what changed: new chats, untouched chats, chats with new or edited messages, new branches (a regenerated answer), and chats that weren't in this export. 7 new tests, 477 in total. The fake v1 → v2 exports match their hand-written answer key exactly.
+**Key decisions and why:**
+- **Missing isn't deleted.** A chat absent from a new export is marked "not seen". All its messages stay. If it shows up again later, it's "present" again.
+- **Edits keep history.** An edited message gets a new revision; the old one is kept.
+- **Metadata drift costs nothing.** If only the model name or similar changed, the import records a new "raw observation" of the same message, but nothing is handed to the AI stages.
+- **Full or partial source.** Importing a single shared chat shouldn't mark the rest of the archive "not seen", so the import has a `full_export` switch (on by default).
+**Teach-back (`importer/delta.py`):** "When a new export arrives, each message is compared by its content fingerprint: new, unchanged, or revised, and a revision never replaces the old one. A chat missing from a full export is marked 'not seen', never deleted, and comes back if a later export has it. If only metadata changed, I record that I saw it in a new form, but nothing is reprocessed."
+**Talking points:**
+- "Absence of evidence isn't deletion: missing chats are 'not seen', not gone."
+- "Only real content changes flow downstream to the AI step."

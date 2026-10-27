@@ -38,6 +38,8 @@ class ImportReport:
         raw_tree_hash_before: Raw tree signature before reading.
         raw_tree_hash_after: Raw tree signature after reading.
         model_calls_triggered: Always 0 in M1: importing never calls a model.
+        new_branches: Forks that appeared in this import.
+        raw_observations: New raw forms of messages (e.g. metadata drift).
     """
 
     import_id: str
@@ -51,6 +53,8 @@ class ImportReport:
     raw_tree_hash_before: str
     raw_tree_hash_after: str
     model_calls_triggered: int = 0
+    new_branches: int = 0
+    raw_observations: int = 0
     extra: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -66,4 +70,6 @@ class ImportReport:
             "changed_revisions": len(self.changed_revisions),
             "raw_tree_unchanged": self.raw_tree_hash_before == self.raw_tree_hash_after,
             "model_calls_triggered": self.model_calls_triggered,
+            "new_branches": self.new_branches,
+            "raw_observations": self.raw_observations,
         }

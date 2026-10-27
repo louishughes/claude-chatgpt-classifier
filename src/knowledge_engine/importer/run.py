@@ -32,7 +32,11 @@ from knowledge_engine.domain.enums import DeltaCategory, ImportBatchStatus
 from knowledge_engine.graph.conversation import BRANCH_CLASSIFIER_VERSION
 from knowledge_engine.graph.nodes import CANONICAL_HASH_VERSION
 from knowledge_engine.importer.archive import BlobStore
-from knowledge_engine.importer.delta import MissingNativeIdError, apply_conversation
+from knowledge_engine.importer.delta import (
+    MissingNativeIdError,
+    apply_conversation,
+    mark_not_seen,
+)
 from knowledge_engine.importer.ledger import ImportBatchRow, ImportLedger
 from knowledge_engine.importer.report import ImportReport
 from knowledge_engine.infrastructure.db import SessionFactory, create_sqlite_engine, database_path
@@ -47,7 +51,12 @@ DEFAULT_WORKSPACE_NAME = "default"
 
 
 def run_import(
-    path: Path, account_ns: str, *, format_id: str | None, settings: Settings
+    path: Path,
+    account_ns: str,
+    *,
+    format_id: str | None,
+    settings: Settings,
+    full_export: bool = True,
 ) -> ImportReport:
     """Import one source and return its report. See ``importer.import_source``."""
     before = tree_signature(path)
@@ -62,7 +71,7 @@ def run_import(
         archive = BlobStore(
             settings.workspace_root / "archive", max_bytes=settings.limits.max_source_file_bytes
         )
-        return _run(path, account_ns, listing, before, factory, archive, settings)
+        return _run(path, account_ns, listing, before, factory, archive, settings, full_export)
     finally:
         engine.dispose()
 
@@ -75,6 +84,7 @@ def _run(
     factory: SessionFactory,
     archive: BlobStore,
     settings: Settings,
+    full_export: bool,
 ) -> ImportReport:
     versions = {
         "code": __version__,
@@ -112,6 +122,8 @@ def _run(
     messages: Counter[str] = Counter()
     warnings: Counter[str] = Counter(w.code for w in listing.warnings)
     changed: list[str] = []
+    new_branches = 0
+    raw_observations = 0
     group_size = settings.limits.max_conversations_per_batch
     stream = listing.conversations()
     for group in _groups(stream, group_size):
@@ -140,8 +152,22 @@ def _run(
                 messages.update(delta.messages)
                 warnings.update(delta.warnings)
                 changed.extend(delta.changed_revisions)
+                new_branches += delta.new_branches
+                raw_observations += delta.raw_observations
 
     after = tree_signature(path)
+    if after == before and full_export:
+        with factory.transaction() as session:
+            gone, gone_messages = mark_not_seen(
+                session,
+                workspace_id=workspace_id,
+                account_namespace=account_ns,
+                import_id=import_id,
+            )
+        if gone:
+            conversations[DeltaCategory.NOT_SEEN.value] += gone
+        if gone_messages:
+            messages[DeltaCategory.NOT_SEEN.value] += gone_messages
     if after != before:
         status = ImportBatchStatus.FAILED
         warnings["raw_tree_changed"] += 1
@@ -158,6 +184,8 @@ def _run(
         files=dict(files),
         warnings=dict(warnings),
         changed_revisions=tuple(sorted(changed)),
+        new_branches=new_branches,
+        raw_observations=raw_observations,
         raw_tree_hash_before=before,
         raw_tree_hash_after=after,
     )

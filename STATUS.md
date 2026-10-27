@@ -30,8 +30,9 @@ Live ticket status for the build. The full ticket list is `docs/TICKETS.csv` (ke
 | ING-003 ImportCoordinator → import_source | VERIFIED (slice I2; `ke import` CLI wiring waits for Louis, see below) | SESSION_LOG 2026-10-27 ING-003 |
 | IMP-002 Logical identity resolver | IN_PROGRESS (keys done in I2; candidate matches in I4) | SESSION_LOG 2026-10-27 IMP-002 |
 | IMP-004 Transactional idempotent commit, resume and import locking | IN_PROGRESS (repeat + crash rerun in I2; concurrency in I5) | SESSION_LOG 2026-10-27 IMP-004 |
+| IMP-003 Message revision and graph delta engine | VERIFIED (slice I3) | SESSION_LOG 2026-10-27 IMP-003 |
 
-**Next unblocked:** slice I3 (IMP-003 delta categories), then I4 (IMP-002 candidates). Order and module layout follow docs/plans/M1_CONSOLIDATION.md (adopted).
+**Next unblocked:** slice I4 (IMP-002 candidates), I5 (IMP-004 concurrency), then media M1–M2. Order and module layout follow docs/plans/M1_CONSOLIDATION.md (adopted).
 
 **Needs Louis (logged, skipped, not waited on):**
 - Wiring `ke import` to `import_source` means retiring `tests/unit/test_cli.py::test_import_is_an_honest_placeholder`, which asserts the placeholder. Changing an existing test needs your OK (guardrail). Until then, imports run through `import_source(...)` in Python.
