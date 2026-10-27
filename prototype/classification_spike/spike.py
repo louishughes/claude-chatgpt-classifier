@@ -46,7 +46,7 @@ from loader import clip_text, sample_conversations
 from providers import PRICES, AnthropicProvider, FakeProvider, FatalError
 from report import category_spread, consistency, run_stats, to_markdown
 from runner import CostMeter, load_records, run_once
-from schema import SYSTEM_PROMPT, TAXONOMY_VERSION
+from schema import DECISIONS_PROMPT, SYSTEM_PROMPT, TAXONOMY_VERSION
 
 # Rough output size per call, including the model's thinking. Only used for
 # the dry-run estimate; the real run uses the API's exact token counts.
@@ -93,6 +93,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--provider", choices=["anthropic", "fake"], default="anthropic")
     p.add_argument("--model", default="claude-haiku-5-5", choices=[m for m in PRICES if m != "fake"])
     p.add_argument("--effort", choices=["low", "medium", "high"], default="low")
+    p.add_argument("--decisions-model", choices=[m for m in PRICES if m != "fake"],
+                   help="model for the separate decisions step (default: same as --model)")
+    p.add_argument("--decisions-effort", choices=["low", "medium", "high"], default="medium",
+                   help="decisions need more care than labels, so default one level higher")
     p.add_argument("--max-cost-usd", type=float, default=2.0)
     p.add_argument("--budget-chars", type=int, default=24000, help="max characters sent per chat")
     p.add_argument("--max-tokens", type=int, default=8000)
@@ -103,6 +107,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="pick N varied sampled chats, write a labelling sheet, then stop")
     p.add_argument("--gold", type=Path, help="filled-in gold CSV: adds accuracy to the report")
     p.add_argument("--review", type=Path, help="review.csv with your y/n verdicts: adds accuracy to the report")
+    p.add_argument("--reviewer", default="owner", help="who made the verdicts in --review (shown in the report)")
     p.add_argument("--review-size", type=int, default=20, help="chats in the review sheet")
     p.add_argument("--dry-run", action="store_true", help="estimate cost, make no calls")
     return p.parse_args(argv)
@@ -133,15 +138,24 @@ def main(argv: list[str] | None = None) -> int:
         gold = {**reference, **gold}  # blind gold labels win where both exist
 
     model = "fake" if args.provider == "fake" else args.model
+    d_model = "fake" if args.provider == "fake" else (args.decisions_model or args.model)
     sent_chars = sum(len(clip_text(c.full_text(), args.budget_chars)[0]) for c in convs)
-    # ~4 characters per token, plus ~30% because newer Claude tokenizers
-    # count the same text as more tokens. Deliberately pessimistic.
-    est_in = int((sent_chars + len(SYSTEM_PROMPT) * len(convs)) / 4 * 1.3)
-    est_out = EST_OUTPUT_TOKENS * len(convs)
-    price_in, price_out = PRICES[model]
-    est_cost = (est_in * price_in + est_out * price_out) / 1_000_000
-    print(f"Estimate per run: ~{est_in:,} input + ~{est_out:,} output tokens = ~${est_cost:.2f} "
-          f"({model}); x{args.runs} runs = ~${est_cost * args.runs:.2f}. Cap: ${args.max_cost_usd:.2f}")
+
+    def estimate(prompt: str, price_model: str) -> tuple[int, int, float]:
+        # ~4 characters per token, plus ~30% because newer Claude tokenizers
+        # count the same text as more tokens. Deliberately pessimistic.
+        tin = int((sent_chars + len(prompt) * len(convs)) / 4 * 1.3)
+        tout = EST_OUTPUT_TOKENS * len(convs)
+        pin, pout = PRICES[price_model]
+        return tin, tout, (tin * pin + tout * pout) / 1_000_000
+
+    # Two calls per chat: labels, then decisions (possibly a different model).
+    li, lo, lc = estimate(SYSTEM_PROMPT, model)
+    di, do, dc = estimate(DECISIONS_PROMPT, d_model)
+    est_cost = lc + dc
+    print(f"Estimate per run: labels ~{li:,} in + ~{lo:,} out ({model}) ${lc:.2f}; "
+          f"decisions ~{di:,} in + ~{do:,} out ({d_model}) ${dc:.2f}; "
+          f"total ~${est_cost:.2f} x{args.runs} runs = ~${est_cost * args.runs:.2f}. Cap: ${args.max_cost_usd:.2f}")
     if args.dry_run:
         return 0
 
@@ -150,12 +164,15 @@ def main(argv: list[str] | None = None) -> int:
         {"seed": args.seed, "size": len(convs), "files": [c.source_file for c in convs]}, indent=1))
 
     if args.provider == "fake":
-        provider = FakeProvider()
+        provider = decisions_provider = FakeProvider()
     else:
         # Haiku 5.5 has no server-side refusal fallback; asking for one is an error.
         fallback = not args.no_refusal_fallback and not args.model.startswith("claude-haiku")
         provider = AnthropicProvider(args.model, args.effort, args.timeout_s, args.max_tokens,
                                      refusal_fallback=fallback)
+        decisions_provider = AnthropicProvider(
+            d_model, args.decisions_effort, args.timeout_s, args.max_tokens,
+            refusal_fallback=not args.no_refusal_fallback and not d_model.startswith("claude-haiku"))
 
     # Spend already recorded in this folder counts towards the cap, so
     # resuming can't quietly double the budget.
@@ -168,7 +185,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Run {i}/{args.runs}")
             runs.append(run_once(convs, provider, out / f"run-{i}.jsonl", meter,
                                  args.budget_chars, workers=args.workers,
-                                 order_seed=args.seed + i))
+                                 order_seed=args.seed + i, decisions_provider=decisions_provider))
     except FatalError as exc:
         print(f"Stopped: {exc}", file=sys.stderr)
         return 3
@@ -177,12 +194,15 @@ def main(argv: list[str] | None = None) -> int:
     cons = consistency(runs)
     meta = {
         "date_utc": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
-        "model": model, "effort": args.effort, "taxonomy": TAXONOMY_VERSION,
+        "model": model, "effort": args.effort,
+        "decisions_model": d_model,
+        "decisions_effort": args.decisions_effort, "taxonomy": TAXONOMY_VERSION,
         "sample": len(convs), "seed": args.seed, "runs": args.runs, "workers": args.workers,
         "budget_chars": args.budget_chars, "timeout_s": args.timeout_s,
         "total_cost_usd": round(meter.spent, 4),
         # Fingerprint of the answer key, so any later edit to it is visible.
         "gold_file_sha256": fingerprint(args.gold.expanduser()) if args.gold else "none",
+        "reviewer": args.reviewer if args.review else "none",
         "review_file_sha256": fingerprint(args.review.expanduser()) if args.review else "none",
         "reference_labels": len(gold),
     }

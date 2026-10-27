@@ -25,7 +25,7 @@ The earlier attempts failed on three things: inconsistent labels, untyped output
 | `review.py` | Evaluator mode: review sheet of the model's answers, your y/n verdicts, reference labels |
 | `gold.py` | Gold set: picks varied chats, writes the labelling sheet and instructions, scores accuracy, fingerprints the file |
 | `spike.py` | Command line |
-| `tests/` | 43 tests on synthetic data, including 50- and 100-chat batches with injected failures |
+| `tests/` | 47 tests on synthetic data, including 50- and 100-chat batches with injected failures |
 
 ## Order of play (agreed 2026-10-27)
 1. Schema with separate fields (done) → 2. run 50 chats twice → 3. **you evaluate** ~20 of the model's answers (y/n), giving accuracy alongside agreement → 4. go/no-go: if targets are met, run 100, then start M1; if not, change the method (inputs, fields, segmenting), not the prompt wording.
@@ -47,9 +47,15 @@ python spike.py --sample 50 --runs 2 --review ../../private/spike-out/review.csv
 python spike.py --sample 100 --runs 2 --out ../../private/spike-out-100 --review ../../private/spike-out/review.csv
 ```
 Everything stays inside the project folder: input defaults to `raw/`, output to `private/spike-out/`. Both are listed in `.gitignore`, and the script asks Git (`git check-ignore`) before writing, refusing any folder inside the repo that Git would commit.
-Defaults: model `claude-haiku-5-5` (Anthropic's cheapest current model, $0.10 / $0.50 per million input/output tokens), effort `low`, cost cap $2, 4 workers, 90 s timeout, 24,000 characters per chat. If Haiku misses the targets, compare `--model claude-sonnet-5-5` on the same sample and gold set before changing anything else. Server-side refusal fallback is used on Sonnet/Opus only (Haiku 5.5 doesn't support it); `--no-refusal-fallback` turns it off.
+Decisions run as a second call per chat (`--decisions-model`, `--decisions-effort`, default the same model at effort `medium`). Defaults: model `claude-haiku-5-5` (Anthropic's cheapest current model, $0.10 / $0.50 per million input/output tokens), effort `low`, cost cap $2, 4 workers, 90 s timeout, 24,000 characters per chat. If Haiku misses the targets, compare `--model claude-sonnet-5-5` on the same sample and gold set before changing anything else. Server-side refusal fallback is used on Sonnet/Opus only (Haiku 5.5 doesn't support it); `--no-refusal-fallback` turns it off.
 
 **Privacy:** the selected chat text is sent to the Anthropic API. Outputs contain summaries of your chats, so they go to `private/`, which Git ignores (the script refuses any output folder Git would commit). `report.md` has counts only.
+
+## Run log
+| Version | Date | What changed | Result (50 chats × 2, Haiku 5.5) |
+|---|---|---|---|
+| spike-0.2 | 2026-10-27 | First real run | $0.069; 0 timeouts; 84–86% ok (14 of 15 failures = more than 5 topics); domain agree 87.5%, purpose 90%; checked on 20 chats: domain 95%, purpose 85%, **decisions 7/13 right** |
+| spike-0.3 | 2026-10-27 | Topics/summary over the limit are trimmed, not rejected; decisions moved to a separate call (effort `medium`) that must cite message numbers, which code checks (an "accepted" decision must point at a message *you* wrote) | pending |
 
 ## What "good enough" looks like (proposed, to agree before running)
 | Metric | Target |

@@ -201,3 +201,20 @@ These are now in `AGENTS.md`, `CLAUDE.md` and the plan. The spike's gold set got
 **Talking points:**
 - "Design the evaluation around how the human actually wants to work."
 - "Reviewing is faster than labelling but biased. Say so, and raise the bar to compensate."
+
+### 20:35 — First real run: reliable and mostly right, but decisions are weak
+**What:** 50 real chats, labelled twice by Claude Haiku 5.5, for **$0.069**. Then Claude checked 20 of the answers against the actual chats, and Louis spot-checks Claude's borderline calls.
+- **Reliability:** zero timeouts or connection errors (the old OpenRouter setup's main pain), about 3.5 s per chat.
+- **Format:** over half the answers broke a rule on the first try. 84–86% ended up OK. 14 of the 15 failures had the same cause: more than 5 topics.
+- **Consistency:** the two runs, in different orders, agreed on the main subject 87.5% of the time and on purpose 90%. Topics agreed least (0.49 overlap).
+- **Accuracy (Claude's check):** subject area 95%, purpose 85%, but **decisions only 7 of 13 right**. It missed decisions, credited Louis's own ideas to the assistant, and marked things "accepted" that he never agreed to.
+
+**Response (spike-0.3), a change of method rather than prompt tweaking:**
+1. Too many topics or an over-long summary is trimmed by code instead of being rejected and retried. It was never a wrong answer, just a long one.
+2. Decisions moved into their own call with a focused prompt and more thinking effort. The chat is now numbered message by message, and each decision must say which message proposed it and which *user* message accepted or rejected it. Plain code then checks those numbers. "Accepted" pointing at an assistant message is now caught automatically, and that was exactly the run-1 mistake.
+
+Tests went from 43 to 47. Three existing tests had their expected call counts changed (one call per chat became two), and two rejection cases became "trimmed" cases. These are listed for Louis to approve under the "tests only change with owner OK" guardrail.
+**Talking points:**
+- "Seven cents to find out exactly where the AI is weak. That's the point of a spike."
+- "Don't reject an answer for being too long. Trim it in code and save the retry for real errors."
+- "Make the model cite message numbers, then check them with plain code. Trust, but verify."

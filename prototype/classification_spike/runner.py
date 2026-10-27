@@ -2,7 +2,13 @@
 
 How one conversation is handled
 -------------------------------
-1. Ask the provider for a label.
+Two calls per chat: one fills in the labels (domain, purpose, ...), a second,
+separate one finds the decisions. Run 1 showed decisions were the weak spot
+(7 of 13 right) while labels were fine, so decisions get their own focused
+prompt, can use a different model or effort, and are checked by code.
+
+For each call:
+1. Ask the provider.
 2. Timeout / rate limit / server error -> wait (exponential backoff) and try
    again, at most ``max_attempts`` calls in total.
 3. Answer broke the schema -> one repair attempt that tells the model what
@@ -36,8 +42,11 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from loader import Conversation, clip_text
-from providers import FatalError, Provider, RefusalError, SchemaError, TransientError, cost_usd
-from schema import SYSTEM_PROMPT, TAXONOMY_VERSION
+import pydantic
+
+from providers import (FatalError, Provider, RefusalError, SchemaError, TransientError, build_user_message,
+                       cost_usd)
+from schema import DECISIONS_PROMPT, SYSTEM_PROMPT, TAXONOMY_VERSION, ConversationLabel, DecisionList
 
 # A conversation counts as finished if it has one of these. "failed" is not
 # here, so resuming a run retries the ones that failed last time.
@@ -73,6 +82,7 @@ class Record:
     calls: int = 0
     transient_errors: dict[str, int] = field(default_factory=dict)
     schema_failures: int = 0
+    schema_errors: list[str] = field(default_factory=list)  # validator messages (no chat text)
     repaired: bool = False
     input_tokens: int = 0
     output_tokens: int = 0
@@ -82,10 +92,12 @@ class Record:
     clipped: bool = False
     turns: int = 0
     branch_points: int = 0
+    decisions_status: str = ""           # ok | review_required | refusal | failed | skipped_cost_cap
+    decisions_model: str = ""
     decisions_total: int = 0
-    decisions_quote_found: int = 0       # quote appears in a message by the stated speaker
-    decisions_user_accepted: int = 0
-    decisions_assistant_accepted_unquoted: int = 0  # "accepted" with only assistant evidence
+    decisions_quote_found: int = 0       # quote found in the message it points at
+    decisions_refs_ok: int = 0           # message numbers exist and match the speakers
+    decisions_decided_by_assistant: int = 0  # accepted/rejected but decided_in isn't a user message
     position: int = 0                    # order this chat was processed in (order-independence check)
     error: str = ""
 
@@ -94,32 +106,81 @@ def _normalise(s: str) -> str:
     return " ".join(s.split()).lower()
 
 
-def check_quotes(record: Record, conv: Conversation) -> None:
-    """Does each decision's evidence quote really appear, said by the right speaker?
+def check_decisions(record: Record, conv: Conversation) -> None:
+    """Check every decision against the chat with plain code.
 
-    This catches the model inventing evidence or putting the assistant's words
-    in the user's mouth, the two failures that most damage a knowledge base.
+    - ``proposed_in`` must exist and be written by ``proposed_by``.
+    - accepted / rejected / superseded must have a ``decided_in`` that the
+      *user* wrote, at or after the proposal. This is the rule run 1 broke.
+    - the evidence quote must appear in the message it points at.
     We check against the full chat, not the clipped text sent to the model.
     """
     if not record.label:
         return
-    by_speaker = {
-        role: _normalise("\n".join(t.text for t in conv.turns if t.role == role))
-        for role in ("user", "assistant")
-    }
+    turns = conv.turns
+
+    def turn(n) -> object | None:
+        return turns[n - 1] if isinstance(n, int) and 1 <= n <= len(turns) else None
+
     for d in record.label.get("decisions", []):
         record.decisions_total += 1
+        proposed = turn(d.get("proposed_in"))
+        decided = turn(d.get("decided_in"))
+        refs_ok = proposed is not None and proposed.role == d.get("proposed_by")
+        if d.get("state") in {"accepted", "rejected", "superseded"}:
+            if decided is None or decided.role != "user":
+                record.decisions_decided_by_assistant += 1
+                refs_ok = False
+            elif d["decided_in"] < d["proposed_in"]:
+                refs_ok = False
+        record.decisions_refs_ok += refs_ok
+        source = decided or proposed
         quote = _normalise(d.get("evidence_quote", ""))
-        if quote and quote in by_speaker.get(d.get("evidence_speaker"), ""):
+        if source is not None and quote and quote in _normalise(source.text):
             record.decisions_quote_found += 1
-        if d.get("state") == "accepted":
-            if d.get("evidence_speaker") == "user":
-                record.decisions_user_accepted += 1
-            else:
-                # Accepted, but the only evidence is the assistant talking.
-                # Not necessarily wrong ("Agreed, we'll do X" after the user
-                # chose X), but worth counting.
-                record.decisions_assistant_accepted_unquoted += 1
+
+
+def _call(rec: Record, provider: Provider, system: str, text: str, output_format,
+          meter: CostMeter, max_attempts: int, backoff_s: float, sleep) -> tuple[pydantic.BaseModel | None, str]:
+    """One structured call with bounded retries. Returns (answer or None, status)."""
+    repair_note: str | None = None
+    transient_calls = 0
+    while True:
+        if not meter.can_spend():
+            return None, "skipped_cost_cap"
+        rec.calls += 1
+        try:
+            result = provider.parse(system, build_user_message(text, repair_note), output_format)
+        except TransientError as exc:
+            rec.transient_errors[exc.kind] = rec.transient_errors.get(exc.kind, 0) + 1
+            transient_calls += 1
+            if transient_calls >= max_attempts:
+                rec.error = f"gave up after {transient_calls} {exc.kind} errors"
+                return None, "failed"
+            # Exponential backoff with jitter: 2s, 4s, ... plus up to 1s random,
+            # so parallel workers don't all retry at the same instant.
+            sleep(backoff_s * 2 ** (transient_calls - 1) + random.random())
+            continue
+        except SchemaError as exc:
+            rec.schema_failures += 1
+            rec.schema_errors.append(str(exc)[:300])
+            if repair_note is None:
+                repair_note = str(exc)[:500]
+                continue
+            rec.error = str(exc)[:500]
+            return None, "review_required"
+        except RefusalError as exc:
+            rec.error = str(exc)
+            return None, "refusal"
+        spent = cost_usd(provider.model, result.input_tokens, result.output_tokens)
+        meter.add(spent)
+        rec.input_tokens += result.input_tokens
+        rec.output_tokens += result.output_tokens
+        rec.cost_usd += spent
+        rec.repaired = rec.repaired or repair_note is not None
+        if output_format is ConversationLabel:
+            rec.served_model = result.served_model
+        return result.label, "ok"
 
 
 def label_one(
@@ -130,6 +191,7 @@ def label_one(
     max_attempts: int = 3,
     backoff_s: float = 2.0,
     sleep=time.sleep,
+    decisions_provider: Provider | None = None,
 ) -> Record:
     full_text = conv.full_text()
     text, clipped = clip_text(full_text, budget_chars)
@@ -143,50 +205,20 @@ def label_one(
         turns=len(conv.turns),
         branch_points=conv.branch_points,
     )
-    repair_note: str | None = None
-    transient_calls = 0
     started = time.monotonic()
-    while True:
-        if not meter.can_spend():
-            rec.status = "skipped_cost_cap"
-            break
-        rec.calls += 1
-        try:
-            result = provider.label(SYSTEM_PROMPT, text, repair_note)
-        except TransientError as exc:
-            rec.transient_errors[exc.kind] = rec.transient_errors.get(exc.kind, 0) + 1
-            transient_calls += 1
-            if transient_calls >= max_attempts:
-                rec.error = f"gave up after {transient_calls} {exc.kind} errors"
-                break
-            # Exponential backoff with jitter: 2s, 4s, ... plus up to 1s random,
-            # so parallel workers don't all retry at the same instant.
-            sleep(backoff_s * 2 ** (transient_calls - 1) + random.random())
-            continue
-        except SchemaError as exc:
-            rec.schema_failures += 1
-            if repair_note is None:
-                repair_note = str(exc)[:500]
-                continue
-            rec.status = "review_required"
-            rec.error = str(exc)[:500]
-            break
-        except RefusalError as exc:
-            rec.status = "refusal"
-            rec.error = str(exc)
-            break
-        # Success.
-        spent = cost_usd(provider.model, result.input_tokens, result.output_tokens)
-        meter.add(spent)
-        rec.input_tokens += result.input_tokens
-        rec.output_tokens += result.output_tokens
-        rec.cost_usd += spent
-        rec.served_model = result.served_model
-        rec.label = result.label.model_dump(mode="json")
-        rec.repaired = repair_note is not None
-        rec.status = "ok"
-        check_quotes(rec, conv)
-        break
+    label, rec.status = _call(rec, provider, SYSTEM_PROMPT, text, ConversationLabel,
+                              meter, max_attempts, backoff_s, sleep)
+    if label is not None:
+        rec.label = label.model_dump(mode="json")
+        dp = decisions_provider or provider
+        rec.decisions_model = dp.model
+        found, rec.decisions_status = _call(rec, dp, DECISIONS_PROMPT, text, DecisionList,
+                                            meter, max_attempts, backoff_s, sleep)
+        rec.label["decisions"] = found.model_dump(mode="json")["decisions"] if found else []
+        if found is None:
+            # Labels are fine but decisions are missing: needs a look, not a silent pass.
+            rec.status = "review_required" if rec.decisions_status != "skipped_cost_cap" else "skipped_cost_cap"
+        check_decisions(rec, conv)
     rec.latency_s = round(time.monotonic() - started, 3)
     return rec
 
@@ -213,6 +245,7 @@ def run_once(
     backoff_s: float = 2.0,
     progress=print,
     order_seed: int | None = None,
+    decisions_provider: Provider | None = None,
 ) -> dict[str, dict]:
     """Label every conversation not already finished in ``out_file``.
 
@@ -234,7 +267,8 @@ def run_once(
         if fatal:
             return
         try:
-            rec = label_one(conv, provider, meter, budget_chars, max_attempts, backoff_s)
+            rec = label_one(conv, provider, meter, budget_chars, max_attempts, backoff_s,
+                            decisions_provider=decisions_provider)
         except FatalError as exc:
             fatal.append(str(exc))
             return

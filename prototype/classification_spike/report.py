@@ -37,6 +37,23 @@ def _pct(n: int, d: int) -> float:
     return round(100 * n / d, 1) if d else 0.0
 
 
+def _counts(values) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for v in values:
+        out[v] = out.get(v, 0) + 1
+    return out
+
+
+def _error_kinds(rows: list[dict]) -> dict[str, int]:
+    """Count validation failures by the rule that failed (messages hold no chat text)."""
+    kinds: dict[str, int] = {}
+    for r in rows:
+        for msg in r.get("schema_errors", []):
+            key = msg.split(":", 1)[-1].strip()[:80] or "unknown"
+            kinds[key] = kinds.get(key, 0) + 1
+    return dict(sorted(kinds.items(), key=lambda kv: -kv[1]))
+
+
 def run_stats(records: dict[str, dict]) -> dict:
     rows = list(records.values())
     n = len(rows)
@@ -60,6 +77,7 @@ def run_stats(records: dict[str, dict]) -> dict:
         "status_counts": by_status,
         "ok_pct": _pct(len(ok), n),
         "first_try_schema_failures": sum(1 for r in rows if r["schema_failures"] > 0),
+        "schema_error_kinds": _error_kinds(rows),
         "repaired_ok": sum(1 for r in ok if r["repaired"]),
         "transient_errors": transient,
         "calls_total": sum(r["calls"] for r in rows),
@@ -70,10 +88,12 @@ def run_stats(records: dict[str, dict]) -> dict:
         "output_tokens": sum(r["output_tokens"] for r in rows),
         "cost_usd": round(sum(r["cost_usd"] for r in rows), 4),
         "served_models": sorted({r["served_model"] for r in ok}),
+        "decision_step_status": _counts(r.get("decisions_status") or "not_run" for r in rows),
         "decisions": dec_total,
-        "decision_quotes_found_right_speaker_pct": _pct(dec_found, dec_total),
+        "decision_quotes_found_pct": _pct(dec_found, dec_total),
+        "decision_message_refs_ok_pct": _pct(sum(r["decisions_refs_ok"] for r in rows), dec_total),
+        "decided_without_user_message": sum(r["decisions_decided_by_assistant"] for r in rows),
         "decisions_by_proposer_and_state": dict(sorted(states.items())),
-        "accepted_with_only_assistant_evidence": sum(r["decisions_assistant_accepted_unquoted"] for r in rows),
         "chats_with_project_candidates": sum(1 for r in ok if r["label"]["project_candidates"]),
         "mean_confidence": round(statistics.mean(r["label"]["confidence"] for r in ok), 3) if ok else None,
     }
@@ -144,7 +164,7 @@ def to_markdown(meta: dict, stats: list[dict], cons: list[dict], spread: dict[st
         lines += ["| " + " | ".join(str(c.get(k, "")) for k in keys) + " |" for c in cons]
     else:
         lines.append("Only one run, so nothing to compare.")
-    lines += ["", "## Your verdicts on run 1 (review sheet)", ""]
+    lines += ["", f"## Reviewer verdicts on run 1 (reviewer: {meta.get('reviewer', 'none')})", ""]
     if review:
         lines += [f"- **{k}:** {v}" for k, v in review.items()]
     else:

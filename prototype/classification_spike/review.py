@@ -51,7 +51,8 @@ first message and the model's summary, then fill in:
   purpose_ok    y or n. Mark n if you were mainly trying to do something else.
   decisions_ok  y, n, or na if there are none. Mark n if any listed decision is
                 wrong: something you never agreed to marked "accepted", a
-                rejected idea marked "accepted", or it's the wrong speaker.
+                rejected idea marked "accepted", it's the wrong speaker, or an
+                important decision (including dropping or changing course) is missing.
   right_domain / right_purpose   optional: when you marked n, the right key
                 from the lists below. These become reference answers.
   notes         anything else.

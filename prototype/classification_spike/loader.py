@@ -69,7 +69,13 @@ class Conversation:
         return ""
 
     def full_text(self) -> str:
-        return "\n\n".join(f"[{t.role}]: {t.text}" for t in self.turns)
+        """The chat as numbered messages: ``[#1 user]: ...``.
+
+        Numbers start at 1 and count only the kept user/assistant messages, so
+        the decisions step can point at a message and code can look it up in
+        ``turns[n - 1]``.
+        """
+        return "\n\n".join(f"[#{i} {t.role}]: {t.text}" for i, t in enumerate(self.turns, start=1))
 
 
 def native_object(data: object) -> dict | None:

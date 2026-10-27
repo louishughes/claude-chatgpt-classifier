@@ -163,6 +163,9 @@ def gold_stats(records: dict[str, dict], gold: dict[str, dict]) -> dict:
     # primary or secondary domains: useful when a chat honestly spans two.
     anywhere = sum(g["primary"] in {m["primary_domain"], *m["secondary_domains"]} for m, g in scored)
     with_purpose = [(m, g) for m, g in scored if g["purpose"]]
+    # Review verdicts don't cover secondary domains, so only score them where
+    # the reference actually lists some (blind gold labels).
+    with_secondary = [(m, g) for m, g in scored if g["secondary"]]
     return {
         "gold_labelled": len(gold),
         "scored": len(scored),
@@ -170,5 +173,6 @@ def gold_stats(records: dict[str, dict], gold: dict[str, dict]) -> dict:
         "primary_domain_in_any_pct": _pct(anywhere, len(scored)),
         "purpose_accuracy_pct": _pct(sum(m["purpose"] == g["purpose"] for m, g in with_purpose), len(with_purpose)),
         "secondary_domains_jaccard": round(sum(
-            jaccard(set(m["secondary_domains"]), g["secondary"]) for m, g in scored) / len(scored), 3),
+            jaccard(set(m["secondary_domains"]), g["secondary"]) for m, g in with_secondary) / len(with_secondary), 3)
+        if with_secondary else "n/a",
     }

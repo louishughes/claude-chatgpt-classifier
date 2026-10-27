@@ -75,8 +75,8 @@ def valid_label(**over):
 
 
 def decision(**over):
-    base = dict(statement="s", proposed_by="assistant", state="accepted",
-                evidence_quote="q", evidence_speaker="user")
+    base = dict(statement="s", proposed_by="assistant", proposed_in=2, state="accepted",
+                decided_in=3, evidence_quote="q")
     base.update(over)
     return base
 
@@ -89,21 +89,33 @@ def test_schema_accepts_valid_and_normalises_lists():
 @pytest.mark.parametrize("bad", [
     {"primary_domain": "not_a_domain"},
     {"purpose": "procrastinate"},
-    {"topics": [f"t{i}" for i in range(6)]},
     {"topics": []},
-    {"summary": "x" * 301},
+    {"topics": ["  "]},
+    {"summary": "   "},
     {"confidence": 1.5},
     {"secondary_domains": ["games"]},                      # repeats the primary
     {"secondary_domains": ["other", "home_and_life", "money_and_admin", "ai_and_automation"]},
     {"outputs": ["none", "code"]},
     {"knowledge_types": []},
     {"project_candidates": ["a", "b", "c", "d"]},
-    {"decisions": [decision(state="approved")]},
-    {"decisions": [decision(proposed_by="narrator")]},
 ])
 def test_schema_rejects_contract_breaks(bad):
     with pytest.raises(ValidationError):
         ConversationLabel(**valid_label(**bad))
+
+
+def test_harmless_overflows_are_trimmed_not_rejected():
+    """Run 1: 14 of 15 rejected answers only had too many topics. Trim, don't retry."""
+    label = ConversationLabel(**valid_label(topics=[f"t{i}" for i in range(8)], summary="word " * 80))
+    assert label.topics == ["t0", "t1", "t2", "t3", "t4"]
+    assert len(label.summary) <= 300 and label.summary.endswith("…")
+
+
+@pytest.mark.parametrize("bad", [{"state": "approved"}, {"proposed_by": "narrator"}, {"proposed_in": "two"}])
+def test_decision_schema_rejects_contract_breaks(bad):
+    from schema import DecisionList
+    with pytest.raises(ValidationError):
+        DecisionList(decisions=[decision(**bad)])
 
 
 # --- runner: one conversation ----------------------------------------------
@@ -116,7 +128,7 @@ def conv(tmp_path):
 def test_transient_errors_retry_then_succeed(conv):
     p = FakeProvider({"conv-A": ["timeout", "rate_limit"]})
     rec = label_one(conv, p, CostMeter(10), 24000, sleep=no_sleep)
-    assert rec.status == "ok" and rec.calls == 3
+    assert rec.status == "ok" and rec.calls == 4   # 3 for labels + 1 for decisions
     assert rec.transient_errors == {"timeout": 1, "rate_limit": 1}
 
 
@@ -147,25 +159,53 @@ def test_cost_cap_stops_before_calling(conv):
     assert rec.status == "skipped_cost_cap" and p.calls == 0
 
 
-def test_quote_check_counts_only_real_quotes(conv):
+def test_fake_run_produces_checked_decisions(conv):
     rec = label_one(conv, FakeProvider(), CostMeter(10), 24000, sleep=no_sleep)
-    assert rec.decisions_total == rec.decisions_quote_found == 1
+    assert rec.status == "ok" and rec.decisions_status == "ok" and rec.calls == 2
+    assert rec.decisions_total == rec.decisions_quote_found == rec.decisions_refs_ok == 1
 
 
-def test_quote_must_come_from_the_stated_speaker(conv):
-    from runner import Record, check_quotes
-    user_words = conv.turns[0].text[:25]
-    assistant_words = conv.turns[1].text[:8]
-    rec = Record("x", "f", "ok", "fake", label=valid_label(decisions=[
-        decision(evidence_quote=user_words, evidence_speaker="user"),          # real, right speaker
-        decision(evidence_quote=user_words, evidence_speaker="assistant"),     # real words, wrong speaker
-        decision(evidence_quote="words nobody wrote", evidence_speaker="user"),
-        decision(evidence_quote=assistant_words, evidence_speaker="assistant", state="accepted"),
-    ]))
-    check_quotes(rec, conv)
-    assert rec.decisions_total == 4
-    assert rec.decisions_quote_found == 2
-    assert rec.decisions_assistant_accepted_unquoted == 2
+def test_decision_checks_use_message_numbers(conv):
+    """Turns: #1 user, #2 assistant, #3 user, #4 assistant (two exchanges)."""
+    from runner import Record, check_decisions
+    user1 = conv.turns[0].text[:25]
+    assistant2 = conv.turns[1].text[:8]
+    rec = Record("x", "f", "ok", "fake", label={"decisions": [
+        # assistant proposed in #2, user accepted in #3: structure fine, quote not in #3
+        decision(proposed_by="assistant", proposed_in=2, decided_in=3, evidence_quote="words nobody wrote"),
+        # user decided in their own message #1, quote really is in #1
+        decision(proposed_by="user", proposed_in=1, decided_in=1, evidence_quote=user1),
+        # "accepted" but decided_in points at an assistant message: the run-1 failure
+        decision(proposed_by="assistant", proposed_in=2, decided_in=2, evidence_quote=assistant2),
+        # wrong proposer for message #2
+        decision(proposed_by="user", proposed_in=2, state="proposed", decided_in=None, evidence_quote=assistant2),
+        # decided before it was proposed
+        decision(proposed_by="assistant", proposed_in=4, decided_in=3, evidence_quote="x"),
+    ]})
+    check_decisions(rec, conv)
+    assert rec.decisions_total == 5
+    assert rec.decisions_refs_ok == 2
+    assert rec.decisions_decided_by_assistant == 1
+    assert rec.decisions_quote_found == 3
+
+
+def test_decision_step_failure_sends_chat_to_review(conv):
+    from schema import DecisionList
+    p = FakeProvider()
+    from providers import SchemaError
+    def always_bad(_):
+        raise SchemaError("bad decisions")
+    p.responders[DecisionList] = always_bad
+    rec = label_one(conv, p, CostMeter(10), 24000, sleep=no_sleep)
+    assert rec.label is not None and rec.label["decisions"] == []
+    assert rec.decisions_status == "review_required" and rec.status == "review_required"
+
+
+def test_decisions_can_use_a_different_model(conv):
+    labels, decisions = FakeProvider(), FakeProvider()
+    decisions.model = "fake-decisions"
+    rec = label_one(conv, labels, CostMeter(10), 24000, sleep=no_sleep, decisions_provider=decisions)
+    assert labels.calls == 1 and decisions.calls == 1 and rec.decisions_model == "fake-decisions"
 
 
 # --- runner: batches ---------------------------------------------------------
@@ -202,7 +242,7 @@ def test_resume_skips_finished_and_retries_failed(raw_dir, tmp_path):
     run_once(convs, first, out, CostMeter(10), 24000, backoff_s=0, progress=lambda *_: None)
     second = FakeProvider()
     run_once(convs, second, out, CostMeter(10), 24000, backoff_s=0, progress=lambda *_: None)
-    assert second.calls == 1   # only the chat that failed last time
+    assert second.calls == 2   # only the chat that failed last time (labels + decisions)
     assert all(r["status"] == "ok" for r in load_records(out).values())
 
 
@@ -317,7 +357,7 @@ def test_semantic_answers_are_never_retried(conv):
     """A well-formed answer is accepted once, even if it may be wrong: no retry loop."""
     p = FakeProvider()
     rec = label_one(conv, p, CostMeter(10), 24000, sleep=no_sleep)
-    assert rec.status == "ok" and p.calls == 1
+    assert rec.status == "ok" and p.calls == 2   # one call per step, none repeated
 
 
 # --- gold set selection ------------------------------------------------------
