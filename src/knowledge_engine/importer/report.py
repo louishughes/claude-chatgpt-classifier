@@ -40,6 +40,8 @@ class ImportReport:
         model_calls_triggered: Always 0 in M1: importing never calls a model.
         new_branches: Forks that appeared in this import.
         raw_observations: New raw forms of messages (e.g. metadata drift).
+        candidate_matches: Candidate reason -> count: conversations whose
+            identity is ``review_required`` (never merged automatically).
     """
 
     import_id: str
@@ -55,6 +57,7 @@ class ImportReport:
     model_calls_triggered: int = 0
     new_branches: int = 0
     raw_observations: int = 0
+    candidate_matches: Mapping[str, int] = field(default_factory=dict)
     extra: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -72,4 +75,5 @@ class ImportReport:
             "model_calls_triggered": self.model_calls_triggered,
             "new_branches": self.new_branches,
             "raw_observations": self.raw_observations,
+            "candidate_matches": dict(sorted(self.candidate_matches.items())),
         }
