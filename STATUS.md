@@ -18,5 +18,7 @@ Live ticket status for the build. The full ticket list is `docs/TICKETS.csv` (ke
 | SRC-001 Read-only raw source inventory and guard | VERIFIED | SESSION_LOG 2026-10-27 SRC-001 |
 | DOC-002 Deterministic Markdown/YAML renderer | VERIFIED | SESSION_LOG 2026-10-27 DOC-002 |
 | ING-005 ChatGPT message-graph parsing | VERIFIED (slice G1: pure ConversationGraph; branch kinds and integrity issues come in G2) | SESSION_LOG 2026-10-27 ING-005 |
+| REL-001 Native branch classification and path enumeration | VERIFIED (slice G2) | SESSION_LOG 2026-10-27 REL-001 |
+| NRM-002 Conversation graph integrity checker | VERIFIED (slice G2) | SESSION_LOG 2026-10-27 NRM-002 |
 
-**Next unblocked:** slice G2 (REL-001 + NRM-002), slice I1 (ING-001 + IMP-001). Order and module layout follow docs/plans/M1_CONSOLIDATION.md (adopted).
+**Next unblocked:** slice G3 (ING-006 + NRM-001), slice I1 (ING-001 + IMP-001). Order and module layout follow docs/plans/M1_CONSOLIDATION.md (adopted).
