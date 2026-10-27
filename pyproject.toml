@@ -22,6 +22,7 @@ dependencies = [
     "pydantic-settings>=2.6,<3",  # settings from env vars and config files (FND-002)
     "sqlalchemy>=2.0.36,<2.1",    # database access and transactions (FND-003)
     "alembic>=1.14,<2",           # versioned schema migrations (FND-004)
+    "pyyaml>=6.0.2,<7",           # Obsidian frontmatter, written and checked (DOC-002)
 ]
 
 [project.scripts]
@@ -36,6 +37,7 @@ dev = [
     "ruff>=0.8",
     "mypy>=1.13",
     "hypothesis>=6.115",  # property-based tests: random inputs, checked invariants
+    "types-PyYAML>=6.0",  # type hints for PyYAML, so mypy can check calls into it
 ]
 
 [tool.hatch.build.targets.wheel]

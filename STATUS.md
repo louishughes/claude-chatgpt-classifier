@@ -16,5 +16,6 @@ Live ticket status for the build. The full ticket list is `docs/TICKETS.csv` (ke
 | FND-008 CLI skeleton and error/exit contracts | VERIFIED | SESSION_LOG 2026-10-27 FND-008 |
 | OPS-008 Raw/private data Git guard and fixture redaction check | VERIFIED | SESSION_LOG 2026-10-27 OPS-008 |
 | SRC-001 Read-only raw source inventory and guard | VERIFIED | SESSION_LOG 2026-10-27 SRC-001 |
+| DOC-002 Deterministic Markdown/YAML renderer | VERIFIED | SESSION_LOG 2026-10-27 DOC-002 |
 
-**Next unblocked:** slice I1 (ING-001 + IMP-001), graph slice G1 (ING-005), DOC-002. Order and module layout follow docs/plans/M1_CONSOLIDATION.md (adopted).
+**Next unblocked:** slice I1 (ING-001 + IMP-001), graph slice G1 (ING-005). Order and module layout follow docs/plans/M1_CONSOLIDATION.md (adopted).

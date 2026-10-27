@@ -298,3 +298,33 @@ ke --json raw inventory tests/fixtures/chatgpt/split_wrapper/export   # detected
 Fix attempts: 1 (my own new strict-mode test tampered only on the first run; it now writes a new file on every run).
 
 **Next exact task:** slice I1 (ING-001 archive + IMP-001 batch ledger) in `importer/`.
+
+## 2026-10-27 · Review recommendations received (via coordinator)
+
+An independent review ("adjust, not rethink") recommends: (a) consolidating the M1 design (one graph module, one Import module, events deferred, ADR-0003 keys and ticket IDs kept); (b) smaller PRs, one or two tickets each, because PR #3 is too large to read; (c) running the suite on Windows once; (d) listing the real split-wrapper key names (names only) before ING-011; (e) an ADR on the AI step under the no-paid-API rule before M3. (Later decided under delegated authority, see OPEN_DECISIONS.) Actions: PR #3 gets no more tickets; DOC-002 is committed locally and waits for either PR #3 to merge or Louis's OK to use extra branches for small PRs; (c) and (d) wait for his OK to start a Remote Control session.
+
+## 2026-10-27 · DOC-002 — Deterministic Markdown/YAML renderer
+
+**Dependencies:** FND-005 (VERIFIED). **Status:** VERIFIED. Rebased onto `main` after PR #3 and SRC-001 merged; own PR (slice R1).
+
+**Changed files:** `src/knowledge_engine/rendering/__init__.py`, `rendering/markdown.py` (new), `tests/unit/test_markdown_render.py` (new), `pyproject.toml` (adds `pyyaml`, dev `types-PyYAML`), `STATUS.md`.
+
+**Design choices:**
+- A note is data (`DocumentModel`: title, ordered properties, blocks `Heading`/`Paragraph`/`BulletList`/`CodeBlock`) rendered by `render_note` with `\n` line endings and one final newline.
+- Frontmatter is written by `yaml.safe_dump` (order preserved) and parsed back; readable Unicode first, escaped ASCII if a character such as U+0085 doesn't survive. Datetimes must carry a timezone; NaN and unknown types are refused.
+- Untrusted text (`trusted=False`, the default) goes through `escape_text`: wikilinks, embeds, `%%` comments, HTML, inline `#tags`, trailing `^block` refs and line-start heading/quote/table/list markers are neutralised. Titles and headings are forced onto one line. Code fences grow longer than any backtick run inside.
+- `block_anchor` validates Obsidian block IDs for citations. `safe_filename(title, unique_suffix)` is Windows/POSIX-safe (reserved names, illegal characters, trailing dots, 80-character stem); the stable suffix, not the title, keeps names unique. `safe_relative_path` refuses `..`, separators, drive letters and empty parts.
+- `write_note` writes inside the vault only, via a temp file in the same folder, `fsync` and `os.replace`; identical content is not rewritten (mtime kept); a failed write leaves no temp file.
+
+**Commands run:**
+```
+ruff check .            # All checks passed!
+ruff format --check .   # 42 files already formatted
+mypy                    # Success: no issues found in 35 source files
+pytest -q               # 278 passed (47 new for DOC-002)
+git guard               # OK
+extra Hypothesis run, 5,000 examples each: frontmatter round-trip and escape invariants  # ok
+```
+Fix attempts: (1) a title with a newline could carry `#` text, and inline `#tags` from chats would have become Obsidian tags, so tag escaping was added (a backslash before `#` can't undo it); (2) Hypothesis found that U+0085 broke the frontmatter round-trip, so an escaped-ASCII fallback was added; (3) mypy rejected monkeypatching through the module attribute in a test, so the target string form is used. Three attempts used in total; all resolved.
+
+**Next exact task:** waiting on Louis: the architecture proposal (decides ING-001/SRC-001 onwards), the Remote Control OK (Windows run, key names), and the PR approach.
