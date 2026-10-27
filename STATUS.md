@@ -15,5 +15,6 @@ Live ticket status for the build. The full ticket list is `docs/TICKETS.csv` (ke
 | FND-006 Processing jobs and fingerprint keys | VERIFIED | SESSION_LOG 2026-10-27 FND-006 |
 | FND-008 CLI skeleton and error/exit contracts | VERIFIED | SESSION_LOG 2026-10-27 FND-008 |
 | OPS-008 Raw/private data Git guard and fixture redaction check | VERIFIED | SESSION_LOG 2026-10-27 OPS-008 |
+| ING-001 Secure archive storage and checksums | VERIFIED (filesystem store only; the media_blobs table is MED-001) | SESSION_LOG 2026-10-27 ING-001 |
 
-**Next unblocked:** ING-001, SRC-001, DOC-002 (unaffected by the pending architecture proposal). ING-002 onwards waits for the owner's call on that proposal.
+**Next unblocked:** SRC-001, DOC-002. ING-002 onwards follows the M1 consolidation design note (issue #138) once merged.

@@ -263,3 +263,27 @@ pytest -q               # 231 passed (10 new for OPS-008, using throwaway git re
 ```
 
 **Next exact task:** ING-001 (archive storage and checksums), SRC-001 (raw inventory) or DOC-002 (renderer). ING-002 onwards waits for the owner's decision on the architecture proposal.
+
+## 2026-10-27 · ING-001 — Secure archive storage and checksums
+
+**Dependencies:** FND-003, FND-005 (VERIFIED). **Status:** VERIFIED. **Branch:** `claude/project-thread-q0du34-ing-001` (small PR, stacked on PR #3).
+
+**Changed files:** `src/knowledge_engine/infrastructure/blobstore.py` (new), `tests/unit/test_blobstore.py` (new), `STATUS.md`, `docs/TICKETS.csv`, diary.
+
+**Design choices:**
+- `BlobStore(root, max_bytes)`: files live at `<root>/<sha[:2]>/<sha>`. `put_file` copies via a temp file in the store, hashing while copying, fsync, then `os.replace` into place and marks the blob read-only. If the hash already exists, the existing bytes are re-hashed: a mismatch raises `BlobCorruptError` and the corrupt file is left untouched (no silent repair).
+- `put_reference` (OD-02 reference mode) hashes in place and writes nothing; `verify`/`read_bytes` re-check the hash, so an edited or deleted reference is detected.
+- Size limit checked before reading and again while streaming. Error messages carry a hash prefix only, never a path (reference paths can contain private names).
+- No DB table here: the `media_blobs` and `source_snapshots` rows belong to MED-001 and IMP-001. Scope note recorded in STATUS.
+
+**Commands run:**
+```
+ruff check .            # All checks passed!
+ruff format --check .   # 41 files already formatted
+mypy                    # Success: no issues found in 34 source files
+pytest -q               # 250 passed (19 new for ING-001)
+python -m knowledge_engine.devtools.git_guard   # OK
+```
+Fix attempts: 1 (design, before tests: replaced a hard-link approach because chmod on the temp file would have changed the shared inode).
+
+**Next exact task:** SRC-001 (raw inventory), then DOC-002 PR.

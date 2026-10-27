@@ -402,3 +402,15 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Why write it down:** a decision nobody can find later is a decision nobody can question. Recording who decided, when, and under what authority keeps the history honest.
 **Talking points:**
 - "When I act on delegated authority, I log it as delegated and reversible, not as the owner's own choice."
+
+### 22:15 — ING-001: a safe place for exact copies
+**What:** A "blob store": a folder where each imported file is kept once, named by the SHA-256 of its bytes. 19 new tests, 250 in total.
+**Key decisions and why:**
+- **Named by fingerprint.** The same export file seen in ten re-exports is stored once. And a file can't sit under the wrong name without being noticed, because the name *is* the check.
+- **Never overwrite, never repair.** If stored bytes no longer match their name, the store says "corrupt" and leaves them alone. Fixing evidence is a person's call.
+- **Write to a temp file, then swap in.** A crash halfway leaves a temp file, never a half-written blob.
+- **Big images can stay where they are** (reference mode, from decision OD-02): keep the path and hash, check the hash before trusting the file.
+**What I learned:** atomic renames, why hard links and file permissions interact (two names, one file, one set of permissions), and why Windows won't delete read-only files.
+**Talking points:**
+- "My store can't be lied to: every file's name is its own checksum."
+- "Corruption is reported, not repaired. Evidence is never silently changed."
