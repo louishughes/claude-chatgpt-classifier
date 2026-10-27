@@ -22,5 +22,7 @@ Live ticket status for the build. The full ticket list is `docs/TICKETS.csv` (ke
 | NRM-002 Conversation graph integrity checker | VERIFIED (slice G2) | SESSION_LOG 2026-10-27 NRM-002 |
 | ING-006 ChatGPT content and attachment parser | VERIFIED (slice G3) | SESSION_LOG 2026-10-27 ING-006 |
 | NRM-001 Canonical node normalization contract | VERIFIED (slice G3) | SESSION_LOG 2026-10-27 NRM-001 |
+| ING-002 SourceAdapter protocol and import manifests | VERIFIED (slice A1; the stored ImportManifest is part of IMP-001/IMP-005) | SESSION_LOG 2026-10-27 ING-002 |
+| ING-004 ChatGPT ZIP layout discovery | VERIFIED (slice A1; JSON is loaded per file within the size limit, not streamed) | SESSION_LOG 2026-10-27 ING-004 |
 
-**Next unblocked:** slice A1 (ING-002 + ING-004 official adapter), slice I1 (ING-001 + IMP-001). Order and module layout follow docs/plans/M1_CONSOLIDATION.md (adopted).
+**Next unblocked:** slice A2 (ING-011 split adapter), slice I1 (ING-001 + IMP-001). Order and module layout follow docs/plans/M1_CONSOLIDATION.md (adopted).
