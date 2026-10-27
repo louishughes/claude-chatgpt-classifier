@@ -3,7 +3,7 @@
 ```yaml
 id: ADR-0006
 kind: architecture_decision
-status: proposed
+status: accepted   # delegated owner authority 2026-10-27 22:10 UTC; revisitable (REV-006)
 recorded_at: 2026-10-27
 scope: extraction/links
 supersedes: []

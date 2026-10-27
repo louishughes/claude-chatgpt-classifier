@@ -202,7 +202,7 @@ Property-based tests (Hypothesis): random message DAGs (no cycles lost, every no
 - Architecture changes → new ADR in `docs/adr/` (append-only, `supersedes`). Small choices → `.agent-history/DECISION_LOG.md`.
 - Status words from `DECISIONS_AND_HISTORY.md`: `NOT_STARTED`, `IN_PROGRESS`, `BLOCKED`, `REVIEW_REQUIRED`, `VERIFIED`, `DEFERRED`, `CANCELLED`, `FAILED`, `UNKNOWN`. A ticket is `VERIFIED` only with the acceptance commands' real output.
 - Distinguish in every report: test not run, test failed, not implemented, intentionally omitted, source lacks the feature.
-- Tracker: until OD-08 is decided, `TICKETS.csv`/`ROADMAP_AND_TICKETS.md` stay in sync. If GitHub Issues becomes the tracker, issues are created from the CSV for M1 and the files get a "frozen; see issues" banner.
+- Tracker: GitHub Issues (OD-08 resolved, REV-006). `TICKETS.csv`/`ROADMAP_AND_TICKETS.md` are frozen reference and carry no status.
 
 ## 10. Boundaries
 
