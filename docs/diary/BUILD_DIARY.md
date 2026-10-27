@@ -581,3 +581,15 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "One fingerprint says the file changed, the other says the meaning changed. Only the meaning costs money."
 - "My parser is honest about what it doesn't understand: unknown content is kept and flagged."
+
+### 23:28 — ING-002 and ING-004: one seam for every export format
+**What:** The "adapter" seam, and the first adapter: the official ChatGPT export, as a ZIP or an unzipped folder, single file or numbered shards. 24 new tests, 420 in total.
+**Key decisions and why:**
+- **Adapters only find conversations.** Each format is different only in *where* the chats are. Parsing the messages happens once, in the graph module, for every format.
+- **Hostile ZIPs are refused whole.** If any file name in the ZIP tries to climb out of its folder (`../`), the export is refused, not partly imported.
+- **Hidden duplicates are reported.** If a JSON object has the same key twice, Python quietly keeps the last one. In a message map that would silently lose a message, so the loader now counts it as a warning.
+- **The test that matters:** the same three chats as one file, as two shards, and inside a ZIP all come out identical.
+**Teach-back (`ingestion/source.py`):** "Every export format gets an adapter with just two jobs: a quick look at file names to say 'this one's mine', and a stream of conversations exactly as exported, each tagged with the file it came from. Adapters never interpret messages, so the parsing rules live in one place for every format. If no adapter, or more than one, recognises a folder, the import stops and asks which format it is instead of guessing."
+**Talking points:**
+- "Formats differ in one way, so the seam between them is one method wide."
+- "Python's JSON parser silently drops duplicate keys. Mine reports them."

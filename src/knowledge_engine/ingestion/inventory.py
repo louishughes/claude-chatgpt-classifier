@@ -301,16 +301,32 @@ def _entry(path: str, read: Any, size: int, max_bytes: int) -> InventoryEntry:
     return InventoryEntry(path, len(data), sha, kind, mime, conversations)
 
 
-def _classify(name: str, data: bytes) -> tuple[FileKind, str | None, int]:
+def sniff_media(head: bytes) -> str | None:
+    """Return the media type of a file from its first bytes, or None.
+
+    Args:
+        head: At least the first 16 bytes of the file.
+
+    Returns:
+        A MIME type such as ``image/png``, or None if it isn't a known
+        media type.
+    """
     for magic, mime in _MAGIC:
-        if data.startswith(magic):
-            return FileKind.MEDIA, mime, 0
-    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
-        return FileKind.MEDIA, "image/webp", 0
-    if data[:4] == b"RIFF" and data[8:12] == b"WAVE":
-        return FileKind.MEDIA, "audio/wav", 0
-    if data[4:8] == b"ftyp":
-        return FileKind.MEDIA, "video/mp4", 0
+        if head.startswith(magic):
+            return mime
+    if head[:4] == b"RIFF" and head[8:12] == b"WEBP":
+        return "image/webp"
+    if head[:4] == b"RIFF" and head[8:12] == b"WAVE":
+        return "audio/wav"
+    if head[4:8] == b"ftyp":
+        return "video/mp4"
+    return None
+
+
+def _classify(name: str, data: bytes) -> tuple[FileKind, str | None, int]:
+    mime = sniff_media(data[:16])
+    if mime is not None:
+        return FileKind.MEDIA, mime, 0
     if data.startswith(b"PK\x03\x04"):
         return FileKind.ARCHIVE, "application/zip", 0
     if name.endswith((".html", ".htm")):

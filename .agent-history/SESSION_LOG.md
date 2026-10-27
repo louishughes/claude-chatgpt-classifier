@@ -395,3 +395,27 @@ pytest -q               # 396 passed, 6 skipped (29 new for G3)
 Key evidence: `metadata_drift` vs `reexport_v1`: all 3 messages keep their content hash and change their raw hash. Hypothesis: any content/metadata never changes the content hash through metadata. Source mapping is deep-equal before and after. Fix attempts: 1 (test loader didn't read split-layout fixtures; my own new test).
 
 **Next exact task:** slice A1 (ING-002 adapter seam + ING-004 official export layouts).
+
+## 2026-10-27 · ING-002 + ING-004 — Adapter seam and official export adapter (slice A1)
+
+**Dependencies:** FND-005 (VERIFIED). The old blocker ING-001 isn't needed by the seam (snapshots are the importer's job, I1). **Status:** both VERIFIED with scope notes. **Branch:** `claude/project-thread-q0du34-adapter-a1`.
+
+**Changed files:** `src/knowledge_engine/ingestion/source.py` (new: `SourceAdapter` protocol, `ProbeResult`, `SourceListing`, `NativeConversation`, `SourceLocator`, `SourceFile`, `MediaFile`, `ImportWarning`, `select_adapter`, `load_json`, `safe_member_name`), `ingestion/chatgpt_export.py` (new), `ingestion/inventory.py` (extracted `sniff_media` for reuse; behaviour unchanged), `tests/unit/test_source_adapters.py` (new), `STATUS.md`, diary.
+
+**Design choices:**
+- Protocol: `format_id`, `probe(path)` (names only), `open(path, max_bytes)` → listing with conversation files + SHA-256, media files, warnings and a lazy conversation stream. Adapters never parse messages.
+- `select_adapter`: forced format must exist and match; otherwise exactly one match, else `UnsupportedFormatError` (none, or ambiguous: the user must pass `--format`).
+- `load_json` reports duplicate keys (`duplicate_json_key`) — closes the G2 scope note — and accepts a BOM.
+- Official adapter: folder or ZIP (read in place); top-level `conversations.json` and `conversations-NNN.json`, numeric shard order; any unsafe member name refuses the whole archive; size checked before reading and capped while reading ZIP members; media found by magic bytes anywhere (top level, `user-*/`, `dalle-generations/`); bad list entries become per-entry warnings.
+- Scope notes: JSON is loaded per file (bounded by `max_source_file_bytes`), not streamed; real data is split-format so this is deferred until a big official export appears. The stored import manifest belongs to IMP-001/IMP-005.
+
+**Commands run:**
+```
+ruff check .            # All checks passed!
+ruff format --check .   # 54 files already formatted
+mypy                    # Success: no issues found in 47 source files
+pytest -q               # 420 passed, 6 skipped (24 new for A1)
+```
+Finish line: `export_single`, `export_sharded` and `export_zip` give equal `NativeConversation.native` lists; a ZIP with `../escape.png` is refused. Fix attempts: 1 (my own new shard-order test expected the wrong tie order).
+
+**Next exact task:** slice A2 (ING-011 split-wrapper adapter).
