@@ -354,3 +354,11 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "My importer is tested against 14 fake exports covering every awkward case I could find in the real data, without committing a single real message."
 - "The tests use their own tiny reader to check the answer keys, so the test data can't mark its own homework."
 - "When I wasn't sure of a real file format, I wrote that down instead of pretending."
+
+### 21:39 — Decision: no more paid API calls
+**What Louis decided:** stop using the paid Claude API. Everything runs locally, or through Claude Code sessions on his existing subscription.
+**What changes:** nothing for the first two milestones, which are plain code anyway. For the AI milestones, the code still talks to a "model provider" interface and is tested with fake providers. When real judgement on his chats is needed, a Claude Code session on his PC will do that step directly and write checked results into the private workspace. The app then validates those results exactly as it would an API response. The "send text to an AI" switch stays off.
+**Why it's a reasonable call:** it caps cost at zero. The interface design means the AI step can be swapped later without rewriting anything, and the earlier spike already answered the "is the API reliable" question for 7 cents.
+**Talking points:**
+- "I designed the AI step behind an interface, so switching from a paid API to a subscription workflow changed a policy, not the code."
+- "Zero marginal cost was a deliberate constraint, not an afterthought."
