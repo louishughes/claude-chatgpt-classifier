@@ -41,10 +41,10 @@ python -m pytest -q tests                         # free, offline
 python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --dry-run          # cost estimate only
 python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --gold-template 20   # labelling sheet, ~1 hour
 # fill in primary_domain and purpose (optionally secondary_domains and projects, ';'-separated), save as ~/spike-out/gold.csv
-python spike.py --raw-dir ../../raw --sample 50 --runs 2 --out ~/spike-out --max-cost-usd 5 --gold ~/spike-out/gold.csv
-python spike.py --raw-dir ../../raw --sample 100 --runs 2 --out ~/spike-out-100 --max-cost-usd 10
+python spike.py --raw-dir ../../raw --sample 50 --runs 2 --out ~/spike-out --max-cost-usd 2 --gold ~/spike-out/gold.csv
+python spike.py --raw-dir ../../raw --sample 100 --runs 2 --out ~/spike-out-100 --max-cost-usd 2
 ```
-Defaults: model `claude-opus-5-5`, effort `low`, 4 workers, 90 s timeout, 24,000 characters per chat. Server-side refusal fallback is on (the API retries a declined request on a fallback model and the report lists which model answered); `--no-refusal-fallback` turns it off.
+Defaults: model `claude-haiku-5-5` (Anthropic's cheapest current model, $0.10 / $0.50 per million input/output tokens), effort `low`, cost cap $2, 4 workers, 90 s timeout, 24,000 characters per chat. If Haiku misses the targets, compare `--model claude-sonnet-5-5` on the same sample and gold set before changing anything else. Server-side refusal fallback is used on Sonnet/Opus only (Haiku 5.5 doesn't support it); `--no-refusal-fallback` turns it off.
 
 **Privacy:** the selected chat text is sent to the Anthropic API. Outputs contain summaries of your chats, so `--out` must be outside the repo (the script refuses otherwise). `report.md` has counts only.
 

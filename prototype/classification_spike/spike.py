@@ -6,14 +6,14 @@ Typical use on the PC that holds raw/:
     python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --dry-run
 
     # 2. Two runs over 50 chats with a $5 cap, then the report.
-    python spike.py --raw-dir ../../raw --sample 50 --runs 2 --out ~/spike-out --max-cost-usd 5
+    python spike.py --raw-dir ../../raw --sample 50 --runs 2 --out ~/spike-out --max-cost-usd 2
 
     # Optional but recommended: hand-label 20 varied chats from the 50 first (see gold.py).
     python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --gold-template 20
     python spike.py ... --gold ~/spike-out/gold.csv
 
     # 3. Same again at 100. The 100 sample contains the 50 sample.
-    python spike.py --raw-dir ../../raw --sample 100 --runs 2 --out ~/spike-out-100 --max-cost-usd 10
+    python spike.py --raw-dir ../../raw --sample 100 --runs 2 --out ~/spike-out-100 --max-cost-usd 2
 
 The output folder holds model answers about your private chats, so it must be
 outside the Git repository. The script refuses to write inside it.
@@ -59,9 +59,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--seed", type=int, default=20261027)
     p.add_argument("--runs", type=int, default=2)
     p.add_argument("--provider", choices=["anthropic", "fake"], default="anthropic")
-    p.add_argument("--model", default="claude-opus-5-5", choices=[m for m in PRICES if m != "fake"])
+    p.add_argument("--model", default="claude-haiku-5-5", choices=[m for m in PRICES if m != "fake"])
     p.add_argument("--effort", choices=["low", "medium", "high"], default="low")
-    p.add_argument("--max-cost-usd", type=float, default=5.0)
+    p.add_argument("--max-cost-usd", type=float, default=2.0)
     p.add_argument("--budget-chars", type=int, default=24000, help="max characters sent per chat")
     p.add_argument("--max-tokens", type=int, default=8000)
     p.add_argument("--timeout-s", type=float, default=90.0)
@@ -95,7 +95,9 @@ def main(argv: list[str] | None = None) -> int:
 
     model = "fake" if args.provider == "fake" else args.model
     sent_chars = sum(len(clip_text(c.full_text(), args.budget_chars)[0]) for c in convs)
-    est_in = (sent_chars + len(SYSTEM_PROMPT)) // 4 + 50 * len(convs)
+    # ~4 characters per token, plus ~30% because newer Claude tokenizers
+    # count the same text as more tokens. Deliberately pessimistic.
+    est_in = int((sent_chars + len(SYSTEM_PROMPT) * len(convs)) / 4 * 1.3)
     est_out = EST_OUTPUT_TOKENS * len(convs)
     price_in, price_out = PRICES[model]
     est_cost = (est_in * price_in + est_out * price_out) / 1_000_000
@@ -111,8 +113,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.provider == "fake":
         provider = FakeProvider()
     else:
+        # Haiku 5.5 has no server-side refusal fallback; asking for one is an error.
+        fallback = not args.no_refusal_fallback and not args.model.startswith("claude-haiku")
         provider = AnthropicProvider(args.model, args.effort, args.timeout_s, args.max_tokens,
-                                     refusal_fallback=not args.no_refusal_fallback)
+                                     refusal_fallback=fallback)
 
     # Spend already recorded in this folder counts towards the cap, so
     # resuming can't quietly double the budget.

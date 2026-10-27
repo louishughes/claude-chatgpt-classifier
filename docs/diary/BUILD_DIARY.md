@@ -176,3 +176,9 @@ These are now in `AGENTS.md`, `CLAUDE.md` and the plan. The spike's gold set got
 - "Agents can't mark their own homework. The answer key is mine, and it's fingerprinted."
 - "Guardrails for AI coding agents: bounded retries, frozen vocabulary, hands off the tests."
 - "Don't pre-fill the human's labels with the model's answer. That's how you get fake agreement."
+
+### 19:50 — Cheaper model for the spike
+**What:** Louis gave the OK to send sample chat text to the API, but $20 was too much: earlier attempts ran on DeepSeek through OpenRouter or Luna through Codex. Switched the spike's default to Claude Haiku 5.5, Anthropic's cheapest current model. The estimate dropped to about $0.06–0.09 per 50-chat run, so roughly $0.50 for the whole spike. The default cost cap is now $2. If Haiku misses the targets, the next step is to compare Sonnet on the *same* sample and gold set, rather than guessing.
+**Talking points:**
+- "Start with the cheapest model that might work, measure it, and only pay for more if the numbers say so."
+- "Same gold set across models makes the comparison fair."
