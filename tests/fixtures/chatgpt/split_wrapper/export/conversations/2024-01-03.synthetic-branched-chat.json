@@ -5,7 +5,9 @@
   "date": "2024-01-03",
   "filename": "2024-01-03.synthetic-branched-chat.json",
   "message_count": 4,
-  "image_count": 0,
+  "user_message_count": 1,
+  "assistant_message_count": 2,
+  "image_references": 0,
   "conversation": {
     "title": "Synthetic branched chat",
     "create_time": 1704240000.0,

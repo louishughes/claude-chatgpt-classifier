@@ -5,7 +5,9 @@
   "date": "2024-01-02",
   "filename": "2024-01-02.synthetic-image-chat.json",
   "message_count": 3,
-  "image_count": 1,
+  "user_message_count": 1,
+  "assistant_message_count": 1,
+  "image_references": 1,
   "conversation": {
     "title": "Synthetic image chat",
     "create_time": 1704153600.0,

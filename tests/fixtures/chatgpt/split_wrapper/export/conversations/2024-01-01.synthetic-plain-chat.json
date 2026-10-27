@@ -5,7 +5,9 @@
   "date": "2024-01-01",
   "filename": "2024-01-01.synthetic-plain-chat.json",
   "message_count": 99,
-  "image_count": 0,
+  "user_message_count": 2,
+  "assistant_message_count": 2,
+  "image_references": 0,
   "conversation": {
     "title": "Synthetic plain chat",
     "create_time": 1704067200.0,

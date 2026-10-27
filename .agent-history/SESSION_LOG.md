@@ -263,3 +263,13 @@ pytest -q               # 231 passed (10 new for OPS-008, using throwaway git re
 ```
 
 **Next exact task:** ING-001 (archive storage and checksums), SRC-001 (raw inventory) or DOC-002 (renderer). ING-002 onwards waits for the owner's decision on the architecture proposal.
+
+## 2026-10-27 · REV-007 (#141) — Windows test run and real split-wrapper key names
+
+**How:** read-only Remote Control session on Louis's PC (delegated authority, 22:10). Outputs only in the git-ignored `workspace/wincheck/`; nothing in `raw/` changed; only key names, types and counts were reported.
+
+**Windows (Python 3.13.2, PR #3 @ 31e68f4):** ruff check passed; ruff format --check passed; mypy passed; git guard OK; pytest 230 passed, 1 failed: `test_regenerated_fixtures_are_byte_identical` (`export.zip`). Cause: `ZipInfo.create_system` is 0 when Python builds the ZIP on Windows and 3 on Linux; everything else in the archive was identical. Fix: the fixture builder now pins `create_system = 3` (the committed fixture already had 3, so its bytes don't change). No test changed.
+
+**Real split-wrapper keys (1158 wrapper files, 0 parse failures):** top level `conversation`, `conversation_id`, `title`, `create_time`, `date`, `filename`, `message_count`, `user_message_count`, `assistant_message_count`, `image_references`. The synthetic wrapper guessed `image_count` and lacked the role counts; it now uses the real names. 9 split fixture files regenerated; manifests and test expectations unchanged. 3 further JSON files look like an index/manifest (`conversations` array; `export_files`, `logical_files`, `manifest_file`, `version`); SRC-001 classifies them as non-conversation files. No official `conversations*.json` and no ZIPs in `raw/`.
+
+**Commands (Linux, after the fix):** ruff check OK; mypy OK (32 files); pytest 231 passed; fixtures regenerated with `python -m knowledge_engine.evaluation.synthetic tests/fixtures/chatgpt`.

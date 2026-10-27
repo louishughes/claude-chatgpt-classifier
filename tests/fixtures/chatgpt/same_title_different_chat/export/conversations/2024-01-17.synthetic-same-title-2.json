@@ -5,7 +5,9 @@
   "date": "2024-01-17",
   "filename": "2024-01-17.synthetic-same-title-2.json",
   "message_count": 3,
-  "image_count": 0,
+  "user_message_count": 1,
+  "assistant_message_count": 1,
+  "image_references": 0,
   "conversation": {
     "title": "Synthetic same title",
     "create_time": 1705449600.0,

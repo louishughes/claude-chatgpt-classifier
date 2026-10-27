@@ -5,7 +5,9 @@
   "date": "2024-01-06",
   "filename": "2024-01-06.synthetic-repeated-image-a.json",
   "message_count": 4,
-  "image_count": 2,
+  "user_message_count": 2,
+  "assistant_message_count": 1,
+  "image_references": 2,
   "conversation": {
     "title": "Synthetic repeated image A",
     "create_time": 1704499200.0,

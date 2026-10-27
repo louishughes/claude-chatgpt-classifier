@@ -5,7 +5,9 @@
   "date": "2024-01-08",
   "filename": "2024-01-08.synthetic-asset-problems.json",
   "message_count": 2,
-  "image_count": 4,
+  "user_message_count": 1,
+  "assistant_message_count": 0,
+  "image_references": 4,
   "conversation": {
     "title": "Synthetic asset problems",
     "create_time": 1704672000.0,

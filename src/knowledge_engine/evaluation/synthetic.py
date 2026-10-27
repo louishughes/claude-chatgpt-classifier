@@ -270,6 +270,13 @@ def _slug(title: str) -> str:
 def split_wrapper(native: JsonDict, filename: str) -> JsonDict:
     """Wrap a native conversation the way the split-wrapper files do.
 
+    The wrapper key names match the real files (checked on the owner's PC,
+    names only, 2026-10-27, REV-007): ``conversation_id``, ``title``,
+    ``create_time``, ``date``, ``filename``, ``message_count``,
+    ``user_message_count``, ``assistant_message_count``,
+    ``image_references`` and ``conversation``. How the real tool counted is
+    not known, so importers must treat the counts as hints only.
+
     Args:
         native: The native conversation object (children already removed).
         filename: The wrapper file's own name.
@@ -277,7 +284,7 @@ def split_wrapper(native: JsonDict, filename: str) -> JsonDict:
     Returns:
         The wrapper dict. Counts are hints the importer cross-checks.
     """
-    messages = sum(1 for node in native["mapping"].values() if node.get("message"))
+    messages = [node["message"] for node in native["mapping"].values() if node.get("message")]
     images = sum(
         1
         for node in native["mapping"].values()
@@ -292,8 +299,10 @@ def split_wrapper(native: JsonDict, filename: str) -> JsonDict:
         "create_time": created,
         "date": _iso_date(created),
         "filename": filename,
-        "message_count": messages,
-        "image_count": images,
+        "message_count": len(messages),
+        "user_message_count": sum(1 for m in messages if m["author"]["role"] == "user"),
+        "assistant_message_count": sum(1 for m in messages if m["author"]["role"] == "assistant"),
+        "image_references": images,
         "conversation": native,
     }
 
@@ -352,6 +361,9 @@ def write_layout(
             for name in sorted(members):
                 info = zipfile.ZipInfo(name, date_time=_ZIP_DATE)
                 info.external_attr = 0o644 << 16
+                # Python records the OS that built the ZIP (0 on Windows,
+                # 3 on Unix). Pin it so the bytes match on every machine.
+                info.create_system = 3
                 archive.writestr(info, members[name])
         files["export.zip"] = buffer.getvalue()
     elif layout == "split":
