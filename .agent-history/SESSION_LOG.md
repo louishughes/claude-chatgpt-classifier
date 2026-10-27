@@ -328,3 +328,26 @@ extra Hypothesis run, 5,000 examples each: frontmatter round-trip and escape inv
 Fix attempts: (1) a title with a newline could carry `#` text, and inline `#tags` from chats would have become Obsidian tags, so tag escaping was added (a backslash before `#` can't undo it); (2) Hypothesis found that U+0085 broke the frontmatter round-trip, so an escaped-ASCII fallback was added; (3) mypy rejected monkeypatching through the module attribute in a test, so the target string form is used. Three attempts used in total; all resolved.
 
 **Next exact task:** waiting on Louis: the architecture proposal (decides ING-001/SRC-001 onwards), the Remote Control OK (Windows run, key names), and the PR approach.
+
+## 2026-10-27 · ING-005 — ChatGPT message-graph parsing (slice G1)
+
+**Dependencies:** FND-005 (VERIFIED). ING-004 is listed as a blocker in the old chain, but under the adopted consolidation the graph is pure and takes a `mapping` directly, so it doesn't need the adapter (M1_CONSOLIDATION §6.2). **Status:** VERIFIED. **Branch:** `claude/project-thread-q0du34-graph-g1`.
+
+**Changed files:** `src/knowledge_engine/graph/__init__.py`, `graph/conversation.py` (new), `tests/unit/test_conversation_graph.py` (new), `STATUS.md`, diary.
+
+**Design choices:**
+- `ConversationGraph.from_mapping(mapping, current_node)` builds `GraphNode`s (parent, children, has_message, role, create_time) once; read-only afterwards.
+- Parent links are the single source of truth for children (the split export has no `children`); siblings are ordered by exported timestamp, then by ID for untimed ones. No timestamp is ever invented.
+- `active_path` walks up from `current_node` with a seen-set, so cycles and dangling parents end the walk instead of hanging; unknown/missing `current_node` gives an empty path (reported as an issue in G2).
+- `active_messages` drops the empty root; `message_number` is 1-based over it and None off-path.
+- Malformed entries (non-object nodes, odd `message`/`author`/boolean timestamps) are tolerated here; NRM-002 (G2) reports them.
+
+**Commands run:**
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 41 source files
+pytest -q               # 350 passed (39 new for G1, incl. all 14 fixture cases and a Hypothesis tree test)
+```
+Fix attempts: 0.
+
+**Next exact task:** slice G2 (REL-001 branch kinds and alternate paths, NRM-002 integrity issues).
