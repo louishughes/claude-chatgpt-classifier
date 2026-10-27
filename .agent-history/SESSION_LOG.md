@@ -373,3 +373,25 @@ pytest -q               # 367 passed, 6 skipped (17 new; skips = fixture layouts
 Hypothesis test: random trees with corrupted parent links; every node is either reachable from a root or named in an issue, and every alternate path is a real parent chain ending at a leaf. Fix attempts: 0.
 
 **Next exact task:** slice G3 (ING-006 content parts and asset pointers, NRM-001 canonical node and the two hashes).
+
+## 2026-10-27 · ING-006 + NRM-001 — Content parts, asset pointers, canonical node and hashes (slice G3)
+
+**Dependencies:** ING-005, FND-005 (VERIFIED). **Status:** both VERIFIED. **Branch:** `claude/project-thread-q0du34-graph-g3`.
+
+**Changed files:** `src/knowledge_engine/graph/nodes.py` (new), `tests/unit/test_canonical_nodes.py` (new), `STATUS.md`, diary.
+
+**Design choices:**
+- `canonical_node(node_id, node) -> CanonicalNode | None` (None for the empty root). Parts are ordered `ContentPart`s: text, asset pointer, or other (raw value kept, read-only view).
+- Content types: text, multimodal_text, code, execution_output, reasoning_recap, tether_quote, tether_browsing_display, thoughts, user_editable_context, system_error, computer_output. Anything else becomes one `other` part plus the `unknown_content_type` flag. Reasoning, context and hidden nodes are flagged, never dropped.
+- Asset pointers: `file-service://` and `sediment://` give a `file_id`; other schemes keep the pointer, `file_id=None` and a `unsupported_pointer_scheme` warning. A pointer-typed part without a pointer warns. Declared size/width/height kept. Resolving a pointer to a file (missing/ambiguous) is MED-002.
+- Hashes: `raw_payload_hash` = SHA-256 of `["ke-raw-v1", whole node]` canonical JSON; `canonical_content_hash` = SHA-256 of `["ke-content-v1", role, content object, create_time as float]`. Message metadata is excluded (OD-13). Choice made: the whole `content` object is hashed (not just parts), so a code language or quoted URL change counts; more conservative than OD-13's minimum.
+
+**Commands run:**
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 44 source files
+pytest -q               # 396 passed, 6 skipped (29 new for G3)
+```
+Key evidence: `metadata_drift` vs `reexport_v1`: all 3 messages keep their content hash and change their raw hash. Hypothesis: any content/metadata never changes the content hash through metadata. Source mapping is deep-equal before and after. Fix attempts: 1 (test loader didn't read split-layout fixtures; my own new test).
+
+**Next exact task:** slice A1 (ING-002 adapter seam + ING-004 official export layouts).

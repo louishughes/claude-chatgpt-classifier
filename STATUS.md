@@ -20,5 +20,7 @@ Live ticket status for the build. The full ticket list is `docs/TICKETS.csv` (ke
 | ING-005 ChatGPT message-graph parsing | VERIFIED (slice G1: pure ConversationGraph; branch kinds and integrity issues come in G2) | SESSION_LOG 2026-10-27 ING-005 |
 | REL-001 Native branch classification and path enumeration | VERIFIED (slice G2) | SESSION_LOG 2026-10-27 REL-001 |
 | NRM-002 Conversation graph integrity checker | VERIFIED (slice G2) | SESSION_LOG 2026-10-27 NRM-002 |
+| ING-006 ChatGPT content and attachment parser | VERIFIED (slice G3) | SESSION_LOG 2026-10-27 ING-006 |
+| NRM-001 Canonical node normalization contract | VERIFIED (slice G3) | SESSION_LOG 2026-10-27 NRM-001 |
 
-**Next unblocked:** slice G3 (ING-006 + NRM-001), slice I1 (ING-001 + IMP-001). Order and module layout follow docs/plans/M1_CONSOLIDATION.md (adopted).
+**Next unblocked:** slice A1 (ING-002 + ING-004 official adapter), slice I1 (ING-001 + IMP-001). Order and module layout follow docs/plans/M1_CONSOLIDATION.md (adopted).
