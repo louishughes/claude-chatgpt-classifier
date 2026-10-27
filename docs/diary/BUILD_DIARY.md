@@ -152,6 +152,23 @@ A running, timestamped log of what is being worked on, the problems hit, how the
 - "A model can be consistently wrong. Measure agreement *and* accuracy."
 - "Fifteen hand labels is a cheap reality check, and it seeds the real evaluation set later."
 
+### 19:31 — Saving ChatGPT's post-mortem of the old attempt
+**What:** Louis shared a ChatGPT conversation explaining why the earlier Hermes/Codex classifier failed. Saved it as `docs/reference/2026-10-27-why-the-classifier-failed.md`: a summary of the reasoning, a table mapping each lesson to where the new plan already covers it, and the transcript.
+**Challenge:** the share link couldn't be fetched. ChatGPT share pages only load the messages with JavaScript, the cloud sandbox's network proxy refused the connection, and the page's data endpoint blocks automated access. Louis pasted the text instead. The paste stops mid-sentence at the end, so the file says it is truncated rather than guessing the rest.
+**Key lessons recorded:** classify against a corpus-wide project registry, not one conversation at a time; lock the vocabulary instead of auto-promoting terms during a run (otherwise results depend on processing order); measure against a human-labelled reference set, not tag counts; track who proposed vs. who decided; retry only for transient errors, never for semantic mistakes; prove a small result before building more system.
+**Gap spotted:** the current classification spike measures whether two runs *agree*, not whether they're *right*. A model can be consistently wrong, so a small hand-labelled subset is worth adding before trusting it. Flagged as a question, not changed.
+**Talking points:**
+- "I asked an AI to write a post-mortem of my own failed project, then checked my new plan against it line by line."
+- "Passing tests that check the form is filled in isn't the same as being correct."
+- "Consistency isn't accuracy: five identical wrong answers are still wrong."
+
+### 19:36 — Correction: the full post-mortem arrived
+**What:** Louis uploaded the complete post-mortem as a Markdown file. The 19:31 entry said the transcript was truncated, but the reference doc now holds the full text, including the ending. Added its closing advice to the summary: give agents small tasks with clear "done" conditions, let code own identities, schemas, vocabulary and state, and never let an agent judge its own output. Also added three rows to the coverage table: separate classification dimensions (only partly covered, since a single "primary category" still exists), small agent tasks, and code-owned identity.
+**Why it matters:** the ending holds the most useful line. Consistency has to be designed into the data model and the evaluation. It can't be enforced with more prompts and repair loops.
+**Talking points:**
+- "When the shared link wouldn't load, exporting to Markdown was the reliable route. Plain files beat clever scraping."
+- "We were building a system to remember what we agreed, using agents that couldn't remember what *they'd* agreed."
+
 ### 19:37 — Learning from the old post-mortem: one question per field
 **What:** Read ChatGPT's post-mortem of the earlier classifier (saved in PR #2) and changed the spike in response:
 - The single "category" field became separate fields: domain, purpose, project candidates, topics, knowledge types and outputs. The old list mixed *Ideas, Projects, Research, Decisions, Content Assets*, and one chat can be all five. So even a perfect model couldn't answer consistently.
