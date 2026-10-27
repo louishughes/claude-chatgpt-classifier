@@ -606,7 +606,7 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "Two formats, one result: the test proves both adapters produce identical conversations."
 
 ### 23:33 — ING-001 and IMP-001: an archive and a ledger
-**What:** Two building blocks inside the new Import module. The archive keeps an exact copy of every imported file, named by its fingerprint. The ledger records every import attempt and every file it read. 28 tests, 462 in total.
+**What:** Two building blocks inside the new Import module. The archive keeps an exact copy of every imported file, named by its fingerprint. The ledger records every import attempt and every file it read. 28 tests, 459 in total.
 **Key decisions and why:**
 - **Same bytes, one copy.** Importing the same export twice gives two ledger rows (two attempts happened) but one stored copy of each file.
 - **Stored copies are re-checked.** When a file comes back, the old copy is checked too. If someone damaged it, the import stops and nothing is "repaired".

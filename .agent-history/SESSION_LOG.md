@@ -458,7 +458,7 @@ Finish line: `split_wrapper` natives equal `export_single` natives (children rem
 ```
 ruff check .            # All checks passed!
 mypy                    # Success: no issues found in 56 source files
-pytest -q               # 462 passed, 6 skipped (21 archive + 7 ledger tests)
+pytest -q               # 459 passed, 6 skipped (21 archive + 7 ledger tests)
 python -m knowledge_engine.devtools.git_guard   # OK
 ```
 Mutation check: deleting a column from 0003 makes the existing drift test fail. Fix attempts: 0.
