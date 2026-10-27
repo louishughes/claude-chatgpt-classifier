@@ -296,3 +296,14 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "Plan in documents, track in issues. 122 tickets went from a spreadsheet to a dependency-linked backlog in one session."
 - "Never trust numbers you predicted. Another process grabbed one halfway through, and only the check script noticed."
 - "Automate the boring part, but check it with something that didn't write it."
+
+### 22:25 — A lock on the paid API (REV-008)
+**What:** Earlier tonight Louis decided: no more paid API calls for now, do the work locally or with Claude inside the subscription. But the spike's real provider still built an Anthropic client straight from `ANTHROPIC_API_KEY`, which is set on his PC. One wrong command (forgetting `--provider fake` or `--dry-run`) would have spent money. So the rule became code: `AnthropicProvider` now refuses to start unless the environment variable `SPIKE_ALLOW_PAID=1` is set, and the error message names Louis's decision and the switch. The check runs before the SDK is even imported. Only the exact value `1` counts, so `0`, `true` or an empty value all keep it locked. `--dry-run` and the fake provider work as before without the switch.
+**Challenges:**
+- The provider is built outside the spike's existing error handling, so a plain error would have dumped a Python traceback. The command line now catches it and prints a one-line "Refusing: ..." message with exit code 4, in both label and discover modes.
+- Testing a "don't call the paid API" rule without calling the paid API: the tests only check that the provider refuses (or, with the switch on and a fake key, that it builds an object that's never used). Nothing touches the network.
+**Result:** 9 new tests, 62 pass in total, and none of the existing 53 tests were changed.
+**Talking points:**
+- "A rule in a doc is a hope. A rule in code is a guarantee."
+- "Make the expensive path opt-in and the free path the default."
+- "Fail loudly and early: the lock trips before any client exists that could spend money."

@@ -556,3 +556,51 @@ def test_repair_note_survives_a_rate_limit(conv):
     p = Spy({"conv-A": ["schema", "rate_limit"]})
     rec = label_one(conv, p, CostMeter(10), 24000, sleep=no_sleep)
     assert rec.status == "ok" and seen == [False, True, True]
+
+
+# --- paid-call guard (REV-008) -----------------------------------------------
+# These tests never reach the network: without the switch the provider stops
+# before the SDK is imported, and with it we only build the client object.
+
+def test_paid_provider_refuses_without_opt_in(monkeypatch):
+    from providers import PAID_SWITCH, AnthropicProvider, PaidCallsDisabled
+    monkeypatch.delenv(PAID_SWITCH, raising=False)
+    with pytest.raises(PaidCallsDisabled, match=PAID_SWITCH):
+        AnthropicProvider("claude-haiku-5-5", "low", 5.0, 100, refusal_fallback=False)
+
+
+@pytest.mark.parametrize("value", ["0", "", "true", "yes"])
+def test_only_exact_opt_in_value_counts(monkeypatch, value):
+    from providers import PAID_SWITCH, AnthropicProvider, PaidCallsDisabled
+    monkeypatch.setenv(PAID_SWITCH, value)
+    with pytest.raises(PaidCallsDisabled):
+        AnthropicProvider("claude-haiku-5-5", "low", 5.0, 100, refusal_fallback=False)
+
+
+def test_paid_provider_builds_with_opt_in(monkeypatch):
+    from providers import PAID_SWITCH, AnthropicProvider
+    monkeypatch.setenv(PAID_SWITCH, "1")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-not-a-real-key")
+    provider = AnthropicProvider("claude-haiku-5-5", "low", 5.0, 100, refusal_fallback=False)
+    assert provider.model == "claude-haiku-5-5"  # built, but never called
+
+
+def test_fake_and_dry_run_work_without_opt_in(raw_dir, tmp_path, monkeypatch):
+    from providers import PAID_SWITCH
+    monkeypatch.delenv(PAID_SWITCH, raising=False)
+    root = raw_dir(4)
+    assert spike.main(["--raw-dir", str(root), "--out", str(tmp_path / "dry"), "--dry-run"]) == 0
+    assert spike.main(["--raw-dir", str(root), "--out", str(tmp_path / "fake"), "--sample", "4",
+                       "--runs", "1", "--provider", "fake"]) == 0
+    assert spike.main(["--raw-dir", str(root), "--out", str(tmp_path / "fake-d"), "--sample", "4",
+                       "--runs", "1", "--provider", "fake", "--mode", "discover"]) == 0
+
+
+@pytest.mark.parametrize("mode", ["label", "discover"])
+def test_cli_real_provider_refuses_cleanly_without_opt_in(raw_dir, tmp_path, monkeypatch, capsys, mode):
+    from providers import PAID_SWITCH
+    monkeypatch.delenv(PAID_SWITCH, raising=False)
+    code = spike.main(["--raw-dir", str(raw_dir(3)), "--out", str(tmp_path / "out"), "--sample", "3",
+                       "--provider", "anthropic", "--mode", mode])
+    assert code == 4
+    assert PAID_SWITCH in capsys.readouterr().err

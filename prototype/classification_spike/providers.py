@@ -20,6 +20,7 @@ Talking points
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import time
 from dataclasses import dataclass
@@ -57,6 +58,31 @@ class RefusalError(Exception):
 
 class FatalError(Exception):
     """Configuration problem (bad key, bad model name, bad request). Stop the run."""
+
+
+# The owner's rule (2026-10-27): no paid API calls until the owner says otherwise.
+# ANTHROPIC_API_KEY is still set on the owner's PC, so a policy alone could be broken
+# by one wrong command. This switch makes the rule mechanical: the real
+# provider refuses to start unless someone deliberately sets it.
+PAID_SWITCH = "SPIKE_ALLOW_PAID"
+
+
+class PaidCallsDisabled(FatalError):
+    """Raised when the paid provider is built without the opt-in switch."""
+
+
+def require_paid_opt_in() -> None:
+    """Stop unless ``SPIKE_ALLOW_PAID=1`` is set in the environment.
+
+    Only the exact value "1" counts, so "0", "false" or an empty value all
+    keep paid calls off.
+    """
+    if os.environ.get(PAID_SWITCH) != "1":
+        raise PaidCallsDisabled(
+            f"Paid API calls are off: the project owner decided on 2026-10-27 not to make paid API calls "
+            f"until the owner says otherwise. Use --provider fake or --dry-run instead. If the owner has approved "
+            f"a paid run, set the environment variable {PAID_SWITCH}=1 for that run only."
+        )
 
 
 @dataclass
@@ -99,6 +125,9 @@ class AnthropicProvider:
     """
 
     def __init__(self, model: str, effort: str, timeout_s: float, max_tokens: int, refusal_fallback: bool):
+        # Checked first, before the SDK is even imported, so without the switch
+        # no client exists that could spend money.
+        require_paid_opt_in()
         import anthropic  # imported here so tests don't need the SDK installed
 
         self._anthropic = anthropic
