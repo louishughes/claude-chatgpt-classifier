@@ -570,3 +570,14 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "Bad input becomes a list of named problems, not a crash and not silent data loss."
 - "I test the integrity checker by deliberately breaking random trees."
+
+### 23:25 — ING-006 and NRM-001: two fingerprints per message
+**What:** Each message is turned into one clean shape: ordered pieces of text, references to images and files, and anything not understood kept as-is. Each message gets two fingerprints. 29 new tests, 396 in total.
+**Key decisions and why:**
+- **Two fingerprints.** The "raw" one covers everything the export said, so the archive can show exactly what changed between exports. The "content" one covers only who said it, what they said and when. Only a change to the content fingerprint means "redo the AI work". A test uses the metadata-drift fixture (only the model label changed) to prove the content fingerprint stays put.
+- **Nothing is thrown away.** Unknown content types are kept raw and flagged. The model's "thoughts" and Louis's custom instructions are flagged so views can hide them, not deleted.
+- **Image references are parsed, not trusted.** A strange pointer scheme gets a warning instead of a made-up file path.
+**Teach-back (`graph/nodes.py`):** "Every message gets two fingerprints: one of the whole exported record, and one of just the role, the content and the time it was written. If only metadata changes between exports, like the model's name, the first fingerprint changes but the second doesn't, so no AI work is redone. Content the parser doesn't understand is kept as-is and flagged, never dropped."
+**Talking points:**
+- "One fingerprint says the file changed, the other says the meaning changed. Only the meaning costs money."
+- "My parser is honest about what it doesn't understand: unknown content is kept and flagged."
