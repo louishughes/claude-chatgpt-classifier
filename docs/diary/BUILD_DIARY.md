@@ -644,3 +644,22 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "Absence of evidence isn't deletion: missing chats are 'not seen', not gone."
 - "Only real content changes flow downstream to the AI step."
+
+### 23:44 — IMP-002: when an ID can't be trusted, ask instead of guessing
+**What:** Two awkward cases now go to a review list instead of being guessed at. If one export holds two *different* chats under the same ID, the first is imported and the second is set aside as an "ID collision" candidate. A chat with no ID at all isn't imported; it becomes a "missing ID" candidate. Both are marked `review_required` and are never merged automatically. 5 new tests, 482 in total.
+**Key decisions and why:**
+- **A candidate is keyed by a fingerprint of the whole chat**, so importing the same export again finds it already recorded and adds nothing.
+- **The same chat twice in one export isn't a collision.** Identical copies are skipped with a warning; only different content under one ID needs a person.
+- **Across exports, same ID with new content is a revision, not a collision.** That's the normal "I kept chatting" case from IMP-003.
+- **Title and date never decide identity.** Two chats with the same title and day stay two chats.
+**Teach-back (`importer/identity.py`):** "A chat's identity comes from the export's own ID, never its title or date. When that ID is missing, or two different chats share it in one export, I don't guess: the chat goes on a review list as a candidate. The candidate is keyed by a fingerprint of the chat, so importing the same export again doesn't add it twice."
+**Talking points:**
+- "When the data can't tell me who something is, it goes to review; the system never merges on a hunch."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 67 source files
+pytest -q               # 482 passed, 6 skipped (5 new)
+```
+Finish line: `id_collision` matches its answer key (candidate_matches id_collision 1 / missing_native_id 1; merged 0); `same_title_different_chat` gives 2 conversations, 0 candidates. Fix attempts: 1 (my own new test assumed two revisions per chat; the fixture's chat also has a root message).
+
+**Next exact task:** slice I5 (IMP-004: two concurrent imports give the same result as one).

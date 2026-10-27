@@ -28,15 +28,17 @@ from itertools import islice
 from pathlib import Path
 
 from knowledge_engine import __version__
-from knowledge_engine.domain.enums import DeltaCategory, ImportBatchStatus
+from knowledge_engine.domain.enums import DeltaCategory, ImportBatchStatus, SourceSystem
+from knowledge_engine.domain.ids import conversation_id
 from knowledge_engine.graph.conversation import BRANCH_CLASSIFIER_VERSION
 from knowledge_engine.graph.nodes import CANONICAL_HASH_VERSION
 from knowledge_engine.importer.archive import BlobStore
 from knowledge_engine.importer.delta import (
-    MissingNativeIdError,
     apply_conversation,
     mark_not_seen,
+    native_conversation_id,
 )
+from knowledge_engine.importer.identity import CandidateReason, conversation_hash, record_candidate
 from knowledge_engine.importer.ledger import ImportBatchRow, ImportLedger
 from knowledge_engine.importer.report import ImportReport
 from knowledge_engine.infrastructure.db import SessionFactory, create_sqlite_engine, database_path
@@ -124,6 +126,10 @@ def _run(
     changed: list[str] = []
     new_branches = 0
     raw_observations = 0
+    candidates: Counter[str] = Counter()
+    # Native ID -> content hash of the first conversation this import saw
+    # with it, to tell an exact duplicate from an ID collision.
+    seen: dict[str, str] = {}
     group_size = settings.limits.max_conversations_per_batch
     stream = listing.conversations()
     for group in _groups(stream, group_size):
@@ -133,21 +139,60 @@ def _run(
                 if not item.native:
                     conversations[DeltaCategory.FAILED.value] += 1
                     continue
-                try:
-                    delta = apply_conversation(
-                        session,
-                        item.native,
-                        workspace_id=workspace_id,
-                        account_namespace=account_ns,
-                        import_id=import_id,
-                        snapshot_id=snapshots[item.locator.file],
-                    )
-                except MissingNativeIdError:
-                    # Keying it without a native ID would be a guess.
-                    # IMP-002's candidate matching (slice I4) handles these.
+                native_id = native_conversation_id(item.native)
+                snapshot_id = snapshots[item.locator.file]
+                if native_id is None:
+                    # Keying it without a native ID would be a guess, so it
+                    # isn't imported: it waits for review as a candidate.
                     warnings["missing_native_id"] += 1
                     conversations[DeltaCategory.FAILED.value] += 1
+                    record_candidate(
+                        session,
+                        item.native,
+                        reason=CandidateReason.MISSING_NATIVE_ID,
+                        workspace_id=workspace_id,
+                        account_namespace=account_ns,
+                        native_id=None,
+                        existing_conversation_id=None,
+                        snapshot_id=snapshot_id,
+                        source_index=item.locator.index,
+                        import_id=import_id,
+                    )
+                    candidates[CandidateReason.MISSING_NATIVE_ID.value] += 1
                     continue
+                digest = conversation_hash(item.native)
+                if native_id in seen:
+                    if seen[native_id] == digest:
+                        # The same chat twice in one export: nothing new.
+                        warnings["duplicate_conversation_in_source"] += 1
+                        continue
+                    # Same ID, different chat: never merged, kept for review.
+                    record_candidate(
+                        session,
+                        item.native,
+                        reason=CandidateReason.ID_COLLISION,
+                        workspace_id=workspace_id,
+                        account_namespace=account_ns,
+                        native_id=native_id,
+                        existing_conversation_id=conversation_id(
+                            workspace_id, SourceSystem.CHATGPT.value, account_ns, native_id
+                        ),
+                        snapshot_id=snapshot_id,
+                        source_index=item.locator.index,
+                        import_id=import_id,
+                    )
+                    candidates[CandidateReason.ID_COLLISION.value] += 1
+                    conversations[DeltaCategory.CANDIDATE_DUPLICATE.value] += 1
+                    continue
+                seen[native_id] = digest
+                delta = apply_conversation(
+                    session,
+                    item.native,
+                    workspace_id=workspace_id,
+                    account_namespace=account_ns,
+                    import_id=import_id,
+                    snapshot_id=snapshot_id,
+                )
                 conversations[delta.category.value] += 1
                 messages.update(delta.messages)
                 warnings.update(delta.warnings)
@@ -186,6 +231,7 @@ def _run(
         changed_revisions=tuple(sorted(changed)),
         new_branches=new_branches,
         raw_observations=raw_observations,
+        candidate_matches=dict(candidates),
         raw_tree_hash_before=before,
         raw_tree_hash_after=after,
     )

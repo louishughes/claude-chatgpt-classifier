@@ -513,3 +513,8 @@ pytest -q               # 477 passed, 6 skipped (7 new)
 Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (conversations new 1 / unchanged 1 / revised 2 / not_seen 1; messages new 5 / revised 1 / unchanged 8 / not_seen 3; new_branches 1; 0 model calls); the absent conversation keeps all 3 revisions. Fix attempts: 1 (first run marked the drift fixture's absent conversations not_seen; resolved by the partial-source flag above).
 
 **Next exact task:** slice I4 (IMP-002 candidate matches: id_collision, missing native ID).
+
+## 2026-10-27 23:44 IMP-002 (slice I4)
+- Added importer/identity.py (identity_candidates table, migration 0006); run.py records id_collision / missing_native_id candidates, skips exact in-source duplicates; report gains candidate_matches.
+- Tests: tests/integration/test_identity_candidates.py (5). Full suite 482 passed, 6 skipped; ruff, mypy clean.
+- Next: slice I5 (IMP-004 concurrency).
