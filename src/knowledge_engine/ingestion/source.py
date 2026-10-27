@@ -145,6 +145,9 @@ class SourceListing:
         media_files: Attachment files found alongside.
         warnings: Source-level warnings (e.g. the format lacks account IDs).
         reader: Called to stream the conversations. Use ``conversations()``.
+        declared_media: File names an export manifest lists, whether or not
+            the file is present. Lets a missing image be reported as
+            "listed but absent" rather than just "not found".
     """
 
     format_id: str
@@ -154,6 +157,7 @@ class SourceListing:
     reader: Callable[[], Iterator[NativeConversation]] = field(
         default=lambda: iter(()), repr=False, compare=False
     )
+    declared_media: tuple[str, ...] = ()
 
     def conversations(self) -> Iterator[NativeConversation]:
         """Stream the conversations, one at a time.

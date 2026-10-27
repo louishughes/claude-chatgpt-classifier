@@ -705,3 +705,25 @@ pytest -q               # 497 passed, 6 skipped (12 new)
 Finish line: `repeated_image` answer key matches (assets 3, blobs 2, available occurrences 5, per-asset 3/1/1); re-import adds 0 blobs, 0 assets, 0 occurrences and the raw tree is unchanged; `reexport_v1` → `v2` reports 1 new image. Fix attempts: 1 (forgot the migration on the first run).
 
 **Next exact task:** media slice M2 (MED-002: missing, ambiguous and unresolved pointers with evidence).
+
+### 23:57 — MED-002: every image reference finds its file, or says why not
+**What:** Each image reference now ends in exactly one of: found, missing, ambiguous (two different files could be it), or unresolved (the pointer isn't a kind I understand). Each one stores its *reason* and the files it considered. 7 new tests, 504 in total. The `asset_problems` fake export matches its answer key: 2 missing, 1 ambiguous, 1 unresolved.
+**The rules, in order:**
+1. A pointer with no file ID I recognise is **unresolved**.
+2. No file with that ID is **missing**. If an export index listed the file, the reason says "listed but absent".
+3. One file is **found**.
+4. Several files are narrowed only by safe evidence: exactly one inside a folder named after the conversation, or all copies byte-identical. Otherwise it's **ambiguous**, and nothing is stored for it.
+**Also new:** uploaded files listed in a message's `attachments` metadata become occurrences too. An image listed both as content and as an attachment is counted once.
+**Something to check on real data:** I only know the *key names* of Louis's export index files (from REV-007), not the shape of their entries, so the reader accepts plain names or objects with a path/filename/name field, and ignores anything else. That gets confirmed at the REV-009 real-data checkpoint.
+**Teach-back (`MediaLibrary.resolve` in `importer/media.py`):** "Each image reference is matched to files by the export's file ID. Exactly one match is found; none is missing; several different files are ambiguous unless the conversation's own folder or identical bytes settle it. Every outcome records its rule and the files it looked at, so nothing is ever guessed or invented."
+**Talking points:**
+- "When the evidence doesn't settle it, the answer is 'ambiguous', not a coin toss."
+- "Every 'missing' comes with the reason it's missing."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 75 source files
+pytest -q               # 504 passed, 6 skipped (7 new)
+```
+Finish line: `asset_problems` states by pointer match the answer key exactly; a manifest-listed but absent file is `missing` with rule `listed_but_absent`; ambiguous candidates store no blob; no occurrence has an invented path. Fix attempts: 0.
+
+**Next exact task:** slice I6 (ING-007 integrity reconciliation + IMP-005 import report and `ke imports report latest`).

@@ -32,7 +32,7 @@ Talking points:
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from types import MappingProxyType
@@ -274,6 +274,55 @@ def parse_pointer(pointer: str) -> tuple[str | None, str | None]:
         return scheme, None
     file_id = rest.strip("/")
     return scheme, file_id or None
+
+
+ATTACHMENT_SCHEME = "attachment"
+
+
+def attachment_pointers(
+    message: Mapping[str, Any], skip_file_ids: Iterable[str] = ()
+) -> tuple[AssetPointer, ...]:
+    """Return a message's uploaded-file attachments as asset pointers.
+
+    Uploaded files are listed in ``metadata.attachments`` rather than in the
+    content, so they don't change the content hash. Each one becomes an
+    ``attachment://<id>`` pointer whose ``part_index`` is its position in
+    that list. An image is often listed both as a content part and as an
+    attachment; pass the content parts' file IDs in ``skip_file_ids`` so it
+    is counted once.
+
+    Args:
+        message: The node's ``message`` object.
+        skip_file_ids: File IDs already referenced by the content.
+
+    Returns:
+        One pointer per attachment that has a string ``id``.
+    """
+    metadata = message.get("metadata")
+    attachments = metadata.get("attachments") if isinstance(metadata, Mapping) else None
+    if not isinstance(attachments, list):
+        return ()
+    skip = set(skip_file_ids)
+    pointers: list[AssetPointer] = []
+    for index, attachment in enumerate(attachments):
+        if not isinstance(attachment, Mapping):
+            continue
+        file_id = _str(attachment.get("id"))
+        if not file_id or file_id in skip:
+            continue
+        pointers.append(
+            AssetPointer(
+                pointer=f"{ATTACHMENT_SCHEME}://{file_id}",
+                scheme=ATTACHMENT_SCHEME,
+                file_id=file_id,
+                part_index=index,
+                content_type=ATTACHMENT_SCHEME,
+                size_bytes=_int(attachment.get("size")),
+                width=_int(attachment.get("width")),
+                height=_int(attachment.get("height")),
+            )
+        )
+    return tuple(pointers)
 
 
 # ---------------------------------------------------------------- content variants
