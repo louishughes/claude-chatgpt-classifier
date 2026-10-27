@@ -182,3 +182,9 @@ These are now in `AGENTS.md`, `CLAUDE.md` and the plan. The spike's gold set got
 **Talking points:**
 - "Start with the cheapest model that might work, measure it, and only pay for more if the numbers say so."
 - "Same gold set across models makes the comparison fair."
+
+### 19:58 — First contact with the real data (no AI yet)
+**What:** Set the spike up on the PC that holds the data, in a separate Git worktree so the main checkout stayed clean. Python 3.13, all 40 tests pass on Windows too. The dry run sampled 50 real conversations with none skipped and estimated about 230k input and 75k output tokens: **~$0.06 per run on Haiku**, ~$0.12 for both runs. It also wrote the 20-chat labelling sheet. No API calls, nothing in `raw/` touched.
+**Talking points:**
+- "Free steps first: tests, cost estimate, labelling sheet. The paid step comes last."
+- "A worktree let me try a branch on my real machine without disturbing my main checkout."
