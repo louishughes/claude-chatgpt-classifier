@@ -98,11 +98,19 @@ class Record:
     decisions_quote_found: int = 0       # quote found in the message it points at
     decisions_refs_ok: int = 0           # message numbers exist and match the speakers
     decisions_decided_by_assistant: int = 0  # accepted/rejected but decided_in isn't a user message
+    checks: dict = field(default_factory=dict)  # code checks on the answer (discovery mode)
     position: int = 0                    # order this chat was processed in (order-independence check)
     error: str = ""
 
 
+# Quote checks failed on harmless differences in earlier attempts: curly vs
+# straight apostrophes and quotes, dashes, and a literal "\n" in the quote.
+_QUOTE_FIXES = str.maketrans({"\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"',
+                              "\u2013": "-", "\u2014": "-", "\u00a0": " "})
+
+
 def _normalise(s: str) -> str:
+    s = s.replace("\\n", " ").translate(_QUOTE_FIXES)
     return " ".join(s.split()).lower()
 
 
@@ -246,6 +254,7 @@ def run_once(
     progress=print,
     order_seed: int | None = None,
     decisions_provider: Provider | None = None,
+    one=None,
 ) -> dict[str, dict]:
     """Label every conversation not already finished in ``out_file``.
 
@@ -253,6 +262,9 @@ def run_once(
     order on purpose: every call is independent (no shared vocabulary that
     grows during the run), so the labels must not depend on order. If two
     runs in different orders still agree, that is evidence of it.
+
+    ``one`` handles a single conversation and returns a Record. The default is
+    ``label_one`` (spike 0.3); discovery mode passes its own.
     """
     done = {cid for cid, r in load_records(out_file).items() if r["status"] in FINISHED}
     todo = [c for c in conversations if c.conversation_id not in done]
@@ -267,8 +279,11 @@ def run_once(
         if fatal:
             return
         try:
-            rec = label_one(conv, provider, meter, budget_chars, max_attempts, backoff_s,
-                            decisions_provider=decisions_provider)
+            if one is not None:
+                rec = one(conv)
+            else:
+                rec = label_one(conv, provider, meter, budget_chars, max_attempts, backoff_s,
+                                decisions_provider=decisions_provider)
         except FatalError as exc:
             fatal.append(str(exc))
             return

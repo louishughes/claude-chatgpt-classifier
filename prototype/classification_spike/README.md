@@ -25,7 +25,8 @@ The earlier attempts failed on three things: inconsistent labels, untyped output
 | `review.py` | Evaluator mode: review sheet of the model's answers, your y/n verdicts, reference labels |
 | `gold.py` | Gold set: picks varied chats, writes the labelling sheet and instructions, scores accuracy, fingerprints the file |
 | `spike.py` | Command line |
-| `tests/` | 47 tests on synthetic data, including 50- and 100-chat batches with injected failures |
+| `discovery.py` | Spike v3 step 2: discovery call, code checks, scoring by message number |
+| `tests/` | 53 tests on synthetic data, including 50- and 100-chat batches with injected failures |
 
 ## Order of play (agreed 2026-10-27)
 1. Schema with separate fields (done) → 2. run 50 chats twice → 3. **you evaluate** ~20 of the model's answers (y/n), giving accuracy alongside agreement → 4. go/no-go: if targets are met, run 100, then start M1; if not, change the method (inputs, fields, segmenting), not the prompt wording.
@@ -54,8 +55,9 @@ Decisions run as a second call per chat (`--decisions-model`, `--decisions-effor
 ## Run log
 | Version | Date | What changed | Result (50 chats × 2, Haiku 5.5) |
 |---|---|---|---|
-| spike-0.2 | 2026-10-27 | First real run | $0.069; 0 timeouts; 84–86% ok (14 of 15 failures = more than 5 topics); domain agree 87.5%, purpose 90%; checked on 20 chats: domain 95%, purpose 85%, **decisions 7/13 right** |
-| spike-0.3 | 2026-10-27 | Topics/summary over the limit are trimmed, not rejected; decisions moved to a separate call (effort `medium`) that must cite message numbers, which code checks (an "accepted" decision must point at a message *you* wrote) | pending |
+| spike-0.2 | 2026-10-27 | First real run | $0.069; 0 timeouts; 84–86% ok (14 of 15 failures = more than 5 topics); domain agree 87.5%, purpose 90%. **Claude's check** of 20 chats (not owner-verified, so not an accuracy figure): domain 95%, purpose 85%, decisions 7/13. 12 of 50 chats were clipped at 24k chars and did markedly worse |
+| spike-0.3 | 2026-10-27 | Topics/summary over the limit trimmed, not rejected; decisions in a separate call citing message numbers, checked by code | not run: owner judged per-chat labels too simplistic |
+| discovery-0.1 (v3) | 2026-10-27 | `--mode discover`: sections + typed items per chat with message citations, code checks, scoring against the owner-approved answer key, run 2 scored against run 1. Clip limit raised to 200k chars; code messages kept; quote matching tolerant of curly quotes and escaped newlines | pending |
 
 ## What "good enough" looks like (proposed, to agree before running)
 | Metric | Target |

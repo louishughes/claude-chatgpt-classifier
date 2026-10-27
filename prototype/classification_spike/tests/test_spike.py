@@ -462,3 +462,97 @@ def test_review_rejects_unknown_correction(tmp_path):
                  "x,games,brainstorm,n,y,gamez\n")
     with pytest.raises(ValueError, match="gamez"):
         load_review(p)
+
+
+# --- spike v3: discovery ---------------------------------------------------------
+
+def seg(start, end, l1="games", purpose="brainstorm", projects=()):
+    return {"start": start, "end": end, "subject_l1": l1, "subject_l2": "x", "purpose": purpose,
+            "projects": list(projects), "summary": "s"}
+
+
+def item(t, m, speaker="user", **kw):
+    return {"type": t, "text": "t", "message": m, "speaker": speaker, "state": kw.get("state"),
+            "decided_in": kw.get("decided_in"), "evidence_quote": kw.get("quote", ""),
+            "proposed_by": kw.get("proposed_by")}
+
+
+def test_discovery_checks_catch_gaps_overlaps_and_bad_refs(tmp_path):
+    from discovery import check_discovery
+    conv = conv_from(tmp_path, make_conversation("d", n_exchanges=3))   # 6 messages
+    answer = {"segments": [seg(1, 3), seg(3, 4), seg(9, 10)], "items": [
+        item("idea", 2, speaker="assistant"),
+        item("idea", 2, speaker="user"),                                      # wrong speaker
+        item("decision", 2, speaker="assistant", state="accepted", decided_in=2),  # decided by assistant
+        item("preference", 1, quote=conv.turns[0].text[:20]),
+    ]}
+    c = check_discovery(answer, conv)
+    assert c["segment_bad_ranges"] == 1 and c["messages_overlapped"] == 1 and c["messages_uncovered"] == 2
+    assert c["item_refs_ok"] == 2 and c["decided_without_user_message"] == 1 and c["item_quotes_ok"] == 1
+
+
+def test_score_pair_by_message_number():
+    from discovery import score_pair
+    key = {"segments": [seg(1, 4, "games"), seg(5, 10, "career_and_education", projects=["Bow Bots"])],
+           "items": [item("idea", 3), item("decision", 6, state="accepted", proposed_by="assistant"),
+                     item("preference", 9)]}
+    pred = {"segments": [seg(1, 5, "games"), seg(6, 10, "career_and_education", projects=["bow-bots", "Other"])],
+            "items": [item("idea", 4), item("decision", 6, speaker="assistant", state="rejected"),
+                      item("fact_about_owner", 2)]}
+    s = score_pair(key, pred, 10)
+    assert s["boundaries_matched"] == 1                    # 5 vs 6 is within one message
+    assert s["subject_l1_messages_agree"] == 9             # only message 5 differs
+    assert s["projects_matched"] == 1 and s["projects_pred"] == 2
+    assert s["items_idea"] == (1, 1, 1) and s["items_preference"] == (1, 0, 0)
+    assert s["decisions_matched"] == 1 and s["decision_state_ok"] == 0 and s["decision_proposer_ok"] == 1
+
+
+def test_cli_discover_mode_scores_against_answer_key(raw_dir, tmp_path):
+    root, out, keydir = raw_dir(8), tmp_path / "out", tmp_path / "key"
+    convs, _ = sample_conversations(root, 8, seed=20261027)
+    keydir.mkdir()
+    for c in convs[:3]:   # key = one section, one fact per user message: matches the fake model
+        n = len(c.turns)
+        users = [i for i, t in enumerate(c.turns, 1) if t.role == "user"]
+        (keydir / f"{c.conversation_id}.json").write_text(json.dumps({
+            "conversation_id": c.conversation_id, "messages": n, "segments": [seg(1, n)],
+            "items": [item("fact_about_owner", m) for m in users]}))
+    code = spike.main(["--raw-dir", str(root), "--out", str(out), "--sample", "8", "--provider", "fake",
+                       "--mode", "discover", "--answer-key", str(keydir), "--runs", "2"])
+    assert code == 0
+    rep = json.loads((out / "discovery_report.json").read_text())
+    assert rep["runs"][0]["status_counts"] == {"ok": 8}
+    assert rep["runs"][0]["segment_coverage_errors"] == 0 and rep["runs"][0]["item_quotes_ok_pct"] == 100.0
+    assert rep["vs_answer_key"][0]["chats_scored"] == 3
+    assert rep["vs_answer_key"][0]["items_recall_pct"] == 100.0
+    assert rep["consistency"]["subject_l1_by_message_pct"] == 100.0
+    assert rep["meta"]["answer_key_sha256"] != "none"
+
+
+def test_quote_matching_ignores_curly_quotes_and_escaped_newlines():
+    from runner import _normalise
+    assert _normalise("Louis’s idea\\nis “good”") == _normalise("louis's idea is \"good\"")
+
+
+def test_code_messages_are_kept(tmp_path):
+    data = make_conversation("c", n_exchanges=1)
+    nodes = data["conversation"]["mapping"]
+    nodes["a0"]["message"]["content"] = {"content_type": "code", "text": "print('hi')"}
+    conv = conv_from(tmp_path, data)
+    assert any("print('hi')" in t.text for t in conv.turns)
+
+
+def test_repair_note_survives_a_rate_limit(conv):
+    """A transient error between a bad answer and its repair must not lose the repair message."""
+    from schema import ConversationLabel
+    seen = []
+
+    class Spy(FakeProvider):
+        def parse(self, system, user_content, output_format):
+            if output_format is ConversationLabel:
+                seen.append("previous answer was rejected" in user_content)
+            return super().parse(system, user_content, output_format)
+
+    p = Spy({"conv-A": ["schema", "rate_limit"]})
+    rec = label_one(conv, p, CostMeter(10), 24000, sleep=no_sleep)
+    assert rec.status == "ok" and seen == [False, True, True]

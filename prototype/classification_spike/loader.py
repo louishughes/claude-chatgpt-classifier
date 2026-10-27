@@ -38,6 +38,9 @@ KEPT_ROLES = {"user", "assistant"}
 # Content types that carry readable chat text. "thoughts" and
 # "reasoning_recap" are the model's hidden reasoning, not the conversation.
 TEXT_CONTENT_TYPES = {"text", "multimodal_text"}
+# Code the user or assistant wrote is kept too: an earlier attempt dropped it
+# and lost real artefacts. It is stored under "text", not "parts".
+CODE_CONTENT_TYPES = {"code"}
 
 
 @dataclass
@@ -130,7 +133,12 @@ def turn_from_node(node: dict) -> Turn | None:
         return None
     role = (msg.get("author") or {}).get("role")
     content = msg.get("content") or {}
-    if role not in KEPT_ROLES or content.get("content_type") not in TEXT_CONTENT_TYPES:
+    if role not in KEPT_ROLES:
+        return None
+    if content.get("content_type") in CODE_CONTENT_TYPES:
+        code = content.get("text")
+        return Turn(role=role, text=f"[code]\n{code}") if isinstance(code, str) and code.strip() else None
+    if content.get("content_type") not in TEXT_CONTENT_TYPES:
         return None
     # Hidden context the user never typed in this chat (custom instructions).
     if (msg.get("metadata") or {}).get("is_visually_hidden_from_conversation"):

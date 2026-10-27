@@ -226,3 +226,15 @@ Tests went from 43 to 47. Three existing tests had their expected call counts ch
 - "Cheap runs aren't the goal. Useful knowledge is. Seven cents told me my categories were the problem, not the model."
 - "Discover first, classify second. You can't pick the categories before you've seen the data."
 - "Write the answer key before you look at the model's answers."
+
+### 20:55 — Lessons from the old attempts, and the discovery step
+**What:** A separate review of the earlier attempts flagged where this spike was repeating old mistakes. It made four points:
+- **The run 1 "accuracy" was Claude marking Claude.** The report even said "your verdicts". That is now labelled "Claude's check" everywhere, and no accuracy figure counts until Louis has approved the answer key.
+- **Clipping hurt.** 12 of 50 chats were cut at 24k characters, and those did much worse. Haiku can read a million tokens, so the limit is now 200k characters, still under a cent per chat.
+- **Code was being dropped**, as in the first attempt. It's kept now.
+- **Quote checks** failed on curly apostrophes and escaped newlines. They're now tolerant of both.
+
+Built step 2 of v3: one call per chat returns sections and typed items, each tied to a message number. Code checks that the sections cover the chat, that speakers match and that quotes are real. It scores against the answer key by message number, and scores run 2 against run 1 for consistency, with clipped and unclipped chats reported separately. The answer key now has 10 chats and 95 items after a full re-read. 53 tests pass.
+**Talking points:**
+- "The easiest bug to miss: your evaluator is the same kind of model as the thing it evaluates."
+- "Truncation is silent data loss. Measure clipped and unclipped separately."

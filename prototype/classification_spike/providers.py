@@ -27,7 +27,8 @@ from typing import Protocol
 
 import pydantic
 
-from schema import DOMAINS, KNOWLEDGE_TYPES, OUTPUTS, PURPOSES, ConversationLabel, Decision, DecisionList
+from schema import (DOMAINS, KNOWLEDGE_TYPES, OUTPUTS, PURPOSES, ConversationLabel, Decision, DecisionList,
+                    Discovery)
 
 # USD per million tokens (input, output). Thinking tokens bill as output.
 PRICES = {
@@ -195,6 +196,8 @@ class FakeProvider:
         if output_format in self.responders:
             # Tests can plug in their own answer for a form.
             return CallResult(self.responders[output_format](user_content), tokens, 100, "fake")
+        if output_format is Discovery:
+            return CallResult(_fake_discovery(user_content), tokens, 300, "fake")
         if output_format is DecisionList:
             return CallResult(_fake_decisions(user_content), tokens, 100, "fake")
         return CallResult(_fake_label(user_content), tokens, 150, "fake")
@@ -216,6 +219,19 @@ def _fake_label(text: str) -> ConversationLabel:
         summary="Synthetic summary from the fake provider.",
         confidence=0.8,
     )
+
+
+def _fake_discovery(text: str) -> Discovery:
+    """One section over all messages; one fact item per user message, quoting its start."""
+    users = re.findall(r"\[#(\d+) user\]: ([^\n]{1,30})", text)
+    last = max([int(n) for n in re.findall(r"\[#(\d+) (?:user|assistant)\]", text)] or [1])
+    digest = int(hashlib.sha256(text.encode()).hexdigest(), 16)
+    return Discovery(
+        segments=[{"start": 1, "end": last, "subject_l1": list(DOMAINS)[digest % len(DOMAINS)],
+                   "subject_l2": f"area {digest % 7}", "purpose": list(PURPOSES)[digest % len(PURPOSES)],
+                   "projects": ["Synthetic Project"] if digest % 2 else [], "summary": "Synthetic."}],
+        items=[{"type": "fact_about_owner", "text": "Synthetic.", "message": int(n), "speaker": "user",
+                "state": None, "decided_in": None, "evidence_quote": q} for n, q in users])
 
 
 def _fake_decisions(text: str) -> DecisionList:

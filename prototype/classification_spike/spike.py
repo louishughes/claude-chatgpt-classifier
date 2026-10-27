@@ -40,13 +40,15 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from discovery import discover_one, load_answer_key, run_checks, score_run
+from discovery import to_markdown as discovery_markdown
 from gold import fingerprint, gold_stats, load_gold, pick_diverse, write_template
 from review import load_review, write_review_sheet
 from loader import clip_text, sample_conversations
 from providers import PRICES, AnthropicProvider, FakeProvider, FatalError
 from report import category_spread, consistency, run_stats, to_markdown
 from runner import CostMeter, load_records, run_once
-from schema import DECISIONS_PROMPT, SYSTEM_PROMPT, TAXONOMY_VERSION
+from schema import DECISIONS_PROMPT, DISCOVERY_PROMPT, DISCOVERY_VERSION, SYSTEM_PROMPT, TAXONOMY_VERSION
 
 # Rough output size per call, including the model's thinking. Only used for
 # the dry-run estimate; the real run uses the API's exact token counts.
@@ -98,7 +100,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--decisions-effort", choices=["low", "medium", "high"], default="medium",
                    help="decisions need more care than labels, so default one level higher")
     p.add_argument("--max-cost-usd", type=float, default=2.0)
-    p.add_argument("--budget-chars", type=int, default=24000, help="max characters sent per chat")
+    # Run 1 clipped 12 of 50 chats at 24k characters, and clipped chats were
+    # wrong far more often. Haiku 5.5 reads 1M tokens, so send nearly everything:
+    # 200k characters is ~65k tokens, under $0.01 per chat on Haiku.
+    p.add_argument("--budget-chars", type=int, default=200_000, help="max characters sent per chat")
     p.add_argument("--max-tokens", type=int, default=8000)
     p.add_argument("--timeout-s", type=float, default=90.0)
     p.add_argument("--workers", type=int, default=4)
@@ -110,6 +115,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--reviewer", default="owner", help="who made the verdicts in --review (shown in the report)")
     p.add_argument("--review-size", type=int, default=20, help="chats in the review sheet")
     p.add_argument("--dry-run", action="store_true", help="estimate cost, make no calls")
+    p.add_argument("--mode", choices=["label", "discover"], default="label",
+                   help="label: spike 0.3 per-chat labels; discover: spike v3 step 2 (segments + typed items)")
+    p.add_argument("--answer-key", type=Path, default=PROJECT_ROOT / "private" / "answer-key",
+                   help="folder of answer-key JSON files (discover mode scores against it if present)")
     return p.parse_args(argv)
 
 
@@ -124,6 +133,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Sampled {len(convs)} conversations (skipped: {skipped})")
     if not convs:
         return 1
+    if args.mode == "discover":
+        return run_discovery(args, out, convs)
 
     if args.gold_template:
         out.mkdir(parents=True, exist_ok=True)
@@ -216,6 +227,81 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Review sheet: {sheet} (mark y/n, save as review.csv in the same folder)")
     print(f"Report: {out / 'report.md'}")
     return 0
+
+
+def run_discovery(args: argparse.Namespace, out: Path, convs: list) -> int:
+    """Spike v3 step 2: discover segments and typed items, check them, score them."""
+    model = "fake" if args.provider == "fake" else args.model
+    sent = sum(len(clip_text(c.full_text(), args.budget_chars)[0]) for c in convs)
+    tin = int((sent + len(DISCOVERY_PROMPT) * len(convs)) / 4 * 1.3)
+    tout = 4000 * len(convs)  # sections + up to 60 items + thinking, pessimistic
+    pin, pout = PRICES[model]
+    est = (tin * pin + tout * pout) / 1_000_000
+    clipped = sum(1 for c in convs if clip_text(c.full_text(), args.budget_chars)[1])
+    print(f"Discovery estimate per run: ~{tin:,} in + ~{tout:,} out ({model}) = ~${est:.2f}; "
+          f"x{args.runs} = ~${est * args.runs:.2f}. Chats clipped at {args.budget_chars:,} chars: {clipped}. "
+          f"Cap: ${args.max_cost_usd:.2f}")
+    if args.dry_run:
+        return 0
+    out.mkdir(parents=True, exist_ok=True)
+    if args.provider == "fake":
+        provider = FakeProvider()
+    else:
+        provider = AnthropicProvider(args.model, args.decisions_effort, args.timeout_s, max(args.max_tokens, 16000),
+                                     refusal_fallback=not args.no_refusal_fallback
+                                     and not args.model.startswith("claude-haiku"))
+    previous = sum(r["cost_usd"] for i in range(1, args.runs + 1)
+                   for r in load_records(out / f"discover-{i}.jsonl").values())
+    meter = CostMeter(args.max_cost_usd, already_spent=previous)
+    one = lambda conv: discover_one(conv, provider, meter, args.budget_chars)
+    runs = []
+    try:
+        for i in range(1, args.runs + 1):
+            print(f"Discovery run {i}/{args.runs}")
+            runs.append(run_once(convs, provider, out / f"discover-{i}.jsonl", meter, args.budget_chars,
+                                 workers=args.workers, order_seed=args.seed + i, one=one))
+    except FatalError as exc:
+        print(f"Stopped: {exc}", file=sys.stderr)
+        return 3
+    by_id = {c.conversation_id: c for c in convs}
+    key = load_answer_key(args.answer_key.expanduser()) if args.answer_key.expanduser().is_dir() else {}
+    vs_key = []
+    for r in runs:
+        scored = score_run(r, key, by_id) if key else {}
+        if key:
+            # Split by whether the chat was cut to fit: earlier runs did worse on clipped chats.
+            scored["clipped_only"] = score_run({k: v for k, v in r.items() if v["clipped"]}, key, by_id)
+            scored["unclipped_only"] = score_run({k: v for k, v in r.items() if not v["clipped"]}, key, by_id)
+            vs_key.append(scored)
+    cons = None
+    if len(runs) > 1:
+        ref = {cid: rec["label"] for cid, rec in runs[0].items() if rec["status"] == "ok"}
+        cons = score_run(runs[1], ref, by_id)
+    meta = {
+        "date_utc": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
+        "model": model, "effort": args.decisions_effort, "version": DISCOVERY_VERSION,
+        "sample": len(convs), "seed": args.seed, "runs": args.runs, "budget_chars": args.budget_chars,
+        "answer_key_chats": len(key),
+        # The key is written by Claude and approved by the owner; until approved,
+        # treat accuracy as provisional.
+        "answer_key_sha256": _folder_fingerprint(args.answer_key.expanduser()) if key else "none",
+        "total_cost_usd": round(meter.spent, 4),
+    }
+    checks = [run_checks(r) for r in runs]
+    (out / "discovery_report.json").write_text(json.dumps(
+        {"meta": meta, "runs": checks, "vs_answer_key": vs_key, "consistency": cons}, indent=1))
+    (out / "discovery_report.md").write_text(discovery_markdown(meta, checks, vs_key, cons))
+    print(f"Report: {out / 'discovery_report.md'}")
+    return 0
+
+
+def _folder_fingerprint(folder: Path) -> str:
+    import hashlib
+    h = hashlib.sha256()
+    for p in sorted(folder.glob("*.json")):
+        h.update(p.name.encode())
+        h.update(p.read_bytes())
+    return h.hexdigest()[:16]
 
 
 if __name__ == "__main__":
