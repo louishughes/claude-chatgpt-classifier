@@ -523,3 +523,9 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - Added importer/lock.py (OS file lock on <workspace>/import.lock, fcntl/msvcrt); run_import holds it for the whole import; Limits.import_lock_timeout_s (default 600).
 - Tests: tests/integration/test_concurrent_import.py (3; two subprocess imports equal one). Verified it fails with the lock removed. Full suite 485 passed, 6 skipped.
 - Next: media slice M1 (MED-001 + MED-003).
+
+## 2026-10-27 23:52 MED-001 + MED-003 (slice M1)
+- Added importer/media.py (media_blobs, media_assets, asset_occurrences, derived_media_artifacts; migration 0007), MediaLibrary (file-ID-prefix match, reference/copy/ZIP storage), image_header (PNG/GIF/JPEG/WebP header only). ConversationDelta.pointers feeds record_occurrences in the same transaction. Report gains media + asset_occurrences. BlobStore.max_bytes property.
+- docs/plans/M1_CONSOLIDATION.md: amendment note on the I5 lock.
+- Tests: test_media_import.py (6), test_image_header.py (6). Full suite 497 passed, 6 skipped.
+- Next: slice M2 (MED-002).
