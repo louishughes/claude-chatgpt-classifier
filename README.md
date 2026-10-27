@@ -130,3 +130,16 @@ Implement one dependency-unblocked ticket or approved vertical slice, test using
 4. Review its audit, changes, revised tickets and plan before instructing it to start implementation.
 
 **Note:** The files in this starter pack are agent guidance and planning instructions. They do not implement an importer, scraper, transcript fetcher or RAG service by themselves.
+
+## 9. Developer setup (FND-001)
+
+The package lives in `src/knowledge_engine/` and needs Python 3.12 or newer. From the project folder:
+
+```bash
+python -m venv .venv
+# Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
+pip install -e ".[dev]"
+ruff check . && ruff format --check . && mypy && pytest
+```
+
+Coding and comment rules are in `docs/CODE_STYLE.md`. Ticket progress is in `STATUS.md`.

@@ -3,3 +3,16 @@ raw/
 
 # Private local outputs (spike results, gold labels): never commit
 private/
+
+# Local working data created by the engine (database, media store, generated
+# vault). Lives inside the project folder by owner preference, never committed.
+workspace/
+
+# Python build and tool caches
+*.egg-info/
+build/
+dist/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/

@@ -266,3 +266,17 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "A spike has to end. Decide what question it answers, and stop when the question changes."
 - "Seven cents and one evening bought me the lessons. The rest waits until the foundation exists."
 - "Know the difference between 'Claude checked it' and 'I checked it'."
+
+### 20:58 — First real code: FND-001, the project skeleton
+**What:** Started milestone M1, the foundation: importing chats, keeping branches, handling re-imports and linking images. It's plain code with no AI. The first ticket only sets up the skeleton: a `pyproject.toml` that describes the project, an empty `knowledge_engine` package in a `src/` folder, three tests, and three checking tools. `ruff` checks style and, importantly, that every public function has a plain-English docstring. `mypy` checks types strictly. `pytest` runs the tests. A new `docs/CODE_STYLE.md` writes down the comment rules, including a "Talking points" list at the top of every module.
+**Why this way:**
+- The `src/` layout forces tests to use the installed package, the same way a user would get it. That catches "works on my machine" packaging mistakes early.
+- No libraries were added yet. Each one arrives with the ticket that needs it, so every dependency has a reason.
+- Strict type checking was chosen because the earlier attempt was "not type-safe", and mistakes are cheaper to catch before the code runs on real data.
+- The docstring rule is checked by a tool, not just written down. I proved it by adding a function without a docstring and watching the check fail.
+**Problem hit:** the formatter also tried to reformat Python examples inside the Markdown docs. Fixed by excluding `docs/` from the code tools, because those snippets are illustrations, not code we run.
+**What I learned:** what `pyproject.toml` is for, what an "editable install" (`pip install -e`) does, and why linters and type checkers run before the tests.
+**Talking points:**
+- "Day one of the real build was boring on purpose: a skeleton, three tools, and a written style guide."
+- "My style rules are enforced by a linter, not by good intentions."
+- "Every dependency arrives with the ticket that needs it."
