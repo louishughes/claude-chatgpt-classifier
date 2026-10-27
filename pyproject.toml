@@ -31,6 +31,7 @@ dev = [
     "pytest>=8.3",
     "ruff>=0.8",
     "mypy>=1.13",
+    "hypothesis>=6.115",  # property-based tests: random inputs, checked invariants
 ]
 
 [tool.hatch.build.targets.wheel]

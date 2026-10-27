@@ -312,7 +312,7 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "I broke my own code on purpose to prove the test would catch it."
 - "SQLite is a real database if you configure it. Foreign keys and WAL mode are two lines that matter."
 
-### 21:06 — FND-004: version control for the database
+### 21:03 — FND-004: version control for the database
 **What:** Added Alembic migrations. A migration is a numbered script that changes the database's shape and can undo the change. The first one, `0001_baseline`, creates the `workspaces` table. 7 new tests, 61 in total.
 **Key decisions and why:**
 - **The migrations ship inside the package.** An installed copy can upgrade its own database without hunting for extra files. I proved it by building the package, installing it into a fresh environment and migrating a new database.
@@ -324,3 +324,19 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "My database schema is versioned like my code: numbered, reversible and tested."
 - "One test makes sure the code and the database can never disagree about a table."
 - "I check that the installed package works, not just the source folder."
+
+### 21:08 — FND-005: IDs that survive re-imports
+**What:** Wrote the code that gives every conversation, message, message version, image and link a permanent ID. Added the fixed lists of states, such as "new / unchanged / revised / not seen", and four core data shapes. 59 new tests, 120 in total.
+**Key decisions and why:**
+- **An ID is a hash of what a thing *is*.** For example: "conversation `abc` from ChatGPT in account `louis-personal`". Import the same export twice and you get the same IDs, so there are no duplicates. This is the heart of the re-import design.
+- **Titles are never part of an ID**, so renaming a chat can't turn it into a new chat.
+- **The same image in three messages** is one asset with three "occurrences". Each message keeps its own link.
+- **Property-based tests** (the Hypothesis library) throw hundreds of random inputs at the ID rules and check they always hold, for example that different native IDs never share an ID.
+- **One pinned ID value** in the tests. If someone changes the ID recipe by accident, that test fails, because changing it would silently change every stored ID.
+- **Scope note for Louis:** the old ticket also listed "Segment" and "KnowledgeRecord". I left those for the AI milestone (M3), because the spike showed their shape still needs to change. The acceptance test is unchanged.
+**Owner input:** Louis confirmed `V:` is a local disk, so the database can live in the project folder safely.
+**What I learned:** hashing as identity, why key boundaries matter (`"ab"+"c"` vs `"a"+"bc"`), and property-based testing.
+**Talking points:**
+- "Re-import safety comes down to one idea: IDs come from identity, not from timing."
+- "I let a library generate hundreds of random test cases to try to break my ID rules."
+- "One test pins an exact ID value, because changing the recipe would quietly change every stored ID."

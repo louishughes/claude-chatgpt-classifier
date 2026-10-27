@@ -10,5 +10,6 @@ Live ticket status for the build. The full ticket list is `docs/TICKETS.csv` (ke
 | FND-002 Environment and settings manager | VERIFIED | SESSION_LOG 2026-10-27 FND-002 |
 | FND-003 Relational persistence interface and SQLite engine | VERIFIED | SESSION_LOG 2026-10-27 FND-003 |
 | FND-004 Alembic migration baseline | VERIFIED | SESSION_LOG 2026-10-27 FND-004 |
+| FND-005 Domain models and stable identifiers | VERIFIED (scope note: Segment/KnowledgeRecord deferred to M3) | SESSION_LOG 2026-10-27 FND-005 |
 
-**Next unblocked:** FND-005 (domain models and stable IDs), then FND-006, FND-008, OPS-008, EVAL-009.
+**Next unblocked:** FND-006 (jobs and stage keys), FND-008 (CLI skeleton), OPS-008 (git guard), EVAL-009 (synthetic fixtures).

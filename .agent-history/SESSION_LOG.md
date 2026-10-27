@@ -123,3 +123,35 @@ Mutation check: adding an unmigrated column to `WorkspaceRow` made the drift tes
 **Not done / not tested:** Windows run. No CLI command yet (`ke db upgrade` belongs to FND-008).
 
 **Next exact task:** FND-005 — domain models and stable identifiers (ADR-0003).
+
+## 2026-10-27 · Owner answer — `V:` is a local disk
+
+Louis confirmed (21:06 UTC) that `V:` is a local disk, not a network drive. The FND-003 risk about WAL on network drives does not apply; the database stays at `V:\Programming\ChatGPT_Classifier\workspace\knowledge.db` (git-ignored).
+
+## 2026-10-27 · FND-005 — Domain models and stable identifiers
+
+**Dependencies:** FND-001 (VERIFIED). **Status:** VERIFIED, with a scope note.
+
+**Changed files:** `src/knowledge_engine/domain/` (new: `__init__.py`, `ids.py`, `enums.py`, `models.py`), `tests/unit/test_domain_ids.py`, `tests/unit/test_domain_models.py` (new), `pyproject.toml` (dev: `hypothesis`), `STATUS.md`, `docs/TICKETS.csv` (FND-005 → VERIFIED), diary (FND-004 entry time corrected from 21:06 to 21:03).
+
+**Design choices (ADR-0003, ADR-0004):**
+- IDs are `<prefix>_<first 32 hex of SHA-256>` over a JSON-encoded key `["ke-id-v1", kind, parts...]`. JSON makes part boundaries unambiguous; the kind and per-kind prefix keep kinds from colliding; `ID_SCHEME_VERSION` makes any future change explicit.
+- Helpers for snapshot, conversation `(workspace, source_system, account_ns, native_id)`, message node `(conversation, native_node_id)`, message revision `(node, canonical_content_hash)`, graph edge `(child, parent|root)`, media asset (tagged native file ID, else tagged blob hash), asset occurrence `(revision, part_index, pointer)`, link target, link occurrence `(revision, start, end, origin)`, YouTube video ID validation, social account (tagged stable platform ID, else lower-cased handle without `@`), relationship `(from, kind, to, detector)`.
+- Native IDs are used exactly (no trimming or case folding); empty native IDs raise. Titles are never part of a key.
+- Enums from DATA_MODEL §10: `SourceSystem`, `Role`, `DeltaCategory`, `PresenceState`, `ImportBatchStatus`, `AssetAvailability`, `BranchKind`, `ReviewState`, plus `check_transition` for the §10.2 lifecycles (import batch never returns to running; presence toggles; review candidate → accepted/rejected, accepted → superseded).
+- Frozen, `extra="forbid"` models: `SourceSnapshot`, `MessageRevision`, `AssetOccurrence`, `EvidenceRef`. Each model with an ID checks the ID against its key. Timestamps must carry a timezone; missing stays `None`. An `available` occurrence must name its asset.
+
+**Scope note (for owner review):** the original objective also lists `SourceArtifact`, `ContentNode`, `Segment` and `KnowledgeRecord`. `ContentNode`/`SourceArtifact` are superseded by the ADR-0003 node/revision model; `Segment` and `KnowledgeRecord` are left to the M3 tickets that use them, because their shape depends on the taxonomy work the spike reshaped. The acceptance criterion (Pydantic validation and deterministic ID property tests) is unchanged.
+
+**Commands run:**
+```
+ruff check .            # All checks passed!
+ruff format --check .   # 24 files already formatted (after formatting one test file)
+mypy                    # Success: no issues found in 18 source files
+pytest -q               # 120 passed (59 new for FND-005, Hypothesis property tests included)
+```
+Fix attempts: mypy rejected the dict-copy typing in `check_transition` (attempt 1, rewritten with an explicit type check first); one line over 100 characters (same pass). A pinned known-value test (`conv_0bfffaf4519e5747672b77cac126e764` for `ws0/chatgpt/fixture/c1`) guards the scheme.
+
+**Not done / not tested:** Windows run; no database tables for these objects yet (IMP-001/IMP-002/MED-* add them with migrations).
+
+**Next exact task:** FND-006 (jobs and stage keys) or EVAL-009 (synthetic fixtures). EVAL-009 is the more useful next step for the import slice.
