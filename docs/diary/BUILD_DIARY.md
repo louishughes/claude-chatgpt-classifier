@@ -146,13 +146,13 @@ A running, timestamped log of what is being worked on, the problems hit, how the
 - "If you can't set temperature to 0, you measure stability instead of assuming it."
 - "Checkpoint after every item; a crash at item 87 should cost one item, not 87."
 
-### 19:35 — Consistent isn't the same as correct
+### 19:28 — Consistent isn't the same as correct
 **What:** A review of the earlier ChatGPT post-mortem pointed out a gap: the spike measured whether two runs agree, but not whether the labels are *right*. Added a small gold set: the spike writes a template of 15 sampled chats, Louis labels them by hand, and the report shows accuracy against his labels next to run-to-run agreement. Unknown category names in the file are rejected, so a typo can't masquerade as a model error. 27 tests pass.
 **Talking points:**
 - "A model can be consistently wrong. Measure agreement *and* accuracy."
 - "Fifteen hand labels is a cheap reality check, and it seeds the real evaluation set later."
 
-### 19:50 — Learning from the old post-mortem: one question per field
+### 19:37 — Learning from the old post-mortem: one question per field
 **What:** Read ChatGPT's post-mortem of the earlier classifier (saved in PR #2) and changed the spike in response:
 - The single "category" field became separate fields: domain, purpose, project candidates, topics, knowledge types and outputs. The old list mixed *Ideas, Projects, Research, Decisions, Content Assets*, and one chat can be all five. So even a perfect model couldn't answer consistently.
 - Decisions now record who proposed them, what the user did (accepted, rejected, superseded, unclear), and who wrote the quoted evidence. The checker confirms the quote really comes from that speaker.
