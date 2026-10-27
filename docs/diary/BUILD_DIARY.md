@@ -502,3 +502,13 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "An AI can write eight thousand lines in an hour. My rule: if I can't explain a module in three sentences, it doesn't merge."
 - "Small PRs aren't about tidiness. They're the only way the reviewer actually reviews."
+
+### 23:20 — Windows check, the real file shapes, and PR #3's teach-back (REV-007)
+**What:** A read-only check on Louis's PC ran the whole test suite on Windows (230 of 231 passed) and listed the key *names* in his real split files (no values, no titles). Both findings are fixed on PR #3.
+**Challenges:**
+- The one Windows failure: rebuilding the test ZIP gave different bytes. Everything inside was identical except one header field that records which operating system built the ZIP (0 for Windows, 3 for Unix). The builder now pins it to 3, so the fixture is byte-identical everywhere.
+- The fake split files had guessed two key names wrong (`image_count` instead of `image_references`, and no per-role message counts). They now use the real names, before any importer code relies on the guess.
+**Teach-back (PR #3, module `domain/ids.py`, exception to the new two-ticket rule because it predates it):** "Every record gets an ID made by hashing the facts that define it, like the account and the conversation's own ID from ChatGPT, never its title or the import time. So importing the same export twice produces the same IDs, and the database's unique keys turn a would-be duplicate into a no-op. Each kind of thing has its own prefix and key layout, so a message ID can never collide with a conversation ID."
+**Talking points:**
+- "Test on the machine you ship to. One header byte broke a 'byte-identical' test on Windows."
+- "I checked my fake data against the real files' structure, names only, before building on it."
