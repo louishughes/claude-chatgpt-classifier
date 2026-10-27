@@ -279,3 +279,12 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "Before building more, I asked for a hostile review of the plan. It said: right direction, wrong commitment size."
 - "The cheapest fix on the list is thirty minutes of my own time: approve the answer key so the AI stops marking its own homework."
 - "An agent can write eight thousand lines in an hour. The question is whether I can explain them in an interview."
+
+### 22:20 — Turning the review into tickets, with Louis asleep
+**What:** Louis asked for tickets and a plan from the direction review, and for other agents to implement them. Then he went to bed with one instruction: don't ask, you have the authority. So the plan (`docs/plans/REVIEW_ACTION_PLAN.md`) records each decision taken tonight as "owner authority 22:10", so he can reverse any of them in the morning, and the one thing only he can do (marking the answer key) is a ticket assigned to him, not a question.
+**Tickets:** REV-001 to REV-009 as GitHub Issues #135–#143 under map #134, with the M1 and M3 ones also under their milestone maps. Six are agent work tonight (scope commitment, ADR-0009 for the no-API model step, M1 consolidation design, PR-size and teach-back rules, closing the ADR/decision record, a paid-call guard on the spike). One needs the PC (Windows run, key-name check), one waits for the parser (early real-data checkpoint), one waits for Louis (answer key).
+**Decision taken under authority:** commit to M1 and M2; M3 to M6 stay roadmap and get re-planned at gate G2. The licence was deliberately *not* chosen: it's a legal call he should make awake.
+**Conflict rule:** the foundation thread owns `src/`, `tests/` and the status files. Review tickets touch only docs, ADRs and the throwaway spike, so several agents can run at once without stepping on each other.
+**Talking points:**
+- "Delegating overnight works if every decision is labelled with who made it and when, so it can be undone."
+- "Tickets with a finish line and a 'don't touch' list are how you run several agents in parallel safely."
