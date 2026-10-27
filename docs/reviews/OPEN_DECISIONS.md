@@ -25,6 +25,7 @@
 ## Resolved during the audit (recorded, not open)
 - **Spike before M1** (owner, 2026-10-27, decision card): validate the AI step on 50 then 100 chats first. Sequence and go/no-go in IMPLEMENTATION_PLAN §12.
 - **Spike closed, M1 next** (owner, 2026-10-27, "we need to learn"). Verdict and lessons in `docs/plans/SPIKE_VERDICT.md`. Run 1 settled OD-05's transport question (direct API, Claude Haiku 5.5, zero timeouts, ~$0.035 per 50 chats). Model choice for M3 stays open until accuracy is scored against the owner-approved answer key.
+- **Spike 0.3 test-expectation changes approved** (owner, 2026-10-27, "yes"): 3 call counts (decisions became a second call) and 2 rejection cases (overflow trimmed instead of rejected).
 - **Classification unit is the segment, not the chat** (owner, 2026-10-27: per-chat labels "too simplistic"). OD-17's separate dimensions now apply per segment, with a two-level taxonomy and project registry discovered from the data and approved by the owner before freezing.
 - **Guardrails** (owner, 2026-10-27, via the project chat): agents don't change tests or the gold set without approval; at most 3 fix attempts per ticket, then stop and ask; vocabulary frozen during a run. Recorded in `AGENTS.md`, `CLAUDE.md` §4 and IMPLEMENTATION_PLAN §8.
 - **Owner is the evaluator, not the labeller** (owner, 2026-10-27). Accuracy comes from his y/n verdicts on about 20 of the model's answers (review sheet), not from blind labels. This replaces the earlier "owner labels 20 chats" step.
