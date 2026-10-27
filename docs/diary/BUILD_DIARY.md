@@ -616,3 +616,9 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "My import history is append-only: attempts are never overwritten, only added."
 - "A crash leaves an honest 'abandoned' record, not a fake success."
+
+### 23:33 — Louis: "implement all the tickets"
+**What:** Louis reaffirmed the original goal: build every milestone, not just the first two. Recorded as his own decision in `docs/reviews/OPEN_DECISIONS.md` and `docs/plans/IMPLEMENTATION_PLAN.md` §4, superseding the overnight "M1 and M2 only" call that was made on his behalf.
+**What doesn't change:** no paid API calls (AI steps run through a Claude session on his subscription, tested with fakes), small PRs with a teach-back each, and anything that needs Louis himself (like approving the answer key) is logged and skipped rather than waited on.
+**Talking points:**
+- "Decisions made on someone's behalf stay reversible, and get reversed cleanly when they speak."
