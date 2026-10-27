@@ -219,6 +219,21 @@ Tests went from 43 to 47. Three existing tests had their expected call counts ch
 - "Don't reject an answer for being too long. Trim it in code and save the retry for real errors."
 - "Make the model cite message numbers, then check them with plain code. Trust, but verify."
 
+### 20:40 (time corrected) — Reading the old attempts before trusting the new one
+**What:** Louis asked for his previous Codex/Hermes attempts (two folders on his PC, May to September 2026) to be read as evidence of what failed, not as guidance, and cross-checked against the first Haiku spike run. Claude read the plans, results, specs, review logs and statistics of 50 old notes, read-only, without running any old scripts. The write-up is `docs/reference/previous-attempts-review.md`.
+**What it found:**
+- **Every attempt graded itself.** The September "pass" used an answer key the agent wrote and a review by the same model. The August "three independent reviewers" were AI sub-agents, and the acceptance rule was changed mid-run to declare success. The uncomfortable part: the current spike's "decisions 7 of 13" and "95% subject accuracy" also come from a Claude-written review file. Louis's own review sheet is still blank.
+- **Decisions were never measured by a person before.** Old notes stored "decisions" with no speaker or state, and 205 of 207 "ideas" were the assistant's suggestions. The spike is the first attempt to score decisions at all.
+- **Count rules caused the format failures every time:** too few tags in May, too many topics now. Trimming in code (spike 0.3) is the first fix that doesn't retry.
+- **Clipping long chats loses decisions, then and now.** In the spike, 3 of the 4 clipped chats with decisions got them wrong, against 3 of 9 unclipped. It's a small sample, but it's the same failure the old pipeline had.
+- **Free-text topics drift** (0.49 overlap between runs), while fixed lists hold (87.5–90%). The old v2 reached the same conclusion: labels need frozen IDs.
+**Decision:** none yet. The findings went to Louis and to the validation thread. The main ask is that an accuracy number only counts once Louis has marked or written the answers himself.
+**Challenges:** the post-mortem from ChatGPT was written without access to the code or logs, so some of its claims were out of date by September. The files showed the overhaul had already fixed vocabulary auto-promotion and still failed.
+**Talking points:**
+- "Three attempts passed their own tests and still failed the only test that mattered: does the owner agree?"
+- "I audited the old logs before trusting the new run, and found the new run making the oldest mistake."
+- "Same bug, three costumes: count rules for tags, for summary length, for topics."
+
 ### 20:45 — "Too simplistic": rethinking the process
 **What:** Louis looked at the results and said the labels were too simplistic. He was right. Reading the chats showed that one subject and one purpose per chat can't describe conversations that drift, a single "games" bucket swallowed 40% of the sample, and only decisions were kept, while the chats are full of ideas, preferences, frameworks and things that were made. The checking was also anchored on the model's answer.
 **New plan (spike v3, `docs/plans/SPIKE_V3_PROCESS.md`):** build a blind answer key for 10 chats first, then let Haiku *discover* segments, projects and typed knowledge with no fixed list. Then consolidate that into a two-level taxonomy and a project registry that Louis approves and we freeze. Only then classify segments against it, and score everything against the answer key. Expected cost is still under $1.
@@ -227,7 +242,7 @@ Tests went from 43 to 47. Three existing tests had their expected call counts ch
 - "Discover first, classify second. You can't pick the categories before you've seen the data."
 - "Write the answer key before you look at the model's answers."
 
-### 20:55 — Lessons from the old attempts, and the discovery step
+### 20:50 (time corrected) — Lessons from the old attempts, and the discovery step
 **What:** A separate review of the earlier attempts flagged where this spike was repeating old mistakes. It made four points:
 - **The run 1 "accuracy" was Claude marking Claude.** The report even said "your verdicts". That is now labelled "Claude's check" everywhere, and no accuracy figure counts until Louis has approved the answer key.
 - **Clipping hurt.** 12 of 50 chats were cut at 24k characters, and those did much worse. Haiku can read a million tokens, so the limit is now 200k characters, still under a cent per chat.
