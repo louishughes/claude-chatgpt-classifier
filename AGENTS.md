@@ -20,6 +20,8 @@ Build a local-first, provenance-preserving knowledge engine that imports source 
 6. `docs/HANDOFF.md`, status/deferral/session logs and all development/testing/validation/final skills present.
 7. Inspect `raw/` structurally, treating it as private read-only source; don't print its conversation text or sensitive filenames to logs.
 
+> **Path reconciliation (audit 2026-10-27):** of the files listed above, `docs/README.md`, `docs/TICKET_INDEX.md`, `docs/HANDOFF.md`, ADR files, `.agent-history/` logs and the Development/Testing/Validation/Final skills did not exist in the repository. `CLAUDE.md`, `AGENTS.md` and `README.md` live at the root, all other specs directly under `docs/`. ADRs now live in `docs/adr/`; the post-audit handoff is `docs/HANDOFF_AFTER_AUDIT.md`; review outputs are in `docs/reviews/` and plans in `docs/plans/`. Root files are authoritative over any nested copy. See `docs/reviews/SPEC_AUDIT.md` §2.
+
 Treat research prose as context, not as a substitute for contracts. The latest explicit product-owner requirements govern proposed spec changes; nontrivial conflicts must be visible in the audit.
 
 ## Engineering invariants
@@ -43,6 +45,11 @@ Treat research prose as context, not as a substitute for contracts. The latest e
 | Retrieval | Answer with resolvable source evidence; abstain on insufficient support |
 | Export | Generated notes never replace originals or overwrite unmanaged hand edits |
 | Failure | A bounded explicit status is preferable to retry/rewrite loops |
+
+**Owner guardrails (2026-10-27, apply to every agent and ticket):**
+1. Agents must not change existing tests, acceptance criteria or the gold set (human-labelled reference data) without the owner's explicit approval. Adding new tests is fine; weakening, deleting, skipping or re-baselining existing ones is not.
+2. Each ticket gets at most **3 fix attempts** for a genuine failure. After the third, mark it `BLOCKED` with the failing command and output, stop, and ask the owner.
+3. Vocabulary is frozen during a run: the taxonomy/category version is fixed at the start of a classification run and nothing may add, rename or promote terms until the run ends. Changes go through review and a versioned re-run.
 
 ## Specification audit requirements
 

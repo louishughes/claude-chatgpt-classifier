@@ -33,7 +33,7 @@ Each case stores `case_id`, anonymised source, expected node topology, segment b
 Expected labels come from a reviewed human annotation, not the model being tested. Corrections append new fixture versions, never silently change baseline. Include explicit **forbidden outputs**, particularly unsupported accepted decisions.
 
 ## 5. Metrics
-- Classification: domain/topical macro and micro F1, project precision/recall, primary category accuracy, calibration/review rate.
+- Classification: domain/topical macro and micro F1, project precision/recall, primary category accuracy, calibration/review rate. *(Audit amendment, 2026-10-27, OD-17: "primary category" means the primary **domain**. Purpose, project, topics, knowledge types and outputs are separate dimensions, each scored on its own.)*
 - Extraction: per-type precision/recall/F1, speaker attribution accuracy, explicit-decision false-positive count, evidence validity.
 - Reconciliation: supersession precision/recall, conflict-detection recall, `current_state` accuracy under scope, historical retention.
 - Retrieval: Recall@5/@10, MRR, nDCG, exact-code hit rate; split keyword/semantic/structured question sets.
@@ -41,7 +41,7 @@ Expected labels come from a reviewed human annotation, not the model being teste
 - Operations: reimport duplicates (target 0), unchanged LLM calls (0), cache hit rate, changed-to-rebuilt dependency ratio, costs/timeouts.
 
 ## 6. Proposed release gates
-Parser inventory and evidence offsets: 100% of supported fixtures accounted for. Every published confirmed record has valid exact evidence anchor. Zero known unsupported accepted decisions on golden benchmark. Initial primary category agreement >=90%, explicit decision recall >=90%, Recall@10 >=90%, directional relationship precision >=90% (calibrate based on representative dataset). Unresolved ambiguous cases must be flagged, not forced. For multi-user release: zero cross-tenant leakage in adversarial integration/e2e cases.
+Parser inventory and evidence offsets: 100% of supported fixtures accounted for. Every published confirmed record has valid exact evidence anchor. Zero known unsupported accepted decisions on golden benchmark. Initial primary category (= primary domain, OD-17) agreement >=90%, explicit decision recall >=90%, Recall@10 >=90%, directional relationship precision >=90% (calibrate based on representative dataset). Unresolved ambiguous cases must be flagged, not forced. For multi-user release: zero cross-tenant leakage in adversarial integration/e2e cases.
 
 ## 7. Order independence and model variability
 Process same golden corpus in at least 3 shuffled orders under identical taxonomy/model/prompt versions. Compare canonical ID sets and confirmed knowledge projections; store diffs, false positives and reasons. Repeat selected classifications across multiple provider runs; measure disagreement. Lexical rendering may differ but canonical classifications and verified decisions should remain stable or be marked for review.
@@ -73,3 +73,60 @@ Next action: fix acceptance antecedent matching (not arbitrary refactor)
 Not run: full corpus benchmark (reason: stage gate only)
 ```
 A test is not 'passed' unless a command/tool actually ran. For provider tests, retain model version, temperature and token/cost budgets; mask secrets/private text in logs.
+
+## 12. Source-layer tests *(added by the 2026-10-27 audit)*
+
+All fixtures are synthetic and versioned under `tests/fixtures/` (EVAL-009). Real `raw/` data is used only for local, read-only smoke runs whose reports contain counts, timings and warning codes, never text, titles or filenames.
+
+### 12.1 Fixture catalogue (EVAL-009)
+| Fixture | Proves |
+|---|---|
+| `export_single/`, `export_sharded/`, `export.zip` | Same conversations from single file, numbered shards and ZIP give identical logical records |
+| `split_wrapper/` + equivalent official export | Split-wrapper adapter equals official adapter; wrapper/native count mismatch warns |
+| `derived_files/` | Non-conversation JSON in the conversation folder is reported as `derived_artifact` |
+| `branches_edit/`, `branches_regen/` | Branch kinds `edit` and `regeneration`; active path from `current_node`; no splicing |
+| `no_children/` | Children derived from parent links when `children` is absent |
+| `repeated_image/` | One blob, many occurrences across two conversations |
+| `missing_asset/`, `ambiguous_asset/`, `unresolved_pointer/` | Each availability state with evidence |
+| `reexport_v1/`, `reexport_v2/` | v2 adds messages, edits one message, adds a regenerated branch, drops one conversation, adds one image; exact delta categories |
+| `metadata_drift/` | Only non-content metadata changed: new raw observation, zero reprocessing |
+| `id_collision/`, `missing_ids/` | Candidate matches, no merges |
+| `same_title_different_chat/` | Two distinct conversations with the same title stay distinct |
+| `urls_mixed/` | Markdown links, angle brackets, trailing punctuation, repeated URLs |
+| `youtube_forms/` | watch, youtu.be, shorts, live, embed, mobile, with `t`, `list`, `si`; invalid IDs; lookalike domains |
+| `youtube_repeated/` | 12 mentions of one video → 1 video, 12 mentions |
+| `transcript_user.vtt` | User-supplied transcript attaches with cues and provenance |
+| `social_profiles/` | Profile URLs per platform; qualified handles; bare `@name` (ambiguous); emails and `@decorators` in code (not accounts); misidentified-account trap |
+| `copied_prefix/` | Manual fork → `forked_from` candidate, review_required |
+| `similar_unrelated/` | Similar topic and wording, different conversations → no structural link, no merge |
+| `prompt_injection_text/` | Instructions inside messages are stored as data; nothing executed |
+| generator (seeded) | 50, 100 and 1,000-conversation synthetic batches |
+
+### 12.2 Unit and property tests
+- **Identity:** same native ID across exports → same logical ID; title/timestamp never used; collision → candidate. *Property:* importing any fixture N times (N=1..5, any order of repeated batches) yields identical logical counts.
+- **Delta:** each category in `reexport_v2` exact; `metadata_drift` → `unchanged` for derivatives; absent conversation → `not_seen`, still queryable.
+- **Concurrency:** two importers on one root: one acquires the lock, the other refuses or waits; no duplicate rows (SQLite WAL, real threads).
+- **Recovery:** kill the import after group k; resume finishes with the same final state and counts as an uninterrupted run.
+- **Raw safety:** tree hash of the fixture raw root identical before and after inventory, import, reimport and render; a write attempt into raw fails the test.
+- **Media:** blob dedup by bytes; no perceptual merging; dimensions from headers; vault paths stable and safe on Windows and POSIX.
+- **Links:** span round-trip `text[start:end] == original`; YouTube table-driven cases; social platform rules; no network access during tests (sockets blocked).
+- **Relationships:** branch kinds; prefix candidate; similar-but-unrelated produces none; review history append-only.
+
+### 12.3 Integration and end-to-end (no LLM)
+`ke raw inventory` → `ke import reexport_v1` → `ke import reexport_v1` (zero new records, zero model calls) → `ke import reexport_v2` (exact delta) → `ke render sources` → link checker passes, missing markers present, branches labelled. This is the G1 demonstration (see `IMPLEMENTATION_PLAN.md` §6).
+
+### 12.4 Batch-scale smoke gates (owner requirement, 2026-10-27)
+Run early and keep running; they are cheap for the source layer and catch scale problems before the pipeline grows.
+| Gate | When | Batch | Pass condition |
+|---|---|---|---|
+| EVAL-010a | end of M1 | synthetic 50 and 100 | import + identical reimport + render all succeed; zero new logical records on reimport; timings and peak memory recorded |
+| EVAL-010b | end of M1 | real `raw/` 50 and 100 (local, read-only, deterministic sample by seed) | same as above; raw tree hash unchanged; report has counts and warning codes only |
+| EVAL-010c | M2 | real 100 | link/YouTube/social counts and ambiguous candidates reported |
+| EVAL-011a | early M3 | synthetic 50 and 100, fake provider | schema failures, retries and checkpoint resume behave as specified |
+| EVAL-011b | M3 | real 50, then 100, pinned real provider, cost cap | zero unvalidated outputs stored; timeout/retry counts bounded; stability report across 2 runs; stop at the cost cap |
+
+Scale-up rule: 50 must pass before 100; 100 before the 1,000-conversation performance run (§2 Performance). A failed batch is investigated with one focused fix, then rerun once (§10).
+
+### 12.5 Model consistency (context: earlier attempts were inconsistent run to run)
+- Every semantic stage test asserts that provider output is schema-validated before storage; invalid output → `review_required`, not a crash, not a silent default.
+- Stability metric: same inputs, same pinned versions, 2–3 runs → label agreement per stage, reported with the golden metrics (EVAL-001, EVAL-008, EVAL-011).

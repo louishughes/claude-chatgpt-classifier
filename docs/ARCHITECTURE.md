@@ -365,3 +365,158 @@ Events are at-least-once; consumers deduplicate using event ID and stage key. Da
 
 ## 6. Implementation ordering
 Source identity before import → provenance before extraction → governed vocabulary before classification → evidence validation before reconciliation → historical/current projections before synthesis → lexical retrieval before semantic optimisation → single-user robustness before tenancy. Every arrow is a dependency, not an optional aesthetic choice.
+
+## 7. Source layer additions *(2026-10-27 audit; proposed, ADR-0002..ADR-0008)*
+
+The diagram in §1 starts at `SourceAdapter → ArchiveStore`. The audit splits the left-hand side into a deterministic **source layer** that must work, be browsable and be re-import-safe before any model is called.
+
+```mermaid
+flowchart TD
+ R[(raw/ read-only)] --> INV[RawInventory]
+ INV --> AD{Adapter registry}
+ AD --> OX[ChatGPTExportAdapter: ZIP/folder, single/sharded]
+ AD --> SW[ChatGPTSplitWrapperAdapter]
+ OX --> MP[Native mapping parser]
+ SW --> MP
+ MP --> IR[LogicalIdentityResolver]
+ IR --> DE[RevisionDeltaEngine]
+ DE --> BR[BranchClassifier]
+ DE --> AR[AssetPointerResolver] --> MS[MediaStore: blob/asset/occurrence]
+ DE --> LX[LinkExtractor] --> YT[YouTubeRegistry] --> TJ[TranscriptAcquisition jobs]
+ LX --> SA[SocialAccountRegistry]
+ DE --> RD[StructuralRelationshipDetector]
+ BR & MS & LX & RD --> CM[ImportCommitter: tx + lock + checkpoint]
+ CM --> REP[ImportDeltaReport]
+ CM --> SB[SourceNoteBuilder / inspect CLI]
+ CM --> CN[CanonicalNormaliser → Segmenter … §1 semantic pipeline]
+```
+
+Ownership: `ingestion/` owns adapters, inventory and parsing; a new `identity/` module owns resolver, delta engine and committer; `media/`, `links/` (URL, YouTube, social, transcripts) and `relationships/` are new modules; `rendering/` gains `SourceNoteBuilder`. None of them import a model SDK. Only `infrastructure/providers` does, behind `ModelProvider`.
+
+### 7.1 Classes and key functions (targets, not existing code)
+```python
+# ingestion/raw_inventory.py
+class RawInventory:
+    """Read-only, metadata-only survey of a raw root.
+    Why: we must know what is in raw/ without changing it or leaking private text."""
+    def scan(self, root: Path) -> InventoryReport: ...          # counts, sizes, hashes, detected roles
+    def tree_hash(self, root: Path) -> str: ...                  # computed before and after every import
+    def classify_file(self, rel: PurePath, head: bytes) -> FileRole: ...  # uses first bytes/keys, never prints content
+
+# ingestion/chatgpt_split.py
+class ChatGPTSplitWrapperAdapter(SourceAdapter):
+    """One JSON file per conversation: wrapper fields + native conversation object."""
+    def probe(self, path: Path) -> ProbeResult: ...              # format 'chatgpt-split-v1' if wrapper keys present
+    def parse(self, snapshot: SourceSnapshot) -> Iterator[ImportedConversation]: ...
+    def compare_wrapper(self, wrapper: dict, native: dict) -> list[ImportWarning]: ...
+    # Wrapper counts/titles are hints only; the native object is the source of truth.
+
+# identity/resolver.py
+class LogicalIdentityResolver:
+    def conversation_key(self, ns: AccountNamespace, native_id: str | None, evidence: dict) -> KeyResult: ...
+    def node_key(self, conversation_id: str, native_node_id: str | None) -> KeyResult: ...
+    # Missing/colliding IDs return KeyResult(candidate=...) and never merge automatically.
+
+# identity/delta.py
+class RevisionDeltaEngine:
+    def canonical_content_hash(self, msg: NativeMessage) -> str: ...   # role + parts + create_time
+    def raw_payload_hash(self, msg: dict) -> str: ...                   # sorted-key JSON of the whole node
+    def diff_conversation(self, prior: ConversationState | None, incoming: ImportedConversation) -> ConversationDelta: ...
+    def mark_not_seen(self, import_id: str, seen: set[str]) -> int: ...  # unknown, never deleted
+
+# identity/commit.py
+class ImportCommitter:
+    def acquire_lock(self, raw_root_id: str) -> LockToken: ...
+    def commit_group(self, token: LockToken, deltas: list[ConversationDelta]) -> Checkpoint: ...
+    def resume(self, import_id: str) -> Checkpoint: ...
+    # One transaction per group: rows + checkpoint + outbox event, all or nothing.
+
+# relationships/branches.py
+class BranchClassifier:
+    def children_index(self, nodes: Mapping[str, NativeNode]) -> dict[str, list[str]]: ...  # built from parent links
+    def active_path(self, current_node: str | None, nodes: Mapping[str, NativeNode]) -> list[str]: ...
+    def classify_fork(self, parent: str, children: list[NativeNode]) -> BranchKind: ...       # edit | regeneration | other
+
+# relationships/structural.py
+class StructuralRelationshipDetector:
+    def shared_prefix(self, a: ConversationState, b: ConversationState, min_messages: int) -> PrefixMatch | None: ...
+    def chatgpt_url_references(self, links: list[LinkOccurrence]) -> list[RelationshipCandidate]: ...
+    def verbatim_quotes(self, a: ConversationState, b: ConversationState, min_chars: int) -> list[RelationshipCandidate]: ...
+    # Produces candidates only; acceptance requires native or human evidence for continues/forked_from.
+
+# media/resolver.py
+class AssetPointerResolver:
+    def parse_pointer(self, pointer: str) -> PointerRef: ...           # file-service://, sediment://, …
+    def candidates(self, ref: PointerRef, index: MediaFileIndex) -> list[Path]: ...
+    def resolve(self, ref: PointerRef, index: MediaFileIndex, manifest: ExportManifest | None) -> Resolution: ...
+    # 0 candidates → missing/unresolved with evidence; 2+ → ambiguous. Never invent a path.
+
+# media/store.py
+class MediaStore:
+    def ingest_blob(self, path: Path, mode: StorageMode) -> MediaBlob: ...   # hash first, then copy or reference
+    def record_occurrence(self, occ: AssetOccurrenceDTO) -> None: ...       # idempotent on (revision, part, pointer)
+    def vault_path(self, blob: MediaBlob) -> PurePosixPath: ...             # safe, stable, hash-based
+
+# links/extract.py
+class LinkExtractor:
+    def find_urls(self, text: str) -> list[UrlSpan]: ...      # exact [start,end); trims trailing punctuation/markdown
+    def canonicalise(self, url: str) -> CanonicalUrl: ...     # keeps original; drops only tracking params
+
+class YouTubeCanonicaliser:
+    def parse(self, url: CanonicalUrl) -> YouTubeRef | None: ... # id, t, list, channel hint; None for lookalikes
+
+class TranscriptAcquisitionService:
+    def request(self, video_id: str, method: str) -> TranscriptAcquisition: ...  # policy gate first
+    def attach_user_transcript(self, video_id: str, path: Path, language: str | None) -> TranscriptSnapshot: ...
+    # Never generates text; network methods only via INT-002 providers with egress enabled.
+
+class SocialMentionDetector:
+    def detect(self, text: str, links: list[LinkOccurrence]) -> list[AccountMention]: ...
+class SocialAccountRegistry:
+    def upsert_from_mention(self, m: AccountMention) -> SocialAccount | None: ...  # ambiguous → None
+    def merge_aliases(self, account_id: str, alias: AccountAlias, reviewer: str) -> None: ...
+
+# rendering/source_notes.py
+class SourceNoteBuilder:
+    def build(self, conversation_id: str, include_branches: bool = True) -> DocumentModel: ...
+    # Deterministic, LLM-free: active path, labelled alternates, media embeds/missing markers, links, related chats.
+
+# infrastructure/providers/structured.py
+class StructuredModelProvider(ModelProvider):
+    def call(self, request: StageRequest, schema: type[BaseModel], capability: Capability) -> StageResult: ...
+    # 1) egress check  2) cache by stage key  3) call with JSON schema  4) validate
+    # 5) at most one repair attempt  6) else review_required. Invalid output is never stored.
+```
+
+### 7.2 Events added
+| Event | Producer | Consumer | Payload |
+|---|---|---|---|
+| `ImportBatchStarted.v1` | ImportCommitter | Ops/logging | import_id, raw_root_id, adapter versions |
+| `ConversationDeltaCommitted.v1` | ImportCommitter | Normaliser, LinkExtractor, BranchClassifier, StructuralRelationshipDetector | source_id, delta category, changed revision IDs |
+| `MediaOccurrencesCommitted.v1` | MediaStore | SourceNoteBuilder, dependency tracker | occurrence IDs, availability |
+| `LinksCommitted.v1` | LinkExtractor | YouTube/Social registries, RelationshipDetector | link occurrence IDs |
+| `TranscriptAttached.v1` | TranscriptAcquisitionService | Indexer, renderer | video_id, transcript_id |
+| `RelationshipCandidateProposed.v1` | Detectors | Review queue, renderer | conv_rel_id |
+| `ImportBatchCompleted.v1` | ImportCommitter | Delta report, `DocumentsInvalidated` | import_id, counts, footprint |
+
+Unchanged revisions emit no downstream events, which is what makes an identical re-import free. Events only flow forward (source layer → semantic layer → documents); no consumer in the source layer subscribes to semantic events, so there is no event cycle.
+
+### 7.3 Hurdles added
+| Hurdle | Primary solution | Verify with | Alternative/fallback |
+|---|---|---|---|
+| raw/ is a split, partly lossy format | Two adapters, cross-format equivalence test, fidelity warnings | EVAL-009 split vs official fixtures | ask owner for original ZIP (OD-01) |
+| Accidental raw writes | read-only open, tree hash before/after, OPS-008 git guard | tamper test on fixture tree | abort import on hash change |
+| Huge JSON | streaming parser | 100 MB synthetic shard | per-shard processing |
+| Missing native IDs / collisions | candidate matches + review | collision fixtures | treat as separate conversations |
+| Cosmetic metadata drift between exports | two-hash scheme | drift fixture: zero reprocessing | full raw observation stored anyway |
+| Concurrent/double imports | import lock + unique keys + idempotency keys | concurrent property test | refuse second writer |
+| Interrupted import | per-group transactions + checkpoint | crash injection | mark `partial`, resume |
+| Missing image bytes | explicit availability states | manifest-listed-absent fixture | marker in notes |
+| Pointer ambiguity | return `ambiguous` with candidates | two-candidate fixture | reviewer picks |
+| Over-eager fork detection | prefix match = candidate only | similar-but-unrelated fixture | `related_to` only |
+| URL edge cases | span tests with markdown/punctuation | table-driven fixture | keep raw string, mark `unparsed` |
+| Ambiguous @handles | ambiguous state, no auto-link | misidentified-account fixture | review queue |
+| Transcript access/rate limits | status machine, opt-in, bounded attempts | network-off test; rate-limit fake | user-supplied transcript |
+| Provider timeouts / batch failures (seen in earlier attempts) | per-call timeout, 3 attempts, checkpointed batches, cost cap | EVAL-011 at 50/100 | fall back to smaller batch, review |
+| Inconsistent model labels (seen in earlier attempts) | schema-enforced output, enum IDs, pinned versions, stability metric | EVAL-008/EVAL-011 | route unstable items to review |
+| Obsidian attachment links break | vault-relative hash paths + link checker | MED-004 tests | marker instead of broken embed |

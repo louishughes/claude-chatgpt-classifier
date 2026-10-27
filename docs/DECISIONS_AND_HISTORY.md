@@ -8,6 +8,9 @@
 6. **Changelog** (`CHANGELOG.md`): user-visible release changes, not a log of every agent thought.
 7. **Handoff** (`HANDOFF.md`): single latest machine/human-readable state of repo and next unblocked ticket.
 
+### Canonical locations *(audit amendment 2026-10-27)*
+None of the files above existed when the audit ran, except this document. Proposed canonical locations, matching `docs/agents/domain.md`: ADRs in `docs/adr/` (created by the audit, see `docs/adr/README.md`); agent history in `.agent-history/` at the repo root (create on first implementation session); the latest handoff in `docs/HANDOFF_AFTER_AUDIT.md` until the first ticket starts, then `HANDOFF.md` at the root; `CHANGELOG.md` at the root once there is a user-visible release. The build-in-public diary requested by the owner lives in `docs/diary/BUILD_DIARY.md`. Owner decision OD-11 covers whether to restore the original package's skills and history files.
+
 ## Status semantics
 `NOT_STARTED`: planned and untouched. `IN_PROGRESS`: code/ticket actively underway. `BLOCKED`: cannot satisfy acceptance until named dependency/issue resolved. `REVIEW_REQUIRED`: semantic/human judgement unresolved. `VERIFIED`: all acceptance criteria and required commands passed with evidence. `DEFERRED`: consciously postponed. `CANCELLED`: explicit removal from roadmap. `FAILED`: bounded attempt did not meet acceptance. `UNKNOWN`: insufficient evidence of what happened. Do not claim a task did not happen merely because no log exists.
 
@@ -48,3 +51,16 @@ Each ticket close:
 
 ## Protection
 Agents cannot edit a decision's rationale retroactively without preserving earlier revision. Review corrections are new audited operations (who, when, what evidence), and source data remains untouched unless legitimately removed through documented deletion workflow.
+
+## Project history *(added 2026-10-27 from the product owner's account; not independently verified)*
+Recorded so later decisions can be read against what already failed. These are the owner's descriptions, kept as context rather than requirements.
+- **First proof of concept:** an early workflow built with Hermes and DeepSeek models, with some local pre-analysis before model calls.
+- **Codex-built version:** used a model the owner calls "Luna" for part of the classification. Results were inconsistent.
+- **Root cause as the owner sees it:** local models were weak at extracting key information, and their output was not type-safe, so results varied between runs.
+- **Smoke tests:** one conversation at a time gave inconsistent output; API/model timeouts occurred via OpenRouter; batches of 20–50 conversations had many failures.
+- **Raw extraction:** the current contents of `raw/` (per-conversation split JSON, flattened `images/`, `export_manifest.json`) were produced from the original export by an earlier extraction step run with Hermes (owner, 2026-10-27). See ADR-0002.
+- **Leftovers in `raw/`:** two small derived JSON files (a classification output and an archive validation result) sit inside `raw/conversations/`. They look like outputs of the earlier attempt (inferred from their key structure only) and are excluded from import (ADR-0002, OD-09).
+- **Responses in this plan:** ADR-0007 (cloud-capable models with schema-enforced output and measured stability), TR-16, FND-009, EVAL-010/EVAL-011 batch smoke gates at 50 and 100.
+
+## ADR index
+See `docs/adr/README.md`. ADR-0002..ADR-0008 were proposed by the 2026-10-27 specification audit and await owner approval.
