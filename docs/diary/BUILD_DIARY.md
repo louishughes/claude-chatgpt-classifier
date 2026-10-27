@@ -622,3 +622,13 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **What doesn't change:** no paid API calls (AI steps run through a Claude session on his subscription, tested with fakes), small PRs with a teach-back each, and anything that needs Louis himself (like approving the answer key) is logged and skipped rather than waited on.
 **Talking points:**
 - "Decisions made on someone's behalf stay reversible, and get reversed cleanly when they speak."
+
+### 23:38 — ING-003: the import is one function
+**What:** `import_source(folder, account)` now imports an export end to end and returns a report: conversations, messages and edges written to the database, every file archived, the batch recorded. 11 new tests, 470 in total.
+**The test that matters:** `test_identical_reimport_adds_nothing` imports the same export twice and counts every table. The second run adds zero conversations, zero messages, zero revisions, zero edges, queues no AI work, and reports everything as "unchanged". It counts *every* table the code defines, so tables added later are covered automatically.
+**Other things it proves:** the official export, its sharded and ZIP versions, and Louis's split format all produce identical records. A simulated crash halfway through, followed by a re-run, ends in exactly the same state as one clean run.
+**Something I stopped short of:** the `ke import` command still says "not built yet", because switching it on means replacing a test that checks the placeholder, and changing tests needs Louis's OK. Logged for him.
+**Teach-back (`importer/__init__.py`):** "The whole importer is one function: give it an export and an account name and it returns a report. Inside, every record's ID comes from what it is, and the database refuses duplicates, so importing the same export twice adds nothing. If it crashes halfway, running it again finishes the job and ends exactly where a clean run would."
+**Talking points:**
+- "One test owns the promise 'importing twice adds nothing', and it counts every table, including ones that don't exist yet."
+- "Crash recovery is just running it again, because the import is idempotent."
