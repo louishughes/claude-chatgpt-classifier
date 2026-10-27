@@ -62,3 +62,32 @@ First mypy run flagged an unneeded `type: ignore` in the new test; removed (fix 
 **Not done / not tested:** Windows run. No `ke config show` command (FND-008 CLI). ADR-0007 remains `proposed`.
 
 **Next exact task:** FND-003 — SQLAlchemy engine for SQLite with WAL and foreign keys, session factory, transaction scope, round-trip and rollback test.
+
+## 2026-10-27 · FND-003 — Relational persistence interface and SQLite engine
+
+**Dependencies:** FND-001, FND-002 (both VERIFIED). **Status:** VERIFIED.
+
+**Changed files:** `src/knowledge_engine/infrastructure/__init__.py`, `infrastructure/db.py`, `infrastructure/workspace.py` (new), `tests/unit/test_db.py` (new), `pyproject.toml` (adds `sqlalchemy>=2.0.36,<2.1`), `STATUS.md`, `docs/TICKETS.csv` (FND-003 → VERIFIED).
+
+**Design choices:**
+- `create_sqlite_engine`: per-connection `foreign_keys=ON`, `journal_mode=WAL` (raises `DatabaseConfigError` if refused), `busy_timeout` (default 5 s), `synchronous=NORMAL`. Pragmas re-checked on a first connection.
+- The pysqlite driver's implicit transaction handling is disabled and `BEGIN` is emitted by an engine event (SQLAlchemy's documented fix), so savepoints work.
+- `SessionFactory.transaction(write=True)`: commit on success, rollback on exception, always close. Write transactions use `BEGIN IMMEDIATE` (take the write lock up front); `write=False` uses `BEGIN DEFERRED`.
+- `Base` declarative class with a constraint naming convention for Alembic (FND-004).
+- `WorkspaceRow` / `WorkspaceRepo` (`workspaces`: random 32-hex ID, unique name, created_at UTC). Repos flush but never commit. Table creation in tests uses `create_all`; FND-004 replaces that with migrations.
+- Database path: `<workspace_root>/knowledge.db`.
+
+**Commands run (scratch venv, Python 3.13.17, SQLAlchemy 2.0.55, SQLite 3.45.1):**
+```
+ruff check .            # All checks passed!
+ruff format --check .   # 14 files already formatted
+mypy                    # Success: no issues found in 8 source files
+pytest -q               # 54 passed (15 new for FND-003)
+```
+Mutation check: switching write transactions to `DEFERRED` made `test_write_transaction_takes_the_lock_before_its_first_write` fail (1 failed, 14 passed); reverted, all pass. First mypy run flagged a `str | None` attribute access in a new test; fixed (attempt 1 of 3).
+
+**Risk carried forward:** the plan notes WAL on Windows network drives. `V:` must be checked on the owner's PC: SQLite may accept WAL on a network share and still be unsafe. To verify during the first Remote Control run.
+
+**Not done / not tested:** Windows run; Alembic (FND-004).
+
+**Next exact task:** FND-004 (Alembic baseline) or FND-005 (domain models and stable IDs); both unblocked.

@@ -267,7 +267,7 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "Seven cents and one evening bought me the lessons. The rest waits until the foundation exists."
 - "Know the difference between 'Claude checked it' and 'I checked it'."
 
-### 20:58 — First real code: FND-001, the project skeleton
+### 20:53 — First real code: FND-001, the project skeleton
 **What:** Started milestone M1, the foundation: importing chats, keeping branches, handling re-imports and linking images. It's plain code with no AI. The first ticket only sets up the skeleton: a `pyproject.toml` that describes the project, an empty `knowledge_engine` package in a `src/` folder, three tests, and three checking tools. `ruff` checks style and, importantly, that every public function has a plain-English docstring. `mypy` checks types strictly. `pytest` runs the tests. A new `docs/CODE_STYLE.md` writes down the comment rules, including a "Talking points" list at the top of every module.
 **Why this way:**
 - The `src/` layout forces tests to use the installed package, the same way a user would get it. That catches "works on my machine" packaging mistakes early.
@@ -281,7 +281,7 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "My style rules are enforced by a linter, not by good intentions."
 - "Every dependency arrives with the ticket that needs it."
 
-### 21:10 — FND-002: settings, with privacy switched on by default
+### 20:57 — FND-002: settings, with privacy switched on by default
 **What:** Added one settings object that holds every switch and limit the engine uses. It can be filled from a `ke.toml` file, from environment variables, or from code. There's a commented example in `ke.example.toml`. 36 new tests, 39 in total, all passing.
 **Key decisions and why:**
 - **Everything that leaves the PC has its own off switch:** text AI, embeddings, image analysis, web fetches and transcript fetches. All five ship switched off. Turning on the text model does *not* turn on image analysis. That's the privacy promise from the plan, enforced in code.
@@ -295,3 +295,19 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "Privacy by default isn't a policy page, it's five booleans that default to False, plus tests."
 - "My config refuses to let the app write inside the folder holding my private data."
 - "API keys never go in config files. My app checks that and refuses to start."
+
+### 21:00 — FND-003: the local database
+**What:** Added the SQLite database layer and the first table, `workspaces`. 15 new tests, 54 in total, all passing.
+**Key decisions and why:**
+- **Foreign keys switched on for every connection.** SQLite ignores them unless asked, which surprises a lot of people. A test checks it's really on.
+- **WAL mode**, so a reader (say, the note renderer) can keep reading while an import writes.
+- **One all-or-nothing transaction block** that every write goes through: commit if it finishes, roll back on any error. Re-imports and resume-after-crash (IMP-004) depend on it.
+- **Writers take the lock at the start** (`BEGIN IMMEDIATE`). Otherwise two writers can each wait for the other halfway through. To prove the test actually checks this, I broke the code on purpose and watched that one test go red. That's called a mutation check.
+- The workspace ID is random and never built from its name, so renaming can't change identity.
+**Problem to watch:** Louis's project lives on drive `V:`. If that's a network drive, SQLite's WAL mode can be unsafe there. I'll check it during the first run on his PC.
+**Housekeeping:** the times on the two earlier entries from this session were ahead of the clock. Corrected to 20:53 and 20:57.
+**What I learned:** what a transaction is, what rollback means in practice, and why SQLite needs a few switches turned on before it's safe.
+**Talking points:**
+- "Every write in my app is all-or-nothing. A crash can't leave half an import behind."
+- "I broke my own code on purpose to prove the test would catch it."
+- "SQLite is a real database if you configure it. Foreign keys and WAL mode are two lines that matter."
