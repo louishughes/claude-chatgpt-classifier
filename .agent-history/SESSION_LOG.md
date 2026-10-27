@@ -419,3 +419,25 @@ pytest -q               # 420 passed, 6 skipped (24 new for A1)
 Finish line: `export_single`, `export_sharded` and `export_zip` give equal `NativeConversation.native` lists; a ZIP with `../escape.png` is refused. Fix attempts: 1 (my own new shard-order test expected the wrong tie order).
 
 **Next exact task:** slice A2 (ING-011 split-wrapper adapter).
+
+## 2026-10-27 · ING-011 — Split-wrapper directory adapter (slice A2)
+
+**Dependencies:** ING-002 (VERIFIED, PR #155), ING-005 (VERIFIED). **Status:** VERIFIED. **Branch:** `claude/project-thread-q0du34-adapter-a2`.
+
+**Changed files:** `src/knowledge_engine/ingestion/chatgpt_split.py` (new), `ingestion/registry.py` (new: `default_adapters()`), `tests/unit/test_split_adapter.py` (new), `STATUS.md`, diary.
+
+**Design choices:**
+- Root = the raw folder (with `conversations/`) or the `conversations/` folder itself; probe reads JSON files in name order until one wraps a conversation (a leading manifest or index file doesn't fool it).
+- `open` hashes every wrapper file; non-wrapper JSON → `non_conversation_file_skipped`, invalid JSON → `invalid_json_skipped`; one source warning `format_lacks_account_id`. Media: any file under the root recognised by magic bytes.
+- The stream re-reads each file and checks it against the listed hash; a change raises `SourceChangedError` (the import mustn't mix versions). Memory stays flat over 1,158 real files.
+- Wrapper hints (REV-007 key names) are cross-checked against the native object: id, title, create_time, message/user/assistant counts. Only a present-and-different hint warns.
+
+**Commands run:**
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 50 source files
+pytest -q               # 431 passed, 6 skipped (11 new for A2)
+```
+Finish line: `split_wrapper` natives equal `export_single` natives (children removed); the derived file and the one wrong count are warnings, not records. Fix attempts: 0.
+
+**Next exact task:** slice I1 (ING-001 archive store + IMP-001 import batch and snapshot ledger) in `importer/`.
