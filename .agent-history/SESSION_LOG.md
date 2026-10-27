@@ -518,3 +518,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - Added importer/identity.py (identity_candidates table, migration 0006); run.py records id_collision / missing_native_id candidates, skips exact in-source duplicates; report gains candidate_matches.
 - Tests: tests/integration/test_identity_candidates.py (5). Full suite 482 passed, 6 skipped; ruff, mypy clean.
 - Next: slice I5 (IMP-004 concurrency).
+
+## 2026-10-27 23:47 IMP-004 (slice I5)
+- Added importer/lock.py (OS file lock on <workspace>/import.lock, fcntl/msvcrt); run_import holds it for the whole import; Limits.import_lock_timeout_s (default 600).
+- Tests: tests/integration/test_concurrent_import.py (3; two subprocess imports equal one). Verified it fails with the lock removed. Full suite 485 passed, 6 skipped.
+- Next: media slice M1 (MED-001 + MED-003).

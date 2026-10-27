@@ -663,3 +663,19 @@ pytest -q               # 482 passed, 6 skipped (5 new)
 Finish line: `id_collision` matches its answer key (candidate_matches id_collision 1 / missing_native_id 1; merged 0); `same_title_different_chat` gives 2 conversations, 0 candidates. Fix attempts: 1 (my own new test assumed two revisions per chat; the fixture's chat also has a root message).
 
 **Next exact task:** slice I5 (IMP-004: two concurrent imports give the same result as one).
+
+### 23:47 — IMP-004: two imports at once just queue
+**What:** Imports into one workspace now run one at a time. The whole import holds a lock file in the workspace; a second import waits for it (up to 10 minutes by default, `import_lock_timeout_s`), then runs and finds everything already done. 3 new tests, 485 in total.
+**Why a lock, when the database already refuses duplicates:** each group of conversations was already safe, but a whole import makes two "am I alone?" judgements. On start it marks any batch still `running` as crashed, and at the end it marks chats it didn't touch as "not seen". Two imports interleaving would get both wrong. I checked the test fails without the lock (3 out of 3 runs) and passes with it (5 out of 5).
+**Why an operating-system lock:** the OS drops it when the process dies, so a crash can never leave the workspace stuck locked.
+**Teach-back (`importer/lock.py`):** "Only one import can write to a workspace at a time, because an import assumes it's alone when it decides what crashed and what's missing. It holds an operating-system lock on a file in the workspace, and a second import waits its turn. If the process crashes, the OS releases the lock, so nothing ever stays stuck."
+**Talking points:**
+- "Concurrency here is solved by queuing, not cleverness: the second import waits, then finds nothing to do."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 69 source files
+pytest -q               # 485 passed, 6 skipped (3 new)
+```
+Finish line: two concurrent `import_source` processes on `reexport_v1` leave the same row counts as one serial import; one reports "new", the other "unchanged". Fix attempts: 0.
+
+**Next exact task:** media slice M1 (MED-001 + MED-003: blobs, assets, occurrences).
