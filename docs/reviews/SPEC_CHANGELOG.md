@@ -125,6 +125,8 @@ None for existing tickets. INT-002 stays P1 with a narrower scope; YouTube detec
 | `docs/adr/0007-model-egress-and-structured-output.md` | Items 8–9 (hybrid split, spike); "temperature 0" replaced by explicit `effort` | Owner question on hybrid/BERT; current models reject sampling parameters |
 | `docs/reviews/OPEN_DECISIONS.md` | Added OD-17 (separate classification dimensions) | Post-mortem cause 7: a single mixed category is ambiguous |
 | `docs/PRD.md` §success metrics, `docs/TEST_STRATEGY.md` §5–6 | "primary category" annotated as primary *domain* (OD-17) | Same |
+| `AGENTS.md`, `CLAUDE.md` §4, IMPLEMENTATION_PLAN §8 | Owner guardrails: tests/gold set changed only with approval; at most 3 fix attempts then stop and ask (CLAUDE.md previously said one remediation pass); vocabulary frozen during a run | Owner approval in the project chat, 2026-10-27 |
+| IMPLEMENTATION_PLAN §12, `docs/HANDOFF_AFTER_AUDIT.md` §6 | Agreed spike sequence and go/no-go; next step is the spike, then FND-001 | Same |
 
 ## 4. ADRs
 ADR-0002..ADR-0008 created with status `proposed`. ADR-0001 is reserved for the SQLite/FTS5 decision that `DECISIONS_AND_HISTORY.md` uses as its worked example; no ADR file existed. No accepted decision was reversed. ADR-0007 refines (does not supersede) the local-only default pending OD-04.

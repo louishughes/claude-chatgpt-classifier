@@ -8,8 +8,13 @@ the report compares the model's labels with his.
 
 How
 ---
-1. ``spike.py ... --gold-template 15`` writes ``gold_template.csv`` into the
-   private output folder: id, file name, title, and empty label columns.
+1. ``spike.py ... --gold-template 20`` picks about 20 *varied* chats from the
+   sample (short and long, with and without images or branches, spread over
+   time) and writes ``gold_template.csv`` plus ``gold_instructions.txt`` into
+   the private output folder. Each row shows the title, date, size and the
+   start of your first message, so you can label most chats without opening
+   them. Label columns are left empty on purpose: pre-filling them with the
+   model's guess would nudge you towards agreeing with it.
 2. Louis fills in ``primary_domain`` and ``purpose`` (keys from
    ``schema.py``), optionally ``secondary_domains`` (separated by ``;``) and
    ``projects`` (names, ``;``-separated, for eyeballing only), and saves it
@@ -19,20 +24,64 @@ How
 Talking points
 --------------
 - "Consistency is not correctness. I hand-labelled a small gold set to check both."
-- Fifteen labels is enough to catch a model that is confidently wrong.
+- "Twenty varied labels catch a model that is confidently wrong."
+- The gold file is fingerprinted (SHA-256) in every report, so nobody,
+  human or agent, can quietly edit the answers to make a run look better.
 """
 
 from __future__ import annotations
 
 import csv
+import hashlib
+import random
+from datetime import datetime, timezone
 from pathlib import Path
 
 from loader import Conversation
 from report import _pct, jaccard
 from schema import DOMAINS, PURPOSES
 
-FIELDS = ["conversation_id", "source_file", "title", "primary_domain", "purpose",
-          "secondary_domains", "projects", "notes"]
+CONTEXT_FIELDS = ["conversation_id", "source_file", "title", "date", "turns", "has_images",
+                  "has_branches", "first_user_message"]
+LABEL_FIELDS = ["primary_domain", "purpose", "secondary_domains", "projects", "notes"]
+FIELDS = CONTEXT_FIELDS + LABEL_FIELDS
+
+
+def _size(c: Conversation) -> str:
+    return "short" if len(c.turns) <= 4 else "medium" if len(c.turns) <= 20 else "long"
+
+
+def pick_diverse(convs: list[Conversation], n: int, seed: int) -> list[Conversation]:
+    """Choose ``n`` chats that cover different shapes of conversation.
+
+    Groups chats by size and by whether they have images or branches, then
+    takes one from each group in turn (round robin). Within a group, chats are
+    ordered by date and the walk starts at a random point, so the set is
+    spread over time too. Same seed, same pick.
+
+    Why not just random? A random 20 from a skewed history is mostly short
+    chats, and the gold set would never test the long, messy ones.
+    """
+    groups: dict[tuple, list[Conversation]] = {}
+    for c in convs:
+        key = (_size(c), c.image_refs > 0, c.branch_points > 0)
+        groups.setdefault(key, []).append(c)
+    rng = random.Random(seed)
+    queues = []
+    for key in sorted(groups):
+        members = sorted(groups[key], key=lambda c: (c.create_time or 0, c.conversation_id))
+        start = rng.randrange(len(members))
+        queues.append(members[start:] + members[:start])
+    picked: list[Conversation] = []
+    while len(picked) < min(n, len(convs)):
+        for q in queues:
+            if q and len(picked) < n:
+                picked.append(q.pop(0))
+    return picked
+
+
+def _date(ts: float | None) -> str:
+    return datetime.fromtimestamp(ts, tz=timezone.utc).strftime("%Y-%m-%d") if ts else ""
 
 
 def write_template(convs: list[Conversation], path: Path) -> None:
@@ -40,7 +89,39 @@ def write_template(convs: list[Conversation], path: Path) -> None:
         w = csv.DictWriter(fh, fieldnames=FIELDS)
         w.writeheader()
         for c in convs:
-            w.writerow({"conversation_id": c.conversation_id, "source_file": c.source_file, "title": c.title})
+            w.writerow({
+                "conversation_id": c.conversation_id, "source_file": c.source_file, "title": c.title,
+                "date": _date(c.create_time), "turns": len(c.turns),
+                "has_images": "yes" if c.image_refs else "", "has_branches": "yes" if c.branch_points else "",
+                "first_user_message": c.first_user_text(),
+            })
+    (path.parent / "gold_instructions.txt").write_text(INSTRUCTIONS, encoding="utf-8")
+
+
+def fingerprint(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:16]
+
+
+INSTRUCTIONS = """How to label the gold set (about 3 minutes per chat)
+
+Open gold_template.csv in Excel or Google Sheets. For each row:
+1. Read the title and first message. Open the chat in ChatGPT only if you
+   can't tell what it was about.
+2. primary_domain: the ONE main subject area (copy a key from the list).
+3. purpose: what you were mainly trying to do (copy a key from the list).
+4. Optional: secondary_domains (up to 3, separated by ;), projects (names
+   of your projects it was about, separated by ;), notes.
+5. Not sure? Pick your best answer and write "unsure" in notes. Leaving
+   primary_domain empty skips the row.
+
+Label it the way YOU see it. Don't try to guess what the model will say.
+Save as gold.csv (CSV, UTF-8) in the same folder.
+
+Domains:
+""" + "\n".join(f"  {k}: {v}" for k, v in DOMAINS.items()) + """
+
+Purposes:
+""" + "\n".join(f"  {k}: {v}" for k, v in PURPOSES.items()) + "\n"
 
 
 def _split(cell: str | None) -> list[str]:

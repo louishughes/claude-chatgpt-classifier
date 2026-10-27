@@ -163,3 +163,16 @@ A running, timestamped log of what is being worked on, the problems hit, how the
 - "Ambiguous questions produce inconsistent answers. Fix the question before blaming the model."
 - "Retry the network, never the judgement."
 - "Processing order shouldn't change the answer. I test it by shuffling."
+
+### 19:40 — Agreed path: gold set, 50 twice, then go/no-go
+**What:** Louis agreed the path forward and three guardrails for every AI agent working on the repo:
+- No changing tests or the gold set without his OK.
+- At most 3 fix attempts per ticket, then stop and ask.
+- The vocabulary stays frozen during a run.
+
+These are now in `AGENTS.md`, `CLAUDE.md` and the plan. The spike's gold set got real tooling. It picks about 20 *varied* chats from the 50: short and long, with and without images or branches, spread over time. It writes a labelling sheet with the title, date, size and first message so labelling takes about an hour. The label columns stay blank so the model's guess can't anchor the human. Every report records a fingerprint of the gold file, so any later edit to the answers is visible. 40 tests pass.
+**Next:** Louis gives the API OK, a cost cap and where to run it; labels the 20; we run 50 chats twice and he reviews. If it hits the targets: 100 chats, then the first real ticket. If not: change the method, not the prompt wording.
+**Talking points:**
+- "Agents can't mark their own homework. The answer key is mine, and it's fingerprinted."
+- "Guardrails for AI coding agents: bounded retries, frozen vocabulary, hands off the tests."
+- "Don't pre-fill the human's labels with the model's answer. That's how you get fake agreement."

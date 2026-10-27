@@ -186,7 +186,9 @@ Property-based tests (Hypothesis): random message DAGs (no cycles lost, every no
 ## 8. Verification strategy and stop rules
 
 - Per ticket: run the ticket's focused tests, then the package's tests, once after the last change (TEST_STRATEGY §10).
-- One focused fix after a genuine failure, then one rerun. Still failing → mark `BLOCKED` with the failing command and stop.
+- At most 3 fix attempts after a genuine failure (owner guardrail, 2026-10-27; replaces the earlier one-fix rule). Still failing → mark `BLOCKED` with the failing command and stop and ask.
+- Existing tests, acceptance criteria and gold-set labels are changed only with owner approval.
+- Taxonomy version is frozen for the duration of any classification run.
 - Transient provider errors: 3 attempts total with backoff; then `failed` for that item, batch continues and resumes later.
 - Semantic disagreement → review item, never a retry loop.
 - Real-provider runs only inside EVAL-011 and later gates, always with a cost cap and pinned versions.
@@ -231,5 +233,11 @@ The owner chose to validate the AI labelling step before starting M1. `prototype
 - **Evidence:** share of decision quotes found verbatim in a message by the stated speaker, and "accepted" decisions backed only by assistant text.
 
 Known limits, from the earlier post-mortem (`docs/reference/2026-10-27-why-the-classifier-failed.md`, PR #2): one call per chat cannot validate project identity (that needs the corpus-wide registry), labels are per chat not per segment, and decision recall needs the fuller EVAL-001 reference set.
+
+**Agreed sequence (owner, 2026-10-27):**
+1. Schema with separate fields and attributed decisions (done, taxonomy `spike-0.2`).
+2. Gold set: the spike picks about 20 varied chats from the 50-chat sample (size, images, branches, spread over time) and writes a labelling sheet. The owner labels domain and purpose, about an hour. Label columns are never pre-filled by the model, and the gold file's hash is recorded in every report.
+3. Owner gives the API-data OK, a cost cap and the run location. Then run 50 chats twice in different orders and score run-to-run agreement and accuracy against the gold set. The owner reviews the report before anything scales.
+4. **Go/no-go.** Go if the README targets are met (headline: primary-domain agreement ≥ 90%, primary-domain accuracy vs gold ≥ 80%, decision quotes verified ≥ 95%, no unrecovered transient errors at 50). Then run 100 chats, and if that also holds, start M1 at FND-001. **No-go:** change the method (input selection, fields, segment-level labelling, model or effort), not the prompt wording, and re-run against the *same* gold set.
 
 Targets are in the spike README. Results feed OD-05 (provider/model, cost cap), the FND-009 contract and the EVAL-001 golden set: the gold labels become its first entries. Nothing in `src/` will import the spike.

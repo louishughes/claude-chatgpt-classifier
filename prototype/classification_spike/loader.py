@@ -54,8 +54,19 @@ class Conversation:
     conversation_id: str
     source_file: str  # file name only, used for resume and debugging
     title: str = ""  # only ever written to the private output folder
+    create_time: float | None = None  # Unix seconds, when the source has it
     turns: list[Turn] = field(default_factory=list)
     branch_points: int = 0  # nodes with more than one child (edits/regens)
+
+    @property
+    def image_refs(self) -> int:
+        return sum(t.image_refs for t in self.turns)
+
+    def first_user_text(self, limit: int = 300) -> str:
+        for t in self.turns:
+            if t.role == "user" and t.text.strip():
+                return " ".join(t.text.split())[:limit]
+        return ""
 
     def full_text(self) -> str:
         return "\n\n".join(f"[{t.role}]: {t.text}" for t in self.turns)
@@ -145,6 +156,7 @@ def load_conversation(path: Path) -> Conversation | None:
         conversation_id=str(conv_id),
         source_file=path.name,
         title=str(title),
+        create_time=native.get("create_time") if isinstance(native.get("create_time"), (int, float)) else None,
         turns=turns,
         branch_points=count_branch_points(mapping),
     )

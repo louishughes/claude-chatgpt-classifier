@@ -8,8 +8,8 @@ Typical use on the PC that holds raw/:
     # 2. Two runs over 50 chats with a $5 cap, then the report.
     python spike.py --raw-dir ../../raw --sample 50 --runs 2 --out ~/spike-out --max-cost-usd 5
 
-    # Optional but recommended: hand-label 15 of the 50 first (see gold.py).
-    python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --gold-template 15
+    # Optional but recommended: hand-label 20 varied chats from the 50 first (see gold.py).
+    python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --gold-template 20
     python spike.py ... --gold ~/spike-out/gold.csv
 
     # 3. Same again at 100. The 100 sample contains the 50 sample.
@@ -32,12 +32,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from gold import gold_stats, load_gold, write_template
+from gold import fingerprint, gold_stats, load_gold, pick_diverse, write_template
 from loader import clip_text, sample_conversations
 from providers import PRICES, AnthropicProvider, FakeProvider, FatalError
 from report import category_spread, consistency, run_stats, to_markdown
 from runner import CostMeter, load_records, run_once
-from schema import DOMAINS, PURPOSES, SYSTEM_PROMPT, TAXONOMY_VERSION
+from schema import SYSTEM_PROMPT, TAXONOMY_VERSION
 
 # Rough output size per call, including the model's thinking. Only used for
 # the dry-run estimate; the real run uses the API's exact token counts.
@@ -68,7 +68,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--no-refusal-fallback", action="store_true")
     p.add_argument("--gold-template", type=int, metavar="N",
-                   help="write a CSV of the first N sampled chats for hand-labelling, then stop")
+                   help="pick N varied sampled chats, write a labelling sheet, then stop")
     p.add_argument("--gold", type=Path, help="filled-in gold CSV: adds accuracy to the report")
     p.add_argument("--dry-run", action="store_true", help="estimate cost, make no calls")
     p.add_argument("--allow-out-in-repo", action="store_true", help="tests only")
@@ -88,8 +88,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.gold_template:
         out.mkdir(parents=True, exist_ok=True)
-        write_template(convs[: args.gold_template], out / "gold_template.csv")
-        print(f"Wrote {out / 'gold_template.csv'}.\n  domains: {', '.join(DOMAINS)}\n  purposes: {', '.join(PURPOSES)}")
+        write_template(pick_diverse(convs, args.gold_template, args.seed), out / "gold_template.csv")
+        print(f"Wrote {out / 'gold_template.csv'} and gold_instructions.txt. Fill it in, save as gold.csv.")
         return 0
     gold = load_gold(args.gold.expanduser()) if args.gold else {}
 
@@ -138,6 +138,9 @@ def main(argv: list[str] | None = None) -> int:
         "sample": len(convs), "seed": args.seed, "runs": args.runs, "workers": args.workers,
         "budget_chars": args.budget_chars, "timeout_s": args.timeout_s,
         "total_cost_usd": round(meter.spent, 4),
+        # Fingerprint of the answer key, so any later edit to it is visible.
+        "gold_file_sha256": fingerprint(args.gold.expanduser()) if args.gold else "none",
+        "gold_rows": len(gold),
     }
     vs_gold = [gold_stats(r, gold) for r in runs] if gold else []
     (out / "report.json").write_text(json.dumps(

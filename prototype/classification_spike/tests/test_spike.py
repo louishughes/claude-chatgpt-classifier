@@ -318,3 +318,48 @@ def test_semantic_answers_are_never_retried(conv):
     p = FakeProvider()
     rec = label_one(conv, p, CostMeter(10), 24000, sleep=no_sleep)
     assert rec.status == "ok" and p.calls == 1
+
+
+# --- gold set selection ------------------------------------------------------
+
+def test_gold_pick_is_varied_and_reproducible(raw_dir):
+    from gold import _size, pick_diverse
+    convs, _ = sample_conversations(raw_dir(40), 40, seed=2)
+    a = pick_diverse(convs, 10, seed=5)
+    assert [c.conversation_id for c in a] == [c.conversation_id for c in pick_diverse(convs, 10, seed=5)]
+    assert len({c.conversation_id for c in a}) == 10
+    groups_all = {(_size(c), c.image_refs > 0, c.branch_points > 0) for c in convs}
+    groups_picked = {(_size(c), c.image_refs > 0, c.branch_points > 0) for c in a}
+    assert groups_picked == groups_all          # every shape of chat is represented
+    assert len(pick_diverse(convs, 100, seed=5)) == 40
+
+
+def test_gold_sheet_has_context_and_blank_labels(raw_dir, tmp_path):
+    import csv
+    out = tmp_path / "out"
+    assert spike.main(["--raw-dir", str(raw_dir(12)), "--out", str(out), "--sample", "10",
+                       "--provider", "fake", "--gold-template", "5"]) == 0
+    rows = list(csv.DictReader((out / "gold_template.csv").open()))
+    assert rows[0]["first_user_message"].startswith("conv-") and rows[0]["turns"]
+    assert all(not r["primary_domain"] and not r["purpose"] for r in rows)   # never pre-filled
+    text = (out / "gold_instructions.txt").read_text()
+    assert "software_development" in text and "brainstorm" in text
+
+
+def test_report_fingerprints_the_gold_file(raw_dir, tmp_path):
+    import csv
+    root, out = raw_dir(6), tmp_path / "out"
+    base = ["--raw-dir", str(root), "--out", str(out), "--sample", "5", "--provider", "fake", "--runs", "1"]
+    spike.main(base + ["--gold-template", "2"])
+    rows = list(csv.DictReader((out / "gold_template.csv").open()))
+    for r in rows:
+        r["primary_domain"], r["purpose"] = "games", "brainstorm"
+    gold = out / "gold.csv"
+    with gold.open("w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=rows[0].keys()); w.writeheader(); w.writerows(rows)
+    spike.main(base + ["--gold", str(gold)])
+    first = json.loads((out / "report.json").read_text())["meta"]["gold_file_sha256"]
+    gold.write_text(gold.read_text().replace("brainstorm", "build_or_fix"))
+    spike.main(base + ["--gold", str(gold)])
+    second = json.loads((out / "report.json").read_text())["meta"]["gold_file_sha256"]
+    assert first != second and len(first) == 16

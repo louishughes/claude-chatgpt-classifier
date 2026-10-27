@@ -11,7 +11,7 @@ The earlier attempts failed on three things: inconsistent labels, untyped output
 4. Validates every answer. One repair attempt, then `review_required`.
 5. Retries only transport and format problems: timeouts/rate limits/server errors at most 3 calls in total, with backoff; a broken schema gets one repair. A well-formed but wrong answer is never retried. Stops before every call if the cost cap is reached. Saves after every chat, so a rerun resumes.
 6. Runs the whole sample twice, **in a different order each time**, and reports reliability, cost and run-to-run agreement per field (`report.md`, counts only). Because every call is independent, agreement across orders also checks processing-order independence.
-7. Optionally compares the model with **your own labels** for 10–20 chats (a gold set). Agreement between runs only proves consistency; a model can be consistently wrong.
+7. Compares the model with **your own labels** for about 20 varied chats (a gold set, about an hour of labelling). The sheet shows title, date, size and your first message, with label columns left blank so the model's guess can't anchor you. The gold file's fingerprint goes into every report. Agreement between runs only proves consistency; a model can be consistently wrong.
 
 ## Files
 | File | Role |
@@ -21,9 +21,14 @@ The earlier attempts failed on three things: inconsistent labels, untyped output
 | `providers.py` | `AnthropicProvider` (real) and `FakeProvider` (tests), typed errors, prices |
 | `runner.py` | Retries, repair, cost cap, checkpoint/resume, evidence-quote check |
 | `report.py` | Metrics and the Markdown report |
-| `gold.py` | Hand-labelled gold set: template and accuracy vs your labels |
+| `gold.py` | Gold set: picks varied chats, writes the labelling sheet and instructions, scores accuracy, fingerprints the file |
 | `spike.py` | Command line |
-| `tests/` | 37 tests on synthetic data, including 50- and 100-chat batches with injected failures |
+| `tests/` | 40 tests on synthetic data, including 50- and 100-chat batches with injected failures |
+
+## Order of play (agreed 2026-10-27)
+1. Schema with separate fields (done) → 2. gold set: you label ~20 chats → 3. run 50 chats twice, score agreement and accuracy, **you review** → 4. go/no-go: if targets are met, run 100, then start M1; if not, change the method (inputs, fields, segmenting), not the prompt wording.
+
+Guardrails: agents don't change the tests or your gold labels without your OK; the category lists are frozen during a run (`TAXONOMY_VERSION`); a failing fix gets at most 3 attempts, then the agent stops and asks.
 
 ## Running it
 ```bash
@@ -34,7 +39,7 @@ python -m pytest -q tests                         # free, offline
 
 # Needs ANTHROPIC_API_KEY set in your shell. Never commit it.
 python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --dry-run          # cost estimate only
-python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --gold-template 15   # optional: label these
+python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --gold-template 20   # labelling sheet, ~1 hour
 # fill in primary_domain and purpose (optionally secondary_domains and projects, ';'-separated), save as ~/spike-out/gold.csv
 python spike.py --raw-dir ../../raw --sample 50 --runs 2 --out ~/spike-out --max-cost-usd 5 --gold ~/spike-out/gold.csv
 python spike.py --raw-dir ../../raw --sample 100 --runs 2 --out ~/spike-out-100 --max-cost-usd 10
