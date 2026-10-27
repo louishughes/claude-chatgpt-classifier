@@ -1,0 +1,24 @@
+{
+  "fixture_format_version": 1,
+  "case": "branches_regen",
+  "synthetic": true,
+  "layout": "official",
+  "proves": "Regenerated replies are assistant siblings; current_node picks the active one.",
+  "expected": {
+    "conversations": 1,
+    "branch_points": {
+      "edit": 0,
+      "regeneration": 1
+    },
+    "branch_children": 3,
+    "active_path_node_ids": [
+      "c0000002-0000-4000-8000-000000000002-sys",
+      "c0000002-0000-4000-8000-000000000002-u0",
+      "regen-a0b"
+    ],
+    "inactive_node_ids": [
+      "c0000002-0000-4000-8000-000000000002-a0",
+      "regen-a0c"
+    ]
+  }
+}

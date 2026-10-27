@@ -1,0 +1,19 @@
+{
+  "fixture_format_version": 1,
+  "case": "metadata_drift",
+  "synthetic": true,
+  "layout": "official",
+  "proves": "Imported after reexport_v1: only cosmetic metadata changed, so the content is unchanged and nothing is reprocessed (OD-13).",
+  "expected": {
+    "conversations": 1,
+    "delta_vs": "reexport_v1",
+    "conversation_delta_by_id": {
+      "c0000005-0000-4000-8000-00000000000a": "unchanged"
+    },
+    "message_delta": {
+      "unchanged": 3
+    },
+    "new_raw_observations": true,
+    "model_calls_triggered": 0
+  }
+}

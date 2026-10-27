@@ -340,3 +340,17 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "Re-import safety comes down to one idea: IDs come from identity, not from timing."
 - "I let a library generate hundreds of random test cases to try to break my ID rules."
 - "One test pins an exact ID value, because changing the recipe would quietly change every stored ID."
+
+### 21:38 — Louis: "We need to do all the milestones." EVAL-009: fake exports to test against
+**Decision:** Louis wants the whole roadmap built, not just the import foundation. So the plan is to keep going ticket by ticket through all six milestones. The approval points stay in place: I'll still ask before the first paid AI run, before any feature that goes online, and before anything that deletes data.
+**What:** Built a generator for fake ChatGPT exports and committed 14 test cases made with it. Together they cover every export layout (one file, numbered shards, a ZIP, and the per-chat files like the current `raw/` folder) and the awkward situations: an edited question, regenerated answers, one image used three times, a missing image, a chat that disappears from the next export, two chats with the same title, and two different chats claiming the same ID. Each case has an answer key written by hand. 60 new tests, 180 in total.
+**Key decisions and why:**
+- **Generated, not hand-written.** Same seed, same bytes, on any machine. A test rebuilds the fixtures and compares them byte by byte with the committed ones. Even the tiny PNG images are written uncompressed for this reason, because compressed bytes can differ between library versions.
+- **The tests count with their own simple reader**, not the generator's code. Otherwise a bug in the generator would agree with itself.
+- **Every piece of text says "Synthetic"**, and a test checks it. It's a cheap guard against real data slipping into a public repo.
+**Honest gap:** I don't know the exact field names in the split files, apart from `title` and `conversation`. They're inferred from the audit's description, and I've flagged them for a key-names-only check on Louis's PC later.
+**What I learned:** what a test fixture is, why determinism matters for tests, and how a ZIP or PNG file is put together.
+**Talking points:**
+- "My importer is tested against 14 fake exports covering every awkward case I could find in the real data, without committing a single real message."
+- "The tests use their own tiny reader to check the answer keys, so the test data can't mark its own homework."
+- "When I wasn't sure of a real file format, I wrote that down instead of pretending."

@@ -1,0 +1,12 @@
+{
+  "fixture_format_version": 1,
+  "case": "same_title_different_chat",
+  "synthetic": true,
+  "layout": "split",
+  "proves": "Same title and day, different IDs: two separate conversations. In the split layout the second file gets a -2 suffix, like the real files.",
+  "expected": {
+    "conversations": 2,
+    "files": 2,
+    "merged": 0
+  }
+}

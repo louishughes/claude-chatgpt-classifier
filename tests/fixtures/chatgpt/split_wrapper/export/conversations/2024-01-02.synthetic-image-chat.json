@@ -1,0 +1,118 @@
+{
+  "conversation_id": "c0000001-0000-4000-8000-000000000002",
+  "title": "Synthetic image chat",
+  "create_time": 1704153600.0,
+  "date": "2024-01-02",
+  "filename": "2024-01-02.synthetic-image-chat.json",
+  "message_count": 3,
+  "image_count": 1,
+  "conversation": {
+    "title": "Synthetic image chat",
+    "create_time": 1704153600.0,
+    "update_time": 1704153840.0,
+    "mapping": {
+      "c0000001-0000-4000-8000-000000000002-root": {
+        "id": "c0000001-0000-4000-8000-000000000002-root",
+        "message": null,
+        "parent": null
+      },
+      "c0000001-0000-4000-8000-000000000002-sys": {
+        "id": "c0000001-0000-4000-8000-000000000002-sys",
+        "message": {
+          "id": "c0000001-0000-4000-8000-000000000002-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704153660.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000001-0000-4000-8000-000000000002-root"
+      },
+      "c2-u0": {
+        "id": "c2-u0",
+        "message": {
+          "id": "c2-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704153720.0,
+          "update_time": null,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "image_asset_pointer",
+                "asset_pointer": "file-service://file-SYN0001",
+                "size_bytes": 0,
+                "width": 4,
+                "height": 4,
+                "fovea": null,
+                "metadata": null
+              },
+              "Synthetic: what colour is this?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000001-0000-4000-8000-000000000002-sys"
+      },
+      "c2-a0": {
+        "id": "c2-a0",
+        "message": {
+          "id": "c2-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704153780.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: it is red."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c2-u0"
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c2-a0",
+    "plugin_ids": null,
+    "conversation_id": "c0000001-0000-4000-8000-000000000002",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000001-0000-4000-8000-000000000002"
+  }
+}

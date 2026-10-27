@@ -1,0 +1,23 @@
+{
+  "fixture_format_version": 1,
+  "case": "branches_edit",
+  "synthetic": true,
+  "layout": "official",
+  "proves": "A user edit creates sibling user nodes; the edited branch is active; no splicing.",
+  "expected": {
+    "conversations": 1,
+    "branch_points": {
+      "edit": 1,
+      "regeneration": 0
+    },
+    "active_path_node_ids": [
+      "c0000002-0000-4000-8000-000000000001-sys",
+      "edit-u0b",
+      "edit-a0b"
+    ],
+    "inactive_node_ids": [
+      "c0000002-0000-4000-8000-000000000001-u0",
+      "c0000002-0000-4000-8000-000000000001-a0"
+    ]
+  }
+}

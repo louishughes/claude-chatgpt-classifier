@@ -1,0 +1,21 @@
+{
+  "fixture_format_version": 1,
+  "case": "repeated_image",
+  "synthetic": true,
+  "layout": "split",
+  "proves": "One file used in three messages across two chats is one asset with three occurrences; a different file ID with identical bytes is a second asset sharing one blob.",
+  "expected": {
+    "conversations": 2,
+    "image_files": 3,
+    "asset_occurrences": {
+      "available": 5
+    },
+    "assets": 3,
+    "blobs": 2,
+    "occurrences_per_asset": {
+      "file-SYN0001": 3,
+      "file-SYN0003": 1,
+      "file_00000000synthetic0004": 1
+    }
+  }
+}
