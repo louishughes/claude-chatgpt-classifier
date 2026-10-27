@@ -90,7 +90,7 @@ If required documents are absent: record exact missing paths, apply conservative
 - Follow one unblocked ticket at a time, unless the explicitly approved plan contains a tightly scoped multi-ticket slice.
 - Before each ticket read its latest dependency chain, acceptance checks and relevant skills from `docs/.claude/skills/`, `docs/skills/`, or current canonical skill path.
 - Make bounded edits. Unit tests and fixture-based integration tests prove invariants; do not begin unbounded test generation, architecture replacement or prompt rewriting.
-- Run focused tests; for one genuine implementation failure, make at most one focused remediation pass before filing a blocker. Retry transient providers at most three attempts total. Semantic disagreement becomes a review item, not an endless loop.
+- Run focused tests; for a genuine implementation failure, make at most 3 fix attempts, then mark the ticket blocked and ask the owner (owner guardrail, 2026-10-27; was "one focused remediation pass"). Never change existing tests, acceptance criteria or the gold set without owner approval. Keep the taxonomy version frozen during a classification run. See `AGENTS.md` "Owner guardrails". Retry transient providers at most three attempts total. Semantic disagreement becomes a review item, not an endless loop.
 - On every completion, record what changed, what was tested, results, pending work, decisions, blocked tickets and next exact task. Never mark a feature complete without its demonstrated acceptance criteria.
 
 ## 5. Output standard

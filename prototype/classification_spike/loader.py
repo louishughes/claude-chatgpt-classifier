@@ -38,6 +38,9 @@ KEPT_ROLES = {"user", "assistant"}
 # Content types that carry readable chat text. "thoughts" and
 # "reasoning_recap" are the model's hidden reasoning, not the conversation.
 TEXT_CONTENT_TYPES = {"text", "multimodal_text"}
+# Code the user or assistant wrote is kept too: an earlier attempt dropped it
+# and lost real artefacts. It is stored under "text", not "parts".
+CODE_CONTENT_TYPES = {"code"}
 
 
 @dataclass
@@ -53,11 +56,29 @@ class Conversation:
 
     conversation_id: str
     source_file: str  # file name only, used for resume and debugging
+    title: str = ""  # only ever written to the private output folder
+    create_time: float | None = None  # Unix seconds, when the source has it
     turns: list[Turn] = field(default_factory=list)
     branch_points: int = 0  # nodes with more than one child (edits/regens)
 
+    @property
+    def image_refs(self) -> int:
+        return sum(t.image_refs for t in self.turns)
+
+    def first_user_text(self, limit: int = 300) -> str:
+        for t in self.turns:
+            if t.role == "user" and t.text.strip():
+                return " ".join(t.text.split())[:limit]
+        return ""
+
     def full_text(self) -> str:
-        return "\n\n".join(f"[{t.role}]: {t.text}" for t in self.turns)
+        """The chat as numbered messages: ``[#1 user]: ...``.
+
+        Numbers start at 1 and count only the kept user/assistant messages, so
+        the decisions step can point at a message and code can look it up in
+        ``turns[n - 1]``.
+        """
+        return "\n\n".join(f"[#{i} {t.role}]: {t.text}" for i, t in enumerate(self.turns, start=1))
 
 
 def native_object(data: object) -> dict | None:
@@ -112,7 +133,12 @@ def turn_from_node(node: dict) -> Turn | None:
         return None
     role = (msg.get("author") or {}).get("role")
     content = msg.get("content") or {}
-    if role not in KEPT_ROLES or content.get("content_type") not in TEXT_CONTENT_TYPES:
+    if role not in KEPT_ROLES:
+        return None
+    if content.get("content_type") in CODE_CONTENT_TYPES:
+        code = content.get("text")
+        return Turn(role=role, text=f"[code]\n{code}") if isinstance(code, str) and code.strip() else None
+    if content.get("content_type") not in TEXT_CONTENT_TYPES:
         return None
     # Hidden context the user never typed in this chat (custom instructions).
     if (msg.get("metadata") or {}).get("is_visually_hidden_from_conversation"):
@@ -139,9 +165,12 @@ def load_conversation(path: Path) -> Conversation | None:
     mapping = native["mapping"]
     turns = [t for t in (turn_from_node(n) for n in active_path(mapping, native.get("current_node"))) if t]
     conv_id = native.get("conversation_id") or native.get("id") or path.stem
+    title = native.get("title") or (data.get("title") if isinstance(data, dict) else "") or ""
     return Conversation(
         conversation_id=str(conv_id),
         source_file=path.name,
+        title=str(title),
+        create_time=native.get("create_time") if isinstance(native.get("create_time"), (int, float)) else None,
         turns=turns,
         branch_points=count_branch_points(mapping),
     )

@@ -33,7 +33,7 @@ Each case stores `case_id`, anonymised source, expected node topology, segment b
 Expected labels come from a reviewed human annotation, not the model being tested. Corrections append new fixture versions, never silently change baseline. Include explicit **forbidden outputs**, particularly unsupported accepted decisions.
 
 ## 5. Metrics
-- Classification: domain/topical macro and micro F1, project precision/recall, primary category accuracy, calibration/review rate.
+- Classification: domain/topical macro and micro F1, project precision/recall, primary category accuracy, calibration/review rate. *(Audit amendment, 2026-10-27, OD-17: "primary category" means the primary **domain**. Purpose, project, topics, knowledge types and outputs are separate dimensions, each scored on its own.)*
 - Extraction: per-type precision/recall/F1, speaker attribution accuracy, explicit-decision false-positive count, evidence validity.
 - Reconciliation: supersession precision/recall, conflict-detection recall, `current_state` accuracy under scope, historical retention.
 - Retrieval: Recall@5/@10, MRR, nDCG, exact-code hit rate; split keyword/semantic/structured question sets.
@@ -41,7 +41,7 @@ Expected labels come from a reviewed human annotation, not the model being teste
 - Operations: reimport duplicates (target 0), unchanged LLM calls (0), cache hit rate, changed-to-rebuilt dependency ratio, costs/timeouts.
 
 ## 6. Proposed release gates
-Parser inventory and evidence offsets: 100% of supported fixtures accounted for. Every published confirmed record has valid exact evidence anchor. Zero known unsupported accepted decisions on golden benchmark. Initial primary category agreement >=90%, explicit decision recall >=90%, Recall@10 >=90%, directional relationship precision >=90% (calibrate based on representative dataset). Unresolved ambiguous cases must be flagged, not forced. For multi-user release: zero cross-tenant leakage in adversarial integration/e2e cases.
+Parser inventory and evidence offsets: 100% of supported fixtures accounted for. Every published confirmed record has valid exact evidence anchor. Zero known unsupported accepted decisions on golden benchmark. Initial primary category (= primary domain, OD-17) agreement >=90%, explicit decision recall >=90%, Recall@10 >=90%, directional relationship precision >=90% (calibrate based on representative dataset). Unresolved ambiguous cases must be flagged, not forced. For multi-user release: zero cross-tenant leakage in adversarial integration/e2e cases.
 
 ## 7. Order independence and model variability
 Process same golden corpus in at least 3 shuffled orders under identical taxonomy/model/prompt versions. Compare canonical ID sets and confirmed knowledge projections; store diffs, false positives and reasons. Repeat selected classifications across multiple provider runs; measure disagreement. Lexical rendering may differ but canonical classifications and verified decisions should remain stable or be marked for review.

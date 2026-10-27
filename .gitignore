@@ -1,2 +1,5 @@
 # Private, immutable source exports: never commit (see CLAUDE.md)
 raw/
+
+# Private local outputs (spike results, gold labels): never commit
+private/

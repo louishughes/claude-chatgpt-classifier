@@ -67,27 +67,55 @@ def test_clip_keeps_start_and_end():
 # --- schema -----------------------------------------------------------------
 
 def valid_label(**over):
-    base = dict(primary_category="games", secondary_categories=[], topics=["Unity"],
-                summary="s", user_decisions=[], confidence=0.5)
+    base = dict(primary_domain="games", secondary_domains=[], purpose="build_or_fix",
+                project_candidates=[], topics=["Unity"], knowledge_types=["how_to"],
+                outputs=["code"], summary="s", decisions=[], confidence=0.5)
     base.update(over)
     return base
 
 
-def test_schema_accepts_valid_and_normalises_topics():
-    assert ConversationLabel(**valid_label()).topics == ["unity"]
+def decision(**over):
+    base = dict(statement="s", proposed_by="assistant", proposed_in=2, state="accepted",
+                decided_in=3, evidence_quote="q")
+    base.update(over)
+    return base
+
+
+def test_schema_accepts_valid_and_normalises_lists():
+    label = ConversationLabel(**valid_label(topics=["Unity", "unity "], outputs=["code", "code"]))
+    assert label.topics == ["unity"] and [o.value for o in label.outputs] == ["code"]
 
 
 @pytest.mark.parametrize("bad", [
-    {"primary_category": "not_a_category"},
-    {"topics": [f"t{i}" for i in range(6)]},
+    {"primary_domain": "not_a_domain"},
+    {"purpose": "procrastinate"},
     {"topics": []},
-    {"summary": "x" * 301},
+    {"topics": ["  "]},
+    {"summary": "   "},
     {"confidence": 1.5},
-    {"secondary_categories": ["games"] * 4},
+    {"secondary_domains": ["games"]},                      # repeats the primary
+    {"secondary_domains": ["other", "home_and_life", "money_and_admin", "ai_and_automation"]},
+    {"outputs": ["none", "code"]},
+    {"knowledge_types": []},
+    {"project_candidates": ["a", "b", "c", "d"]},
 ])
 def test_schema_rejects_contract_breaks(bad):
     with pytest.raises(ValidationError):
         ConversationLabel(**valid_label(**bad))
+
+
+def test_harmless_overflows_are_trimmed_not_rejected():
+    """Run 1: 14 of 15 rejected answers only had too many topics. Trim, don't retry."""
+    label = ConversationLabel(**valid_label(topics=[f"t{i}" for i in range(8)], summary="word " * 80))
+    assert label.topics == ["t0", "t1", "t2", "t3", "t4"]
+    assert len(label.summary) <= 300 and label.summary.endswith("…")
+
+
+@pytest.mark.parametrize("bad", [{"state": "approved"}, {"proposed_by": "narrator"}, {"proposed_in": "two"}])
+def test_decision_schema_rejects_contract_breaks(bad):
+    from schema import DecisionList
+    with pytest.raises(ValidationError):
+        DecisionList(decisions=[decision(**bad)])
 
 
 # --- runner: one conversation ----------------------------------------------
@@ -100,7 +128,7 @@ def conv(tmp_path):
 def test_transient_errors_retry_then_succeed(conv):
     p = FakeProvider({"conv-A": ["timeout", "rate_limit"]})
     rec = label_one(conv, p, CostMeter(10), 24000, sleep=no_sleep)
-    assert rec.status == "ok" and rec.calls == 3
+    assert rec.status == "ok" and rec.calls == 4   # 3 for labels + 1 for decisions
     assert rec.transient_errors == {"timeout": 1, "rate_limit": 1}
 
 
@@ -131,14 +159,53 @@ def test_cost_cap_stops_before_calling(conv):
     assert rec.status == "skipped_cost_cap" and p.calls == 0
 
 
-def test_quote_check_counts_only_real_quotes(conv):
+def test_fake_run_produces_checked_decisions(conv):
     rec = label_one(conv, FakeProvider(), CostMeter(10), 24000, sleep=no_sleep)
-    assert rec.decisions_total == rec.decisions_quote_found == 1
-    from runner import Record, check_quotes
-    fake = Record("x", "f", "ok", "fake", label=valid_label(
-        user_decisions=[{"statement": "s", "evidence_quote": "words nobody wrote"}]))
-    check_quotes(fake, conv.full_text())
-    assert fake.decisions_total == 1 and fake.decisions_quote_found == 0
+    assert rec.status == "ok" and rec.decisions_status == "ok" and rec.calls == 2
+    assert rec.decisions_total == rec.decisions_quote_found == rec.decisions_refs_ok == 1
+
+
+def test_decision_checks_use_message_numbers(conv):
+    """Turns: #1 user, #2 assistant, #3 user, #4 assistant (two exchanges)."""
+    from runner import Record, check_decisions
+    user1 = conv.turns[0].text[:25]
+    assistant2 = conv.turns[1].text[:8]
+    rec = Record("x", "f", "ok", "fake", label={"decisions": [
+        # assistant proposed in #2, user accepted in #3: structure fine, quote not in #3
+        decision(proposed_by="assistant", proposed_in=2, decided_in=3, evidence_quote="words nobody wrote"),
+        # user decided in their own message #1, quote really is in #1
+        decision(proposed_by="user", proposed_in=1, decided_in=1, evidence_quote=user1),
+        # "accepted" but decided_in points at an assistant message: the run-1 failure
+        decision(proposed_by="assistant", proposed_in=2, decided_in=2, evidence_quote=assistant2),
+        # wrong proposer for message #2
+        decision(proposed_by="user", proposed_in=2, state="proposed", decided_in=None, evidence_quote=assistant2),
+        # decided before it was proposed
+        decision(proposed_by="assistant", proposed_in=4, decided_in=3, evidence_quote="x"),
+    ]})
+    check_decisions(rec, conv)
+    assert rec.decisions_total == 5
+    assert rec.decisions_refs_ok == 2
+    assert rec.decisions_decided_by_assistant == 1
+    assert rec.decisions_quote_found == 3
+
+
+def test_decision_step_failure_sends_chat_to_review(conv):
+    from schema import DecisionList
+    p = FakeProvider()
+    from providers import SchemaError
+    def always_bad(_):
+        raise SchemaError("bad decisions")
+    p.responders[DecisionList] = always_bad
+    rec = label_one(conv, p, CostMeter(10), 24000, sleep=no_sleep)
+    assert rec.label is not None and rec.label["decisions"] == []
+    assert rec.decisions_status == "review_required" and rec.status == "review_required"
+
+
+def test_decisions_can_use_a_different_model(conv):
+    labels, decisions = FakeProvider(), FakeProvider()
+    decisions.model = "fake-decisions"
+    rec = label_one(conv, labels, CostMeter(10), 24000, sleep=no_sleep, decisions_provider=decisions)
+    assert labels.calls == 1 and decisions.calls == 1 and rec.decisions_model == "fake-decisions"
 
 
 # --- runner: batches ---------------------------------------------------------
@@ -164,7 +231,8 @@ def test_batch_with_injected_failures_accounts_for_every_chat(raw_dir, tmp_path,
     assert stats["repaired_ok"] == 1
     # The fake provider is deterministic, so two runs must agree perfectly.
     c = consistency(runs)[0]
-    assert c["primary_agreement_pct"] == 100.0 and c["topic_jaccard"] == 1.0
+    assert c["primary_domain_agree_pct"] == c["purpose_agree_pct"] == 100.0
+    assert c["topics_jaccard"] == c["project_names_jaccard"] == 1.0
 
 
 def test_resume_skips_finished_and_retries_failed(raw_dir, tmp_path):
@@ -174,7 +242,7 @@ def test_resume_skips_finished_and_retries_failed(raw_dir, tmp_path):
     run_once(convs, first, out, CostMeter(10), 24000, backoff_s=0, progress=lambda *_: None)
     second = FakeProvider()
     run_once(convs, second, out, CostMeter(10), 24000, backoff_s=0, progress=lambda *_: None)
-    assert second.calls == 1   # only the chat that failed last time
+    assert second.calls == 2   # only the chat that failed last time (labels + decisions)
     assert all(r["status"] == "ok" for r in load_records(out).values())
 
 
@@ -205,7 +273,8 @@ def test_cli_fake_run_writes_report_and_leaves_raw_untouched(raw_dir, tmp_path):
     assert code == 0
     assert tree_hash(root) == before
     report = json.loads((out / "report.json").read_text())
-    assert report["consistency"][0]["primary_agreement_pct"] == 100.0
+    assert report["consistency"][0]["primary_domain_agree_pct"] == 100.0
+    assert report["consistency"][0]["orders_differ"] is True   # runs used different orders
     assert "Run-to-run consistency" in (out / "report.md").read_text()
 
 
@@ -220,3 +289,270 @@ def test_cli_refuses_output_inside_a_git_repo(raw_dir, tmp_path):
     (repo / ".git").mkdir(parents=True)
     code = spike.main(["--raw-dir", str(raw_dir(3)), "--out", str(repo / "out"), "--provider", "fake"])
     assert code == 2
+
+
+# --- gold set ----------------------------------------------------------------
+
+def test_gold_template_then_accuracy_in_report(raw_dir, tmp_path):
+    import csv
+    root = raw_dir(12)
+    out = tmp_path / "out"
+    base = ["--raw-dir", str(root), "--out", str(out), "--sample", "10", "--provider", "fake"]
+    assert spike.main(base + ["--gold-template", "4"]) == 0
+    rows = list(csv.DictReader((out / "gold_template.csv").open()))
+    assert len(rows) == 4 and rows[0]["title"] == "synthetic" and not (out / "run-1.jsonl").exists()
+
+    # Label two chats with the fake model's own answer and two with a wrong one.
+    assert spike.main(base + ["--runs", "1"]) == 0
+    model = load_records(out / "run-1.jsonl")
+    for i, row in enumerate(rows):
+        label = model[row["conversation_id"]]["label"]
+        right = label["primary_domain"]
+        row["primary_domain"] = right if i < 2 else ("games" if right != "games" else "other")
+        row["purpose"] = label["purpose"]
+    with (out / "gold.csv").open("w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=rows[0].keys())
+        w.writeheader()
+        w.writerows(rows)
+    assert spike.main(base + ["--runs", "1", "--gold", str(out / "gold.csv")]) == 0
+    report = json.loads((out / "report.json").read_text())
+    assert report["gold"][0]["scored"] == 4
+    assert report["gold"][0]["primary_domain_accuracy_pct"] == 50.0
+    assert report["gold"][0]["purpose_accuracy_pct"] == 100.0
+    assert "Accuracy vs reference labels" in (out / "report.md").read_text()
+
+
+def test_gold_rejects_unknown_category(tmp_path):
+    from gold import load_gold
+    p = tmp_path / "g.csv"
+    p.write_text("conversation_id,primary_domain,purpose\nx,gamez,brainstorm\n")
+    with pytest.raises(ValueError, match="gamez"):
+        load_gold(p)
+    p.write_text("conversation_id,primary_domain,purpose\nx,games,dither\n")
+    with pytest.raises(ValueError, match="dither"):
+        load_gold(p)
+
+
+# --- processing order ----------------------------------------------------------
+
+def test_labels_do_not_depend_on_processing_order(raw_dir, tmp_path):
+    """Same chats, three different orders: identical labels.
+
+    Guards against the old failure where a vocabulary grew during the run, so
+    chat 800 was labelled against different words from chat 8. Each call here
+    is independent; this test fails if anyone adds shared state between calls.
+    """
+    convs, _ = sample_conversations(raw_dir(30), 30, seed=1)
+    labels = []
+    for order in (1, 2, 3):
+        recs = run_once(convs, FakeProvider(), tmp_path / f"o{order}.jsonl", CostMeter(10), 24000,
+                        workers=1, progress=lambda *_: None, order_seed=order)
+        labels.append({cid: r["label"] for cid, r in recs.items()})
+        positions = [recs[c.conversation_id]["position"] for c in convs]
+        assert sorted(positions) == list(range(30))
+    assert labels[0] == labels[1] == labels[2]
+
+
+def test_semantic_answers_are_never_retried(conv):
+    """A well-formed answer is accepted once, even if it may be wrong: no retry loop."""
+    p = FakeProvider()
+    rec = label_one(conv, p, CostMeter(10), 24000, sleep=no_sleep)
+    assert rec.status == "ok" and p.calls == 2   # one call per step, none repeated
+
+
+# --- gold set selection ------------------------------------------------------
+
+def test_gold_pick_is_varied_and_reproducible(raw_dir):
+    from gold import _size, pick_diverse
+    convs, _ = sample_conversations(raw_dir(40), 40, seed=2)
+    a = pick_diverse(convs, 10, seed=5)
+    assert [c.conversation_id for c in a] == [c.conversation_id for c in pick_diverse(convs, 10, seed=5)]
+    assert len({c.conversation_id for c in a}) == 10
+    groups_all = {(_size(c), c.image_refs > 0, c.branch_points > 0) for c in convs}
+    groups_picked = {(_size(c), c.image_refs > 0, c.branch_points > 0) for c in a}
+    assert groups_picked == groups_all          # every shape of chat is represented
+    assert len(pick_diverse(convs, 100, seed=5)) == 40
+
+
+def test_gold_sheet_has_context_and_blank_labels(raw_dir, tmp_path):
+    import csv
+    out = tmp_path / "out"
+    assert spike.main(["--raw-dir", str(raw_dir(12)), "--out", str(out), "--sample", "10",
+                       "--provider", "fake", "--gold-template", "5"]) == 0
+    rows = list(csv.DictReader((out / "gold_template.csv").open()))
+    assert rows[0]["first_user_message"].startswith("conv-") and rows[0]["turns"]
+    assert all(not r["primary_domain"] and not r["purpose"] for r in rows)   # never pre-filled
+    text = (out / "gold_instructions.txt").read_text()
+    assert "software_development" in text and "brainstorm" in text
+
+
+def test_report_fingerprints_the_gold_file(raw_dir, tmp_path):
+    import csv
+    root, out = raw_dir(6), tmp_path / "out"
+    base = ["--raw-dir", str(root), "--out", str(out), "--sample", "5", "--provider", "fake", "--runs", "1"]
+    spike.main(base + ["--gold-template", "2"])
+    rows = list(csv.DictReader((out / "gold_template.csv").open()))
+    for r in rows:
+        r["primary_domain"], r["purpose"] = "games", "brainstorm"
+    gold = out / "gold.csv"
+    with gold.open("w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=rows[0].keys()); w.writeheader(); w.writerows(rows)
+    spike.main(base + ["--gold", str(gold)])
+    first = json.loads((out / "report.json").read_text())["meta"]["gold_file_sha256"]
+    gold.write_text(gold.read_text().replace("brainstorm", "build_or_fix"))
+    spike.main(base + ["--gold", str(gold)])
+    second = json.loads((out / "report.json").read_text())["meta"]["gold_file_sha256"]
+    assert first != second and len(first) == 16
+
+
+def test_cli_allows_a_git_ignored_folder_inside_the_repo(raw_dir, tmp_path):
+    import subprocess
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    (repo / ".gitignore").write_text("private/\n")
+    common = ["--raw-dir", str(raw_dir(3)), "--provider", "fake", "--runs", "1"]
+    assert spike.main(common + ["--out", str(repo / "private" / "spike-out")]) == 0
+    assert (repo / "private" / "spike-out" / "report.md").exists()
+    assert spike.main(common + ["--out", str(repo / "results")]) == 2   # not ignored: refused
+
+
+# --- evaluator mode (review sheet) ---------------------------------------------
+
+def test_review_sheet_then_verdicts_score_every_run(raw_dir, tmp_path):
+    import csv
+    root, out = raw_dir(30), tmp_path / "out"
+    base = ["--raw-dir", str(root), "--out", str(out), "--sample", "25", "--provider", "fake", "--runs", "2",
+            "--review-size", "6"]
+    assert spike.main(base) == 0
+    sheet = out / "review_sheet.csv"
+    rows = list(csv.DictReader(sheet.open()))
+    assert len(rows) == 6 and rows[0]["model_primary_domain"] and rows[0]["model_summary"]
+    assert all(not r["domain_ok"] for r in rows)                 # verdicts never pre-filled
+    assert (out / "review_instructions.txt").exists()
+
+    # Evaluator: 4 domains right, 2 wrong (one with a correction), purposes all right.
+    for i, r in enumerate(rows):
+        r["domain_ok"] = "y" if i < 4 else "n"
+        r["purpose_ok"] = "y"
+        r["decisions_ok"] = "na" if not r["model_decisions"] else "y"
+        if i == 4:
+            r["right_domain"] = "games" if r["model_primary_domain"] != "games" else "other"
+    with (out / "review.csv").open("w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=rows[0].keys()); w.writeheader(); w.writerows(rows)
+
+    sheet_before = sheet.read_text()
+    calls_before = sum(1 for _ in (out / "run-1.jsonl").open())
+    assert spike.main(base + ["--review", str(out / "review.csv")]) == 0
+    assert sum(1 for _ in (out / "run-1.jsonl").open()) == calls_before   # resumed: no new work
+    report = json.loads((out / "report.json").read_text())
+    assert report["review"]["domain_correct_pct"] == round(100 * 4 / 6, 1)
+    assert report["review"]["purpose_correct_pct"] == 100.0
+    # Reference labels: 4 confirmed + 1 corrected = 5; the uncorrected "n" has no answer.
+    assert report["meta"]["reference_labels"] == 5
+    assert report["gold"][0]["scored"] == 5 and report["gold"][0]["primary_domain_accuracy_pct"] == 80.0
+    assert report["meta"]["review_file_sha256"] != "none"
+    assert sheet.read_text() == sheet_before                    # existing sheet not overwritten
+
+
+def test_review_rejects_unknown_correction(tmp_path):
+    from review import load_review
+    p = tmp_path / "r.csv"
+    p.write_text("conversation_id,model_primary_domain,model_purpose,domain_ok,purpose_ok,right_domain\n"
+                 "x,games,brainstorm,n,y,gamez\n")
+    with pytest.raises(ValueError, match="gamez"):
+        load_review(p)
+
+
+# --- spike v3: discovery ---------------------------------------------------------
+
+def seg(start, end, l1="games", purpose="brainstorm", projects=()):
+    return {"start": start, "end": end, "subject_l1": l1, "subject_l2": "x", "purpose": purpose,
+            "projects": list(projects), "summary": "s"}
+
+
+def item(t, m, speaker="user", **kw):
+    return {"type": t, "text": "t", "message": m, "speaker": speaker, "state": kw.get("state"),
+            "decided_in": kw.get("decided_in"), "evidence_quote": kw.get("quote", ""),
+            "proposed_by": kw.get("proposed_by")}
+
+
+def test_discovery_checks_catch_gaps_overlaps_and_bad_refs(tmp_path):
+    from discovery import check_discovery
+    conv = conv_from(tmp_path, make_conversation("d", n_exchanges=3))   # 6 messages
+    answer = {"segments": [seg(1, 3), seg(3, 4), seg(9, 10)], "items": [
+        item("idea", 2, speaker="assistant"),
+        item("idea", 2, speaker="user"),                                      # wrong speaker
+        item("decision", 2, speaker="assistant", state="accepted", decided_in=2),  # decided by assistant
+        item("preference", 1, quote=conv.turns[0].text[:20]),
+    ]}
+    c = check_discovery(answer, conv)
+    assert c["segment_bad_ranges"] == 1 and c["messages_overlapped"] == 1 and c["messages_uncovered"] == 2
+    assert c["item_refs_ok"] == 2 and c["decided_without_user_message"] == 1 and c["item_quotes_ok"] == 1
+
+
+def test_score_pair_by_message_number():
+    from discovery import score_pair
+    key = {"segments": [seg(1, 4, "games"), seg(5, 10, "career_and_education", projects=["Bow Bots"])],
+           "items": [item("idea", 3), item("decision", 6, state="accepted", proposed_by="assistant"),
+                     item("preference", 9)]}
+    pred = {"segments": [seg(1, 5, "games"), seg(6, 10, "career_and_education", projects=["bow-bots", "Other"])],
+            "items": [item("idea", 4), item("decision", 6, speaker="assistant", state="rejected"),
+                      item("fact_about_owner", 2)]}
+    s = score_pair(key, pred, 10)
+    assert s["boundaries_matched"] == 1                    # 5 vs 6 is within one message
+    assert s["subject_l1_messages_agree"] == 9             # only message 5 differs
+    assert s["projects_matched"] == 1 and s["projects_pred"] == 2
+    assert s["items_idea"] == (1, 1, 1) and s["items_preference"] == (1, 0, 0)
+    assert s["decisions_matched"] == 1 and s["decision_state_ok"] == 0 and s["decision_proposer_ok"] == 1
+
+
+def test_cli_discover_mode_scores_against_answer_key(raw_dir, tmp_path):
+    root, out, keydir = raw_dir(8), tmp_path / "out", tmp_path / "key"
+    convs, _ = sample_conversations(root, 8, seed=20261027)
+    keydir.mkdir()
+    for c in convs[:3]:   # key = one section, one fact per user message: matches the fake model
+        n = len(c.turns)
+        users = [i for i, t in enumerate(c.turns, 1) if t.role == "user"]
+        (keydir / f"{c.conversation_id}.json").write_text(json.dumps({
+            "conversation_id": c.conversation_id, "messages": n, "segments": [seg(1, n)],
+            "items": [item("fact_about_owner", m) for m in users]}))
+    code = spike.main(["--raw-dir", str(root), "--out", str(out), "--sample", "8", "--provider", "fake",
+                       "--mode", "discover", "--answer-key", str(keydir), "--runs", "2"])
+    assert code == 0
+    rep = json.loads((out / "discovery_report.json").read_text())
+    assert rep["runs"][0]["status_counts"] == {"ok": 8}
+    assert rep["runs"][0]["segment_coverage_errors"] == 0 and rep["runs"][0]["item_quotes_ok_pct"] == 100.0
+    assert rep["vs_answer_key"][0]["chats_scored"] == 3
+    assert rep["vs_answer_key"][0]["items_recall_pct"] == 100.0
+    assert rep["consistency"]["subject_l1_by_message_pct"] == 100.0
+    assert rep["meta"]["answer_key_sha256"] != "none"
+
+
+def test_quote_matching_ignores_curly_quotes_and_escaped_newlines():
+    from runner import _normalise
+    assert _normalise("Louis’s idea\\nis “good”") == _normalise("louis's idea is \"good\"")
+
+
+def test_code_messages_are_kept(tmp_path):
+    data = make_conversation("c", n_exchanges=1)
+    nodes = data["conversation"]["mapping"]
+    nodes["a0"]["message"]["content"] = {"content_type": "code", "text": "print('hi')"}
+    conv = conv_from(tmp_path, data)
+    assert any("print('hi')" in t.text for t in conv.turns)
+
+
+def test_repair_note_survives_a_rate_limit(conv):
+    """A transient error between a bad answer and its repair must not lose the repair message."""
+    from schema import ConversationLabel
+    seen = []
+
+    class Spy(FakeProvider):
+        def parse(self, system, user_content, output_format):
+            if output_format is ConversationLabel:
+                seen.append("previous answer was rejected" in user_content)
+            return super().parse(system, user_content, output_format)
+
+    p = Spy({"conv-A": ["schema", "rate_limit"]})
+    rec = label_one(conv, p, CostMeter(10), 24000, sleep=no_sleep)
+    assert rec.status == "ok" and seen == [False, True, True]

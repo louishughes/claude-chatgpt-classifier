@@ -20,13 +20,15 @@ Talking points
 from __future__ import annotations
 
 import hashlib
+import re
 import time
 from dataclasses import dataclass
 from typing import Protocol
 
 import pydantic
 
-from schema import CATEGORIES, ConversationLabel, UserDecision
+from schema import (DOMAINS, KNOWLEDGE_TYPES, OUTPUTS, PURPOSES, ConversationLabel, Decision, DecisionList,
+                    Discovery)
 
 # USD per million tokens (input, output). Thinking tokens bill as output.
 PRICES = {
@@ -59,7 +61,7 @@ class FatalError(Exception):
 
 @dataclass
 class CallResult:
-    label: ConversationLabel
+    label: pydantic.BaseModel  # a ConversationLabel or a DecisionList
     input_tokens: int
     output_tokens: int
     served_model: str
@@ -68,7 +70,7 @@ class CallResult:
 class Provider(Protocol):
     model: str
 
-    def label(self, system: str, conversation_text: str, repair_note: str | None = None) -> CallResult: ...
+    def parse(self, system: str, user_content: str, output_format: type[pydantic.BaseModel]) -> CallResult: ...
 
 
 def cost_usd(model: str, input_tokens: int, output_tokens: int) -> float:
@@ -107,14 +109,15 @@ class AnthropicProvider:
         self.max_tokens = max_tokens
         self.refusal_fallback = refusal_fallback
 
-    def label(self, system: str, conversation_text: str, repair_note: str | None = None) -> CallResult:
+    def parse(self, system: str, user_content: str, output_format: type[pydantic.BaseModel]) -> CallResult:
+        """One structured-output call; ``output_format`` is the Pydantic form to fill in."""
         a = self._anthropic
         kwargs = dict(
             model=self.model,
             max_tokens=self.max_tokens,
             system=system,
-            messages=[{"role": "user", "content": build_user_message(conversation_text, repair_note)}],
-            output_format=ConversationLabel,
+            messages=[{"role": "user", "content": user_content}],
+            output_format=output_format,
             output_config={"effort": self.effort},
         )
         try:
@@ -166,19 +169,21 @@ class FakeProvider:
 
     model = "fake"
 
-    def __init__(self, fail_plan: dict[str, list[str]] | None = None, latency_s: float = 0.0):
+    def __init__(self, fail_plan: dict[str, list[str]] | None = None, latency_s: float = 0.0,
+                 responders: dict | None = None):
         # fail_plan maps a marker found in the text to a queue of failures to
         # raise on successive calls, e.g. {"conv-3": ["timeout", "timeout"]}.
         self.fail_plan = {k: list(v) for k, v in (fail_plan or {}).items()}
         self.latency_s = latency_s
         self.calls = 0
+        self.responders = responders or {}
 
-    def label(self, system: str, conversation_text: str, repair_note: str | None = None) -> CallResult:
+    def parse(self, system: str, user_content: str, output_format: type[pydantic.BaseModel]) -> CallResult:
         self.calls += 1
         if self.latency_s:
             time.sleep(self.latency_s)
         for marker, queue in self.fail_plan.items():
-            if marker in conversation_text and queue:
+            if marker in user_content and queue:
                 kind = queue.pop(0)
                 if kind == "schema":
                     raise SchemaError("injected schema failure")
@@ -187,25 +192,54 @@ class FakeProvider:
                 if kind == "fatal":
                     raise FatalError("injected fatal error")
                 raise TransientError(kind)
-        digest = int(hashlib.sha256(conversation_text.encode()).hexdigest(), 16)
-        keys = list(CATEGORIES)
-        primary = keys[digest % len(keys)]
-        quote = _first_user_snippet(conversation_text)
-        label = ConversationLabel(
-            primary_category=primary,
-            secondary_categories=[keys[(digest // 7) % len(keys)]] if digest % 2 else [],
-            topics=[f"topic {digest % 13}"],
-            summary="Synthetic summary from the fake provider.",
-            user_decisions=[UserDecision(statement="Synthetic decision.", evidence_quote=quote)] if quote else [],
-            confidence=0.8,
-        )
-        approx_tokens = len(conversation_text) // 4
-        return CallResult(label=label, input_tokens=approx_tokens, output_tokens=150, served_model="fake")
+        tokens = len(user_content) // 4
+        if output_format in self.responders:
+            # Tests can plug in their own answer for a form.
+            return CallResult(self.responders[output_format](user_content), tokens, 100, "fake")
+        if output_format is Discovery:
+            return CallResult(_fake_discovery(user_content), tokens, 300, "fake")
+        if output_format is DecisionList:
+            return CallResult(_fake_decisions(user_content), tokens, 100, "fake")
+        return CallResult(_fake_label(user_content), tokens, 150, "fake")
 
 
-def _first_user_snippet(text: str) -> str:
-    marker = "[user]: "
-    start = text.find(marker)
-    if start < 0:
-        return ""
-    return text[start + len(marker): start + len(marker) + 40].split("\n")[0]
+def _fake_label(text: str) -> ConversationLabel:
+    digest = int(hashlib.sha256(text.encode()).hexdigest(), 16)
+    domains, purposes = list(DOMAINS), list(PURPOSES)
+    primary = domains[digest % len(domains)]
+    secondary = domains[(digest // 7) % len(domains)]
+    return ConversationLabel(
+        primary_domain=primary,
+        secondary_domains=[secondary] if digest % 2 and secondary != primary else [],
+        purpose=purposes[(digest // 11) % len(purposes)],
+        project_candidates=["Synthetic Project"] if digest % 3 == 0 else [],
+        topics=[f"topic {digest % 13}"],
+        knowledge_types=[list(KNOWLEDGE_TYPES)[digest % len(KNOWLEDGE_TYPES)]],
+        outputs=[list(OUTPUTS)[digest % len(OUTPUTS)]],
+        summary="Synthetic summary from the fake provider.",
+        confidence=0.8,
+    )
+
+
+def _fake_discovery(text: str) -> Discovery:
+    """One section over all messages; one fact item per user message, quoting its start."""
+    users = re.findall(r"\[#(\d+) user\]: ([^\n]{1,30})", text)
+    last = max([int(n) for n in re.findall(r"\[#(\d+) (?:user|assistant)\]", text)] or [1])
+    digest = int(hashlib.sha256(text.encode()).hexdigest(), 16)
+    return Discovery(
+        segments=[{"start": 1, "end": last, "subject_l1": list(DOMAINS)[digest % len(DOMAINS)],
+                   "subject_l2": f"area {digest % 7}", "purpose": list(PURPOSES)[digest % len(PURPOSES)],
+                   "projects": ["Synthetic Project"] if digest % 2 else [], "summary": "Synthetic."}],
+        items=[{"type": "fact_about_owner", "text": "Synthetic.", "message": int(n), "speaker": "user",
+                "state": None, "decided_in": None, "evidence_quote": q} for n, q in users])
+
+
+def _fake_decisions(text: str) -> DecisionList:
+    """One decision: the user's first message, decided by the user in that same message."""
+    match = re.search(r"\[#(\d+) user\]: ([^\n]{1,40})", text)
+    if not match:
+        return DecisionList(decisions=[])
+    n = int(match.group(1))
+    return DecisionList(decisions=[Decision(
+        statement="Synthetic decision.", proposed_by="user", proposed_in=n, state="accepted",
+        decided_in=n, evidence_quote=match.group(2))])

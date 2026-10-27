@@ -50,7 +50,7 @@ The old pipeline made many independent, probabilistic decisions (one LLM call pe
 
 ### How this maps to the current plan
 
-Most of these lessons are already written into the audited specification on the `claude/project-thread-bk4540` branch:
+Most of these lessons are already written into the audited specification:
 
 | Lesson | Where it is already covered |
 | --- | --- |
@@ -62,15 +62,18 @@ Most of these lessons are already written into the audited specification on the 
 | Precision and recall, not tag counts | `TEST_STRATEGY.md` classification and extraction metrics |
 | Order independence | `TEST_STRATEGY.md` §7 (at least 3 shuffled orders) |
 | Retry only for transient or format errors | Plan rule "Semantic disagreement → review item, never a retry loop" |
-| Separate classification dimensions (domain, project, purpose, topics, knowledge types, outputs) | Partly. `docs/TEST_STRATEGY.md` scores domain, topic, project and primary category separately, but a single "primary category" still exists. Worth checking it isn't the old mixed list. |
+| Separate classification dimensions (domain, project, purpose, topics, knowledge types, outputs) | OD-17 in `docs/reviews/OPEN_DECISIONS.md`; the spike schema uses separate fields |
 | Small agent tasks with finite completion conditions | `CLAUDE.md` §4: one unblocked ticket at a time, at most one focused fix before filing a blocker, at most 3 attempts for transient errors |
 | Code owns identity, schema, vocabulary and state; models only interpret meaning | ADR-0007 (hybrid split) and ADR-0006 (deterministic link registries) |
 
-### Gaps and questions worth raising
+### Gaps raised, and what happened to them
 
-- **The classification spike checks consistency, not correctness.** `prototype/classification_spike/` compares two runs against each other. The post-mortem warns that a model can be consistently wrong ("five variations of the same mistake"). Before trusting spike results, a small hand-labelled subset (even 10–20 of the 50) would show whether stable answers are also right. This is a candidate open decision, not a change made here.
-- **The spike is one call per conversation.** That is the pattern cause 1 blames. That's fine for a spike measuring stability and output shape, but its results shouldn't be read as validating per-conversation project labels. Project identity should come from the corpus-wide registry.
-- **Who writes the tests.** This matches the closing advice that no agent should judge its own output. The audit plan still has agents writing most tests. The lesson is that *semantic* expectations (the golden set) must come from Louis, not from the agent being judged.
+These were open when this file was written. The spike work merged in PR #1 has since dealt with them:
+
+- **Consistency vs. correctness.** The spike first only compared two runs. A hand-labelled gold set was added (diary 19:28), and an owner-approved answer key is now the stated bar for accuracy. See `docs/plans/SPIKE_VERDICT.md`, lesson 6. No owner-scored accuracy exists yet.
+- **One call per conversation.** The spike confirmed that per-chat labels are "too simplistic". The plan now classifies segments against a discovered, owner-approved taxonomy and project registry (`docs/reviews/OPEN_DECISIONS.md`, OD-17 and the segment decision).
+- **A single "primary category".** It was split into separate dimensions (domain, purpose, project candidates, topics, knowledge types, outputs) under OD-17.
+- **Who writes the tests.** Still a principle to hold: *semantic* expectations come from Louis, never from the agent being judged.
 
 ---
 

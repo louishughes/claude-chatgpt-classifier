@@ -45,7 +45,20 @@ OD-01..OD-16 in `docs/reviews/OPEN_DECISIONS.md`. The ones that shape M1: **OD-0
 ## 5. Revised phases
 M0 audit (done) → **M1 source-fidelity slice** (33 tickets, LLM-free, ends with source notes and 50/100 batch smoke) → M2 link/YouTube/social/relationship registries (9) → M3 semantic foundation with structured-output provider and 50/100 semantic smoke (31) → M4 reconciliation, retrieval, documents, late relationships (30) → M5 hardening/API (12) → M6 integrations/productisation (7). Details: `docs/plans/IMPLEMENTATION_PLAN.md` §4, order: `docs/plans/DEPENDENCY_MAP.md` §4.
 
-## 6. First unblocked ticket
+## 6. Next step (updated again 2026-10-27): start M1
+The classification spike is **closed** (owner decision). Verdict: `docs/plans/SPIKE_VERDICT.md`. Next is FND-001 (see 6a). The spike history below is kept for the record.
+
+### Spike history
+Before FND-001, the owner chose to validate the AI labelling step with the throwaway spike in `prototype/classification_spike/` (IMPLEMENTATION_PLAN §12):
+1. Done: schema with separate fields, decisions with speaker and state, 40 synthetic tests.
+2. Done: API-data OK, Claude Haiku 5.5, $2 cap, runs on the owner's PC from `V:\Programming\ChatGPT_Classifier` with outputs in the git-ignored `private/`.
+3. Run 50 chats twice (`spike.py --sample 50 --runs 2`, ~$0.12).
+4. The owner evaluates about 20 of the model's answers on `review_sheet.csv` (y/n, ~20 minutes). Re-run with `--review` to add accuracy, then the owner reviews the report.
+5. Go/no-go. Go means 100 chats, then FND-001. No-go means change the method and re-run against the same gold set.
+
+Guardrails now in force: see `AGENTS.md` "Owner guardrails".
+
+## 6a. First unblocked ticket (after the spike)
 **FND-001 — Bootstrap Python repository and tool configuration** (no blockers). Includes the audit amendment: `docs/CODE_STYLE.md` with the learning-friendly comment standard. Next in order: FND-002, FND-003, FND-004, FND-005, FND-006, FND-008, OPS-008, EVAL-009 (EVAL-009 and OPS-008 only need FND-001 and can run right after it).
 
-**Do not start FND-001 until the owner approves this plan.**
+The owner has chosen to start M1 (2026-10-27).

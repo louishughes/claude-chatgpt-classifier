@@ -46,6 +46,11 @@ Treat research prose as context, not as a substitute for contracts. The latest e
 | Export | Generated notes never replace originals or overwrite unmanaged hand edits |
 | Failure | A bounded explicit status is preferable to retry/rewrite loops |
 
+**Owner guardrails (2026-10-27, apply to every agent and ticket):**
+1. Agents must not change existing tests, acceptance criteria or the gold set (human-labelled reference data) without the owner's explicit approval. Adding new tests is fine; weakening, deleting, skipping or re-baselining existing ones is not.
+2. Each ticket gets at most **3 fix attempts** for a genuine failure. After the third, mark it `BLOCKED` with the failing command and output, stop, and ask the owner.
+3. Vocabulary is frozen during a run: the taxonomy/category version is fixed at the start of a classification run and nothing may add, rename or promote terms until the run ends. Changes go through review and a versioned re-run.
+
 ## Specification audit requirements
 
 Create a traceability matrix covering these vertical slices and showing `spec → schema → module/method → ticket → test → user-visible output`:

@@ -31,7 +31,7 @@
 └── workspace/ (outside repo, configurable)   # SQLite DB, content-addressed store, generated vault
 ```
 
-**Boundary rules** (from TR-02, plus the audit): `domain` imports nothing internal. The source layer (`ingestion`, `identity`, `media`, `links`, `relationships`) never imports `infrastructure/providers`. Only `orchestration` sequences stages. `rendering` reads projections; it never writes knowledge. Generated output and the private store live outside the repo.
+**Boundary rules** (from TR-02, plus the audit): `domain` imports nothing internal. The source layer (`ingestion`, `identity`, `media`, `links`, `relationships`) never imports `infrastructure/providers`. Only `orchestration` sequences stages. `rendering` reads projections; it never writes knowledge. Generated output and the private store live outside the repo or in a git-ignored folder inside it (e.g. `private/`, owner preference 2026-10-27 to keep everything in one project folder).
 
 ## 2. Dataflow
 
@@ -186,7 +186,9 @@ Property-based tests (Hypothesis): random message DAGs (no cycles lost, every no
 ## 8. Verification strategy and stop rules
 
 - Per ticket: run the ticket's focused tests, then the package's tests, once after the last change (TEST_STRATEGY §10).
-- One focused fix after a genuine failure, then one rerun. Still failing → mark `BLOCKED` with the failing command and stop.
+- At most 3 fix attempts after a genuine failure (owner guardrail, 2026-10-27; replaces the earlier one-fix rule). Still failing → mark `BLOCKED` with the failing command and stop and ask.
+- Existing tests, acceptance criteria and gold-set labels are changed only with owner approval.
+- Taxonomy version is frozen for the duration of any classification run.
 - Transient provider errors: 3 attempts total with backoff; then `failed` for that item, batch continues and resumes later.
 - Semantic disagreement → review item, never a retry loop.
 - Real-provider runs only inside EVAL-011 and later gates, always with a cost cap and pinned versions.
@@ -221,3 +223,29 @@ The owner is learning Python and wants the code to work as a portfolio piece and
 - Each ticket's diary entry ends with "What I learned" and "Talking points" (see `docs/diary/BUILD_DIARY.md`).
 
 Packaging and monetisation are recorded as a future option (OD-16) and do not enlarge the MVP. The one early action worth considering is choosing a licence, because the repository is public.
+
+## 12. Pre-M1 classification spike (owner decision, 2026-10-27) — CLOSED
+
+**Closed the same day** (owner: "we need to learn"). Verdict, lessons and how to resume are in `docs/plans/SPIKE_VERDICT.md`. M1 starts now. It is LLM-free, so it doesn't depend on the open classification question. The history below is kept for the record.
+
+**Lessons carried into the plan:**
+- **FND-009 / provider adapter:** direct provider APIs; retry transport and format errors only; trim harmless overflows in code; log schema-error kinds.
+- **M3 design:** discover, then consolidate into an owner-approved two-level taxonomy and project registry, then classify *segments*. Items cite message numbers, which code checks (speaker, decided-by-user, quote present). No clipping, or clipped results reported separately. Keep code messages.
+- **EVAL-001:** the answer key in `private/answer-key/` (10 chats, 95 items, awaiting owner review) is the seed of the golden set. Score by message number. Reports must name the reviewer. An AI check is never reported as accuracy.
+- **M1 dependency:** NRM/IMP must keep message order and numbering stable per active branch, because evidence anchors and segment ranges use them. They must also keep `code` content.
+The owner chose to validate the AI labelling step before starting M1. `prototype/classification_spike/` is throwaway code that labels a reproducible sample of 50, then 100, real conversations twice with schema-checked output, and reports:
+- **Reliability:** ok rate, first-try schema failures, repairs, timeouts and rate limits, latency, cost. Retries cover transport and format errors only; a well-formed wrong answer is never retried.
+- **Separate dimensions** (OD-17): primary/secondary domain, purpose, project candidates, topics, knowledge types, outputs, and decisions with proposer, state and a quoted speaker. One mixed "primary category" is not used.
+- **Consistency:** per-field agreement and Jaccard overlap between runs. Each run processes chats in a different shuffled order, so this also tests processing-order independence (calls share no state, and a unit test runs three orders).
+- **Accuracy:** agreement with a small gold set of 10–20 chats that the owner hand-labels (domain and purpose). Consistency alone is not enough, because a model can be consistently wrong. Gold labels come from the owner, never from the agent being judged.
+- **Evidence:** share of decision quotes found verbatim in a message by the stated speaker, and "accepted" decisions backed only by assistant text.
+
+Known limits, from the earlier post-mortem (`docs/reference/2026-10-27-why-the-classifier-failed.md`, PR #2): one call per chat cannot validate project identity (that needs the corpus-wide registry), labels are per chat not per segment, and decision recall needs the fuller EVAL-001 reference set.
+
+**Agreed sequence (owner, 2026-10-27):**
+1. Schema with separate fields and attributed decisions (done, taxonomy `spike-0.2`).
+2. Owner gives the API-data OK, a cost cap and the run location (done: Claude Haiku 5.5, $2 cap, on the owner's PC). Run 50 chats twice in different orders.
+3. **Owner as evaluator** (owner, 2026-10-27: "I am just the evaluator, I am not doing any tagging myself"). After run 1 the spike writes a review sheet for about 20 varied chats (size, images, branches, spread over time) showing the model's answers. The owner marks domain, purpose and decisions `y`/`n` and may give the right answer. Verdicts give accuracy, and confirmed or corrected answers become reference labels that score every run and later models. The review file's hash is recorded in every report, and agents never fill in or edit verdicts. Seeing the model's answer first biases reviewers towards agreeing, so this accuracy is treated as an upper bound. Blind labelling (`--gold-template`) remains available. The owner reviews the report before anything scales.
+4. **Go/no-go.** Go if the README targets are met (headline: primary-domain agreement ≥ 90%, primary-domain accuracy by owner verdicts ≥ 85% (higher bar than blind labels, to allow for anchoring), decision quotes verified ≥ 95%, no unrecovered transient errors at 50). Then run 100 chats, and if that also holds, start M1 at FND-001. **No-go:** change the method (input selection, fields, segment-level labelling, model or effort), not the prompt wording, and re-run against the *same* gold set.
+
+Targets are in the spike README. Results feed OD-05 (provider/model, cost cap), the FND-009 contract and the EVAL-001 golden set: the gold labels become its first entries. Nothing in `src/` will import the spike.
