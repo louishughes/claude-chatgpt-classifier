@@ -224,7 +224,15 @@ The owner is learning Python and wants the code to work as a portfolio piece and
 
 Packaging and monetisation are recorded as a future option (OD-16) and do not enlarge the MVP. The one early action worth considering is choosing a licence, because the repository is public.
 
-## 12. Pre-M1 classification spike (owner decision, 2026-10-27)
+## 12. Pre-M1 classification spike (owner decision, 2026-10-27) — CLOSED
+
+**Closed the same day** (owner: "we need to learn"). Verdict, lessons and how to resume are in `docs/plans/SPIKE_VERDICT.md`. M1 starts now. It is LLM-free, so it doesn't depend on the open classification question. The history below is kept for the record.
+
+**Lessons carried into the plan:**
+- **FND-009 / provider adapter:** direct provider APIs; retry transport and format errors only; trim harmless overflows in code; log schema-error kinds.
+- **M3 design:** discover, then consolidate into an owner-approved two-level taxonomy and project registry, then classify *segments*. Items cite message numbers, which code checks (speaker, decided-by-user, quote present). No clipping, or clipped results reported separately. Keep code messages.
+- **EVAL-001:** the answer key in `private/answer-key/` (10 chats, 95 items, awaiting owner review) is the seed of the golden set. Score by message number. Reports must name the reviewer. An AI check is never reported as accuracy.
+- **M1 dependency:** NRM/IMP must keep message order and numbering stable per active branch, because evidence anchors and segment ranges use them. They must also keep `code` content.
 The owner chose to validate the AI labelling step before starting M1. `prototype/classification_spike/` is throwaway code that labels a reproducible sample of 50, then 100, real conversations twice with schema-checked output, and reports:
 - **Reliability:** ok rate, first-try schema failures, repairs, timeouts and rate limits, latency, cost. Retries cover transport and format errors only; a well-formed wrong answer is never retried.
 - **Separate dimensions** (OD-17): primary/secondary domain, purpose, project candidates, topics, knowledge types, outputs, and decisions with proposer, state and a quoted speaker. One mixed "primary category" is not used.

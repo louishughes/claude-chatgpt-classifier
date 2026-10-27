@@ -238,3 +238,16 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "The easiest bug to miss: your evaluator is the same kind of model as the thing it evaluates."
 - "Truncation is silent data loss. Measure clipped and unclipped separately."
+
+### 20:52 — Stopping before the rabbit hole
+**What:** Louis closed the classification spike: "we need to learn". In one evening it had grown from "run 50 chats twice" into a review sheet, an answer key, a redesign and a discovery mode. Each step made sense, but together they looked like the drift that sank the earlier attempts. So we stopped, wrote down what it proved and what it didn't (`docs/plans/SPIKE_VERDICT.md`), folded the lessons into the plan, and moved on to the first milestone, which is plain code with no AI.
+**What it proved for 7 cents:**
+- the API connection is reliable now;
+- trim long answers instead of retrying them;
+- cut-off chats do worse;
+- one label per chat is the wrong unit.
+**What it didn't prove:** accuracy. Nothing has been scored by Louis yet. The answer key is waiting for his review whenever classification comes back.
+**Talking points:**
+- "A spike has to end. Decide what question it answers, and stop when the question changes."
+- "Seven cents and one evening bought me the lessons. The rest waits until the foundation exists."
+- "Know the difference between 'Claude checked it' and 'I checked it'."
