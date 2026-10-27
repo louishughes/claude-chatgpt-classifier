@@ -679,3 +679,29 @@ pytest -q               # 485 passed, 6 skipped (3 new)
 Finish line: two concurrent `import_source` processes on `reexport_v1` leave the same row counts as one serial import; one reports "new", the other "unchanged". Fix attempts: 0.
 
 **Next exact task:** media slice M1 (MED-001 + MED-003: blobs, assets, occurrences).
+
+### 23:52 — MED-001 + MED-003: each image stored once, every use remembered
+**What:** Imports now pick up images. The same picture used in five messages is stored once and linked five times, and each link remembers the exact message and position. 12 new tests, 497 in total. The `repeated_image` fake export matches its answer key: 3 logical images, 2 distinct byte contents (two different file IDs share identical bytes), 5 uses, all available.
+**The four records (ADR-0004):**
+- **Blob:** the bytes, named by their fingerprint. Identical bytes are one blob, whatever the file is called.
+- **Asset:** the export's file ID (`file-...`). Points at a blob once some export supplies the bytes.
+- **Occurrence:** one message using one asset at one position. Keyed by the message revision, so re-importing adds nothing.
+- **Derived artefact:** room for thumbnails later; it hangs off a blob and can never replace it. Nothing creates one yet.
+**Key decisions and why:**
+- **Missing stays visible.** If an export mentions an image that isn't there, the occurrence is kept and marked `missing`, with no blob and no made-up path. If a later export includes the file, it flips to `available` without creating a new occurrence.
+- **Images stay where they are by default** (OD-02 "reference" mode): the database remembers where the file is and its fingerprint. Images inside a ZIP are copied into the private store, because a ZIP member can't be pointed at.
+- **Header facts only.** Type and pixel size are read from the first bytes of the file. Nothing looks at the picture itself.
+- **A file ID claims a file only with a separator after it**, so `file-abc` never claims `file-abcd.png`.
+**Also:** I wrote a short amendment into `M1_CONSOLIDATION.md` saying the separate import lock came back in slice I5, and why.
+**Teach-back (`importer/media.py`):** "An image is split into its bytes, the export's file, and each place a message uses it. Identical bytes are stored once, and every use is a separate link that remembers the message and position. If the file isn't in the export, the link is kept and marked missing, never pointed at a guessed path."
+**Talking points:**
+- "Storing once and linking many times is how one picture used in a dozen chats costs one copy."
+- "Missing is a state, not a gap: the system shows you what it couldn't find."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 73 source files
+pytest -q               # 497 passed, 6 skipped (12 new)
+```
+Finish line: `repeated_image` answer key matches (assets 3, blobs 2, available occurrences 5, per-asset 3/1/1); re-import adds 0 blobs, 0 assets, 0 occurrences and the raw tree is unchanged; `reexport_v1` → `v2` reports 1 new image. Fix attempts: 1 (forgot the migration on the first run).
+
+**Next exact task:** media slice M2 (MED-002: missing, ambiguous and unresolved pointers with evidence).

@@ -33,7 +33,7 @@ from knowledge_engine.domain.ids import (
     sha256_hex,
 )
 from knowledge_engine.graph.conversation import ConversationGraph
-from knowledge_engine.graph.nodes import canonical_json, canonical_node
+from knowledge_engine.graph.nodes import AssetPointer, canonical_json, canonical_node
 from knowledge_engine.importer.records import (
     ConversationRow,
     GraphEdgeRow,
@@ -60,6 +60,8 @@ class ConversationDelta:
         new_branches: Forks that appeared in this import (a node gaining a
             second child, e.g. a regenerated answer).
         raw_observations: New raw forms of existing or new revisions.
+        pointers: ``(revision_id, pointer)`` for every asset pointer in the
+            conversation's current revisions, for the media step.
     """
 
     conversation_id: str
@@ -69,6 +71,7 @@ class ConversationDelta:
     warnings: Counter[str] = field(default_factory=Counter)
     new_branches: int = 0
     raw_observations: int = 0
+    pointers: list[tuple[str, AssetPointer]] = field(default_factory=list)
 
 
 def native_conversation_id(native: Mapping[str, Any]) -> str | None:
@@ -174,6 +177,7 @@ def apply_conversation(
             for warning in canonical.warnings:
                 delta.warnings[f"content_{warning.value}"] += 1
             revision_key = message_revision_id(node_key, canonical.canonical_content_hash)
+            delta.pointers.extend((revision_key, p) for p in canonical.asset_pointers)
             if session.get(MessageRevisionRow, revision_key) is None:
                 message = mapping[node_id]["message"]
                 session.add(

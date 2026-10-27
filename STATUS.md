@@ -31,8 +31,10 @@ Live ticket status for the build. The full ticket list is `docs/TICKETS.csv` (ke
 | IMP-002 Logical identity resolver | VERIFIED (slice I4: ID collisions and missing IDs become review_required candidates, never merged) | SESSION_LOG 2026-10-27 IMP-002 |
 | IMP-004 Transactional idempotent commit, resume and import locking | VERIFIED (repeat + crash rerun in I2; single-writer import lock in I5; checkpoint resume deferred per M1_CONSOLIDATION) | SESSION_LOG 2026-10-27 IMP-004 |
 | IMP-003 Message revision and graph delta engine | VERIFIED (slice I3) | SESSION_LOG 2026-10-27 IMP-003 |
+| MED-001 Media blob / asset / occurrence model | VERIFIED (slice M1: tables + derived-artefact table, nothing writes it yet) | SESSION_LOG 2026-10-27 MED-001 |
+| MED-003 Media dedup and header facts | VERIFIED (slice M1: one blob per byte content, occurrences per revision part, reference/copy modes) | SESSION_LOG 2026-10-27 MED-003 |
 
-**Next unblocked:** media slice M1 (MED-001 + MED-003), then M2 (MED-002). Order and module layout follow docs/plans/M1_CONSOLIDATION.md (adopted).
+**Next unblocked:** media slice M2 (MED-002 pointer resolver: missing, ambiguous, unresolved with evidence), then I6 (ING-007 + IMP-005). Order and module layout follow docs/plans/M1_CONSOLIDATION.md (adopted).
 
 **Needs Louis (logged, skipped, not waited on):**
 - Wiring `ke import` to `import_source` means retiring `tests/unit/test_cli.py::test_import_is_an_honest_placeholder`, which asserts the placeholder. Changing an existing test needs your OK (guardrail). Until then, imports run through `import_source(...)` in Python.

@@ -133,6 +133,11 @@ class BlobStore:
         """The store folder."""
         return self._root
 
+    @property
+    def max_bytes(self) -> int | None:
+        """Largest file accepted, or None for no limit."""
+        return self._max_bytes
+
     def path_for(self, sha256: str) -> Path:
         """Return where a blob with this hash lives in the store.
 

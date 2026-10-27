@@ -8,7 +8,8 @@ One call does, in order:
 4. open a batch in the ledger and snapshot every input file;
 5. write conversations in groups, one transaction per group, each opened
    with SQLite's write lock (``BEGIN IMMEDIATE``), so a crash loses at
-   most the group in progress;
+   most the group in progress; each conversation's images and attachments
+   are linked in the same transaction;
 6. fingerprint the raw tree again and close the batch with its counts.
 
 Re-running after a crash is the resume: groups already committed come
@@ -42,6 +43,7 @@ from knowledge_engine.importer.delta import (
 from knowledge_engine.importer.identity import CandidateReason, conversation_hash, record_candidate
 from knowledge_engine.importer.ledger import ImportBatchRow, ImportLedger
 from knowledge_engine.importer.lock import import_lock
+from knowledge_engine.importer.media import MediaDelta, MediaLibrary, record_occurrences
 from knowledge_engine.importer.report import ImportReport
 from knowledge_engine.infrastructure.db import SessionFactory, create_sqlite_engine, database_path
 from knowledge_engine.infrastructure.migrations import upgrade_to_head
@@ -78,7 +80,17 @@ def run_import(
                 settings.workspace_root / "archive",
                 max_bytes=settings.limits.max_source_file_bytes,
             )
-            return _run(path, account_ns, listing, before, factory, archive, settings, full_export)
+            # Same content-addressed folder, but the media size limit.
+            media_store = BlobStore(
+                settings.workspace_root / "archive",
+                max_bytes=settings.limits.max_media_file_bytes,
+            )
+            library = MediaLibrary(
+                path, listing.media_files, media_store, settings.media_storage_mode
+            )
+            return _run(
+                path, account_ns, listing, before, factory, archive, library, settings, full_export
+            )
         finally:
             engine.dispose()
 
@@ -90,6 +102,7 @@ def _run(
     before: str,
     factory: SessionFactory,
     archive: BlobStore,
+    library: MediaLibrary,
     settings: Settings,
     full_export: bool,
 ) -> ImportReport:
@@ -132,6 +145,7 @@ def _run(
     new_branches = 0
     raw_observations = 0
     candidates: Counter[str] = Counter()
+    media = MediaDelta()
     # Native ID -> content hash of the first conversation this import saw
     # with it, to tell an exact duplicate from an ID collision.
     seen: dict[str, str] = {}
@@ -204,7 +218,16 @@ def _run(
                 changed.extend(delta.changed_revisions)
                 new_branches += delta.new_branches
                 raw_observations += delta.raw_observations
+                record_occurrences(
+                    session,
+                    delta.pointers,
+                    library,
+                    media,
+                    workspace_id=workspace_id,
+                    import_id=import_id,
+                )
 
+    warnings.update(media.warnings)
     after = tree_signature(path)
     if after == before and full_export:
         with factory.transaction() as session:
@@ -237,6 +260,8 @@ def _run(
         new_branches=new_branches,
         raw_observations=raw_observations,
         candidate_matches=dict(candidates),
+        media=media.counts(),
+        asset_occurrences=dict(media.availability),
         raw_tree_hash_before=before,
         raw_tree_hash_after=after,
     )

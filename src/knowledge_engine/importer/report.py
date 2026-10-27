@@ -40,6 +40,9 @@ class ImportReport:
         model_calls_triggered: Always 0 in M1: importing never calls a model.
         new_branches: Forks that appeared in this import.
         raw_observations: New raw forms of messages (e.g. metadata drift).
+        media: ``new_blobs``, ``new_assets`` and ``new_occurrences``.
+        asset_occurrences: Availability state -> count, over every image or
+            attachment reference this import saw.
         candidate_matches: Candidate reason -> count: conversations whose
             identity is ``review_required`` (never merged automatically).
     """
@@ -58,6 +61,8 @@ class ImportReport:
     new_branches: int = 0
     raw_observations: int = 0
     candidate_matches: Mapping[str, int] = field(default_factory=dict)
+    media: Mapping[str, int] = field(default_factory=dict)
+    asset_occurrences: Mapping[str, int] = field(default_factory=dict)
     extra: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -76,4 +81,6 @@ class ImportReport:
             "new_branches": self.new_branches,
             "raw_observations": self.raw_observations,
             "candidate_matches": dict(sorted(self.candidate_matches.items())),
+            "media": dict(sorted(self.media.items())),
+            "asset_occurrences": dict(sorted(self.asset_occurrences.items())),
         }
