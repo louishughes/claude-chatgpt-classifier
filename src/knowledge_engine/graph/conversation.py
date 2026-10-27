@@ -14,6 +14,13 @@ message numbers. Everything else (import, notes, the M3 evidence checks)
 uses these answers instead of walking the tree itself, so "message 7"
 means the same thing everywhere (docs/plans/M1_CONSOLIDATION.md §2.1).
 
+Branch points (REL-001): a node with more than one child is a fork. If
+the children are all user messages, the user edited their question; if
+they're all assistant messages, the answer was regenerated; anything else
+is ``other``. Integrity problems (NRM-002) such as a missing parent, a
+cycle or a node that can't be reached from the root are listed in
+``issues``. They are reported, never "fixed": no node is dropped.
+
 Talking points:
     - "A chat is a tree, not a list. Edits and regenerated answers are
       branches, and I keep every branch."
@@ -25,9 +32,16 @@ Talking points:
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any
+
+from knowledge_engine.domain.enums import BranchKind
+
+# Bump when the branch-kind rule changes, so stored branch points can be
+# recomputed (DATA_MODEL_AND_CONTRACTS: branch_points.classifier version).
+BRANCH_CLASSIFIER_VERSION = "rel-001-v1"
 
 
 @dataclass(frozen=True)
@@ -53,6 +67,51 @@ class GraphNode:
     create_time: float | None
 
 
+@dataclass(frozen=True)
+class BranchPoint:
+    """A node with several children: where the conversation forked.
+
+    Attributes:
+        parent_id: The node that has several children.
+        children: The children, in ``GraphNode.children`` order.
+        kind: ``edit`` (all user), ``regeneration`` (all assistant) or ``other``.
+        active_child: The child on the active path, or None.
+    """
+
+    parent_id: str
+    children: tuple[str, ...]
+    kind: BranchKind
+    active_child: str | None
+
+
+class IssueCode(StrEnum):
+    """Kinds of structural problem the integrity check reports (NRM-002)."""
+
+    INVALID_NODE = "invalid_node"  # mapping value isn't an object
+    MISSING_PARENT = "missing_parent"  # parent ID not in the mapping
+    SELF_PARENT = "self_parent"  # a node is its own parent
+    CYCLE = "cycle"  # parent links loop
+    UNREACHABLE = "unreachable"  # can't be reached from any root
+    MULTIPLE_ROOTS = "multiple_roots"  # more than one node without a parent
+    ID_MISMATCH = "id_mismatch"  # node's own "id" differs from its mapping key
+    DUPLICATE_MESSAGE_ID = "duplicate_message_id"  # two nodes carry one message ID
+    CHILDREN_MISMATCH = "children_mismatch"  # exported children list disagrees
+    CURRENT_NODE_MISSING = "current_node_missing"  # current_node absent or unknown
+
+
+@dataclass(frozen=True)
+class GraphIssue:
+    """One structural problem, by code and node. Never contains message text.
+
+    Attributes:
+        code: What is wrong.
+        node_id: The node concerned, or None for a whole-graph issue.
+    """
+
+    code: IssueCode
+    node_id: str | None = None
+
+
 class ConversationGraph:
     """The native message tree of one conversation.
 
@@ -65,6 +124,7 @@ class ConversationGraph:
         nodes: Mapping[str, GraphNode],
         current_node: str | None,
         active_path: tuple[str, ...],
+        issues: tuple[GraphIssue, ...] = (),
     ) -> None:
         """Store precomputed results. Use ``from_mapping`` instead.
 
@@ -73,12 +133,25 @@ class ConversationGraph:
             current_node: The exported ``current_node`` if it exists in
                 ``nodes``, else None.
             active_path: Node IDs from the root down to ``current_node``.
+            issues: Structural problems found while building.
         """
         self._nodes = dict(nodes)
         self._current_node = current_node
         self._active_path = active_path
         self._active_messages = tuple(n for n in active_path if self._nodes[n].has_message)
         self._numbers = {node_id: i for i, node_id in enumerate(self._active_messages, start=1)}
+        self._issues = issues
+        on_path = set(active_path)
+        self._branch_points = tuple(
+            BranchPoint(
+                node.node_id,
+                node.children,
+                _branch_kind([self._nodes[c].role for c in node.children]),
+                next((c for c in node.children if c in on_path), None),
+            )
+            for node in self._nodes.values()
+            if len(node.children) > 1
+        )
 
     @classmethod
     def from_mapping(
@@ -94,10 +167,15 @@ class ConversationGraph:
             current_node: The exported current node ID, or None.
 
         Returns:
-            The graph. Malformed entries (not an object) are skipped here;
-            reporting them is the integrity checker's job (NRM-002).
+            The graph. Malformed entries (not an object) are left out of
+            ``nodes`` and reported in ``issues``.
         """
         raw = {key: value for key, value in mapping.items() if isinstance(value, Mapping)}
+        issues = [
+            GraphIssue(IssueCode.INVALID_NODE, key)
+            for key, value in mapping.items()
+            if not isinstance(value, Mapping)
+        ]
         kids: dict[str, list[str]] = {key: [] for key in raw}
         for key, value in raw.items():
             parent = value.get("parent")
@@ -119,7 +197,11 @@ class ConversationGraph:
             )
 
         current = current_node if current_node in nodes else None
-        return cls(nodes, current, _path_to_root(nodes, current))
+        if current is None:
+            issues.append(GraphIssue(IssueCode.CURRENT_NODE_MISSING))
+        issues += _check(raw, nodes)
+        issues.sort(key=lambda i: (i.code.value, i.node_id or ""))
+        return cls(nodes, current, _path_to_root(nodes, current), tuple(issues))
 
     @property
     def nodes(self) -> Mapping[str, GraphNode]:
@@ -140,6 +222,34 @@ class ConversationGraph:
     def active_messages(self) -> tuple[str, ...]:
         """The active path without empty (message-less) nodes."""
         return self._active_messages
+
+    @property
+    def branch_points(self) -> tuple[BranchPoint, ...]:
+        """Every fork in the tree, in node order."""
+        return self._branch_points
+
+    @property
+    def issues(self) -> tuple[GraphIssue, ...]:
+        """Structural problems, sorted by code then node. Empty for a clean tree."""
+        return self._issues
+
+    def alternate_paths(self) -> Iterator[tuple[str, ...]]:
+        """Yield every root-to-leaf path except the active one.
+
+        In a damaged tree a path starts where its parent chain stops (a
+        missing parent or a loop); ``issues`` names those nodes.
+
+        Each path is a whole, separate version of the conversation. Paths are
+        never merged or spliced into the active path.
+
+        Yields:
+            Node ID tuples from a root down to a leaf, in node order.
+        """
+        for node in self._nodes.values():
+            if not node.children and node.node_id != self._current_node:
+                path = _path_to_root(self._nodes, node.node_id)
+                if path:
+                    yield path
 
     def message_number(self, node_id: str) -> int | None:
         """Return a node's 1-based position among the active path's messages.
@@ -177,6 +287,73 @@ def _path_to_root(nodes: Mapping[str, GraphNode], leaf: str | None) -> tuple[str
         path.append(node_id)
         node_id = nodes[node_id].parent_id
     return tuple(reversed(path))
+
+
+def _branch_kind(roles: list[str | None]) -> BranchKind:
+    if roles and all(role == "user" for role in roles):
+        return BranchKind.EDIT
+    if roles and all(role == "assistant" for role in roles):
+        return BranchKind.REGENERATION
+    return BranchKind.OTHER
+
+
+def _check(
+    raw: Mapping[str, Mapping[str, Any]], nodes: Mapping[str, GraphNode]
+) -> list[GraphIssue]:
+    issues: list[GraphIssue] = []
+    roots = [n.node_id for n in nodes.values() if n.parent_id is None]
+    if len(roots) > 1:
+        issues.append(GraphIssue(IssueCode.MULTIPLE_ROOTS))
+    message_ids: dict[str, str] = {}
+    for key, value in raw.items():
+        node = nodes[key]
+        if node.parent_id == key:
+            issues.append(GraphIssue(IssueCode.SELF_PARENT, key))
+        elif node.parent_id is not None and node.parent_id not in nodes:
+            issues.append(GraphIssue(IssueCode.MISSING_PARENT, key))
+        own_id = value.get("id")
+        if own_id is not None and own_id != key:
+            issues.append(GraphIssue(IssueCode.ID_MISMATCH, key))
+        message = value.get("message")
+        message_id = message.get("id") if isinstance(message, Mapping) else None
+        if isinstance(message_id, str):
+            if message_id in message_ids:
+                issues.append(GraphIssue(IssueCode.DUPLICATE_MESSAGE_ID, key))
+            else:
+                message_ids[message_id] = key
+        listed = value.get("children")
+        if isinstance(listed, list) and set(listed) != set(node.children):
+            issues.append(GraphIssue(IssueCode.CHILDREN_MISMATCH, key))
+    # Reachability from the roots. Anything not reached is either on a
+    # cycle (its parent chain never ends) or hangs below one.
+    reached: set[str] = set()
+    stack = list(roots)
+    while stack:
+        node_id = stack.pop()
+        if node_id not in reached:
+            reached.add(node_id)
+            stack.extend(nodes[node_id].children)
+    for node_id in nodes:
+        if node_id in reached or nodes[node_id].parent_id == node_id:
+            continue
+        if node_id in _path_to_root_cycle(nodes, node_id):
+            issues.append(GraphIssue(IssueCode.CYCLE, node_id))
+        elif nodes[node_id].parent_id in nodes:
+            issues.append(GraphIssue(IssueCode.UNREACHABLE, node_id))
+    return issues
+
+
+def _path_to_root_cycle(nodes: Mapping[str, GraphNode], start: str) -> set[str]:
+    # The nodes of the loop that the parent chain from ``start`` runs into,
+    # or an empty set if the chain ends at a root or a missing parent.
+    order: list[str] = []
+    node_id: str | None = start
+    while node_id is not None and node_id in nodes and node_id not in order:
+        order.append(node_id)
+        node_id = nodes[node_id].parent_id
+    if node_id is not None and node_id in order:
+        return set(order[order.index(node_id) :])
+    return set()
 
 
 def _role(message: Mapping[str, Any] | None) -> str | None:

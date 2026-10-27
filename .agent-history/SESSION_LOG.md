@@ -351,3 +351,25 @@ pytest -q               # 350 passed (39 new for G1, incl. all 14 fixture cases 
 Fix attempts: 0.
 
 **Next exact task:** slice G2 (REL-001 branch kinds and alternate paths, NRM-002 integrity issues).
+
+## 2026-10-27 · REL-001 + NRM-002 — Branch kinds, alternate paths, graph integrity (slice G2)
+
+**Dependencies:** ING-005 (VERIFIED, PR #152). NRM-002's old blocker NRM-001 doesn't apply: integrity is structural and lives in the pure graph (M1_CONSOLIDATION §2.1). **Status:** both VERIFIED. **Branch:** `claude/project-thread-q0du34-graph-g2`.
+
+**Changed files:** `src/knowledge_engine/graph/conversation.py` (BranchPoint, IssueCode, GraphIssue, `branch_points`, `alternate_paths()`, `issues`), `tests/unit/test_graph_branches_integrity.py` (new), `STATUS.md`, diary.
+
+**Design choices:**
+- Branch point = node with ≥2 children; kind from child roles: all user → edit, all assistant → regeneration, else other; `active_child` from the active path; `BRANCH_CLASSIFIER_VERSION = "rel-001-v1"` for the stored rows later.
+- `alternate_paths()` yields every root-to-leaf path except the active one; never merged or spliced.
+- Issues (codes and node IDs only, never text): invalid_node, missing_parent, self_parent, cycle, unreachable, multiple_roots, id_mismatch, duplicate_message_id, children_mismatch (exported list vs parent links), current_node_missing. Sorted deterministically. Nodes are never dropped (except non-object entries, which are reported).
+- Note: JSON objects with duplicate keys are collapsed by the JSON parser before the graph sees them; detecting that needs a parse hook in the adapter (A1/A2). Recorded as a scope note.
+
+**Commands run:**
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 42 source files
+pytest -q               # 367 passed, 6 skipped (17 new; skips = fixture layouts without conversations.json, covered by the G1 loader)
+```
+Hypothesis test: random trees with corrupted parent links; every node is either reachable from a root or named in an issue, and every alternate path is a real parent chain ending at a leaf. Fix attempts: 0.
+
+**Next exact task:** slice G3 (ING-006 content parts and asset pointers, NRM-001 canonical node and the two hashes).

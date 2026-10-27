@@ -559,3 +559,14 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "A conversation is a tree, not a list. I keep every branch and never splice them together."
 - "I never invent a timestamp. If the export didn't have one, neither does my data."
+
+### 23:22 — REL-001 and NRM-002: naming the branches and flagging broken trees
+**What:** The graph now says *why* a chat forked (the user edited a question, or asked for a new answer), lists every other version of the chat as its own path, and reports broken structure: missing parents, loops, unreachable messages, mismatched IDs. 17 new tests, 367 in total.
+**Key decisions and why:**
+- **Report, don't repair.** A broken tree is listed as issues with a code and a node ID. No message is thrown away, and no message text goes into the report.
+- **The roles decide the branch kind.** Sibling user messages mean an edit; sibling assistant messages mean a regeneration. Anything mixed is honestly "other".
+- **A random-damage test.** Hypothesis builds random trees, breaks some parent links, and checks every message is either reachable or named in an issue.
+**Teach-back (`graph/conversation.py`, branches and issues):** "Where a message has more than one child, the conversation forked: sibling user messages mean the user edited a question, sibling assistant messages mean the answer was regenerated. Every other version is available as its own complete path, separate from the one the user ended on. If the tree is damaged, the problem is listed with a code and the node's ID, and no message is ever dropped."
+**Talking points:**
+- "Bad input becomes a list of named problems, not a crash and not silent data loss."
+- "I test the integrity checker by deliberately breaking random trees."
