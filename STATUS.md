@@ -7,5 +7,6 @@ Live ticket status for the build. The full ticket list is `docs/TICKETS.csv` (ke
 | Ticket | Status | Evidence |
 |---|---|---|
 | FND-001 Bootstrap Python repository and tool configuration | VERIFIED | SESSION_LOG 2026-10-27 FND-001 |
+| FND-002 Environment and settings manager | VERIFIED | SESSION_LOG 2026-10-27 FND-002 |
 
-**Next unblocked:** FND-002 (settings and egress switches), then FND-003, FND-005, OPS-008, EVAL-009.
+**Next unblocked:** FND-003 (SQLite engine), then FND-005, OPS-008, EVAL-009.

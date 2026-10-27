@@ -280,3 +280,18 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "Day one of the real build was boring on purpose: a skeleton, three tools, and a written style guide."
 - "My style rules are enforced by a linter, not by good intentions."
 - "Every dependency arrives with the ticket that needs it."
+
+### 21:10 — FND-002: settings, with privacy switched on by default
+**What:** Added one settings object that holds every switch and limit the engine uses. It can be filled from a `ke.toml` file, from environment variables, or from code. There's a commented example in `ke.example.toml`. 36 new tests, 39 in total, all passing.
+**Key decisions and why:**
+- **Everything that leaves the PC has its own off switch:** text AI, embeddings, image analysis, web fetches and transcript fetches. All five ship switched off. Turning on the text model does *not* turn on image analysis. That's the privacy promise from the plan, enforced in code.
+- **The settings refuse a workspace inside the raw folder.** "Never write to raw/" is now a check, not just a rule in a document. A test even tries to sneak past it with `..` in the path.
+- **API keys can only come from environment variables.** If a key turns up in the config file, the engine refuses to start, and the error message names the setting without printing the key. Config files get copied and committed; environment variables don't.
+- **Settings are frozen** after loading, so nothing can flip a switch halfway through a run.
+- Used two plan defaults Louis accepted by starting M1: images stay where they are and get hash-checked (OD-02), and each raw folder gets an account label such as `louis-personal` (OD-03).
+**Problem hit:** a misspelt environment variable is silently ignored by the settings library. It fails safe, because the switch stays off, but it's logged as a known limitation.
+**What I learned:** Pydantic validation, `SecretStr`, how config sources get layered in priority order, and why `extra="forbid"` catches typos.
+**Talking points:**
+- "Privacy by default isn't a policy page, it's five booleans that default to False, plus tests."
+- "My config refuses to let the app write inside the folder holding my private data."
+- "API keys never go in config files. My app checks that and refuses to start."

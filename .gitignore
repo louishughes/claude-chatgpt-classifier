@@ -16,3 +16,7 @@ dist/
 .ruff_cache/
 .coverage
 htmlcov/
+
+# Local engine config and env files name private paths or hold secrets
+ke.toml
+.env

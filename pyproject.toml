@@ -17,7 +17,10 @@ requires-python = ">=3.12"
 # Runtime dependencies are added by the ticket that first needs them
 # (Pydantic in FND-002, SQLAlchemy in FND-003, and so on), so every
 # dependency can be traced back to a reason.
-dependencies = []
+dependencies = [
+    "pydantic>=2.9,<3",           # typed, validated data models (FND-002 onwards)
+    "pydantic-settings>=2.6,<3",  # settings from env vars and config files (FND-002)
+]
 
 [project.optional-dependencies]
 # Tools needed to develop and test, but not to run the package.
