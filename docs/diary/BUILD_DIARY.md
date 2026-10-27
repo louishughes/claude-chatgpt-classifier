@@ -327,6 +327,17 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "Keeping a ticket isn't the same as committing to it. I parked a third of the roadmap without deleting anything."
 - "Re-plan with real data. The plan for the AI milestones gets rewritten after the import works on my actual export."
 
+### 22:25 — A lock on the paid API (REV-008)
+**What:** Earlier tonight Louis decided: no more paid API calls for now, do the work locally or with Claude inside the subscription. But the spike's real provider still built an Anthropic client straight from `ANTHROPIC_API_KEY`, which is set on his PC. One wrong command (forgetting `--provider fake` or `--dry-run`) would have spent money. So the rule became code: `AnthropicProvider` now refuses to start unless the environment variable `SPIKE_ALLOW_PAID=1` is set, and the error message names Louis's decision and the switch. The check runs before the SDK is even imported. Only the exact value `1` counts, so `0`, `true` or an empty value all keep it locked. `--dry-run` and the fake provider work as before without the switch.
+**Challenges:**
+- The provider is built outside the spike's existing error handling, so a plain error would have dumped a Python traceback. The command line now catches it and prints a one-line "Refusing: ..." message with exit code 4, in both label and discover modes.
+- Testing a "don't call the paid API" rule without calling the paid API: the tests only check that the provider refuses (or, with the switch on and a fake key, that it builds an object that's never used). Nothing touches the network.
+**Result:** 9 new tests, 62 pass in total, and none of the existing 53 tests were changed.
+**Talking points:**
+- "A rule in a doc is a hope. A rule in code is a guarantee."
+- "Make the expensive path opt-in and the free path the default."
+- "Fail loudly and early: the lock trips before any client exists that could spend money."
+
 ### 23:12 — Designing fewer, deeper import modules (REV-004)
 **What:** Wrote `docs/plans/M1_CONSOLIDATION.md`, the design note that turns the architecture review's advice into a concrete shape for the first milestone. Design only: no code or tests changed. Instead of about fifteen small classes that the caller has to call in the right order, M1 becomes four modules: a pure *conversation graph* (active path, message numbers, branches and broken-tree checks, worked out in one place), one *Import* module whose whole interface is `import_source(path, account_ns) -> ImportReport`, a narrow adapter seam where the two export formats really differ (finding the conversations), and rendering as planned.
 **Why:** the most important promise of the slice, "importing the same export again adds nothing and costs nothing", had no single owner. Now it does: one named test, `test_identical_reimport_adds_nothing`, calls one function twice and checks that every table has the same row count.

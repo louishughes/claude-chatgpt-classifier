@@ -26,7 +26,7 @@ The earlier attempts failed on three things: inconsistent labels, untyped output
 | `gold.py` | Gold set: picks varied chats, writes the labelling sheet and instructions, scores accuracy, fingerprints the file |
 | `spike.py` | Command line |
 | `discovery.py` | Spike v3 step 2: discovery call, code checks, scoring by message number |
-| `tests/` | 53 tests on synthetic data, including 50- and 100-chat batches with injected failures |
+| `tests/` | 62 tests on synthetic data, including 50- and 100-chat batches with injected failures |
 
 ## Order of play (agreed 2026-10-27)
 1. Schema with separate fields (done) → 2. run 50 chats twice → 3. **you evaluate** ~20 of the model's answers (y/n), giving accuracy alongside agreement → 4. go/no-go: if targets are met, run 100, then start M1; if not, change the method (inputs, fields, segmenting), not the prompt wording.
@@ -40,6 +40,7 @@ python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activ
 pip install -r requirements.txt
 python -m pytest -q tests                         # free, offline
 
+# Paid calls are OFF by default (owner's no-paid-API rule, 2026-10-27): --provider anthropic refuses to start unless SPIKE_ALLOW_PAID=1 is set for that run. --dry-run and --provider fake never need it.
 # Needs ANTHROPIC_API_KEY set (Windows: setx ANTHROPIC_API_KEY "..." then a new terminal). Never commit it.
 python spike.py --sample 50 --dry-run                 # cost estimate only
 python spike.py --sample 50 --runs 2                  # ~$0.12; also writes private/spike-out/review_sheet.csv
