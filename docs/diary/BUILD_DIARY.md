@@ -549,7 +549,7 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "My importer proves it's read-only: same folder fingerprint before and after, or the report refuses to be trusted."
 - "Recognise files by what's inside them, not by what they're called."
 
-### 23:24 — ING-005: a chat is a tree
+### 23:20 — ING-005: a chat is a tree
 **What:** The conversation graph: give it a chat's raw message map and it works out the tree, the version of the chat the user actually ended on (the "active path"), and stable message numbers. 39 new tests, 350 in total. It reads no files and touches no database, which makes it easy to test and reuse.
 **Key decisions and why:**
 - **Walk up, don't sort.** The active path comes from walking up from the last message the user saw, not from timestamps. Timestamps can be missing or odd; the tree can't lie about which message answers which.
