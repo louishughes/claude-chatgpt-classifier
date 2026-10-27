@@ -48,9 +48,9 @@ M0 audit (done) → **M1 source-fidelity slice** (33 tickets, LLM-free, ends wit
 ## 6. Next step (updated 2026-10-27, owner decision)
 Before FND-001, the owner chose to validate the AI labelling step with the throwaway spike in `prototype/classification_spike/` (IMPLEMENTATION_PLAN §12):
 1. Done: schema with separate fields, decisions with speaker and state, 40 synthetic tests.
-2. Waiting on the owner: API-data OK, cost cap, and run location (Remote Control session or owner runs it).
-3. Gold sheet: `spike.py --sample 50 --gold-template 20`, then the owner labels about 20 chats (~1 hour).
-4. Run 50 chats twice, then the owner reviews the report.
+2. Done: API-data OK, Claude Haiku 5.5, $2 cap, runs on the owner's PC from `V:\Programming\ChatGPT_Classifier` with outputs in the git-ignored `private/`.
+3. Run 50 chats twice (`spike.py --sample 50 --runs 2`, ~$0.12).
+4. The owner evaluates about 20 of the model's answers on `review_sheet.csv` (y/n, ~20 minutes). Re-run with `--review` to add accuracy, then the owner reviews the report.
 5. Go/no-go. Go means 100 chats, then FND-001. No-go means change the method and re-run against the same gold set.
 
 Guardrails now in force: see `AGENTS.md` "Owner guardrails".

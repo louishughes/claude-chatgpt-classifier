@@ -279,7 +279,7 @@ def test_gold_template_then_accuracy_in_report(raw_dir, tmp_path):
     assert report["gold"][0]["scored"] == 4
     assert report["gold"][0]["primary_domain_accuracy_pct"] == 50.0
     assert report["gold"][0]["purpose_accuracy_pct"] == 100.0
-    assert "Accuracy vs your hand labels" in (out / "report.md").read_text()
+    assert "Accuracy vs reference labels" in (out / "report.md").read_text()
 
 
 def test_gold_rejects_unknown_category(tmp_path):
@@ -375,3 +375,50 @@ def test_cli_allows_a_git_ignored_folder_inside_the_repo(raw_dir, tmp_path):
     assert spike.main(common + ["--out", str(repo / "private" / "spike-out")]) == 0
     assert (repo / "private" / "spike-out" / "report.md").exists()
     assert spike.main(common + ["--out", str(repo / "results")]) == 2   # not ignored: refused
+
+
+# --- evaluator mode (review sheet) ---------------------------------------------
+
+def test_review_sheet_then_verdicts_score_every_run(raw_dir, tmp_path):
+    import csv
+    root, out = raw_dir(30), tmp_path / "out"
+    base = ["--raw-dir", str(root), "--out", str(out), "--sample", "25", "--provider", "fake", "--runs", "2",
+            "--review-size", "6"]
+    assert spike.main(base) == 0
+    sheet = out / "review_sheet.csv"
+    rows = list(csv.DictReader(sheet.open()))
+    assert len(rows) == 6 and rows[0]["model_primary_domain"] and rows[0]["model_summary"]
+    assert all(not r["domain_ok"] for r in rows)                 # verdicts never pre-filled
+    assert (out / "review_instructions.txt").exists()
+
+    # Evaluator: 4 domains right, 2 wrong (one with a correction), purposes all right.
+    for i, r in enumerate(rows):
+        r["domain_ok"] = "y" if i < 4 else "n"
+        r["purpose_ok"] = "y"
+        r["decisions_ok"] = "na" if not r["model_decisions"] else "y"
+        if i == 4:
+            r["right_domain"] = "games" if r["model_primary_domain"] != "games" else "other"
+    with (out / "review.csv").open("w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=rows[0].keys()); w.writeheader(); w.writerows(rows)
+
+    sheet_before = sheet.read_text()
+    calls_before = sum(1 for _ in (out / "run-1.jsonl").open())
+    assert spike.main(base + ["--review", str(out / "review.csv")]) == 0
+    assert sum(1 for _ in (out / "run-1.jsonl").open()) == calls_before   # resumed: no new work
+    report = json.loads((out / "report.json").read_text())
+    assert report["review"]["domain_correct_pct"] == round(100 * 4 / 6, 1)
+    assert report["review"]["purpose_correct_pct"] == 100.0
+    # Reference labels: 4 confirmed + 1 corrected = 5; the uncorrected "n" has no answer.
+    assert report["meta"]["reference_labels"] == 5
+    assert report["gold"][0]["scored"] == 5 and report["gold"][0]["primary_domain_accuracy_pct"] == 80.0
+    assert report["meta"]["review_file_sha256"] != "none"
+    assert sheet.read_text() == sheet_before                    # existing sheet not overwritten
+
+
+def test_review_rejects_unknown_correction(tmp_path):
+    from review import load_review
+    p = tmp_path / "r.csv"
+    p.write_text("conversation_id,model_primary_domain,model_purpose,domain_ok,purpose_ok,right_domain\n"
+                 "x,games,brainstorm,n,y,gamez\n")
+    with pytest.raises(ValueError, match="gamez"):
+        load_review(p)

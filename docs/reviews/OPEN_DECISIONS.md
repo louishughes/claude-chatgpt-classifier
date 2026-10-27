@@ -25,7 +25,7 @@
 ## Resolved during the audit (recorded, not open)
 - **Spike before M1** (owner, 2026-10-27, decision card): validate the AI step on 50 then 100 chats first. Sequence and go/no-go in IMPLEMENTATION_PLAN §12.
 - **Guardrails** (owner, 2026-10-27, via the project chat): agents don't change tests or the gold set without approval; at most 3 fix attempts per ticket, then stop and ask; vocabulary frozen during a run. Recorded in `AGENTS.md`, `CLAUDE.md` §4 and IMPLEMENTATION_PLAN §8.
-- **Gold set** of about 20 owner-labelled chats before the first real run (owner, 2026-10-27).
+- **Owner is the evaluator, not the labeller** (owner, 2026-10-27). Accuracy comes from his y/n verdicts on about 20 of the model's answers (review sheet), not from blind labels. This replaces the earlier "owner labels 20 chats" step.
 - **Cloud is acceptable** in principle (owner, 2026-10-27, thread message). Captured in ADR-0007; the detailed policy is still OD-04.
 - **Batch tests at 50 and 100 early** (owner, 2026-10-27). Captured as EVAL-010/EVAL-011 and TEST_STRATEGY §12.4.
 - **Build diary** at `docs/diary/BUILD_DIARY.md` with timestamps, reasons and talking points (owner, 2026-10-27).

@@ -194,3 +194,10 @@ These are now in `AGENTS.md`, `CLAUDE.md` and the plan. The spike's gold set got
 **Talking points:**
 - "Ask Git, don't guess: `git check-ignore` tells you exactly what `git add` would do."
 - "Tidy and safe aren't opposites. One folder, with the private bit fenced off."
+
+### 20:25 — "I'm the evaluator, not the labeller"
+**What:** Louis doesn't want to hand-label chats. He wants to judge the model's work. Added an evaluator mode: after the first run, the spike writes a review sheet for about 20 varied chats showing the model's answers (domain, purpose, projects, summary, decisions). Louis marks each one y/n, optionally with the right answer, in about 20 minutes. His verdicts give an accuracy score, and every confirmed or corrected answer becomes a reference label that scores all runs and any future model. Re-running with the verdicts costs nothing: finished chats are skipped.
+**Trade-off, stated honestly:** seeing the model's answer first nudges a reviewer towards agreeing (anchoring). So the pass mark went up (85% instead of 80%), the sheet asks a strict y/n per field, and the result is reported as an upper bound. Agents still never fill in or edit the verdicts. 43 tests pass.
+**Talking points:**
+- "Design the evaluation around how the human actually wants to work."
+- "Reviewing is faster than labelling but biased. Say so, and raise the bar to compensate."

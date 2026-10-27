@@ -8,15 +8,18 @@ ignores, so private outputs can't be committed by accident. Run from
     # 1. See what it would cost. Makes no API calls.
     python spike.py --sample 50 --dry-run
 
-    # 2. Make the labelling sheet for ~20 varied chats (no API calls), fill it
-    #    in and save it as private/spike-out/gold.csv.
-    python spike.py --sample 50 --gold-template 20
+    # 2. Two runs over 50 chats. Also writes review_sheet.csv: ~20 varied
+    #    chats with the model's answers for you to mark y/n (~20 minutes).
+    python spike.py --sample 50 --runs 2
 
-    # 3. Two runs over 50 chats, scored against your labels.
-    python spike.py --sample 50 --runs 2 --gold ../../private/spike-out/gold.csv
+    # 3. Save your marked sheet as review.csv and re-run: finished chats are
+    #    skipped (no new cost) and the report adds accuracy by your verdicts.
+    python spike.py --sample 50 --runs 2 --review ../../private/spike-out/review.csv
 
     # 4. Same again at 100, in its own folder. The 100 sample contains the 50.
-    python spike.py --sample 100 --runs 2 --out ../../private/spike-out-100 --gold ../../private/spike-out/gold.csv
+    python spike.py --sample 100 --runs 2 --out ../../private/spike-out-100 --review ../../private/spike-out/review.csv
+
+    # Alternative to review mode: label chats blind yourself (--gold-template, --gold; see gold.py).
 
 The output folder holds model answers about your private chats. The script
 refuses to write anywhere inside a Git repository unless Git ignores that
@@ -38,6 +41,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from gold import fingerprint, gold_stats, load_gold, pick_diverse, write_template
+from review import load_review, write_review_sheet
 from loader import clip_text, sample_conversations
 from providers import PRICES, AnthropicProvider, FakeProvider, FatalError
 from report import category_spread, consistency, run_stats, to_markdown
@@ -98,6 +102,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--gold-template", type=int, metavar="N",
                    help="pick N varied sampled chats, write a labelling sheet, then stop")
     p.add_argument("--gold", type=Path, help="filled-in gold CSV: adds accuracy to the report")
+    p.add_argument("--review", type=Path, help="review.csv with your y/n verdicts: adds accuracy to the report")
+    p.add_argument("--review-size", type=int, default=20, help="chats in the review sheet")
     p.add_argument("--dry-run", action="store_true", help="estimate cost, make no calls")
     return p.parse_args(argv)
 
@@ -120,6 +126,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Wrote {out / 'gold_template.csv'} and gold_instructions.txt. Fill it in, save as gold.csv.")
         return 0
     gold = load_gold(args.gold.expanduser()) if args.gold else {}
+    review_stats: dict = {}
+    if args.review:
+        # Your verdicts double as reference labels for scoring every run.
+        review_stats, reference = load_review(args.review.expanduser())
+        gold = {**reference, **gold}  # blind gold labels win where both exist
 
     model = "fake" if args.provider == "fake" else args.model
     sent_chars = sum(len(clip_text(c.full_text(), args.budget_chars)[0]) for c in convs)
@@ -172,13 +183,17 @@ def main(argv: list[str] | None = None) -> int:
         "total_cost_usd": round(meter.spent, 4),
         # Fingerprint of the answer key, so any later edit to it is visible.
         "gold_file_sha256": fingerprint(args.gold.expanduser()) if args.gold else "none",
-        "gold_rows": len(gold),
+        "review_file_sha256": fingerprint(args.review.expanduser()) if args.review else "none",
+        "reference_labels": len(gold),
     }
     vs_gold = [gold_stats(r, gold) for r in runs] if gold else []
     (out / "report.json").write_text(json.dumps(
-        {"meta": meta, "runs": stats, "consistency": cons, "gold": vs_gold, "spread": category_spread(runs)},
-        indent=1))
-    (out / "report.md").write_text(to_markdown(meta, stats, cons, category_spread(runs), vs_gold))
+        {"meta": meta, "runs": stats, "consistency": cons, "review": review_stats, "gold": vs_gold,
+         "spread": category_spread(runs)}, indent=1))
+    (out / "report.md").write_text(to_markdown(meta, stats, cons, category_spread(runs), vs_gold, review_stats))
+    sheet = write_review_sheet(convs, runs[0], args.review_size, args.seed, out)
+    if sheet:
+        print(f"Review sheet: {sheet} (mark y/n, save as review.csv in the same folder)")
     print(f"Report: {out / 'report.md'}")
     return 0
 
