@@ -188,3 +188,9 @@ These are now in `AGENTS.md`, `CLAUDE.md` and the plan. The spike's gold set got
 **Talking points:**
 - "Free steps first: tests, cost estimate, labelling sheet. The paid step comes last."
 - "A worktree let me try a branch on my real machine without disturbing my main checkout."
+
+### 20:15 — Keep everything in one folder
+**What:** Louis wanted the spike's code and outputs inside the project folder rather than scattered across the drive. The script used to refuse any output folder inside a Git repo. Now it writes to `private/spike-out/` by default, `private/` is in `.gitignore`, and before writing the script asks Git itself (`git check-ignore`) whether that folder would be committed. It refuses if so. Same safety, one tidy folder. The API key is set. 41 tests pass.
+**Talking points:**
+- "Ask Git, don't guess: `git check-ignore` tells you exactly what `git add` would do."
+- "Tidy and safe aren't opposites. One folder, with the private bit fenced off."

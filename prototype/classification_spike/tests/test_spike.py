@@ -363,3 +363,15 @@ def test_report_fingerprints_the_gold_file(raw_dir, tmp_path):
     spike.main(base + ["--gold", str(gold)])
     second = json.loads((out / "report.json").read_text())["meta"]["gold_file_sha256"]
     assert first != second and len(first) == 16
+
+
+def test_cli_allows_a_git_ignored_folder_inside_the_repo(raw_dir, tmp_path):
+    import subprocess
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    (repo / ".gitignore").write_text("private/\n")
+    common = ["--raw-dir", str(raw_dir(3)), "--provider", "fake", "--runs", "1"]
+    assert spike.main(common + ["--out", str(repo / "private" / "spike-out")]) == 0
+    assert (repo / "private" / "spike-out" / "report.md").exists()
+    assert spike.main(common + ["--out", str(repo / "results")]) == 2   # not ignored: refused

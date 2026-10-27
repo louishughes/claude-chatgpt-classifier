@@ -23,7 +23,7 @@ The earlier attempts failed on three things: inconsistent labels, untyped output
 | `report.py` | Metrics and the Markdown report |
 | `gold.py` | Gold set: picks varied chats, writes the labelling sheet and instructions, scores accuracy, fingerprints the file |
 | `spike.py` | Command line |
-| `tests/` | 40 tests on synthetic data, including 50- and 100-chat batches with injected failures |
+| `tests/` | 41 tests on synthetic data, including 50- and 100-chat batches with injected failures |
 
 ## Order of play (agreed 2026-10-27)
 1. Schema with separate fields (done) → 2. gold set: you label ~20 chats → 3. run 50 chats twice, score agreement and accuracy, **you review** → 4. go/no-go: if targets are met, run 100, then start M1; if not, change the method (inputs, fields, segmenting), not the prompt wording.
@@ -37,16 +37,16 @@ python -m venv .venv && . .venv/bin/activate      # Windows: .venv\Scripts\activ
 pip install -r requirements.txt
 python -m pytest -q tests                         # free, offline
 
-# Needs ANTHROPIC_API_KEY set in your shell. Never commit it.
-python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --dry-run          # cost estimate only
-python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --gold-template 20   # labelling sheet, ~1 hour
-# fill in primary_domain and purpose (optionally secondary_domains and projects, ';'-separated), save as ~/spike-out/gold.csv
-python spike.py --raw-dir ../../raw --sample 50 --runs 2 --out ~/spike-out --max-cost-usd 2 --gold ~/spike-out/gold.csv
-python spike.py --raw-dir ../../raw --sample 100 --runs 2 --out ~/spike-out-100 --max-cost-usd 2
+# Needs ANTHROPIC_API_KEY set (Windows: setx ANTHROPIC_API_KEY "..." then a new terminal). Never commit it.
+python spike.py --sample 50 --dry-run                 # cost estimate only
+python spike.py --sample 50 --gold-template 20        # labelling sheet, ~1 hour; save as private/spike-out/gold.csv
+python spike.py --sample 50 --runs 2 --gold ../../private/spike-out/gold.csv
+python spike.py --sample 100 --runs 2 --out ../../private/spike-out-100 --gold ../../private/spike-out/gold.csv
 ```
+Everything stays inside the project folder: input defaults to `raw/`, output to `private/spike-out/`. Both are listed in `.gitignore`, and the script asks Git (`git check-ignore`) before writing, refusing any folder inside the repo that Git would commit.
 Defaults: model `claude-haiku-5-5` (Anthropic's cheapest current model, $0.10 / $0.50 per million input/output tokens), effort `low`, cost cap $2, 4 workers, 90 s timeout, 24,000 characters per chat. If Haiku misses the targets, compare `--model claude-sonnet-5-5` on the same sample and gold set before changing anything else. Server-side refusal fallback is used on Sonnet/Opus only (Haiku 5.5 doesn't support it); `--no-refusal-fallback` turns it off.
 
-**Privacy:** the selected chat text is sent to the Anthropic API. Outputs contain summaries of your chats, so `--out` must be outside the repo (the script refuses otherwise). `report.md` has counts only.
+**Privacy:** the selected chat text is sent to the Anthropic API. Outputs contain summaries of your chats, so they go to `private/`, which Git ignores (the script refuses any output folder Git would commit). `report.md` has counts only.
 
 ## What "good enough" looks like (proposed, to agree before running)
 | Metric | Target |

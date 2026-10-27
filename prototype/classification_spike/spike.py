@@ -1,33 +1,38 @@
 """Command line entry point for the classification spike.
 
-Typical use on the PC that holds raw/:
+Everything stays inside the project folder. By default the script reads
+``<project>/raw`` and writes to ``<project>/private/spike-out``, a folder Git
+ignores, so private outputs can't be committed by accident. Run from
+``prototype/classification_spike``:
 
     # 1. See what it would cost. Makes no API calls.
-    python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --dry-run
+    python spike.py --sample 50 --dry-run
 
-    # 2. Two runs over 50 chats with a $5 cap, then the report.
-    python spike.py --raw-dir ../../raw --sample 50 --runs 2 --out ~/spike-out --max-cost-usd 2
+    # 2. Make the labelling sheet for ~20 varied chats (no API calls), fill it
+    #    in and save it as private/spike-out/gold.csv.
+    python spike.py --sample 50 --gold-template 20
 
-    # Optional but recommended: hand-label 20 varied chats from the 50 first (see gold.py).
-    python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --gold-template 20
-    python spike.py ... --gold ~/spike-out/gold.csv
+    # 3. Two runs over 50 chats, scored against your labels.
+    python spike.py --sample 50 --runs 2 --gold ../../private/spike-out/gold.csv
 
-    # 3. Same again at 100. The 100 sample contains the 50 sample.
-    python spike.py --raw-dir ../../raw --sample 100 --runs 2 --out ~/spike-out-100 --max-cost-usd 2
+    # 4. Same again at 100, in its own folder. The 100 sample contains the 50.
+    python spike.py --sample 100 --runs 2 --out ../../private/spike-out-100 --gold ../../private/spike-out/gold.csv
 
-The output folder holds model answers about your private chats, so it must be
-outside the Git repository. The script refuses to write inside it.
+The output folder holds model answers about your private chats. The script
+refuses to write anywhere inside a Git repository unless Git ignores that
+path.
 
 Talking points
 --------------
 - "Dry run first: know the cost before you spend it."
-- "Private outputs never land in the repo by accident; the script checks."
+- "Private outputs never land in the repo by accident; the script asks Git."
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -44,17 +49,40 @@ from schema import SYSTEM_PROMPT, TAXONOMY_VERSION
 EST_OUTPUT_TOKENS = 1500
 
 
-def inside_git_repo(path: Path) -> bool:
+# prototype/classification_spike/spike.py -> the project root is two folders up.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def git_root(path: Path) -> Path | None:
     for parent in [path, *path.parents]:
         if (parent / ".git").exists():
-            return True
-    return False
+            return parent
+    return None
+
+
+def safe_output_dir(path: Path) -> bool:
+    """True if ``path`` is outside any Git repo, or inside one but ignored by Git.
+
+    We ask Git itself (``git check-ignore``) rather than reading .gitignore
+    ourselves, so the answer matches what ``git add`` would really do. If Git
+    isn't installed we can't check, so we refuse.
+    """
+    root = git_root(path)
+    if root is None:
+        return True
+    try:
+        result = subprocess.run(["git", "-C", str(root), "check-ignore", "-q", str(path)],
+                                capture_output=True, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Throwaway spike: is the AI labelling step consistent?")
-    p.add_argument("--raw-dir", type=Path, required=True, help="raw/ folder (read-only)")
-    p.add_argument("--out", type=Path, required=True, help="output folder, outside the repo")
+    p.add_argument("--raw-dir", type=Path, default=PROJECT_ROOT / "raw", help="raw/ folder (read-only)")
+    p.add_argument("--out", type=Path, default=PROJECT_ROOT / "private" / "spike-out",
+                   help="output folder; must be outside Git or ignored by it")
     p.add_argument("--sample", type=int, default=50)
     p.add_argument("--seed", type=int, default=20261027)
     p.add_argument("--runs", type=int, default=2)
@@ -71,15 +99,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
                    help="pick N varied sampled chats, write a labelling sheet, then stop")
     p.add_argument("--gold", type=Path, help="filled-in gold CSV: adds accuracy to the report")
     p.add_argument("--dry-run", action="store_true", help="estimate cost, make no calls")
-    p.add_argument("--allow-out-in-repo", action="store_true", help="tests only")
     return p.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     out = args.out.expanduser().resolve()
-    if inside_git_repo(out) and not args.allow_out_in_repo:
-        print(f"Refusing: {out} is inside a Git repository. Choose a private folder.", file=sys.stderr)
+    if not safe_output_dir(out):
+        print(f"Refusing: {out} is inside a Git repository and not ignored by it. "
+              f"Use the default private/ folder or add the path to .gitignore.", file=sys.stderr)
         return 2
     convs, skipped = sample_conversations(args.raw_dir.expanduser(), args.sample, args.seed)
     print(f"Sampled {len(convs)} conversations (skipped: {skipped})")

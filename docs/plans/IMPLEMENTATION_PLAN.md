@@ -31,7 +31,7 @@
 └── workspace/ (outside repo, configurable)   # SQLite DB, content-addressed store, generated vault
 ```
 
-**Boundary rules** (from TR-02, plus the audit): `domain` imports nothing internal. The source layer (`ingestion`, `identity`, `media`, `links`, `relationships`) never imports `infrastructure/providers`. Only `orchestration` sequences stages. `rendering` reads projections; it never writes knowledge. Generated output and the private store live outside the repo.
+**Boundary rules** (from TR-02, plus the audit): `domain` imports nothing internal. The source layer (`ingestion`, `identity`, `media`, `links`, `relationships`) never imports `infrastructure/providers`. Only `orchestration` sequences stages. `rendering` reads projections; it never writes knowledge. Generated output and the private store live outside the repo or in a git-ignored folder inside it (e.g. `private/`, owner preference 2026-10-27 to keep everything in one project folder).
 
 ## 2. Dataflow
 
