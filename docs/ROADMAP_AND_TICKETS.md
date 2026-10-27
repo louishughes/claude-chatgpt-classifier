@@ -1,4 +1,6 @@
 # Roadmap and Dependency-Ordered Engineering Backlog
+
+> **FROZEN REFERENCE (2026-10-27, REV-006).** Live tickets are GitHub Issues: milestone maps #4–#9, tickets #10–#132. This file and `docs/TICKETS.csv` are no longer updated; status, scope and blockers live in the issues. See `docs/agents/issue-tracker.md`. (No banner row was added to the CSV because a comment row would break standard CSV readers.)
 **Status:** planned; not implemented. **Ticket count:** 122 (93 original + 29 added by the 2026-10-27 specification audit). Tickets are ordered in this file so all blockers precede their dependents; this file order is **not** the execution order. Execution order, milestones and the first vertical slice are in `docs/plans/IMPLEMENTATION_PLAN.md` and `docs/plans/DEPENDENCY_MAP.md`.
 
 > **Tracker note (audit 2026-10-27):** `docs/agents/issue-tracker.md` names GitHub Issues as the tracker of record and calls this file and `TICKETS.csv` legacy reference. The audit work order required them to be updated in sync, so they were. Which source is authoritative going forward is open decision OD-08 in `docs/reviews/OPEN_DECISIONS.md`.

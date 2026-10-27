@@ -326,3 +326,11 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "Keeping a ticket isn't the same as committing to it. I parked a third of the roadmap without deleting anything."
 - "Re-plan with real data. The plan for the AI milestones gets rewritten after the import works on my actual export."
+
+### 23:12 — Closing the record (REV-006)
+**What:** Seven architecture decisions (ADR-0002 to ADR-0008) were still marked "proposed", even though the M1 code is being built on them, and starting M1 had quietly accepted the default answers to the open decisions. This entry makes that honest on paper. The seven ADRs are now `accepted`, with a note that it was done under Louis's delegated authority for the night and can be reversed. The open decisions with sensible defaults (OD-01..03, 06, 07, 09..15, 17) are marked "default accepted". OD-08 is closed: GitHub Issues is the one ticket tracker, and the roadmap file now opens with a "frozen reference" banner. `CLAUDE.md` no longer tells agents to keep the CSV and Markdown in sync.
+**Left alone on purpose:** the licence (OD-16). No licence file means "all rights reserved", which keeps the option to sell it later; picking an open-source licence is a legal choice Louis should make awake. OD-04/05 (cloud policy and model choice) belong to the ADR-0009 work in another thread.
+**Challenge:** the ticket asked for a banner row in `TICKETS.csv` if the reader tolerates it. A comment line at the top of a CSV breaks standard readers (the header row would no longer be first), so the banner went only into the Markdown, and it names the CSV too.
+**Talking points:**
+- "A decision you're already building on is a decision. Write it down as one, with who made it and how to undo it."
+- "Three ticket trackers is zero ticket trackers. I picked one and froze the others."

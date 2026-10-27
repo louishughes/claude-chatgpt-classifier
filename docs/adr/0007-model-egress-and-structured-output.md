@@ -3,7 +3,7 @@
 ```yaml
 id: ADR-0007
 kind: architecture_decision
-status: proposed   # needs product-owner confirmation (OD-04, OD-05)
+status: accepted   # delegated owner authority 2026-10-27 22:10 UTC; revisitable (REV-006). Provider and egress detail stays open in OD-04/OD-05 and ADR-0009 (REV-002)
 recorded_at: 2026-10-27
 scope: providers/egress
 supersedes: []     # refines, does not replace, PRD §11 and TR-08 "local-only by default"
