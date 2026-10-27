@@ -8,7 +8,7 @@ from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
 from sqlalchemy import Engine, inspect
 
-from knowledge_engine.infrastructure import workspace  # noqa: F401  (registers tables)
+from knowledge_engine.infrastructure import jobs, migrations, workspace  # noqa: F401  (registers tables)
 from knowledge_engine.infrastructure.db import Base, SessionFactory, create_sqlite_engine
 from knowledge_engine.infrastructure.migrations import (
     current_revision,
@@ -30,8 +30,11 @@ def _tables(engine: Engine) -> set[str]:
     return set(inspect(engine).get_table_names()) - {"alembic_version"}
 
 
-def test_there_is_exactly_one_head() -> None:
-    assert head_revision() == "0001_baseline"
+def test_there_is_exactly_one_head_and_it_is_the_newest_file() -> None:
+    # head_revision() itself raises if the scripts branch into two heads.
+    versions = Path(migrations.__file__).parent / "versions"
+    newest = max(p.stem for p in versions.glob("[0-9][0-9][0-9][0-9]_*.py"))
+    assert head_revision() == newest
 
 
 def test_upgrade_empty_database_twice(engine: Engine) -> None:

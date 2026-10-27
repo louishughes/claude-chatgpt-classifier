@@ -91,6 +91,17 @@ class ReviewState(StrEnum):
     SUPERSEDED = "superseded"
 
 
+class JobState(StrEnum):
+    """Lifecycle of one processing job (TECHNICAL_REQUIREMENTS TR-03)."""
+
+    PENDING = "pending"
+    RUNNING = "running"
+    SUCCEEDED = "succeeded"
+    FAILED = "failed"
+    REVIEW_REQUIRED = "review_required"  # a person must look; never retried automatically
+    SKIPPED = "skipped"
+
+
 # Allowed state changes. Anything not listed is refused. Kept as data, not
 # if-statements, so the whole lifecycle can be read (and tested) at a glance.
 _IMPORT_TRANSITIONS: dict[ImportBatchStatus, frozenset[ImportBatchStatus]] = {
@@ -121,13 +132,27 @@ _REVIEW_TRANSITIONS: dict[ReviewState, frozenset[ReviewState]] = {
 }
 
 
+_JOB_TRANSITIONS: dict[JobState, frozenset[JobState]] = {
+    JobState.PENDING: frozenset({JobState.RUNNING, JobState.SKIPPED}),
+    # RUNNING -> PENDING is a transient failure with attempts left, or a
+    # crashed run being resumed.
+    JobState.RUNNING: frozenset(
+        {JobState.SUCCEEDED, JobState.FAILED, JobState.REVIEW_REQUIRED, JobState.PENDING}
+    ),
+    JobState.SUCCEEDED: frozenset(),
+    JobState.FAILED: frozenset(),
+    JobState.REVIEW_REQUIRED: frozenset(),
+    JobState.SKIPPED: frozenset(),
+}
+
+
 class InvalidTransitionError(ValueError):
     """Raised when a state change is not in the allowed-transitions table."""
 
 
 def check_transition(
-    current: ImportBatchStatus | PresenceState | ReviewState,
-    new: ImportBatchStatus | PresenceState | ReviewState,
+    current: ImportBatchStatus | PresenceState | ReviewState | JobState,
+    new: ImportBatchStatus | PresenceState | ReviewState | JobState,
 ) -> None:
     """Refuse a state change that the lifecycle doesn't allow.
 
@@ -148,6 +173,8 @@ def check_transition(
         allowed = _IMPORT_TRANSITIONS[current]
     elif isinstance(current, PresenceState):
         allowed = _PRESENCE_TRANSITIONS[current]
+    elif isinstance(current, JobState):
+        allowed = _JOB_TRANSITIONS[current]
     else:
         allowed = _REVIEW_TRANSITIONS[current]
     if new not in allowed:

@@ -362,3 +362,16 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "I designed the AI step behind an interface, so switching from a paid API to a subscription workflow changed a policy, not the code."
 - "Zero marginal cost was a deliberate constraint, not an afterthought."
+
+### 21:47 — FND-006: never do the same work twice
+**What:** Added a jobs table and a "stage key". Every piece of work gets a fingerprint made from its input and the versions of everything that could change the result. Same fingerprint means the saved result is reused. 21 new tests, 202 in total.
+**Key decisions and why:**
+- **Retries follow Louis's guardrails exactly.** Errors that might go away (a timeout, broken JSON) get up to 3 attempts in total. A doubtful *answer* goes straight to review and is never retried. A real bug fails at once.
+- **Checkpoints are saved in the same transaction as the work.** If the app crashes, the checkpoint and the data can't disagree. A test fakes a crash and checks that the job resumes from the right place.
+- **The database checks too.** It refuses an unknown job state or more attempts than allowed, even if the Python code had a bug.
+**Problem hit:** a job that had already failed three times said "out of attempts" when restarted, instead of "this job is finished". The message is accurate, but it's the wrong reason. Fixed by checking the state first.
+**Flagged for Louis:** I changed one of my own earlier tests, still unmerged, that pinned the database version to "1". Every new table would have broken it. It now checks "there is exactly one latest version", which is what it really meant.
+**Also happening:** a separate architecture review has proposed merging some of the planned import classes into fewer, bigger modules. Until Louis decides, I'm working on tickets the proposal doesn't touch.
+**Talking points:**
+- "Whether to redo work is a lookup: same fingerprint, same answer."
+- "Retry what might be temporary, review what might be wrong, never loop."

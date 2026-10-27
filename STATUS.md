@@ -12,5 +12,6 @@ Live ticket status for the build. The full ticket list is `docs/TICKETS.csv` (ke
 | FND-004 Alembic migration baseline | VERIFIED | SESSION_LOG 2026-10-27 FND-004 |
 | FND-005 Domain models and stable identifiers | VERIFIED (scope note: Segment/KnowledgeRecord deferred to M3) | SESSION_LOG 2026-10-27 FND-005 |
 | EVAL-009 Synthetic source-fidelity fixture suite and scale generator | VERIFIED (M2 link/YouTube/social cases deferred to their tickets) | SESSION_LOG 2026-10-27 EVAL-009 |
+| FND-006 Processing jobs and fingerprint keys | VERIFIED | SESSION_LOG 2026-10-27 FND-006 |
 
-**Next unblocked:** FND-006 (jobs and stage keys), FND-008 (CLI skeleton), OPS-008 (git guard).
+**Next unblocked:** FND-008 (CLI skeleton), OPS-008 (git guard), then ING-001, SRC-001, DOC-002 (unaffected by the pending architecture proposal).

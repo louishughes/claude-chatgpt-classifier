@@ -12,6 +12,7 @@ from sqlalchemy import Engine
 
 # Import every module that defines tables, so autogenerate and the drift test
 # see the full schema.
+from knowledge_engine.infrastructure import jobs as _jobs  # noqa: F401
 from knowledge_engine.infrastructure import workspace as _workspace  # noqa: F401
 from knowledge_engine.infrastructure.db import Base
 

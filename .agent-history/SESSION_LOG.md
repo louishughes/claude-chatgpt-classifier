@@ -188,3 +188,31 @@ pytest -q               # 180 passed (60 new for EVAL-009)
 Mutation check: changing two answer-key numbers in committed manifests made 3 tests fail (count check, delta check, byte comparison); fixtures regenerated afterwards and all pass.
 
 **Next exact task:** FND-006 (processing jobs and stage keys).
+
+## 2026-10-27 · FND-006 — Processing jobs and fingerprint keys
+
+**Dependencies:** FND-003, FND-005 (both VERIFIED). **Status:** VERIFIED.
+
+**Changed files:** `src/knowledge_engine/orchestration/__init__.py`, `orchestration/stage_keys.py` (new), `infrastructure/jobs.py` (new), `infrastructure/migrations/versions/0002_jobs.py` (new), `migrations/env.py` (registers jobs), `domain/enums.py` (adds `JobState` and its transitions), `tests/unit/test_jobs.py` (new), `tests/unit/test_migrations.py` (see note), `STATUS.md`, `docs/TICKETS.csv` (FND-006 → VERIFIED).
+
+**Design choices:**
+- `stage_key(stage_id, input_hash, versions)` = `stg_` + full SHA-256 of `["ke-stage-v1", stage_id, input_hash, sorted(versions)]` (TR-03). `versions` must include `code`; prompt, taxonomy, config and model-policy versions are added by the stages that have them.
+- `jobs` table (migration `0002_jobs`): unique `stage_key`, CHECK constraints on state values and `attempts <= max_attempts`.
+- `JobRepository.claim()` is idempotent and reports a cache hit when the job already succeeded. `start/succeed/fail/skip` go through `check_transition`. `fail()` applies the owner's retry guardrail: `transient` back to pending while attempts remain (3 in total by default), `semantic` to `review_required` (never retried), `permanent` to `failed`.
+- Checkpoints are written in the caller's transaction, so they commit or roll back with the work. `recover_interrupted()` returns crashed `running` jobs to `pending`, keeping their checkpoint.
+- Results and errors hold summaries and short messages only, never source content.
+
+**Test change for owner review:** `test_there_is_exactly_one_head` in `tests/unit/test_migrations.py` (written in FND-004, not yet merged) pinned the head revision to `0001_baseline`, which every new migration would break. It now asserts that the single head equals the newest numbered migration file, so it keeps its meaning (one head, and it's the latest) without being edited for each migration. Recorded here because of the guardrail on changing existing tests.
+
+**Commands run:**
+```
+ruff check .            # All checks passed!
+ruff format --check .   # 33 files already formatted
+mypy                    # Success: no issues found in 26 source files
+pytest -q               # 202 passed (21 new for FND-006)
+```
+Fix attempt 1 of 3: starting a job that had already failed after 3 attempts raised "out of attempts" instead of "not pending"; `start()` now checks the state first.
+
+**Note:** an architecture-review proposal (pending owner decision) may merge the import, graph and identity classes. FND-006 is not affected. Until Louis decides, the next tickets are the ones the proposal doesn't touch: FND-008, OPS-008, ING-001, SRC-001, DOC-002.
+
+**Next exact task:** FND-008 — CLI skeleton (`ke`) with JSON/text output and exit codes.
