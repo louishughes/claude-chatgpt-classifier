@@ -396,3 +396,9 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "My repo checks itself before every commit. Staging a private file gets the commit refused."
 - "'.gitignore' is a suggestion. 'git add -f' ignores it. So I check the index."
+
+### 22:13 — Overnight: decisions taken for Louis
+**What:** Louis went to bed and handed over authority. The decisions taken on his behalf are written down in `docs/reviews/OPEN_DECISIONS.md` as "decided under delegated authority, revisitable": adopt the simpler import design (one graph module, one Import module), small PRs, merge when green, and a read-only check on his PC (Windows tests, plus the real key names of the split files, names only).
+**Why write it down:** a decision nobody can find later is a decision nobody can question. Recording who decided, when, and under what authority keeps the history honest.
+**Talking points:**
+- "When I act on delegated authority, I log it as delegated and reversible, not as the owner's own choice."
