@@ -101,7 +101,11 @@ Work in concrete file paths. Comments should explain *why* a non-obvious invaria
 
 ### Issue tracker
 
-Issues live in this repo's GitHub Issues (via the `gh` CLI). See `docs/agents/issue-tracker.md`.
+Issues live in this repo's GitHub Issues (via the `gh` CLI); `docs/TICKETS.csv` and `docs/ROADMAP_AND_TICKETS.md` are legacy reference only. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 

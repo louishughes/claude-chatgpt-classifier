@@ -13,6 +13,10 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 The GitHub repo is `louishughes/claude-chatgpt-classifier`. `gh` infers it from `git remote -v` when run inside a clone.
 
+## Legacy tickets in `docs/`
+
+`docs/TICKETS.csv` and `docs/ROADMAP_AND_TICKETS.md` predate this tracker. They are **reference material, not the tracker**: read them for scope, requirement IDs and prior thinking when charting a map or drafting tickets, but don't treat their structure, IDs or blocking edges as current. New and reworked tickets go to GitHub Issues; don't keep the legacy files in sync with them.
+
 ## Pull requests as a triage surface
 
 **PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_
