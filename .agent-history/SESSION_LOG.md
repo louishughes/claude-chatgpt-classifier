@@ -273,3 +273,28 @@ pytest -q               # 231 passed (10 new for OPS-008, using throwaway git re
 **Real split-wrapper keys (1158 wrapper files, 0 parse failures):** top level `conversation`, `conversation_id`, `title`, `create_time`, `date`, `filename`, `message_count`, `user_message_count`, `assistant_message_count`, `image_references`. The synthetic wrapper guessed `image_count` and lacked the role counts; it now uses the real names. 9 split fixture files regenerated; manifests and test expectations unchanged. 3 further JSON files look like an index/manifest (`conversations` array; `export_files`, `logical_files`, `manifest_file`, `version`); SRC-001 classifies them as non-conversation files. No official `conversations*.json` and no ZIPs in `raw/`.
 
 **Commands (Linux, after the fix):** ruff check OK; mypy OK (32 files); pytest 231 passed; fixtures regenerated with `python -m knowledge_engine.evaluation.synthetic tests/fixtures/chatgpt`.
+
+## 2026-10-27 · SRC-001 — Read-only raw source inventory and guard (slice S0)
+
+**Dependencies:** FND-002, FND-005, FND-008 (VERIFIED). **Status:** VERIFIED. **Branch:** `claude/project-thread-q0du34-src-001-v2`. First ticket under the adopted M1 consolidation (`docs/plans/M1_CONSOLIDATION.md`): the module lives at `ingestion/inventory.py` and the command is `ke raw inventory`.
+
+**Changed files:** `src/knowledge_engine/ingestion/__init__.py`, `ingestion/inventory.py` (new), `cli/main.py` (`ke raw inventory [--show-names] ROOT`), `tests/unit/test_inventory.py` (new), `STATUS.md`, diary.
+
+**Design choices:**
+- Folder or ZIP root. Every file gets size, SHA-256 and a `FileKind`: official conversations list, split conversation, bare native conversation, account metadata (by known export file names), export manifest (by key names seen in the real split export, REV-007), derived JSON, invalid JSON, HTML export, media (by magic bytes, not extension), archive, oversized (listed, never read), other.
+- "Is a conversation" means "has a `mapping` object", so derived files that mention conversations (an old classifier's output) are never parsed as chats.
+- Read-only proof: `tree_signature` (path, type, size, mtime of every entry) before and after; `unchanged=False` (or `RawTreeChangedError` in strict mode) if anything moved. The CLI exits 1 with `raw_changed` in that case. The report carries the "before" hash so a later import can compare.
+- Redacted by default: files appear as `f_` + 12 hex of the path's SHA-256; `--show-names` is for local use. Symlinks are skipped so nothing outside the root is read. ZIP members are read with a cap of limit+1 bytes so a member that lies about its size can't fill memory.
+- Known limit: each file is read whole (bounded by the configured limits). Streaming hashes for large media can come with MED-003 if EVAL-010 shows memory pressure.
+
+**Commands run:**
+```
+ruff check .            # All checks passed!
+ruff format --check .   # OK
+mypy                    # Success: no issues found in 35 source files
+pytest -q               # 264 passed (33 new for SRC-001, incl. byte-identical-after check on all 14 fixture cases)
+ke --json raw inventory tests/fixtures/chatgpt/split_wrapper/export   # detected chatgpt-split-v1, 3 conversations, 1 derived, no names
+```
+Fix attempts: 1 (my own new strict-mode test tampered only on the first run; it now writes a new file on every run).
+
+**Next exact task:** slice I1 (ING-001 archive + IMP-001 batch ledger) in `importer/`.

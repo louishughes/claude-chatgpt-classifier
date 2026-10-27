@@ -156,6 +156,31 @@ def _db_upgrade(settings: Settings, _args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _inventory(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    from knowledge_engine.ingestion.inventory import inventory
+
+    limit = max(settings.limits.max_source_file_bytes, settings.limits.max_media_file_bytes)
+    try:
+        report = inventory(args.root, max_bytes=limit)
+    except FileNotFoundError:
+        return CommandResult(
+            "raw inventory", ExitCode.USAGE, message="raw root not found", error_code="not_found"
+        )
+    data = report.to_dict(show_names=args.show_names)
+    if not args.json:
+        # The per-file rows are for scripts; people get the summary.
+        data.pop("entries")
+    if not report.unchanged:
+        return CommandResult(
+            "raw inventory",
+            ExitCode.ERROR,
+            data=data,
+            message="the raw root changed during the inventory; do not trust this report",
+            error_code="raw_changed",
+        )
+    return CommandResult("raw inventory", data=data, message="Raw source inventory (read-only)")
+
+
 def _not_built(name: str, ticket: str) -> Callable[[Settings, argparse.Namespace], CommandResult]:
     def handler(_settings: Settings, _args: argparse.Namespace) -> CommandResult:
         return CommandResult(
@@ -190,6 +215,15 @@ def build_parser() -> argparse.ArgumentParser:
     db_commands = db.add_subparsers(dest="db_command", metavar="ACTION", parser_class=_Parser)
     upgrade = db_commands.add_parser("upgrade", help="apply pending migrations")
     upgrade.set_defaults(handler=_db_upgrade)
+
+    raw = commands.add_parser("raw", help="read-only views of raw source folders")
+    raw_commands = raw.add_subparsers(dest="raw_command", metavar="ACTION", parser_class=_Parser)
+    inv = raw_commands.add_parser("inventory", help="list a raw folder or ZIP, metadata only")
+    inv.add_argument("root", type=Path, help="raw folder or export ZIP (never modified)")
+    inv.add_argument(
+        "--show-names", action="store_true", help="show real file names (local use only)"
+    )
+    inv.set_defaults(handler=_inventory)
 
     importer = commands.add_parser("import", help="import an export (not built yet)")
     importer.add_argument("source", type=Path, help="export ZIP or folder")
