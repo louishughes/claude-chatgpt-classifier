@@ -266,3 +266,17 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "A spike has to end. Decide what question it answers, and stop when the question changes."
 - "Seven cents and one evening bought me the lessons. The rest waits until the foundation exists."
 - "Know the difference between 'Claude checked it' and 'I checked it'."
+
+### 21:40 — Architecture check before writing any app code
+**What:** Louis asked whether an architecture review (Matt Pocock's "improve codebase architecture" skill) agrees with the plan. There's no app code yet, so the review looked at the planned module shapes for the first milestone and at the closed spike.
+**Verdict:** the direction holds up. Doing the plain, AI-free import first matches the evidence: every earlier failure was in the AI layer, and import bugs are cheapest to find before any model spend. The identity rules for re-imports (ADR-0003) are sound.
+**The concern:** the plan splits the import into many small classes, one ticket each, and the caller has to call them in the right order. The most important promise, "importing the same export twice adds nothing and costs nothing", has no single place that owns it. The review suggests:
+1. one *conversation graph* module that works out the active path, message numbers and branches in one place (it's currently planned in three);
+2. one deep *Import* module whose interface is "import this export, get a report", with the identity, hashing and locking hidden inside;
+3. a narrower adapter seam, since the two export formats only differ in how you find the conversations;
+4. postponing the internal event system until something actually needs it.
+Re-slicing the tickets would change the approved plan, so nothing was edited. It's Louis's call.
+**Talking points:**
+- "Small classes aren't the same as simple design. If the caller has to know the order to call five things, the complexity just moved."
+- "Put the most important guarantee behind one function, then test that function."
+- "I reviewed the architecture before writing the code, while changing it was still free."
