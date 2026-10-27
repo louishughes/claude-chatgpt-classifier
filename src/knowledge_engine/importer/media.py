@@ -49,9 +49,9 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from knowledge_engine.domain.enums import AssetAvailability, SourceSystem
-from knowledge_engine.domain.ids import asset_occurrence_id, media_asset_id
-from knowledge_engine.graph.nodes import AssetPointer
-from knowledge_engine.importer.archive import BlobStore, BlobTooLargeError, StoredBlob
+from knowledge_engine.domain.ids import asset_occurrence_id, media_asset_id, sha256_hex
+from knowledge_engine.graph.nodes import AssetPointer, canonical_json
+from knowledge_engine.importer.archive import BlobStore, BlobTooLargeError, StoredBlob, hash_file
 from knowledge_engine.infrastructure.db import Base
 from knowledge_engine.ingestion.inventory import sniff_media
 from knowledge_engine.ingestion.source import MediaFile
@@ -130,6 +130,9 @@ class AssetOccurrenceRow(Base):
     availability: Mapped[str] = mapped_column(String(12))
     # How many files matched the pointer: 0 missing, 1 available, 2+ ambiguous.
     candidate_count: Mapped[int] = mapped_column(Integer, default=0)
+    # Why the state was chosen (MED-002): the rule and the files considered.
+    # Private (file paths), so it stays in the workspace database.
+    evidence_json: Mapped[str | None] = mapped_column(Text, default=None)
     declared_size: Mapped[int | None] = mapped_column(Integer, default=None)
     declared_width: Mapped[int | None] = mapped_column(Integer, default=None)
     declared_height: Mapped[int | None] = mapped_column(Integer, default=None)
@@ -184,10 +187,39 @@ class MediaDelta:
         }
 
 
+@dataclass(frozen=True)
+class Resolution:
+    """Where a pointer led, and why (MED-002).
+
+    Attributes:
+        state: The availability state.
+        rule: The rule that decided it, e.g. ``file_id_name`` or
+            ``listed_but_absent``.
+        candidates: The media paths that matched, sorted. Private.
+        stored: The chosen file's blob and header bytes, when available.
+    """
+
+    state: AssetAvailability
+    rule: str
+    candidates: tuple[str, ...] = ()
+    stored: tuple[StoredBlob, bytes] | None = None
+
+    def evidence(self) -> str:
+        """Return the rule and candidates as canonical JSON."""
+        return canonical_json({"rule": self.rule, "candidates": list(self.candidates)})
+
+
 class MediaLibrary:
     """The media files of one source, matched and stored for one import."""
 
-    def __init__(self, root: Path, files: Sequence[MediaFile], store: BlobStore, mode: str) -> None:
+    def __init__(
+        self,
+        root: Path,
+        files: Sequence[MediaFile],
+        store: BlobStore,
+        mode: str,
+        declared: Sequence[str] = (),
+    ) -> None:
         """Index a source's media files.
 
         Args:
@@ -196,11 +228,13 @@ class MediaLibrary:
             store: Where copies go (``copy`` mode, and always for ZIP
                 members, which can't be referenced in place).
             mode: ``reference`` or ``copy`` (OD-02).
+            declared: File names an export manifest lists, present or not.
         """
         self._root = root
         self._store = store
         self._mode = mode
         self._by_name = sorted(files, key=lambda f: f.path)
+        self._declared = tuple(sorted(declared))
         self._stored: dict[str, tuple[StoredBlob, bytes]] = {}
 
     def candidates(self, file_id: str) -> list[MediaFile]:
@@ -216,11 +250,61 @@ class MediaLibrary:
         Returns:
             Matching files, sorted by path.
         """
-        return [
-            media
-            for media in self._by_name
-            if media.name == file_id or media.name.startswith((f"{file_id}-", f"{file_id}."))
-        ]
+        return [media for media in self._by_name if _belongs(media.name, file_id)]
+
+    def resolve(self, pointer: AssetPointer, conversation_native_id: str | None) -> Resolution:
+        """Decide which file, if any, a pointer refers to.
+
+        The rules, in order: a pointer without a recognised file ID is
+        ``unresolved``; no matching file is ``missing`` (noting whether an
+        export manifest listed it); one match is ``available``. Several
+        matches are narrowed only by safe evidence: exactly one inside a
+        folder named after the conversation, or all with identical bytes.
+        Otherwise the pointer is ``ambiguous``. Nothing is ever guessed.
+
+        Args:
+            pointer: The pointer from the message.
+            conversation_native_id: The conversation's own ID, for
+                per-conversation asset folders.
+
+        Returns:
+            The resolution, with the chosen file stored when available.
+        """
+        if pointer.file_id is None:
+            rule = "unknown_scheme" if pointer.scheme else "no_scheme"
+            return Resolution(AssetAvailability.UNRESOLVED, rule)
+        matches = self.candidates(pointer.file_id)
+        paths = tuple(m.path for m in matches)
+        if not matches:
+            listed = any(_belongs(name, pointer.file_id) for name in self._declared)
+            rule = "listed_but_absent" if listed else "no_matching_file"
+            return Resolution(AssetAvailability.MISSING, rule)
+        rule = "file_id_name"
+        if len(matches) > 1 and conversation_native_id:
+            own = [m for m in matches if conversation_native_id in PurePosixPath(m.path).parts[:-1]]
+            if len(own) == 1:
+                matches, rule = own, "conversation_folder"
+        try:
+            # Several files are only hashed, so nothing is stored for a
+            # pointer that turns out to be ambiguous.
+            if len(matches) > 1:
+                if len({self._fingerprint(m) for m in matches}) > 1:
+                    return Resolution(AssetAvailability.AMBIGUOUS, "several_files", paths)
+                rule = "identical_bytes"
+            stored = self.store(matches[0])
+        except BlobTooLargeError:
+            return Resolution(AssetAvailability.UNSUPPORTED, "too_large", paths)
+        return Resolution(AssetAvailability.AVAILABLE, rule, paths, stored)
+
+    def _fingerprint(self, media: MediaFile) -> str:
+        limit = self._store.max_bytes
+        if self._root.is_file():
+            with zipfile.ZipFile(self._root) as archive:
+                if limit is not None and archive.getinfo(media.path).file_size > limit:
+                    raise BlobTooLargeError("media file is over the size limit")
+                return sha256_hex(archive.read(media.path))
+        sha, _ = hash_file(self._root / PurePosixPath(media.path), max_bytes=limit)
+        return sha
 
     def store(self, media: MediaFile) -> tuple[StoredBlob, bytes]:
         """Store (or reference) one file, once per import.
@@ -265,6 +349,7 @@ def record_occurrences(
     *,
     workspace_id: str,
     import_id: str,
+    conversation_native_id: str | None = None,
 ) -> None:
     """Record every asset occurrence of some message revisions.
 
@@ -278,6 +363,8 @@ def record_occurrences(
         delta: Updated in place.
         workspace_id: The workspace.
         import_id: The running batch.
+        conversation_native_id: The conversation's own ID, used to prefer
+            a file inside that conversation's asset folder.
     """
     for revision_id, pointer in pointers:
         occurrence_key = asset_occurrence_id(revision_id, pointer.part_index, pointer.pointer)
@@ -285,9 +372,11 @@ def record_occurrences(
         if row is not None and row.availability == AssetAvailability.AVAILABLE.value:
             delta.availability[row.availability] += 1
             continue
-        asset_id, state, candidates = _resolve(
-            session, pointer, library, delta, workspace_id=workspace_id, import_id=import_id
+        resolution = library.resolve(pointer, conversation_native_id)
+        asset_id = _apply(
+            session, pointer, resolution, delta, workspace_id=workspace_id, import_id=import_id
         )
+        state, candidates = resolution.state, len(resolution.candidates)
         if row is None:
             session.add(
                 AssetOccurrenceRow(
@@ -299,6 +388,7 @@ def record_occurrences(
                     asset_id=asset_id,
                     availability=state.value,
                     candidate_count=candidates,
+                    evidence_json=resolution.evidence(),
                     declared_size=pointer.size_bytes,
                     declared_width=pointer.width,
                     declared_height=pointer.height,
@@ -307,37 +397,34 @@ def record_occurrences(
                 )
             )
             delta.new_occurrences += 1
-        elif row.availability != state.value or row.candidate_count != candidates:
+        elif row.availability != state.value or row.evidence_json != resolution.evidence():
             row.asset_id = asset_id
             row.availability = state.value
             row.candidate_count = candidates
+            row.evidence_json = resolution.evidence()
             row.resolved_import_id = import_id
         delta.availability[state.value] += 1
     session.flush()
 
 
-def _resolve(
+def _apply(
     session: Session,
     pointer: AssetPointer,
-    library: MediaLibrary,
+    resolution: Resolution,
     delta: MediaDelta,
     *,
     workspace_id: str,
     import_id: str,
-) -> tuple[str | None, AssetAvailability, int]:
+) -> str | None:
+    """Write the asset (and blob) a resolution implies; return the asset ID."""
     if pointer.file_id is None:
-        return None, AssetAvailability.UNRESOLVED, 0
+        return None
     asset = _asset(session, pointer.file_id, delta, workspace_id=workspace_id, import_id=import_id)
-    candidates = library.candidates(pointer.file_id)
-    if not candidates:
-        return asset.asset_id, AssetAvailability.MISSING, 0
-    if len(candidates) > 1:
-        return asset.asset_id, AssetAvailability.AMBIGUOUS, len(candidates)
-    try:
-        stored, head = library.store(candidates[0])
-    except BlobTooLargeError:
+    if resolution.state is AssetAvailability.UNSUPPORTED:
         delta.warnings["media_too_large"] += 1
-        return asset.asset_id, AssetAvailability.UNSUPPORTED, 1
+    if resolution.stored is None:
+        return asset.asset_id
+    stored, head = resolution.stored
     _blob(session, stored, head, delta, import_id=import_id)
     if asset.blob_sha256 is None:
         asset.blob_sha256 = stored.sha256
@@ -345,7 +432,7 @@ def _resolve(
         # Same file ID, different bytes: keep the first and flag it rather
         # than silently swapping evidence.
         delta.warnings["asset_bytes_changed"] += 1
-    return asset.asset_id, AssetAvailability.AVAILABLE, 1
+    return asset.asset_id
 
 
 def _asset(
@@ -387,6 +474,12 @@ def _blob(
     )
     session.flush()
     delta.new_blobs += 1
+
+
+def _belongs(name: str, file_id: str) -> bool:
+    # A name belongs to an ID when it is the ID or starts with the ID and a
+    # separator; without the separator ``file-abc`` would claim ``file-abcd``.
+    return name == file_id or name.startswith((f"{file_id}-", f"{file_id}."))
 
 
 def image_header(head: bytes) -> tuple[str | None, int | None, int | None]:

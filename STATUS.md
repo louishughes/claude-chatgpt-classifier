@@ -33,8 +33,9 @@ Live ticket status for the build. The full ticket list is `docs/TICKETS.csv` (ke
 | IMP-003 Message revision and graph delta engine | VERIFIED (slice I3) | SESSION_LOG 2026-10-27 IMP-003 |
 | MED-001 Media blob / asset / occurrence model | VERIFIED (slice M1: tables + derived-artefact table, nothing writes it yet) | SESSION_LOG 2026-10-27 MED-001 |
 | MED-003 Media dedup and header facts | VERIFIED (slice M1: one blob per byte content, occurrences per revision part, reference/copy modes) | SESSION_LOG 2026-10-27 MED-003 |
+| MED-002 Asset pointer resolver | VERIFIED (slice M2: unresolved/missing/ambiguous with evidence; manifest-listed-absent, conversation folders, identical bytes, attachments; real manifest shape to confirm at REV-009) | SESSION_LOG 2026-10-27 MED-002 |
 
-**Next unblocked:** media slice M2 (MED-002 pointer resolver: missing, ambiguous, unresolved with evidence), then I6 (ING-007 + IMP-005). Order and module layout follow docs/plans/M1_CONSOLIDATION.md (adopted).
+**Next unblocked:** slice I6 (ING-007 integrity reconciliation + IMP-005 import report, `ke imports report latest`), then R2 (MED-004), R3 (BRW-001), E (EVAL-010). Order and module layout follow docs/plans/M1_CONSOLIDATION.md (adopted).
 
 **Needs Louis (logged, skipped, not waited on):**
 - Wiring `ke import` to `import_source` means retiring `tests/unit/test_cli.py::test_import_is_an_honest_placeholder`, which asserts the placeholder. Changing an existing test needs your OK (guardrail). Until then, imports run through `import_source(...)` in Python.

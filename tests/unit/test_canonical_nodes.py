@@ -273,3 +273,25 @@ def test_any_content_is_handled_and_metadata_never_affects_content_hash(
     b = canonical_node("n", with_meta)
     assert a is not None and b is not None
     assert a.canonical_content_hash == b.canonical_content_hash
+
+
+def test_attachment_pointers_skip_ids_already_in_the_content() -> None:
+    from knowledge_engine.graph.nodes import attachment_pointers
+
+    message = {
+        "metadata": {
+            "attachments": [
+                {"id": "file-a", "name": "a.png"},
+                "not an attachment",
+                {"name": "no id"},
+                {"id": "file-b", "size": 5, "width": 2, "height": 3},
+            ]
+        }
+    }
+
+    pointers = attachment_pointers(message, ["file-a"])
+
+    assert [(p.pointer, p.part_index, p.size_bytes, p.width, p.height) for p in pointers] == [
+        ("attachment://file-b", 3, 5, 2, 3)
+    ]
+    assert attachment_pointers({"metadata": None}) == ()

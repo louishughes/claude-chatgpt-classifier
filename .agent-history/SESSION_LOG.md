@@ -529,3 +529,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - docs/plans/M1_CONSOLIDATION.md: amendment note on the I5 lock.
 - Tests: test_media_import.py (6), test_image_header.py (6). Full suite 497 passed, 6 skipped.
 - Next: slice M2 (MED-002).
+
+## 2026-10-27 23:57 MED-002 (slice M2)
+- MediaLibrary.resolve + Resolution (rules: no_scheme/unknown_scheme, no_matching_file/listed_but_absent, file_id_name, conversation_folder, identical_bytes, several_files, too_large); asset_occurrences.evidence_json (migration 0008). graph.nodes.attachment_pointers (metadata.attachments). SourceListing.declared_media from split-export index files (forgiving reader; entry shape to confirm at REV-009).
+- Tests: test_pointer_resolution.py (6), test_canonical_nodes.py +1. Full suite 504 passed, 6 skipped.
+- Next: slice I6 (ING-007 + IMP-005).

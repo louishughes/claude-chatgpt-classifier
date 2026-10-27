@@ -101,6 +101,7 @@ class ChatGPTSplitAdapter:
         root = folder.parent if folder != path else path
         files: list[SourceFile] = []
         warnings: list[ImportWarning] = [ImportWarning("format_lacks_account_id")]
+        declared: set[str] = set()
         for file in sorted(folder.glob("*.json")):
             rel = file.relative_to(root).as_posix()
             data = _read(file, max_bytes)
@@ -113,6 +114,7 @@ class ChatGPTSplitAdapter:
                 files.append(SourceFile(rel, sha256_of(data), len(data)))
             else:
                 warnings.append(ImportWarning("non_conversation_file_skipped", rel))
+                declared.update(_manifest_names(value))
 
         media = [
             MediaFile(p.relative_to(root).as_posix(), p.stat().st_size)
@@ -138,6 +140,7 @@ class ChatGPTSplitAdapter:
             media_files=tuple(media),
             warnings=tuple(warnings),
             reader=stream,
+            declared_media=tuple(sorted(declared)),
         )
 
 
@@ -150,6 +153,36 @@ def _conversation_folder(path: Path) -> Path | None:
     if any(path.glob("*.json")) and not (path / "conversations.json").exists():
         return path
     return None
+
+
+# Keys seen in the real export's index files (REV-007). Only key names are
+# known, not the entries' exact shape, so reading them is deliberately
+# forgiving: any string, or a dict's path/filename/name/file, counts.
+_MANIFEST_KEYS = ("export_files", "logical_files")
+_ENTRY_NAME_KEYS = ("path", "filename", "name", "file")
+
+
+def _manifest_names(value: Any) -> set[str]:
+    """Return the file names an export manifest lists (folders dropped)."""
+    if not isinstance(value, Mapping) or not value.keys() & {"manifest_file", *_MANIFEST_KEYS}:
+        return set()
+    names: set[str] = set()
+    for key in _MANIFEST_KEYS:
+        entries = value.get(key)
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            candidates = (
+                [entry]
+                if isinstance(entry, str)
+                else [entry.get(k) for k in _ENTRY_NAME_KEYS]
+                if isinstance(entry, Mapping)
+                else []
+            )
+            for name in candidates:
+                if isinstance(name, str) and name.strip():
+                    names.add(name.replace("\\", "/").rsplit("/", 1)[-1])
+    return names
 
 
 def _is_wrapper(value: Any) -> bool:

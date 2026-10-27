@@ -86,7 +86,11 @@ def run_import(
                 max_bytes=settings.limits.max_media_file_bytes,
             )
             library = MediaLibrary(
-                path, listing.media_files, media_store, settings.media_storage_mode
+                path,
+                listing.media_files,
+                media_store,
+                settings.media_storage_mode,
+                listing.declared_media,
             )
             return _run(
                 path, account_ns, listing, before, factory, archive, library, settings, full_export
@@ -225,6 +229,7 @@ def _run(
                     media,
                     workspace_id=workspace_id,
                     import_id=import_id,
+                    conversation_native_id=native_id,
                 )
 
     warnings.update(media.warnings)
