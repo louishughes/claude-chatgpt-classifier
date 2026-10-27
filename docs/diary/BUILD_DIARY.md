@@ -376,7 +376,7 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "Whether to redo work is a lookup: same fingerprint, same answer."
 - "Retry what might be temporary, review what might be wrong, never loop."
 
-### 21:49 — FND-008: the `ke` command
+### 21:44 — FND-008: the `ke` command
 **What:** Installing the package now gives a `ke` command. `ke status` shows the settings and database state, `ke db upgrade` sets up or updates the database, and `ke import` exists as a placeholder that says "not built yet" and exits with its own code. 19 new tests, 221 in total.
 **Key decisions and why:**
 - **Two output modes with a contract.** Plain text for people, and `--json` for scripts: exactly one line with sorted keys. Tests check the exact shape, so later scripts and smoke tests can rely on it.
@@ -387,3 +387,12 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "My CLI has a contract: text for people, one line of sorted JSON for scripts, and exit codes that never change meaning."
 - "Unbuilt commands are honest placeholders with their own exit code, not silent no-ops."
+
+### 21:45 — OPS-008: the repo refuses to publish private data
+**What:** Added a guard that runs before every commit. It refuses the commit if anything from `raw/`, `private/` or `workspace/`, or a local config file, is about to be committed. It also checks that every test fixture folder carries a `SYNTHETIC` marker. 10 new tests, 231 in total.
+**Why:** the repository is public and `raw/` holds Louis's real chats. `.gitignore` isn't enough on its own, because one `git add -f` bypasses it. The guard checks what's actually staged.
+**Nice detail:** when the guard complains, it names the folder, never the file, so its own error message can't leak a private file name. A test checks that too.
+**To do on Louis's PC:** run `git config core.hooksPath .githooks` once to switch the hook on.
+**Talking points:**
+- "My repo checks itself before every commit. Staging a private file gets the commit refused."
+- "'.gitignore' is a suggestion. 'git add -f' ignores it. So I check the index."

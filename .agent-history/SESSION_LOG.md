@@ -241,3 +241,25 @@ ke --help / ke --json status / ke import x / ke frob   # exit 0 / 0 / 4 / 2
 The tests include running the installed `ke` console script in a subprocess.
 
 **Next exact task:** OPS-008 — raw/private Git guard and fixture marker check.
+
+## 2026-10-27 · OPS-008 — Raw/private data Git guard and fixture redaction check
+
+**Dependencies:** FND-001 (VERIFIED). **Status:** VERIFIED.
+
+**Changed files:** `src/knowledge_engine/devtools/__init__.py`, `devtools/git_guard.py` (new), `.githooks/pre-commit` (new, executable), `tests/unit/test_git_guard.py` (new), `README.md` §9 (how to enable the hook), `STATUS.md`, `docs/TICKETS.csv` (OPS-008 → VERIFIED), diary (FND-008 entry time corrected from 21:49 to 21:44).
+
+**Design choices:**
+- Three rules: protected paths (`raw/`, `private/`, `workspace/`, `ke.toml`, `.env`) must be ignored (`git check-ignore --no-index`); nothing under them may be in the index, which covers committed and staged files and catches `git add -f`; every case folder under `tests/fixtures/<suite>/` must contain `SYNTHETIC`.
+- Output names protected paths and fixture folders only, never private file names (a test checks this).
+- Runs as `python -m knowledge_engine.devtools.git_guard [REPO]` (exit 0 clean, 1 problems, 2 usage/not a repo), from the test suite against this repository, and as a pre-commit hook once `git config core.hooksPath .githooks` is set. The hook is not enabled in the cloud container (its `python` doesn't have the package); README tells Louis how to enable it on his PC.
+
+**Commands run:**
+```
+python -m knowledge_engine.devtools.git_guard   # git guard: OK ... (exit 0)
+ruff check .            # All checks passed!
+ruff format --check .   # 39 files already formatted
+mypy                    # Success: no issues found in 32 source files
+pytest -q               # 231 passed (10 new for OPS-008, using throwaway git repos)
+```
+
+**Next exact task:** ING-001 (archive storage and checksums), SRC-001 (raw inventory) or DOC-002 (renderer). ING-002 onwards waits for the owner's decision on the architecture proposal.

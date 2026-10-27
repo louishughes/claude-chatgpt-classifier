@@ -142,4 +142,11 @@ pip install -e ".[dev]"
 ruff check . && ruff format --check . && mypy && pytest
 ```
 
+Turn on the commit guard once per clone (it refuses commits that would include `raw/`, `private/`, `workspace/`, `ke.toml` or `.env`, and checks fixtures are marked synthetic):
+
+```bash
+git config core.hooksPath .githooks
+python -m knowledge_engine.devtools.git_guard   # run it by hand any time
+```
+
 Coding and comment rules are in `docs/CODE_STYLE.md`. Ticket progress is in `STATUS.md`.
