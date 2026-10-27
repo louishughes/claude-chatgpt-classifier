@@ -1,0 +1,15 @@
+{
+  "fixture_format_version": 1,
+  "case": "id_collision",
+  "synthetic": true,
+  "layout": "official",
+  "proves": "Two different chats share a conversation ID; a third has none. Candidates for review, never an automatic merge.",
+  "expected": {
+    "conversations_in_file": 3,
+    "candidate_matches": {
+      "id_collision": 1,
+      "missing_native_id": 1
+    },
+    "merged": 0
+  }
+}

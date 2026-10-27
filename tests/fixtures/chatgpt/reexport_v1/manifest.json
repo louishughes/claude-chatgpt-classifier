@@ -1,0 +1,11 @@
+{
+  "fixture_format_version": 1,
+  "case": "reexport_v1",
+  "synthetic": true,
+  "layout": "official",
+  "proves": "Baseline export: four chats.",
+  "expected": {
+    "conversations": 4,
+    "messages": 12
+  }
+}

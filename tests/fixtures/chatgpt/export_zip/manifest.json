@@ -1,0 +1,28 @@
+{
+  "fixture_format_version": 1,
+  "case": "export_zip",
+  "synthetic": true,
+  "layout": "official_zip",
+  "proves": "Official export as a ZIP file.",
+  "expected": {
+    "conversations": 3,
+    "mapping_nodes": 15,
+    "messages": 12,
+    "branch_points": {
+      "edit": 0,
+      "regeneration": 1
+    },
+    "active_path_messages": {
+      "c0000001-0000-4000-8000-000000000001": 5,
+      "c0000001-0000-4000-8000-000000000002": 3,
+      "c0000001-0000-4000-8000-000000000003": 3
+    },
+    "asset_occurrences": {
+      "available": 1
+    },
+    "assets": 1,
+    "image_files": 1,
+    "derived_artifacts": 0,
+    "warnings": []
+  }
+}

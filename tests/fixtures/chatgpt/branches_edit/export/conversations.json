@@ -1,0 +1,169 @@
+[
+  {
+    "title": "Synthetic edited question",
+    "create_time": 1704326400.0,
+    "update_time": 1704326760.0,
+    "mapping": {
+      "c0000002-0000-4000-8000-000000000001-root": {
+        "id": "c0000002-0000-4000-8000-000000000001-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000002-0000-4000-8000-000000000001-sys"
+        ]
+      },
+      "c0000002-0000-4000-8000-000000000001-sys": {
+        "id": "c0000002-0000-4000-8000-000000000001-sys",
+        "message": {
+          "id": "c0000002-0000-4000-8000-000000000001-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704326460.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000002-0000-4000-8000-000000000001-root",
+        "children": [
+          "c0000002-0000-4000-8000-000000000001-u0",
+          "edit-u0b"
+        ]
+      },
+      "c0000002-0000-4000-8000-000000000001-u0": {
+        "id": "c0000002-0000-4000-8000-000000000001-u0",
+        "message": {
+          "id": "c0000002-0000-4000-8000-000000000001-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704326520.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic original question?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000002-0000-4000-8000-000000000001-sys",
+        "children": [
+          "c0000002-0000-4000-8000-000000000001-a0"
+        ]
+      },
+      "c0000002-0000-4000-8000-000000000001-a0": {
+        "id": "c0000002-0000-4000-8000-000000000001-a0",
+        "message": {
+          "id": "c0000002-0000-4000-8000-000000000001-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704326580.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer to original."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000002-0000-4000-8000-000000000001-u0",
+        "children": []
+      },
+      "edit-u0b": {
+        "id": "edit-u0b",
+        "message": {
+          "id": "edit-u0b",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704326640.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic edited question?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000002-0000-4000-8000-000000000001-sys",
+        "children": [
+          "edit-a0b"
+        ]
+      },
+      "edit-a0b": {
+        "id": "edit-a0b",
+        "message": {
+          "id": "edit-a0b",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704326700.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer to edit."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "edit-u0b",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "edit-a0b",
+    "plugin_ids": null,
+    "conversation_id": "c0000002-0000-4000-8000-000000000001",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000002-0000-4000-8000-000000000001"
+  }
+]

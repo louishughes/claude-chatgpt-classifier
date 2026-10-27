@@ -1,0 +1,84 @@
+# pyproject.toml is the single place that describes this Python project:
+# its name, which Python it needs, its dependencies, and how the tools
+# (pytest, ruff, mypy) are configured. Keeping all of that in one file
+# means a newcomer only has to read one thing to know how the repo works.
+
+[build-system]
+# Hatchling turns the code in src/ into an installable package.
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "knowledge-engine"
+version = "0.0.1"
+description = "Local-first, provenance-preserving knowledge engine for exported AI conversations."
+readme = "README.md"
+requires-python = ">=3.12"
+# Runtime dependencies are added by the ticket that first needs them
+# (Pydantic in FND-002, SQLAlchemy in FND-003, and so on), so every
+# dependency can be traced back to a reason.
+dependencies = [
+    "pydantic>=2.9,<3",           # typed, validated data models (FND-002 onwards)
+    "pydantic-settings>=2.6,<3",  # settings from env vars and config files (FND-002)
+    "sqlalchemy>=2.0.36,<2.1",    # database access and transactions (FND-003)
+    "alembic>=1.14,<2",           # versioned schema migrations (FND-004)
+]
+
+[project.scripts]
+# Installing the package creates a `ke` command that runs this function.
+ke = "knowledge_engine.cli.main:run"
+
+[project.optional-dependencies]
+# Tools needed to develop and test, but not to run the package.
+# Install with: pip install -e ".[dev]"
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.8",
+    "mypy>=1.13",
+    "hypothesis>=6.115",  # property-based tests: random inputs, checked invariants
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/knowledge_engine"]
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+# Only collect the real test suite. The throwaway classification spike
+# under prototype/ has its own tests and its own dependencies.
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--import-mode=importlib"]
+
+# ------------------------------------------------------------------ ruff
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+# The spike is throwaway code and is not held to the package's rules.
+# Code snippets inside docs/ are illustrations, not code we run.
+extend-exclude = ["prototype", "docs"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",  # pycodestyle: basic formatting errors
+    "F",       # pyflakes: unused imports, undefined names
+    "I",       # isort: consistent import order
+    "B",       # bugbear: common bug patterns
+    "UP",      # pyupgrade: modern Python syntax
+    "D",       # pydocstyle: docstrings (see docs/CODE_STYLE.md)
+]
+
+[tool.ruff.lint.pydocstyle]
+# Google style: "Args:", "Returns:", "Raises:" sections.
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# Tests explain themselves through their names; docstrings are optional there.
+"tests/**" = ["D"]
+
+# ------------------------------------------------------------------ mypy
+[tool.mypy]
+# Strict typing is the main fix for the earlier attempt's "not type-safe"
+# problem: mistakes show up before the code runs, not on real data.
+strict = true
+python_version = "3.12"
+files = ["src", "tests"]

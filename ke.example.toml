@@ -1,0 +1,30 @@
+# Example engine configuration (FND-002). Copy to ke.toml and edit.
+# ke.toml is git-ignored because it names folders on your machine.
+# Never put API keys here: set ANTHROPIC_API_KEY as an environment variable.
+
+# Where the database, media store and generated notes go. Keep it inside the
+# project folder (git-ignored) and outside every raw root.
+workspace_root = "workspace"
+
+# "reference" keeps images where they are and checks their hash on each
+# import; "copy" copies them into the workspace (OD-02).
+media_storage_mode = "reference"
+
+# Everything that leaves this machine is off until switched on here.
+[egress]
+text_llm = false
+embedding = false
+vision = false
+network_fetch = false
+transcript_fetch = false
+
+[limits]
+max_conversations_per_batch = 50
+max_model_calls_per_run = 0
+max_cost_usd_per_run = 0.0
+
+# One block per read-only source folder.
+[[raw_roots]]
+path = "raw"
+account_namespace = "louis-personal"
+source_format = "chatgpt-split-v1"

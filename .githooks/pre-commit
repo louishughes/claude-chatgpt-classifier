@@ -1,0 +1,7 @@
+#!/bin/sh
+# Refuse a commit that would publish private data (OPS-008).
+# Enable once per clone with:  git config core.hooksPath .githooks
+python -m knowledge_engine.devtools.git_guard || {
+  echo "Commit blocked by the git guard. See the problems above." >&2
+  exit 1
+}

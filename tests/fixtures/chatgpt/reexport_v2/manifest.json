@@ -1,0 +1,33 @@
+{
+  "fixture_format_version": 1,
+  "case": "reexport_v2",
+  "synthetic": true,
+  "layout": "official",
+  "proves": "Imported after reexport_v1: exact delta categories, nothing deleted.",
+  "expected": {
+    "conversations": 4,
+    "delta_vs": "reexport_v1",
+    "conversation_delta": {
+      "new": 1,
+      "unchanged": 1,
+      "revised": 2,
+      "not_seen": 1
+    },
+    "conversation_delta_by_id": {
+      "c0000005-0000-4000-8000-00000000000a": "unchanged",
+      "c0000005-0000-4000-8000-00000000000b": "revised",
+      "c0000005-0000-4000-8000-00000000000c": "revised",
+      "c0000005-0000-4000-8000-00000000000d": "not_seen",
+      "c0000005-0000-4000-8000-00000000000e": "new"
+    },
+    "message_delta": {
+      "new": 5,
+      "revised": 1,
+      "unchanged": 8,
+      "not_seen": 3
+    },
+    "new_branches": 1,
+    "new_media": 1,
+    "model_calls_triggered": 0
+  }
+}

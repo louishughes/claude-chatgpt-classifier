@@ -1,0 +1,111 @@
+{
+  "conversation_id": "c0000007-0000-4000-8000-000000000002",
+  "title": "Synthetic same title",
+  "create_time": 1705449600.0,
+  "date": "2024-01-17",
+  "filename": "2024-01-17.synthetic-same-title-2.json",
+  "message_count": 3,
+  "user_message_count": 1,
+  "assistant_message_count": 1,
+  "image_references": 0,
+  "conversation": {
+    "title": "Synthetic same title",
+    "create_time": 1705449600.0,
+    "update_time": 1705449840.0,
+    "mapping": {
+      "c0000007-0000-4000-8000-000000000002-root": {
+        "id": "c0000007-0000-4000-8000-000000000002-root",
+        "message": null,
+        "parent": null
+      },
+      "c0000007-0000-4000-8000-000000000002-sys": {
+        "id": "c0000007-0000-4000-8000-000000000002-sys",
+        "message": {
+          "id": "c0000007-0000-4000-8000-000000000002-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705449660.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000007-0000-4000-8000-000000000002-root"
+      },
+      "c0000007-0000-4000-8000-000000000002-u0": {
+        "id": "c0000007-0000-4000-8000-000000000002-u0",
+        "message": {
+          "id": "c0000007-0000-4000-8000-000000000002-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705449720.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic twin question B?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000007-0000-4000-8000-000000000002-sys"
+      },
+      "c0000007-0000-4000-8000-000000000002-a0": {
+        "id": "c0000007-0000-4000-8000-000000000002-a0",
+        "message": {
+          "id": "c0000007-0000-4000-8000-000000000002-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705449780.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic twin answer B."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000007-0000-4000-8000-000000000002-u0"
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000007-0000-4000-8000-000000000002-a0",
+    "plugin_ids": null,
+    "conversation_id": "c0000007-0000-4000-8000-000000000002",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000007-0000-4000-8000-000000000002"
+  }
+}

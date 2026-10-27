@@ -1,0 +1,121 @@
+[
+  {
+    "title": "Synthetic unchanged chat",
+    "create_time": 1704758400.0,
+    "update_time": 1705067199.0,
+    "mapping": {
+      "c0000005-0000-4000-8000-00000000000a-root": {
+        "id": "c0000005-0000-4000-8000-00000000000a-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000005-0000-4000-8000-00000000000a-sys"
+        ]
+      },
+      "c0000005-0000-4000-8000-00000000000a-sys": {
+        "id": "c0000005-0000-4000-8000-00000000000a-sys",
+        "message": {
+          "id": "c0000005-0000-4000-8000-00000000000a-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704758460.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {
+            "model_slug": "synthetic-model-2",
+            "finish_details": {}
+          },
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000005-0000-4000-8000-00000000000a-root",
+        "children": [
+          "c0000005-0000-4000-8000-00000000000a-u0"
+        ]
+      },
+      "c0000005-0000-4000-8000-00000000000a-u0": {
+        "id": "c0000005-0000-4000-8000-00000000000a-u0",
+        "message": {
+          "id": "c0000005-0000-4000-8000-00000000000a-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704758520.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic A question?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {
+            "model_slug": "synthetic-model-2",
+            "finish_details": {}
+          },
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000005-0000-4000-8000-00000000000a-sys",
+        "children": [
+          "c0000005-0000-4000-8000-00000000000a-a0"
+        ]
+      },
+      "c0000005-0000-4000-8000-00000000000a-a0": {
+        "id": "c0000005-0000-4000-8000-00000000000a-a0",
+        "message": {
+          "id": "c0000005-0000-4000-8000-00000000000a-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704758580.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic A answer."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {
+            "model_slug": "synthetic-model-2",
+            "finish_details": {}
+          },
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000005-0000-4000-8000-00000000000a-u0",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000005-0000-4000-8000-00000000000a-a0",
+    "plugin_ids": null,
+    "conversation_id": "c0000005-0000-4000-8000-00000000000a",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model-2",
+    "id": "c0000005-0000-4000-8000-00000000000a"
+  }
+]

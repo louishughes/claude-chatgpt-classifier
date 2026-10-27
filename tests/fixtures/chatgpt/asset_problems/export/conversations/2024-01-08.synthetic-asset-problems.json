@@ -1,0 +1,121 @@
+{
+  "conversation_id": "c0000004-0000-4000-8000-000000000001",
+  "title": "Synthetic asset problems",
+  "create_time": 1704672000.0,
+  "date": "2024-01-08",
+  "filename": "2024-01-08.synthetic-asset-problems.json",
+  "message_count": 2,
+  "user_message_count": 1,
+  "assistant_message_count": 0,
+  "image_references": 4,
+  "conversation": {
+    "title": "Synthetic asset problems",
+    "create_time": 1704672000.0,
+    "update_time": 1704672180.0,
+    "mapping": {
+      "c0000004-0000-4000-8000-000000000001-root": {
+        "id": "c0000004-0000-4000-8000-000000000001-root",
+        "message": null,
+        "parent": null
+      },
+      "c0000004-0000-4000-8000-000000000001-sys": {
+        "id": "c0000004-0000-4000-8000-000000000001-sys",
+        "message": {
+          "id": "c0000004-0000-4000-8000-000000000001-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704672060.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000004-0000-4000-8000-000000000001-root"
+      },
+      "miss-u0": {
+        "id": "miss-u0",
+        "message": {
+          "id": "miss-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704672120.0,
+          "update_time": null,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "image_asset_pointer",
+                "asset_pointer": "file-service://file-SYNMISSING",
+                "size_bytes": 0,
+                "width": 4,
+                "height": 4,
+                "fovea": null,
+                "metadata": null
+              },
+              {
+                "content_type": "image_asset_pointer",
+                "asset_pointer": "weird-scheme://abc",
+                "size_bytes": 0,
+                "width": 4,
+                "height": 4,
+                "fovea": null,
+                "metadata": null
+              },
+              {
+                "content_type": "image_asset_pointer",
+                "asset_pointer": "file-service://file-SYN0005",
+                "size_bytes": 0,
+                "width": 4,
+                "height": 4,
+                "fovea": null,
+                "metadata": null
+              },
+              {
+                "content_type": "audio_asset_pointer",
+                "asset_pointer": "sediment://file_00000000synthaudio",
+                "size_bytes": 0,
+                "width": 4,
+                "height": 4,
+                "fovea": null,
+                "metadata": null
+              },
+              "Synthetic: four broken references."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000004-0000-4000-8000-000000000001-sys"
+      }
+    },
+    "moderation_results": [],
+    "current_node": "miss-u0",
+    "plugin_ids": null,
+    "conversation_id": "c0000004-0000-4000-8000-000000000001",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000004-0000-4000-8000-000000000001"
+  }
+}

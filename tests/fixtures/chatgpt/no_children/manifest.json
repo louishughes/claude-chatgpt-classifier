@@ -1,0 +1,14 @@
+{
+  "fixture_format_version": 1,
+  "case": "no_children",
+  "synthetic": true,
+  "layout": "official",
+  "proves": "Official layout without children lists: children are rebuilt from parent links.",
+  "expected": {
+    "conversations": 1,
+    "branch_points": {
+      "edit": 0,
+      "regeneration": 1
+    }
+  }
+}

@@ -1,0 +1,140 @@
+[
+  {
+    "title": "Synthetic branched chat",
+    "create_time": 1704240000.0,
+    "update_time": 1704240300.0,
+    "mapping": {
+      "c0000001-0000-4000-8000-000000000003-root": {
+        "id": "c0000001-0000-4000-8000-000000000003-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000001-0000-4000-8000-000000000003-sys"
+        ]
+      },
+      "c0000001-0000-4000-8000-000000000003-sys": {
+        "id": "c0000001-0000-4000-8000-000000000003-sys",
+        "message": {
+          "id": "c0000001-0000-4000-8000-000000000003-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704240060.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000001-0000-4000-8000-000000000003-root",
+        "children": [
+          "c0000001-0000-4000-8000-000000000003-u0"
+        ]
+      },
+      "c0000001-0000-4000-8000-000000000003-u0": {
+        "id": "c0000001-0000-4000-8000-000000000003-u0",
+        "message": {
+          "id": "c0000001-0000-4000-8000-000000000003-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704240120.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000001-0000-4000-8000-000000000003-sys",
+        "children": [
+          "c0000001-0000-4000-8000-000000000003-a0",
+          "c0000001-0000-4000-8000-000000000003-a0-regen"
+        ]
+      },
+      "c0000001-0000-4000-8000-000000000003-a0": {
+        "id": "c0000001-0000-4000-8000-000000000003-a0",
+        "message": {
+          "id": "c0000001-0000-4000-8000-000000000003-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704240180.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic first answer."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000001-0000-4000-8000-000000000003-u0",
+        "children": []
+      },
+      "c0000001-0000-4000-8000-000000000003-a0-regen": {
+        "id": "c0000001-0000-4000-8000-000000000003-a0-regen",
+        "message": {
+          "id": "c0000001-0000-4000-8000-000000000003-a0-regen",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704240240.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic regenerated answer."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000001-0000-4000-8000-000000000003-u0",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000001-0000-4000-8000-000000000003-a0-regen",
+    "plugin_ids": null,
+    "conversation_id": "c0000001-0000-4000-8000-000000000003",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000001-0000-4000-8000-000000000003"
+  }
+]

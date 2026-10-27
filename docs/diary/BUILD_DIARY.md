@@ -285,6 +285,136 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "Seven cents and one evening bought me the lessons. The rest waits until the foundation exists."
 - "Know the difference between 'Claude checked it' and 'I checked it'."
 
+### 20:53 — First real code: FND-001, the project skeleton
+**What:** Started milestone M1, the foundation: importing chats, keeping branches, handling re-imports and linking images. It's plain code with no AI. The first ticket only sets up the skeleton: a `pyproject.toml` that describes the project, an empty `knowledge_engine` package in a `src/` folder, three tests, and three checking tools. `ruff` checks style and, importantly, that every public function has a plain-English docstring. `mypy` checks types strictly. `pytest` runs the tests. A new `docs/CODE_STYLE.md` writes down the comment rules, including a "Talking points" list at the top of every module.
+**Why this way:**
+- The `src/` layout forces tests to use the installed package, the same way a user would get it. That catches "works on my machine" packaging mistakes early.
+- No libraries were added yet. Each one arrives with the ticket that needs it, so every dependency has a reason.
+- Strict type checking was chosen because the earlier attempt was "not type-safe", and mistakes are cheaper to catch before the code runs on real data.
+- The docstring rule is checked by a tool, not just written down. I proved it by adding a function without a docstring and watching the check fail.
+**Problem hit:** the formatter also tried to reformat Python examples inside the Markdown docs. Fixed by excluding `docs/` from the code tools, because those snippets are illustrations, not code we run.
+**What I learned:** what `pyproject.toml` is for, what an "editable install" (`pip install -e`) does, and why linters and type checkers run before the tests.
+**Talking points:**
+- "Day one of the real build was boring on purpose: a skeleton, three tools, and a written style guide."
+- "My style rules are enforced by a linter, not by good intentions."
+- "Every dependency arrives with the ticket that needs it."
+
+### 20:57 — FND-002: settings, with privacy switched on by default
+**What:** Added one settings object that holds every switch and limit the engine uses. It can be filled from a `ke.toml` file, from environment variables, or from code. There's a commented example in `ke.example.toml`. 36 new tests, 39 in total, all passing.
+**Key decisions and why:**
+- **Everything that leaves the PC has its own off switch:** text AI, embeddings, image analysis, web fetches and transcript fetches. All five ship switched off. Turning on the text model does *not* turn on image analysis. That's the privacy promise from the plan, enforced in code.
+- **The settings refuse a workspace inside the raw folder.** "Never write to raw/" is now a check, not just a rule in a document. A test even tries to sneak past it with `..` in the path.
+- **API keys can only come from environment variables.** If a key turns up in the config file, the engine refuses to start, and the error message names the setting without printing the key. Config files get copied and committed; environment variables don't.
+- **Settings are frozen** after loading, so nothing can flip a switch halfway through a run.
+- Used two plan defaults Louis accepted by starting M1: images stay where they are and get hash-checked (OD-02), and each raw folder gets an account label such as `louis-personal` (OD-03).
+**Problem hit:** a misspelt environment variable is silently ignored by the settings library. It fails safe, because the switch stays off, but it's logged as a known limitation.
+**What I learned:** Pydantic validation, `SecretStr`, how config sources get layered in priority order, and why `extra="forbid"` catches typos.
+**Talking points:**
+- "Privacy by default isn't a policy page, it's five booleans that default to False, plus tests."
+- "My config refuses to let the app write inside the folder holding my private data."
+- "API keys never go in config files. My app checks that and refuses to start."
+
+### 21:00 — FND-003: the local database
+**What:** Added the SQLite database layer and the first table, `workspaces`. 15 new tests, 54 in total, all passing.
+**Key decisions and why:**
+- **Foreign keys switched on for every connection.** SQLite ignores them unless asked, which surprises a lot of people. A test checks it's really on.
+- **WAL mode**, so a reader (say, the note renderer) can keep reading while an import writes.
+- **One all-or-nothing transaction block** that every write goes through: commit if it finishes, roll back on any error. Re-imports and resume-after-crash (IMP-004) depend on it.
+- **Writers take the lock at the start** (`BEGIN IMMEDIATE`). Otherwise two writers can each wait for the other halfway through. To prove the test actually checks this, I broke the code on purpose and watched that one test go red. That's called a mutation check.
+- The workspace ID is random and never built from its name, so renaming can't change identity.
+**Problem to watch:** Louis's project lives on drive `V:`. If that's a network drive, SQLite's WAL mode can be unsafe there. I'll check it during the first run on his PC.
+**Housekeeping:** the times on the two earlier entries from this session were ahead of the clock. Corrected to 20:53 and 20:57.
+**What I learned:** what a transaction is, what rollback means in practice, and why SQLite needs a few switches turned on before it's safe.
+**Talking points:**
+- "Every write in my app is all-or-nothing. A crash can't leave half an import behind."
+- "I broke my own code on purpose to prove the test would catch it."
+- "SQLite is a real database if you configure it. Foreign keys and WAL mode are two lines that matter."
+
+### 21:03 — FND-004: version control for the database
+**What:** Added Alembic migrations. A migration is a numbered script that changes the database's shape and can undo the change. The first one, `0001_baseline`, creates the `workspaces` table. 7 new tests, 61 in total.
+**Key decisions and why:**
+- **The migrations ship inside the package.** An installed copy can upgrade its own database without hunting for extra files. I proved it by building the package, installing it into a fresh environment and migrating a new database.
+- **A "drift" test** compares the migrated database with the Python table definitions. If someone changes a table and forgets the migration, the test fails. I checked that by adding a column without a migration and watching it go red.
+- **Upgrade twice** is a no-op the second time. Running the same step twice with the same result is called idempotency, and it's the theme of the whole import design.
+**Problem hit:** the Python cache folders (`__pycache__`) had been committed in the first three tickets, because the main `.gitignore` didn't list them. They're untracked now, and it's fixed for the future. It was a small slip, but a reminder to check `git status` before every commit.
+**What I learned:** what a schema migration is, upgrade vs downgrade, and why constraint names matter (you can't drop a constraint you can't name).
+**Talking points:**
+- "My database schema is versioned like my code: numbered, reversible and tested."
+- "One test makes sure the code and the database can never disagree about a table."
+- "I check that the installed package works, not just the source folder."
+
+### 21:08 — FND-005: IDs that survive re-imports
+**What:** Wrote the code that gives every conversation, message, message version, image and link a permanent ID. Added the fixed lists of states, such as "new / unchanged / revised / not seen", and four core data shapes. 59 new tests, 120 in total.
+**Key decisions and why:**
+- **An ID is a hash of what a thing *is*.** For example: "conversation `abc` from ChatGPT in account `louis-personal`". Import the same export twice and you get the same IDs, so there are no duplicates. This is the heart of the re-import design.
+- **Titles are never part of an ID**, so renaming a chat can't turn it into a new chat.
+- **The same image in three messages** is one asset with three "occurrences". Each message keeps its own link.
+- **Property-based tests** (the Hypothesis library) throw hundreds of random inputs at the ID rules and check they always hold, for example that different native IDs never share an ID.
+- **One pinned ID value** in the tests. If someone changes the ID recipe by accident, that test fails, because changing it would silently change every stored ID.
+- **Scope note for Louis:** the old ticket also listed "Segment" and "KnowledgeRecord". I left those for the AI milestone (M3), because the spike showed their shape still needs to change. The acceptance test is unchanged.
+**Owner input:** Louis confirmed `V:` is a local disk, so the database can live in the project folder safely.
+**What I learned:** hashing as identity, why key boundaries matter (`"ab"+"c"` vs `"a"+"bc"`), and property-based testing.
+**Talking points:**
+- "Re-import safety comes down to one idea: IDs come from identity, not from timing."
+- "I let a library generate hundreds of random test cases to try to break my ID rules."
+- "One test pins an exact ID value, because changing the recipe would quietly change every stored ID."
+
+### 21:38 — Louis: "We need to do all the milestones." EVAL-009: fake exports to test against
+**Decision:** Louis wants the whole roadmap built, not just the import foundation. So the plan is to keep going ticket by ticket through all six milestones. The approval points stay in place: I'll still ask before the first paid AI run, before any feature that goes online, and before anything that deletes data.
+**What:** Built a generator for fake ChatGPT exports and committed 14 test cases made with it. Together they cover every export layout (one file, numbered shards, a ZIP, and the per-chat files like the current `raw/` folder) and the awkward situations: an edited question, regenerated answers, one image used three times, a missing image, a chat that disappears from the next export, two chats with the same title, and two different chats claiming the same ID. Each case has an answer key written by hand. 60 new tests, 180 in total.
+**Key decisions and why:**
+- **Generated, not hand-written.** Same seed, same bytes, on any machine. A test rebuilds the fixtures and compares them byte by byte with the committed ones. Even the tiny PNG images are written uncompressed for this reason, because compressed bytes can differ between library versions.
+- **The tests count with their own simple reader**, not the generator's code. Otherwise a bug in the generator would agree with itself.
+- **Every piece of text says "Synthetic"**, and a test checks it. It's a cheap guard against real data slipping into a public repo.
+**Honest gap:** I don't know the exact field names in the split files, apart from `title` and `conversation`. They're inferred from the audit's description, and I've flagged them for a key-names-only check on Louis's PC later.
+**What I learned:** what a test fixture is, why determinism matters for tests, and how a ZIP or PNG file is put together.
+**Talking points:**
+- "My importer is tested against 14 fake exports covering every awkward case I could find in the real data, without committing a single real message."
+- "The tests use their own tiny reader to check the answer keys, so the test data can't mark its own homework."
+- "When I wasn't sure of a real file format, I wrote that down instead of pretending."
+
+### 21:39 — Decision: no more paid API calls
+**What Louis decided:** stop using the paid Claude API. Everything runs locally, or through Claude Code sessions on his existing subscription.
+**What changes:** nothing for the first two milestones, which are plain code anyway. For the AI milestones, the code still talks to a "model provider" interface and is tested with fake providers. When real judgement on his chats is needed, a Claude Code session on his PC will do that step directly and write checked results into the private workspace. The app then validates those results exactly as it would an API response. The "send text to an AI" switch stays off.
+**Why it's a reasonable call:** it caps cost at zero. The interface design means the AI step can be swapped later without rewriting anything, and the earlier spike already answered the "is the API reliable" question for 7 cents.
+**Talking points:**
+- "I designed the AI step behind an interface, so switching from a paid API to a subscription workflow changed a policy, not the code."
+- "Zero marginal cost was a deliberate constraint, not an afterthought."
+
+### 21:42 — FND-006: never do the same work twice
+**What:** Added a jobs table and a "stage key". Every piece of work gets a fingerprint made from its input and the versions of everything that could change the result. Same fingerprint means the saved result is reused. 21 new tests, 202 in total.
+**Key decisions and why:**
+- **Retries follow Louis's guardrails exactly.** Errors that might go away (a timeout, broken JSON) get up to 3 attempts in total. A doubtful *answer* goes straight to review and is never retried. A real bug fails at once.
+- **Checkpoints are saved in the same transaction as the work.** If the app crashes, the checkpoint and the data can't disagree. A test fakes a crash and checks that the job resumes from the right place.
+- **The database checks too.** It refuses an unknown job state or more attempts than allowed, even if the Python code had a bug.
+**Problem hit:** a job that had already failed three times said "out of attempts" when restarted, instead of "this job is finished". The message is accurate, but it's the wrong reason. Fixed by checking the state first.
+**Flagged for Louis:** I changed one of my own earlier tests, still unmerged, that pinned the database version to "1". Every new table would have broken it. It now checks "there is exactly one latest version", which is what it really meant.
+**Also happening:** a separate architecture review has proposed merging some of the planned import classes into fewer, bigger modules. Until Louis decides, I'm working on tickets the proposal doesn't touch.
+**Talking points:**
+- "Whether to redo work is a lookup: same fingerprint, same answer."
+- "Retry what might be temporary, review what might be wrong, never loop."
+
+### 21:44 — FND-008: the `ke` command
+**What:** Installing the package now gives a `ke` command. `ke status` shows the settings and database state, `ke db upgrade` sets up or updates the database, and `ke import` exists as a placeholder that says "not built yet" and exits with its own code. 19 new tests, 221 in total.
+**Key decisions and why:**
+- **Two output modes with a contract.** Plain text for people, and `--json` for scripts: exactly one line with sorted keys. Tests check the exact shape, so later scripts and smoke tests can rely on it.
+- **Fixed exit codes.** 0 OK, 2 typo, 3 bad config, 4 not built yet, 5 blocked by a privacy switch. A script can react without reading the message.
+- **Status never prints private paths or keys.** Raw folders show up by their account label only, and the key shows as yes or no. A test plants a fake key and a private-looking folder name and checks neither appears.
+- Used Python's built-in `argparse` instead of a CLI library: one less dependency, and it's easy to explain.
+**What I learned:** console scripts in `pyproject.toml`, exit codes, and why machine-readable output needs a fixed schema.
+**Talking points:**
+- "My CLI has a contract: text for people, one line of sorted JSON for scripts, and exit codes that never change meaning."
+- "Unbuilt commands are honest placeholders with their own exit code, not silent no-ops."
+
+### 21:45 — OPS-008: the repo refuses to publish private data
+**What:** Added a guard that runs before every commit. It refuses the commit if anything from `raw/`, `private/` or `workspace/`, or a local config file, is about to be committed. It also checks that every test fixture folder carries a `SYNTHETIC` marker. 10 new tests, 231 in total.
+**Why:** the repository is public and `raw/` holds Louis's real chats. `.gitignore` isn't enough on its own, because one `git add -f` bypasses it. The guard checks what's actually staged.
+**Nice detail:** when the guard complains, it names the folder, never the file, so its own error message can't leak a private file name. A test checks that too.
+**To do on Louis's PC:** run `git config core.hooksPath .githooks` once to switch the hook on.
+**Talking points:**
+- "My repo checks itself before every commit. Staging a private file gets the commit refused."
+- "'.gitignore' is a suggestion. 'git add -f' ignores it. So I check the index."
+
 ### 21:51 — The backlog moves into GitHub Issues
 **What:** Louis said yes to turning every planned ticket into a GitHub Issue, across all milestones. The spec had 122 tickets, but they only lived in two docs (`docs/ROADMAP_AND_TICKETS.md` and `docs/TICKETS.csv`), even though we had picked GitHub Issues as the tracker. Now there are six milestone issues, M1 to M6 (#4–#9), with 122 ticket issues under them as sub-issues (#10–#132; #113 is a pull request from another thread). Each ticket's title starts with its ID, for example "FND-005: Domain models and stable identifiers". Each one has a summary, a checklist of acceptance criteria, its priority and phase, and a link back to its section in the roadmap. The first line lists its blockers as issue numbers, like "Blocked by: #12, #14". FND-001 to FND-005 (#10–#14) are marked as built in PR #3, waiting for review, rather than closed.
 **Challenges:**
@@ -311,14 +441,11 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "The cheapest fix on the list is thirty minutes of my own time: approve the answer key so the AI stops marking its own homework."
 - "An agent can write eight thousand lines in an hour. The question is whether I can explain them in an interview."
 
-### 22:20 — Turning the review into tickets, with Louis asleep
-**What:** Louis asked for tickets and a plan from the direction review, and for other agents to implement them. Then he went to bed with one instruction: don't ask, you have the authority. So the plan (`docs/plans/REVIEW_ACTION_PLAN.md`) records each decision taken tonight as "owner authority 22:10", so he can reverse any of them in the morning, and the one thing only he can do (marking the answer key) is a ticket assigned to him, not a question.
-**Tickets:** REV-001 to REV-009 as GitHub Issues #135–#143 under map #134, with the M1 and M3 ones also under their milestone maps. Six are agent work tonight (scope commitment, ADR-0009 for the no-API model step, M1 consolidation design, PR-size and teach-back rules, closing the ADR/decision record, a paid-call guard on the spike). One needs the PC (Windows run, key-name check), one waits for the parser (early real-data checkpoint), one waits for Louis (answer key).
-**Decision taken under authority:** commit to M1 and M2; M3 to M6 stay roadmap and get re-planned at gate G2. The licence was deliberately *not* chosen: it's a legal call he should make awake.
-**Conflict rule:** the foundation thread owns `src/`, `tests/` and the status files. Review tickets touch only docs, ADRs and the throwaway spike, so several agents can run at once without stepping on each other.
+### 22:13 — Overnight: decisions taken for Louis
+**What:** Louis went to bed and handed over authority. The decisions taken on his behalf are written down in `docs/reviews/OPEN_DECISIONS.md` as "decided under delegated authority, revisitable": adopt the simpler import design (one graph module, one Import module), small PRs, merge when green, and a read-only check on his PC (Windows tests, plus the real key names of the split files, names only).
+**Why write it down:** a decision nobody can find later is a decision nobody can question. Recording who decided, when, and under what authority keeps the history honest.
 **Talking points:**
-- "Delegating overnight works if every decision is labelled with who made it and when, so it can be undone."
-- "Tickets with a finish line and a 'don't touch' list are how you run several agents in parallel safely."
+- "When I act on delegated authority, I log it as delegated and reversible, not as the owner's own choice."
 
 ### 22:16 — Committing to two milestones, not six (REV-001)
 **What:** Before going to bed, Louis asked for the direction review to be turned into tickets and implemented by agents, and gave blanket authority for the night ("do not ask me anything"). The first ticket narrows the commitment. Only M1 (importing chats faithfully) and M2 (links, YouTube and social registries) are committed now. M3 to M6 stay on the roadmap but get re-planned at gate G2, once real-data results exist. Thirteen product tickets (the web API, PostgreSQL, multi-user accounts, packaging and integrations) are labelled `parked` in GitHub Issues. Nothing was closed or renumbered.
@@ -327,6 +454,15 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "Keeping a ticket isn't the same as committing to it. I parked a third of the roadmap without deleting anything."
 - "Re-plan with real data. The plan for the AI milestones gets rewritten after the import works on my actual export."
+
+### 22:20 — Turning the review into tickets, with Louis asleep
+**What:** Louis asked for tickets and a plan from the direction review, and for other agents to implement them. Then he went to bed with one instruction: don't ask, you have the authority. So the plan (`docs/plans/REVIEW_ACTION_PLAN.md`) records each decision taken tonight as "owner authority 22:10", so he can reverse any of them in the morning, and the one thing only he can do (marking the answer key) is a ticket assigned to him, not a question.
+**Tickets:** REV-001 to REV-009 as GitHub Issues #135–#143 under map #134, with the M1 and M3 ones also under their milestone maps. Six are agent work tonight (scope commitment, ADR-0009 for the no-API model step, M1 consolidation design, PR-size and teach-back rules, closing the ADR/decision record, a paid-call guard on the spike). One needs the PC (Windows run, key-name check), one waits for the parser (early real-data checkpoint), one waits for Louis (answer key).
+**Decision taken under authority:** commit to M1 and M2; M3 to M6 stay roadmap and get re-planned at gate G2. The licence was deliberately *not* chosen: it's a legal call he should make awake.
+**Conflict rule:** the foundation thread owns `src/`, `tests/` and the status files. Review tickets touch only docs, ADRs and the throwaway spike, so several agents can run at once without stepping on each other.
+**Talking points:**
+- "Delegating overnight works if every decision is labelled with who made it and when, so it can be undone."
+- "Tickets with a finish line and a 'don't touch' list are how you run several agents in parallel safely."
 
 ### 22:25 — A lock on the paid API (REV-008)
 **What:** Earlier tonight Louis decided: no more paid API calls for now, do the work locally or with Claude inside the subscription. But the spike's real provider still built an Anthropic client straight from `ANTHROPIC_API_KEY`, which is set on his PC. One wrong command (forgetting `--provider fake` or `--dry-run`) would have spent money. So the rule became code: `AnthropicProvider` now refuses to start unless the environment variable `SPIKE_ALLOW_PAID=1` is set, and the error message names Louis's decision and the switch. The check runs before the SDK is even imported. Only the exact value `1` counts, so `0`, `true` or an empty value all keep it locked. `--dry-run` and the fake provider work as before without the switch.
@@ -379,3 +515,13 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "An AI can write eight thousand lines in an hour. My rule: if I can't explain a module in three sentences, it doesn't merge."
 - "Small PRs aren't about tidiness. They're the only way the reviewer actually reviews."
+
+### 23:15 — Windows check, the real file shapes, and PR #3's teach-back (REV-007)
+**What:** A read-only check on Louis's PC ran the whole test suite on Windows (230 of 231 passed) and listed the key *names* in his real split files (no values, no titles). Both findings are fixed on PR #3.
+**Challenges:**
+- The one Windows failure: rebuilding the test ZIP gave different bytes. Everything inside was identical except one header field that records which operating system built the ZIP (0 for Windows, 3 for Unix). The builder now pins it to 3, so the fixture is byte-identical everywhere.
+- The fake split files had guessed two key names wrong (`image_count` instead of `image_references`, and no per-role message counts). They now use the real names, before any importer code relies on the guess.
+**Teach-back (PR #3, module `domain/ids.py`, exception to the new two-ticket rule because it predates it):** "Every record gets an ID made by hashing the facts that define it, like the account and the conversation's own ID from ChatGPT, never its title or the import time. So importing the same export twice produces the same IDs, and the database's unique keys turn a would-be duplicate into a no-op. Each kind of thing has its own prefix and key layout, so a message ID can never collide with a conversation ID."
+**Talking points:**
+- "Test on the machine you ship to. One header byte broke a 'byte-identical' test on Windows."
+- "I checked my fake data against the real files' structure, names only, before building on it."

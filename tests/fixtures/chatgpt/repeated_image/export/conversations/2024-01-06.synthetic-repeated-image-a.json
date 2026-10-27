@@ -1,0 +1,155 @@
+{
+  "conversation_id": "c0000003-0000-4000-8000-000000000001",
+  "title": "Synthetic repeated image A",
+  "create_time": 1704499200.0,
+  "date": "2024-01-06",
+  "filename": "2024-01-06.synthetic-repeated-image-a.json",
+  "message_count": 4,
+  "user_message_count": 2,
+  "assistant_message_count": 1,
+  "image_references": 2,
+  "conversation": {
+    "title": "Synthetic repeated image A",
+    "create_time": 1704499200.0,
+    "update_time": 1704499500.0,
+    "mapping": {
+      "c0000003-0000-4000-8000-000000000001-root": {
+        "id": "c0000003-0000-4000-8000-000000000001-root",
+        "message": null,
+        "parent": null
+      },
+      "c0000003-0000-4000-8000-000000000001-sys": {
+        "id": "c0000003-0000-4000-8000-000000000001-sys",
+        "message": {
+          "id": "c0000003-0000-4000-8000-000000000001-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704499260.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000003-0000-4000-8000-000000000001-root"
+      },
+      "rep-u0": {
+        "id": "rep-u0",
+        "message": {
+          "id": "rep-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704499320.0,
+          "update_time": null,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "image_asset_pointer",
+                "asset_pointer": "file-service://file-SYN0001",
+                "size_bytes": 0,
+                "width": 4,
+                "height": 4,
+                "fovea": null,
+                "metadata": null
+              },
+              "Synthetic: first look."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000003-0000-4000-8000-000000000001-sys"
+      },
+      "rep-a0": {
+        "id": "rep-a0",
+        "message": {
+          "id": "rep-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704499380.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic reply."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "rep-u0"
+      },
+      "rep-u1": {
+        "id": "rep-u1",
+        "message": {
+          "id": "rep-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704499440.0,
+          "update_time": null,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "image_asset_pointer",
+                "asset_pointer": "file-service://file-SYN0001",
+                "size_bytes": 0,
+                "width": 4,
+                "height": 4,
+                "fovea": null,
+                "metadata": null
+              },
+              "Synthetic: same image again."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "rep-a0"
+      }
+    },
+    "moderation_results": [],
+    "current_node": "rep-u1",
+    "plugin_ids": null,
+    "conversation_id": "c0000003-0000-4000-8000-000000000001",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000003-0000-4000-8000-000000000001"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "fixture_format_version": 1,
+  "case": "asset_problems",
+  "synthetic": true,
+  "layout": "split",
+  "proves": "Each non-available state appears once, with evidence and no invented path.",
+  "expected": {
+    "conversations": 1,
+    "image_files": 2,
+    "asset_occurrences": {
+      "missing": 2,
+      "unresolved": 1,
+      "ambiguous": 1
+    },
+    "occurrence_states_by_pointer": {
+      "file-service://file-SYNMISSING": "missing",
+      "weird-scheme://abc": "unresolved",
+      "file-service://file-SYN0005": "ambiguous",
+      "sediment://file_00000000synthaudio": "missing"
+    },
+    "note": "The audio pointer is 'missing': audio is not in raw/ (OD-10)."
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "conversation_id": "c0000003-0000-4000-8000-000000000002",
+  "title": "Synthetic repeated image B",
+  "create_time": 1704585600.0,
+  "date": "2024-01-07",
+  "filename": "2024-01-07.synthetic-repeated-image-b.json",
+  "message_count": 2,
+  "user_message_count": 1,
+  "assistant_message_count": 0,
+  "image_references": 3,
+  "conversation": {
+    "title": "Synthetic repeated image B",
+    "create_time": 1704585600.0,
+    "update_time": 1704585780.0,
+    "mapping": {
+      "c0000003-0000-4000-8000-000000000002-root": {
+        "id": "c0000003-0000-4000-8000-000000000002-root",
+        "message": null,
+        "parent": null
+      },
+      "c0000003-0000-4000-8000-000000000002-sys": {
+        "id": "c0000003-0000-4000-8000-000000000002-sys",
+        "message": {
+          "id": "c0000003-0000-4000-8000-000000000002-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704585660.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000003-0000-4000-8000-000000000002-root"
+      },
+      "rep2-u0": {
+        "id": "rep2-u0",
+        "message": {
+          "id": "rep2-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704585720.0,
+          "update_time": null,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "image_asset_pointer",
+                "asset_pointer": "file-service://file-SYN0001",
+                "size_bytes": 0,
+                "width": 4,
+                "height": 4,
+                "fovea": null,
+                "metadata": null
+              },
+              {
+                "content_type": "image_asset_pointer",
+                "asset_pointer": "file-service://file-SYN0003",
+                "size_bytes": 0,
+                "width": 4,
+                "height": 4,
+                "fovea": null,
+                "metadata": null
+              },
+              {
+                "content_type": "image_asset_pointer",
+                "asset_pointer": "sediment://file_00000000synthetic0004",
+                "size_bytes": 0,
+                "width": 4,
+                "height": 4,
+                "fovea": null,
+                "metadata": null
+              },
+              "Synthetic: three images."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000003-0000-4000-8000-000000000002-sys"
+      }
+    },
+    "moderation_results": [],
+    "current_node": "rep2-u0",
+    "plugin_ids": null,
+    "conversation_id": "c0000003-0000-4000-8000-000000000002",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000003-0000-4000-8000-000000000002"
+  }
+}

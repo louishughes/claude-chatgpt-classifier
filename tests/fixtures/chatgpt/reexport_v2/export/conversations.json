@@ -1,0 +1,508 @@
+[
+  {
+    "title": "Synthetic unchanged chat",
+    "create_time": 1704758400.0,
+    "update_time": 1704758640.0,
+    "mapping": {
+      "c0000005-0000-4000-8000-00000000000a-root": {
+        "id": "c0000005-0000-4000-8000-00000000000a-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000005-0000-4000-8000-00000000000a-sys"
+        ]
+      },
+      "c0000005-0000-4000-8000-00000000000a-sys": {
+        "id": "c0000005-0000-4000-8000-00000000000a-sys",
+        "message": {
+          "id": "c0000005-0000-4000-8000-00000000000a-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704758460.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000005-0000-4000-8000-00000000000a-root",
+        "children": [
+          "c0000005-0000-4000-8000-00000000000a-u0"
+        ]
+      },
+      "c0000005-0000-4000-8000-00000000000a-u0": {
+        "id": "c0000005-0000-4000-8000-00000000000a-u0",
+        "message": {
+          "id": "c0000005-0000-4000-8000-00000000000a-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704758520.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic A question?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000005-0000-4000-8000-00000000000a-sys",
+        "children": [
+          "c0000005-0000-4000-8000-00000000000a-a0"
+        ]
+      },
+      "c0000005-0000-4000-8000-00000000000a-a0": {
+        "id": "c0000005-0000-4000-8000-00000000000a-a0",
+        "message": {
+          "id": "c0000005-0000-4000-8000-00000000000a-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704758580.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic A answer."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000005-0000-4000-8000-00000000000a-u0",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000005-0000-4000-8000-00000000000a-a0",
+    "plugin_ids": null,
+    "conversation_id": "c0000005-0000-4000-8000-00000000000a",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000005-0000-4000-8000-00000000000a"
+  },
+  {
+    "title": "Synthetic growing chat",
+    "create_time": 1704844800.0,
+    "update_time": 1704845160.0,
+    "mapping": {
+      "c0000005-0000-4000-8000-00000000000b-root": {
+        "id": "c0000005-0000-4000-8000-00000000000b-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000005-0000-4000-8000-00000000000b-sys"
+        ]
+      },
+      "c0000005-0000-4000-8000-00000000000b-sys": {
+        "id": "c0000005-0000-4000-8000-00000000000b-sys",
+        "message": {
+          "id": "c0000005-0000-4000-8000-00000000000b-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704844860.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000005-0000-4000-8000-00000000000b-root",
+        "children": [
+          "c0000005-0000-4000-8000-00000000000b-u0"
+        ]
+      },
+      "c0000005-0000-4000-8000-00000000000b-u0": {
+        "id": "c0000005-0000-4000-8000-00000000000b-u0",
+        "message": {
+          "id": "c0000005-0000-4000-8000-00000000000b-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704844920.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic B question?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000005-0000-4000-8000-00000000000b-sys",
+        "children": [
+          "c0000005-0000-4000-8000-00000000000b-a0"
+        ]
+      },
+      "c0000005-0000-4000-8000-00000000000b-a0": {
+        "id": "c0000005-0000-4000-8000-00000000000b-a0",
+        "message": {
+          "id": "c0000005-0000-4000-8000-00000000000b-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704844980.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic B answer."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000005-0000-4000-8000-00000000000b-u0",
+        "children": [
+          "c0000005-0000-4000-8000-00000000000b-u1"
+        ]
+      },
+      "c0000005-0000-4000-8000-00000000000b-u1": {
+        "id": "c0000005-0000-4000-8000-00000000000b-u1",
+        "message": {
+          "id": "c0000005-0000-4000-8000-00000000000b-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704845040.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic B follow-up?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000005-0000-4000-8000-00000000000b-a0",
+        "children": [
+          "c0000005-0000-4000-8000-00000000000b-a1"
+        ]
+      },
+      "c0000005-0000-4000-8000-00000000000b-a1": {
+        "id": "c0000005-0000-4000-8000-00000000000b-a1",
+        "message": {
+          "id": "c0000005-0000-4000-8000-00000000000b-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704845100.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic B follow-up answer."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000005-0000-4000-8000-00000000000b-u1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000005-0000-4000-8000-00000000000b-a1",
+    "plugin_ids": null,
+    "conversation_id": "c0000005-0000-4000-8000-00000000000b",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000005-0000-4000-8000-00000000000b"
+  },
+  {
+    "title": "Synthetic edited chat",
+    "create_time": 1704931200.0,
+    "update_time": 1704931500.0,
+    "mapping": {
+      "c0000005-0000-4000-8000-00000000000c-root": {
+        "id": "c0000005-0000-4000-8000-00000000000c-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000005-0000-4000-8000-00000000000c-sys"
+        ]
+      },
+      "c0000005-0000-4000-8000-00000000000c-sys": {
+        "id": "c0000005-0000-4000-8000-00000000000c-sys",
+        "message": {
+          "id": "c0000005-0000-4000-8000-00000000000c-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704931260.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000005-0000-4000-8000-00000000000c-root",
+        "children": [
+          "c0000005-0000-4000-8000-00000000000c-u0"
+        ]
+      },
+      "c0000005-0000-4000-8000-00000000000c-u0": {
+        "id": "c0000005-0000-4000-8000-00000000000c-u0",
+        "message": {
+          "id": "c0000005-0000-4000-8000-00000000000c-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704931320.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic C question?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000005-0000-4000-8000-00000000000c-sys",
+        "children": [
+          "c0000005-0000-4000-8000-00000000000c-a0",
+          "c-regen"
+        ]
+      },
+      "c0000005-0000-4000-8000-00000000000c-a0": {
+        "id": "c0000005-0000-4000-8000-00000000000c-a0",
+        "message": {
+          "id": "c0000005-0000-4000-8000-00000000000c-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704931380.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic C answer, revised."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000005-0000-4000-8000-00000000000c-u0",
+        "children": []
+      },
+      "c-regen": {
+        "id": "c-regen",
+        "message": {
+          "id": "c-regen",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1704931440.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic C regenerated."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000005-0000-4000-8000-00000000000c-u0",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c-regen",
+    "plugin_ids": null,
+    "conversation_id": "c0000005-0000-4000-8000-00000000000c",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000005-0000-4000-8000-00000000000c"
+  },
+  {
+    "title": "Synthetic new chat",
+    "create_time": 1705104000.0,
+    "update_time": 1705104180.0,
+    "mapping": {
+      "c0000005-0000-4000-8000-00000000000e-root": {
+        "id": "c0000005-0000-4000-8000-00000000000e-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000005-0000-4000-8000-00000000000e-sys"
+        ]
+      },
+      "c0000005-0000-4000-8000-00000000000e-sys": {
+        "id": "c0000005-0000-4000-8000-00000000000e-sys",
+        "message": {
+          "id": "c0000005-0000-4000-8000-00000000000e-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705104060.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000005-0000-4000-8000-00000000000e-root",
+        "children": [
+          "e-u0"
+        ]
+      },
+      "e-u0": {
+        "id": "e-u0",
+        "message": {
+          "id": "e-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705104120.0,
+          "update_time": null,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "image_asset_pointer",
+                "asset_pointer": "file-service://file-SYN0002",
+                "size_bytes": 0,
+                "width": 4,
+                "height": 4,
+                "fovea": null,
+                "metadata": null
+              },
+              "Synthetic E with image."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000005-0000-4000-8000-00000000000e-sys",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "e-u0",
+    "plugin_ids": null,
+    "conversation_id": "c0000005-0000-4000-8000-00000000000e",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000005-0000-4000-8000-00000000000e"
+  }
+]
