@@ -88,6 +88,8 @@ If required documents are absent: record exact missing paths, apply conservative
 ## 4. Future implementation workflow (only after plan approval)
 
 - Follow one unblocked ticket at a time, unless the explicitly approved plan contains a tightly scoped multi-ticket slice.
+- A PR carries at most two tickets (one by default); more needs the owner's OK in the thread (`AGENTS.md` owner guardrail 4).
+- Teach-back before merge: before a PR that adds or changes code merges, the owner (or, under blanket authority, the thread) picks one module from it, and that ticket's diary entry gets a **Teach-back** line explaining the module in three plain sentences, as the owner would say it in an interview. If it can't be done in three sentences, the code comments need work before merging. (REV-005, 2026-10-27.)
 - Tickets live in GitHub Issues (`docs/agents/issue-tracker.md`); the CSV and roadmap Markdown are frozen reference and are not updated.
 - Before each ticket read its latest dependency chain, acceptance checks and relevant skills from `docs/.claude/skills/`, `docs/skills/`, or current canonical skill path.
 - Make bounded edits. Unit tests and fixture-based integration tests prove invariants; do not begin unbounded test generation, architecture replacement or prompt rewriting.
