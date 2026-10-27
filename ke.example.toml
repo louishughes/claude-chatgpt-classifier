@@ -22,6 +22,7 @@ transcript_fetch = false
 max_conversations_per_batch = 50
 max_model_calls_per_run = 0
 max_cost_usd_per_run = 0.0
+import_lock_timeout_s = 600.0
 
 # One block per read-only source folder.
 [[raw_roots]]

@@ -157,6 +157,8 @@ class Limits(BaseModel):
             means no model calls at all.
         max_cost_usd_per_run: Hard spending cap per run. Zero means nothing
             may be spent.
+        import_lock_timeout_s: How long an import waits for another import
+            into the same workspace to finish (IMP-004).
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -166,6 +168,7 @@ class Limits(BaseModel):
     max_conversations_per_batch: int = Field(default=50, gt=0, le=10_000)
     max_model_calls_per_run: int = Field(default=0, ge=0)
     max_cost_usd_per_run: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
+    import_lock_timeout_s: float = Field(default=600.0, ge=0.0, allow_inf_nan=False)
 
 
 class Settings(BaseSettings):

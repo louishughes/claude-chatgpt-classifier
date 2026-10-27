@@ -4,11 +4,12 @@ One call does, in order:
 
 1. fingerprint the raw tree (read-only proof, before);
 2. pick the adapter and list the source;
-3. open a batch in the ledger and snapshot every input file;
-4. write conversations in groups, one transaction per group, each opened
+3. take the workspace's import lock, so imports run one at a time;
+4. open a batch in the ledger and snapshot every input file;
+5. write conversations in groups, one transaction per group, each opened
    with SQLite's write lock (``BEGIN IMMEDIATE``), so a crash loses at
    most the group in progress;
-5. fingerprint the raw tree again and close the batch with its counts.
+6. fingerprint the raw tree again and close the batch with its counts.
 
 Re-running after a crash is the resume: groups already committed come
 back ``unchanged`` and cost nothing (M1_CONSOLIDATION §5).
@@ -40,6 +41,7 @@ from knowledge_engine.importer.delta import (
 )
 from knowledge_engine.importer.identity import CandidateReason, conversation_hash, record_candidate
 from knowledge_engine.importer.ledger import ImportBatchRow, ImportLedger
+from knowledge_engine.importer.lock import import_lock
 from knowledge_engine.importer.report import ImportReport
 from knowledge_engine.infrastructure.db import SessionFactory, create_sqlite_engine, database_path
 from knowledge_engine.infrastructure.migrations import upgrade_to_head
@@ -65,17 +67,20 @@ def run_import(
     adapter = select_adapter(path, default_adapters(), format_id)
     listing = adapter.open(path, max_bytes=settings.limits.max_source_file_bytes)
 
-    settings.workspace_root.mkdir(parents=True, exist_ok=True)
-    engine = create_sqlite_engine(database_path(settings))
-    try:
-        upgrade_to_head(engine)
-        factory = SessionFactory(engine)
-        archive = BlobStore(
-            settings.workspace_root / "archive", max_bytes=settings.limits.max_source_file_bytes
-        )
-        return _run(path, account_ns, listing, before, factory, archive, settings, full_export)
-    finally:
-        engine.dispose()
+    # The whole import holds the workspace lock: "running means crashed" and
+    # "not touched by this import means not seen" both assume it's alone.
+    with import_lock(settings.workspace_root, timeout_s=settings.limits.import_lock_timeout_s):
+        engine = create_sqlite_engine(database_path(settings))
+        try:
+            upgrade_to_head(engine)
+            factory = SessionFactory(engine)
+            archive = BlobStore(
+                settings.workspace_root / "archive",
+                max_bytes=settings.limits.max_source_file_bytes,
+            )
+            return _run(path, account_ns, listing, before, factory, archive, settings, full_export)
+        finally:
+            engine.dispose()
 
 
 def _run(
