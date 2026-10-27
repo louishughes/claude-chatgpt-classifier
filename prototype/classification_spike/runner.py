@@ -9,6 +9,12 @@ How one conversation is handled
    was wrong. Still broken -> ``review_required`` (a human looks later).
 4. Refusal -> recorded as ``refusal``. Configuration error -> stop the run.
 
+Retries are only for *transport* problems (timeouts, overload) and *format*
+problems (the answer broke the schema). A label that is well-formed but wrong
+is never retried: asking again just produces another variation of the same
+mistake. Wrong answers are found by the gold set and fixed by changing the
+method, not by looping.
+
 Every result is appended to a JSONL file as soon as it finishes. If the run
 crashes or is stopped, running it again skips everything already done.
 
@@ -77,7 +83,10 @@ class Record:
     turns: int = 0
     branch_points: int = 0
     decisions_total: int = 0
-    decisions_quote_found: int = 0
+    decisions_quote_found: int = 0       # quote appears in a message by the stated speaker
+    decisions_user_accepted: int = 0
+    decisions_assistant_accepted_unquoted: int = 0  # "accepted" with only assistant evidence
+    position: int = 0                    # order this chat was processed in (order-independence check)
     error: str = ""
 
 
@@ -85,19 +94,32 @@ def _normalise(s: str) -> str:
     return " ".join(s.split()).lower()
 
 
-def check_quotes(record: Record, full_text: str) -> None:
-    """Does each decision's evidence quote really appear in the chat?
+def check_quotes(record: Record, conv: Conversation) -> None:
+    """Does each decision's evidence quote really appear, said by the right speaker?
 
-    This catches the model inventing evidence, the core risk for a knowledge
-    base. We check against the full text, not the clipped text.
+    This catches the model inventing evidence or putting the assistant's words
+    in the user's mouth, the two failures that most damage a knowledge base.
+    We check against the full chat, not the clipped text sent to the model.
     """
     if not record.label:
         return
-    haystack = _normalise(full_text)
-    for d in record.label.get("user_decisions", []):
+    by_speaker = {
+        role: _normalise("\n".join(t.text for t in conv.turns if t.role == role))
+        for role in ("user", "assistant")
+    }
+    for d in record.label.get("decisions", []):
         record.decisions_total += 1
-        if _normalise(d.get("evidence_quote", "")) and _normalise(d["evidence_quote"]) in haystack:
+        quote = _normalise(d.get("evidence_quote", ""))
+        if quote and quote in by_speaker.get(d.get("evidence_speaker"), ""):
             record.decisions_quote_found += 1
+        if d.get("state") == "accepted":
+            if d.get("evidence_speaker") == "user":
+                record.decisions_user_accepted += 1
+            else:
+                # Accepted, but the only evidence is the assistant talking.
+                # Not necessarily wrong ("Agreed, we'll do X" after the user
+                # chose X), but worth counting.
+                record.decisions_assistant_accepted_unquoted += 1
 
 
 def label_one(
@@ -163,7 +185,7 @@ def label_one(
         rec.label = result.label.model_dump(mode="json")
         rec.repaired = repair_note is not None
         rec.status = "ok"
-        check_quotes(rec, full_text)
+        check_quotes(rec, conv)
         break
     rec.latency_s = round(time.monotonic() - started, 3)
     return rec
@@ -190,9 +212,20 @@ def run_once(
     max_attempts: int = 3,
     backoff_s: float = 2.0,
     progress=print,
+    order_seed: int | None = None,
 ) -> dict[str, dict]:
+    """Label every conversation not already finished in ``out_file``.
+
+    ``order_seed`` shuffles the processing order. Each run uses a different
+    order on purpose: every call is independent (no shared vocabulary that
+    grows during the run), so the labels must not depend on order. If two
+    runs in different orders still agree, that is evidence of it.
+    """
     done = {cid for cid, r in load_records(out_file).items() if r["status"] in FINISHED}
     todo = [c for c in conversations if c.conversation_id not in done]
+    if order_seed is not None:
+        random.Random(order_seed).shuffle(todo)
+    positions = {c.conversation_id: i for i, c in enumerate(todo)}
     progress(f"  {out_file.name}: {len(done)} already done, {len(todo)} to go")
     lock = threading.Lock()
     fatal: list[str] = []
@@ -205,6 +238,7 @@ def run_once(
         except FatalError as exc:
             fatal.append(str(exc))
             return
+        rec.position = positions[conv.conversation_id]
         with lock, out_file.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(asdict(rec)) + "\n")
         progress(f"  {rec.status:<16} calls={rec.calls} {rec.latency_s:>6.1f}s  spent=${meter.spent:.2f}")

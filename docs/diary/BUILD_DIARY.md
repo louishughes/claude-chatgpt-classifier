@@ -151,3 +151,15 @@ A running, timestamped log of what is being worked on, the problems hit, how the
 **Talking points:**
 - "A model can be consistently wrong. Measure agreement *and* accuracy."
 - "Fifteen hand labels is a cheap reality check, and it seeds the real evaluation set later."
+
+### 19:50 — Learning from the old post-mortem: one question per field
+**What:** Read ChatGPT's post-mortem of the earlier classifier (saved in PR #2) and changed the spike in response:
+- The single "category" field became separate fields: domain, purpose, project candidates, topics, knowledge types and outputs. The old list mixed *Ideas, Projects, Research, Decisions, Content Assets*, and one chat can be all five. So even a perfect model couldn't answer consistently.
+- Decisions now record who proposed them, what the user did (accepted, rejected, superseded, unclear), and who wrote the quoted evidence. The checker confirms the quote really comes from that speaker.
+- Each run processes chats in a different shuffled order, and a test runs three orders. The old system's vocabulary grew mid-run, so chat 800 was judged against different words from chat 8.
+- Retries are for network and format problems only. A well-formed wrong answer is never retried: "five variations of the same mistake".
+- The gold set now covers domain and purpose. Logged OD-17 and annotated the PRD and test strategy so "primary category" means primary domain. 37 tests pass.
+**Talking points:**
+- "Ambiguous questions produce inconsistent answers. Fix the question before blaming the model."
+- "Retry the network, never the judgement."
+- "Processing order shouldn't change the answer. I test it by shuffling."

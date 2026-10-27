@@ -26,7 +26,7 @@ from typing import Protocol
 
 import pydantic
 
-from schema import CATEGORIES, ConversationLabel, UserDecision
+from schema import DOMAINS, KNOWLEDGE_TYPES, OUTPUTS, PURPOSES, ConversationLabel, Decision
 
 # USD per million tokens (input, output). Thinking tokens bill as output.
 PRICES = {
@@ -188,15 +188,21 @@ class FakeProvider:
                     raise FatalError("injected fatal error")
                 raise TransientError(kind)
         digest = int(hashlib.sha256(conversation_text.encode()).hexdigest(), 16)
-        keys = list(CATEGORIES)
-        primary = keys[digest % len(keys)]
+        domains, purposes = list(DOMAINS), list(PURPOSES)
+        primary = domains[digest % len(domains)]
+        secondary = domains[(digest // 7) % len(domains)]
         quote = _first_user_snippet(conversation_text)
         label = ConversationLabel(
-            primary_category=primary,
-            secondary_categories=[keys[(digest // 7) % len(keys)]] if digest % 2 else [],
+            primary_domain=primary,
+            secondary_domains=[secondary] if digest % 2 and secondary != primary else [],
+            purpose=purposes[(digest // 11) % len(purposes)],
+            project_candidates=["Synthetic Project"] if digest % 3 == 0 else [],
             topics=[f"topic {digest % 13}"],
+            knowledge_types=[list(KNOWLEDGE_TYPES)[digest % len(KNOWLEDGE_TYPES)]],
+            outputs=[list(OUTPUTS)[digest % len(OUTPUTS)]],
             summary="Synthetic summary from the fake provider.",
-            user_decisions=[UserDecision(statement="Synthetic decision.", evidence_quote=quote)] if quote else [],
+            decisions=[Decision(statement="Synthetic decision.", proposed_by="user", state="accepted",
+                                evidence_quote=quote, evidence_speaker="user")] if quote else [],
             confidence=0.8,
         )
         approx_tokens = len(conversation_text) // 4

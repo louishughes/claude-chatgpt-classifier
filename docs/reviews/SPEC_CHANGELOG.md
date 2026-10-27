@@ -118,6 +118,14 @@ New ID prefixes: `SRC` (raw source), `IMP` (import identity/reimport), `MED` (me
 ### 3.4 Priority changes
 None for existing tickets. INT-002 stays P1 with a narrower scope; YouTube detection and status became P0 through YTB-001/YTB-002.
 
+### 3.5 Post-audit amendments (2026-10-27, after the owner chose the pre-M1 spike)
+| File | Change | Reason |
+|---|---|---|
+| `docs/plans/IMPLEMENTATION_PLAN.md` | Added §12 "Pre-M1 classification spike" | Owner chose to validate the AI step before M1 |
+| `docs/adr/0007-model-egress-and-structured-output.md` | Items 8–9 (hybrid split, spike); "temperature 0" replaced by explicit `effort` | Owner question on hybrid/BERT; current models reject sampling parameters |
+| `docs/reviews/OPEN_DECISIONS.md` | Added OD-17 (separate classification dimensions) | Post-mortem cause 7: a single mixed category is ambiguous |
+| `docs/PRD.md` §success metrics, `docs/TEST_STRATEGY.md` §5–6 | "primary category" annotated as primary *domain* (OD-17) | Same |
+
 ## 4. ADRs
 ADR-0002..ADR-0008 created with status `proposed`. ADR-0001 is reserved for the SQLite/FTS5 decision that `DECISIONS_AND_HISTORY.md` uses as its worked example; no ADR file existed. No accepted decision was reversed. ADR-0007 refines (does not supersede) the local-only default pending OD-04.
 

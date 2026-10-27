@@ -224,9 +224,12 @@ Packaging and monetisation are recorded as a future option (OD-16) and do not en
 
 ## 12. Pre-M1 classification spike (owner decision, 2026-10-27)
 The owner chose to validate the AI labelling step before starting M1. `prototype/classification_spike/` is throwaway code that labels a reproducible sample of 50, then 100, real conversations twice with schema-checked output, and reports:
-- **Reliability:** ok rate, first-try schema failures, repairs, timeouts and rate limits, latency, cost.
-- **Consistency:** primary-category agreement and secondary/topic Jaccard between runs.
-- **Accuracy:** agreement with a small gold set of 10–20 chats that the owner hand-labels. Consistency alone is not enough, because a model can be consistently wrong.
-- **Evidence:** share of decision quotes found verbatim in the source.
+- **Reliability:** ok rate, first-try schema failures, repairs, timeouts and rate limits, latency, cost. Retries cover transport and format errors only; a well-formed wrong answer is never retried.
+- **Separate dimensions** (OD-17): primary/secondary domain, purpose, project candidates, topics, knowledge types, outputs, and decisions with proposer, state and a quoted speaker. One mixed "primary category" is not used.
+- **Consistency:** per-field agreement and Jaccard overlap between runs. Each run processes chats in a different shuffled order, so this also tests processing-order independence (calls share no state, and a unit test runs three orders).
+- **Accuracy:** agreement with a small gold set of 10–20 chats that the owner hand-labels (domain and purpose). Consistency alone is not enough, because a model can be consistently wrong. Gold labels come from the owner, never from the agent being judged.
+- **Evidence:** share of decision quotes found verbatim in a message by the stated speaker, and "accepted" decisions backed only by assistant text.
+
+Known limits, from the earlier post-mortem (`docs/reference/2026-10-27-why-the-classifier-failed.md`, PR #2): one call per chat cannot validate project identity (that needs the corpus-wide registry), labels are per chat not per segment, and decision recall needs the fuller EVAL-001 reference set.
 
 Targets are in the spike README. Results feed OD-05 (provider/model, cost cap), the FND-009 contract and the EVAL-001 golden set: the gold labels become its first entries. Nothing in `src/` will import the spike.

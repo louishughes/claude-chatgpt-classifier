@@ -10,9 +10,10 @@ How
 ---
 1. ``spike.py ... --gold-template 15`` writes ``gold_template.csv`` into the
    private output folder: id, file name, title, and empty label columns.
-2. Louis fills in ``primary_category`` (and optionally
-   ``secondary_categories``, separated by ``;``) using the category keys from
-   ``schema.py``, and saves it as e.g. ``gold.csv``.
+2. Louis fills in ``primary_domain`` and ``purpose`` (keys from
+   ``schema.py``), optionally ``secondary_domains`` (separated by ``;``) and
+   ``projects`` (names, ``;``-separated, for eyeballing only), and saves it
+   as e.g. ``gold.csv``.
 3. ``spike.py ... --gold gold.csv`` adds a "vs gold" section to the report.
 
 Talking points
@@ -28,9 +29,10 @@ from pathlib import Path
 
 from loader import Conversation
 from report import _pct, jaccard
-from schema import CATEGORIES
+from schema import DOMAINS, PURPOSES
 
-FIELDS = ["conversation_id", "source_file", "title", "primary_category", "secondary_categories", "notes"]
+FIELDS = ["conversation_id", "source_file", "title", "primary_domain", "purpose",
+          "secondary_domains", "projects", "notes"]
 
 
 def write_template(convs: list[Conversation], path: Path) -> None:
@@ -41,42 +43,51 @@ def write_template(convs: list[Conversation], path: Path) -> None:
             w.writerow({"conversation_id": c.conversation_id, "source_file": c.source_file, "title": c.title})
 
 
-def load_gold(path: Path) -> dict[str, dict]:
-    """Read a filled-in template. Rows without a primary category are ignored.
+def _split(cell: str | None) -> list[str]:
+    return [s.strip() for s in (cell or "").split(";") if s.strip()]
 
-    Unknown category keys raise an error straight away, so a typo can't
-    silently count as the model being wrong.
+
+def load_gold(path: Path) -> dict[str, dict]:
+    """Read a filled-in template. Rows without a primary domain are ignored.
+
+    Unknown keys raise an error straight away, so a typo can't silently count
+    as the model being wrong.
     """
     gold: dict[str, dict] = {}
     with path.open(newline="", encoding="utf-8") as fh:
         for row in csv.DictReader(fh):
-            primary = (row.get("primary_category") or "").strip()
+            cid = row["conversation_id"]
+            primary = (row.get("primary_domain") or "").strip()
             if not primary:
                 continue
-            secondary = [s.strip() for s in (row.get("secondary_categories") or "").split(";") if s.strip()]
+            purpose = (row.get("purpose") or "").strip()
+            secondary = _split(row.get("secondary_domains"))
             for key in [primary, *secondary]:
-                if key not in CATEGORIES:
-                    raise ValueError(f"unknown category {key!r} for {row['conversation_id']}")
-            gold[row["conversation_id"]] = {"primary": primary, "secondary": set(secondary)}
+                if key not in DOMAINS:
+                    raise ValueError(f"unknown domain {key!r} for {cid}")
+            if purpose and purpose not in PURPOSES:
+                raise ValueError(f"unknown purpose {purpose!r} for {cid}")
+            gold[cid] = {"primary": primary, "secondary": set(secondary), "purpose": purpose}
     return gold
 
 
 def gold_stats(records: dict[str, dict], gold: dict[str, dict]) -> dict:
     """Compare one run with the gold labels."""
-    scored = [(records[cid], g) for cid, g in gold.items()
+    scored = [(records[cid]["label"], g) for cid, g in gold.items()
               if cid in records and records[cid]["status"] == "ok"]
     if not scored:
         return {"gold_labelled": len(gold), "scored": 0}
-    hits = sum(r["label"]["primary_category"] == g["primary"] for r, g in scored)
-    # "Lenient" counts the model as right if your primary appears anywhere in
-    # its primary or secondary categories: useful when a chat honestly spans two.
-    lenient = sum(g["primary"] in {r["label"]["primary_category"], *r["label"]["secondary_categories"]}
-                  for r, g in scored)
+    hits = sum(m["primary_domain"] == g["primary"] for m, g in scored)
+    # "In any" counts the model as right if your primary domain appears in its
+    # primary or secondary domains: useful when a chat honestly spans two.
+    anywhere = sum(g["primary"] in {m["primary_domain"], *m["secondary_domains"]} for m, g in scored)
+    with_purpose = [(m, g) for m, g in scored if g["purpose"]]
     return {
         "gold_labelled": len(gold),
         "scored": len(scored),
-        "primary_accuracy_pct": _pct(hits, len(scored)),
-        "primary_in_any_pct": _pct(lenient, len(scored)),
-        "secondary_jaccard": round(sum(
-            jaccard(set(r["label"]["secondary_categories"]), g["secondary"]) for r, g in scored) / len(scored), 3),
+        "primary_domain_accuracy_pct": _pct(hits, len(scored)),
+        "primary_domain_in_any_pct": _pct(anywhere, len(scored)),
+        "purpose_accuracy_pct": _pct(sum(m["purpose"] == g["purpose"] for m, g in with_purpose), len(with_purpose)),
+        "secondary_domains_jaccard": round(sum(
+            jaccard(set(m["secondary_domains"]), g["secondary"]) for m, g in scored) / len(scored), 3),
     }

@@ -95,7 +95,7 @@ Source: product-owner work order of 2026-10-27 and CLAUDE.md §2 A–D. Traceabi
 | FR-37 | P1 | Corrections survive re-export | Reviewer overrides persist on unchanged content and become review items when content changes |
 
 ## 9. Success metrics and gates
-These targets are *proposed*, to be calibrated against a human-reviewed 30–50-conversation benchmark. Import integrity: 100% supported nodes accounted for or flagged. Schema-valid committed records: 100%. Reimport idempotency: zero duplicates. Unsupported user decisions: zero in release benchmark. Primary category agreement >=90%; explicit decision recall >=90%; asserted relationship precision >=90%; Recall@10 >=90% on benchmark; exact evidence anchor validity 100%. Report precision/recall **per type**, not a single inflated score.
+These targets are *proposed*, to be calibrated against a human-reviewed 30–50-conversation benchmark. Import integrity: 100% supported nodes accounted for or flagged. Schema-valid committed records: 100%. Reimport idempotency: zero duplicates. Unsupported user decisions: zero in release benchmark. Primary category (= primary domain, see OD-17) agreement >=90%; explicit decision recall >=90%; asserted relationship precision >=90%; Recall@10 >=90% on benchmark; exact evidence anchor validity 100%. Report precision/recall **per type**, not a single inflated score.
 
 ## 10. UX and reports
 - **Import dashboard:** source counts, nodes, branches, attachments, parser warnings and stage timings.

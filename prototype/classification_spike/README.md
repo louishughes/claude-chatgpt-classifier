@@ -7,10 +7,10 @@ The earlier attempts failed on three things: inconsistent labels, untyped output
 ## What it does
 1. Picks a reproducible random sample from `raw/` (read-only). The 100 sample always contains the 50 sample.
 2. Follows each chat's active branch and keeps user/assistant text (no hidden reasoning, system or tool messages, no images).
-3. Asks the model to fill in a fixed form (`schema.py`): primary category, up to 3 secondary categories, topics, a short summary, user decisions with verbatim evidence, confidence.
+3. Asks the model to fill in a fixed form (`schema.py`) with **one field per question**: primary and secondary *domain*, *purpose*, *project candidates*, *topics*, *knowledge types*, *outputs*, a short summary, and *decisions* (who proposed it, accepted/rejected/superseded, and a verbatim quote with its speaker). The old single "primary category" mixed subject, intent and output, which made consistent answers impossible.
 4. Validates every answer. One repair attempt, then `review_required`.
-5. Retries timeouts/rate limits/server errors at most 3 calls in total, with backoff. Stops before every call if the cost cap is reached. Saves after every chat, so a rerun resumes.
-6. Runs the whole sample twice and reports reliability, cost and run-to-run agreement (`report.md`, counts only).
+5. Retries only transport and format problems: timeouts/rate limits/server errors at most 3 calls in total, with backoff; a broken schema gets one repair. A well-formed but wrong answer is never retried. Stops before every call if the cost cap is reached. Saves after every chat, so a rerun resumes.
+6. Runs the whole sample twice, **in a different order each time**, and reports reliability, cost and run-to-run agreement per field (`report.md`, counts only). Because every call is independent, agreement across orders also checks processing-order independence.
 7. Optionally compares the model with **your own labels** for 10–20 chats (a gold set). Agreement between runs only proves consistency; a model can be consistently wrong.
 
 ## Files
@@ -23,7 +23,7 @@ The earlier attempts failed on three things: inconsistent labels, untyped output
 | `report.py` | Metrics and the Markdown report |
 | `gold.py` | Hand-labelled gold set: template and accuracy vs your labels |
 | `spike.py` | Command line |
-| `tests/` | 27 tests on synthetic data, including 50- and 100-chat batches with injected failures |
+| `tests/` | 37 tests on synthetic data, including 50- and 100-chat batches with injected failures |
 
 ## Running it
 ```bash
@@ -35,7 +35,7 @@ python -m pytest -q tests                         # free, offline
 # Needs ANTHROPIC_API_KEY set in your shell. Never commit it.
 python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --dry-run          # cost estimate only
 python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --gold-template 15   # optional: label these
-# fill in primary_category (and secondary_categories, ';'-separated), save as ~/spike-out/gold.csv
+# fill in primary_domain and purpose (optionally secondary_domains and projects, ';'-separated), save as ~/spike-out/gold.csv
 python spike.py --raw-dir ../../raw --sample 50 --runs 2 --out ~/spike-out --max-cost-usd 5 --gold ~/spike-out/gold.csv
 python spike.py --raw-dir ../../raw --sample 100 --runs 2 --out ~/spike-out-100 --max-cost-usd 10
 ```
@@ -49,15 +49,23 @@ Defaults: model `claude-opus-5-5`, effort `low`, 4 workers, 90 s timeout, 24,000
 | ok after retries | ≥ 98% |
 | first-try schema failures | ≤ 2% |
 | transient errors left unrecovered | 0 at 50, ≤ 1% at 100 |
-| primary category agreement run 1 vs run 2 | ≥ 90% |
-| secondary category Jaccard | ≥ 0.75 |
-| decision evidence quotes found verbatim | ≥ 95% |
-| primary category matches your gold labels | ≥ 80% (≥ 90% counting secondaries) |
+| primary domain agreement, run 1 vs run 2 | ≥ 90% |
+| purpose agreement | ≥ 85% |
+| secondary domains / knowledge types / outputs Jaccard | ≥ 0.75 |
+| decision evidence quotes found verbatim, right speaker | ≥ 95% |
+| primary domain matches your gold labels | ≥ 80% (≥ 90% counting secondaries) |
+| purpose matches your gold labels | ≥ 75% |
 | cost per 100 chats | reported, compared with the cap |
 
-Topic Jaccard is reported but not gated: free-text topics are expected to vary in wording. That is why the real system will map topics onto a governed taxonomy.
+Topic and project-name overlap are reported but not gated: free text is expected to vary in wording. That is why the real system maps topics onto a locked taxonomy and projects onto a corpus-wide registry.
+
+## What the spike does *not* prove
+- **Project identity.** One call per chat, with no shared registry, is the pattern that gave one game several names last time. `project_candidates` shows how much names vary; it does not validate project labels.
+- **Segment-level labels.** A chat that covers several subjects gets one set of labels here. The real pipeline classifies segments.
+- **Decision recall.** The gold set covers domain and purpose. Checking that all of your decisions were found needs a fuller reference set (EVAL-001).
 
 ## Talking points
 - "Before building a pipeline around an AI step, I measured whether the AI step was stable."
 - "The model fills in a typed form. Validation, one repair, then a human: never a silent guess."
-- "Same 50 chats, twice. Agreement is the number that decides whether we go ahead."
+- "Same 50 chats, twice, in different orders. Agreement and accuracy against my own labels decide whether we go ahead."
+- "Retry the network, never the judgement."

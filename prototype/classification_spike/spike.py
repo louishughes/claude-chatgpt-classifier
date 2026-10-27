@@ -37,7 +37,7 @@ from loader import clip_text, sample_conversations
 from providers import PRICES, AnthropicProvider, FakeProvider, FatalError
 from report import category_spread, consistency, run_stats, to_markdown
 from runner import CostMeter, load_records, run_once
-from schema import CATEGORIES, SYSTEM_PROMPT, TAXONOMY_VERSION
+from schema import DOMAINS, PURPOSES, SYSTEM_PROMPT, TAXONOMY_VERSION
 
 # Rough output size per call, including the model's thinking. Only used for
 # the dry-run estimate; the real run uses the API's exact token counts.
@@ -89,7 +89,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.gold_template:
         out.mkdir(parents=True, exist_ok=True)
         write_template(convs[: args.gold_template], out / "gold_template.csv")
-        print(f"Wrote {out / 'gold_template.csv'}. Categories: {', '.join(CATEGORIES)}")
+        print(f"Wrote {out / 'gold_template.csv'}.\n  domains: {', '.join(DOMAINS)}\n  purposes: {', '.join(PURPOSES)}")
         return 0
     gold = load_gold(args.gold.expanduser()) if args.gold else {}
 
@@ -124,7 +124,8 @@ def main(argv: list[str] | None = None) -> int:
         for i in range(1, args.runs + 1):
             print(f"Run {i}/{args.runs}")
             runs.append(run_once(convs, provider, out / f"run-{i}.jsonl", meter,
-                                 args.budget_chars, workers=args.workers))
+                                 args.budget_chars, workers=args.workers,
+                                 order_seed=args.seed + i))
     except FatalError as exc:
         print(f"Stopped: {exc}", file=sys.stderr)
         return 3
