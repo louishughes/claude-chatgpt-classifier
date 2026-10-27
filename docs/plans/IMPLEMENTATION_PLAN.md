@@ -88,6 +88,8 @@ Signatures and comments are in `ARCHITECTURE.md` §7.1 (source layer) and §3 (s
 | **M5** Hardening (12 tickets) | API, backups, deletion, CI, security hardening, packaging, extra adapters | **G5:** restore test, deletion test, adversarial suite, clean-machine install |
 | **M6** Integrations/productisation (7 tickets, P1/P2) | Web connector, network transcript providers, watched folders, multi-user | **G6:** per-ticket acceptance; owner approval for each network integration |
 
+**Commitment (REV-001, decided under delegated authority 2026-10-27, revisitable):** only **M1 and M2 are committed**. M3–M6 are roadmap: planned, not committed. They are re-planned at gate G2 using real-data results from M1/M2. Entry conditions for M3: ADR-0009 (the model step under the no-paid-API rule, REV-002) is accepted, and the owner has approved the answer key (REV-003). The product tickets API-001..005, PROD-001..004, OPS-007 and INT-001..003 are labelled `parked` in GitHub Issues: kept, not closed or renumbered, and not worked on. Reason: building all 122 tickets (API, PostgreSQL, multi-user) before the core works on real data repeats failure mode F7 ("too much system too early") from `docs/reference/previous-attempts-review.md`.
+
 Human approval points: before M1 starts (this plan); before the first real-provider call in M3 (provider, cost cap, egress profile: OD-04/05); before any network integration in M6; before any deletion/retention feature is used on real data.
 
 ## 5. Ordered tickets, dependencies and estimates
@@ -200,13 +202,13 @@ Property-based tests (Hypothesis): random message DAGs (no cycles lost, every no
 - Architecture changes → new ADR in `docs/adr/` (append-only, `supersedes`). Small choices → `.agent-history/DECISION_LOG.md`.
 - Status words from `DECISIONS_AND_HISTORY.md`: `NOT_STARTED`, `IN_PROGRESS`, `BLOCKED`, `REVIEW_REQUIRED`, `VERIFIED`, `DEFERRED`, `CANCELLED`, `FAILED`, `UNKNOWN`. A ticket is `VERIFIED` only with the acceptance commands' real output.
 - Distinguish in every report: test not run, test failed, not implemented, intentionally omitted, source lacks the feature.
-- Tracker: until OD-08 is decided, `TICKETS.csv`/`ROADMAP_AND_TICKETS.md` stay in sync. If GitHub Issues becomes the tracker, issues are created from the CSV for M1 and the files get a "frozen; see issues" banner.
+- Tracker: GitHub Issues (OD-08 resolved, REV-006). `TICKETS.csv`/`ROADMAP_AND_TICKETS.md` are frozen reference and carry no status.
 
 ## 10. Boundaries
 
-**In scope after approval:** M1 tickets one at a time in `DEPENDENCY_MAP.md` order; synthetic fixtures; local read-only runs on `raw/` that write only to the private workspace.
+**In scope after approval:** M1 then M2 tickets one at a time in `DEPENDENCY_MAP.md` order (M3–M6 only after the G2 re-plan, see §4); synthetic fixtures; local read-only runs on `raw/` that write only to the private workspace.
 
-**Not in scope without a further explicit approval:** any model/provider call with real data; any network fetch (URLs, YouTube, profiles); any write, move or clean-up under `raw/`; deleting anything; creating GitHub Issues; hosting or sharing outputs; packaging for sale.
+**Not in scope without a further explicit approval:** any model/provider call with real data; any network fetch (URLs, YouTube, profiles); any write, move or clean-up under `raw/`; deleting anything; creating GitHub Issues; hosting or sharing outputs; packaging for sale; any ticket labelled `parked`.
 
 **Never:** OCR/vision/face recognition on images by default; inventing transcripts or accounts; merging conversations or images by similarity; treating a missing conversation as deleted; committing private data (the repository is public).
 
