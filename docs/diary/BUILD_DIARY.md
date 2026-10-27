@@ -311,3 +311,16 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "Every write in my app is all-or-nothing. A crash can't leave half an import behind."
 - "I broke my own code on purpose to prove the test would catch it."
 - "SQLite is a real database if you configure it. Foreign keys and WAL mode are two lines that matter."
+
+### 21:06 — FND-004: version control for the database
+**What:** Added Alembic migrations. A migration is a numbered script that changes the database's shape and can undo the change. The first one, `0001_baseline`, creates the `workspaces` table. 7 new tests, 61 in total.
+**Key decisions and why:**
+- **The migrations ship inside the package.** An installed copy can upgrade its own database without hunting for extra files. I proved it by building the package, installing it into a fresh environment and migrating a new database.
+- **A "drift" test** compares the migrated database with the Python table definitions. If someone changes a table and forgets the migration, the test fails. I checked that by adding a column without a migration and watching it go red.
+- **Upgrade twice** is a no-op the second time. Running the same step twice with the same result is called idempotency, and it's the theme of the whole import design.
+**Problem hit:** the Python cache folders (`__pycache__`) had been committed in the first three tickets, because the main `.gitignore` didn't list them. They're untracked now, and it's fixed for the future. It was a small slip, but a reminder to check `git status` before every commit.
+**What I learned:** what a schema migration is, upgrade vs downgrade, and why constraint names matter (you can't drop a constraint you can't name).
+**Talking points:**
+- "My database schema is versioned like my code: numbered, reversible and tested."
+- "One test makes sure the code and the database can never disagree about a table."
+- "I check that the installed package works, not just the source folder."

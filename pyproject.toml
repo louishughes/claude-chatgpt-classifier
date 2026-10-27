@@ -21,6 +21,7 @@ dependencies = [
     "pydantic>=2.9,<3",           # typed, validated data models (FND-002 onwards)
     "pydantic-settings>=2.6,<3",  # settings from env vars and config files (FND-002)
     "sqlalchemy>=2.0.36,<2.1",    # database access and transactions (FND-003)
+    "alembic>=1.14,<2",           # versioned schema migrations (FND-004)
 ]
 
 [project.optional-dependencies]

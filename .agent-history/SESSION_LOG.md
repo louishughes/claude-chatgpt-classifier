@@ -91,3 +91,35 @@ Mutation check: switching write transactions to `DEFERRED` made `test_write_tran
 **Not done / not tested:** Windows run; Alembic (FND-004).
 
 **Next exact task:** FND-004 (Alembic baseline) or FND-005 (domain models and stable IDs); both unblocked.
+
+## 2026-10-27 · Housekeeping — bytecode caches untracked
+
+The root `.gitignore` had no `__pycache__/` entry (only `prototype/.gitignore` did), so the FND-001..003 commits included 8 `.pyc` files. Added `__pycache__/`, `*.py[cod]`, `.pytest_cache/`, `.venv/` to the root `.gitignore` and untracked the files (separate commit).
+
+## 2026-10-27 · FND-004 — Alembic migration baseline
+
+**Dependencies:** FND-003 (VERIFIED). **Status:** VERIFIED.
+
+**Changed files:** `src/knowledge_engine/infrastructure/migrations/` (new: `__init__.py` helpers, `env.py`, `script.py.mako`, `versions/0001_baseline.py`), `tests/unit/test_migrations.py` (new), `pyproject.toml` (adds `alembic>=1.14,<2`), `STATUS.md`, `docs/TICKETS.csv` (FND-004 → VERIFIED).
+
+**Design choices:**
+- Migrations ship inside the package (no `alembic.ini`); `alembic_config(engine)` passes the app's configured engine to `env.py`, so migrations run with the same pragmas and explicit-BEGIN handling.
+- `render_as_batch=True` for future SQLite column changes; `compare_type=True`.
+- Hand-written, numbered revision IDs (`0001_baseline`) for readability.
+- Baseline contains only `workspaces` (the only table so far). Each later ticket adds its own migration.
+- Helpers: `upgrade_to_head`, `downgrade_to`, `current_revision`, `head_revision` (fails if the scripts branch).
+
+**Commands run (scratch venv, Alembic 1.20.1):**
+```
+ruff check .            # All checks passed! (after ruff --fix sorted env.py imports: attempt 1 of 3)
+ruff format --check .   # 18 files already formatted (after formatting one blank line)
+mypy                    # Success: no issues found in 12 source files
+pytest -q               # 61 passed (7 new for FND-004)
+pip wheel . ; fresh venv install of the wheel; upgrade a new DB   # "installed wheel migrates to 0001_baseline"
+```
+Tests cover: upgrade empty DB twice (no-op second time), schema equals table definitions (Alembic `compare_metadata` → no diff), constraint names, downgrade to base and re-upgrade, existing rows survive a re-upgrade, migrated DB works with `WorkspaceRepo`.
+Mutation check: adding an unmigrated column to `WorkspaceRow` made the drift test (and two others) fail; reverted.
+
+**Not done / not tested:** Windows run. No CLI command yet (`ke db upgrade` belongs to FND-008).
+
+**Next exact task:** FND-005 — domain models and stable identifiers (ADR-0003).

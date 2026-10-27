@@ -1,0 +1,32 @@
+"""Alembic entry point: runs migrations on the engine passed in by the app.
+
+Alembic imports this file itself; the app never imports it. It only supports
+"online" mode (a live database connection), because the engine always has
+its database file locally.
+"""
+
+from __future__ import annotations
+
+from alembic import context
+from sqlalchemy import Engine
+
+# Import every module that defines tables, so autogenerate and the drift test
+# see the full schema.
+from knowledge_engine.infrastructure import workspace as _workspace  # noqa: F401
+from knowledge_engine.infrastructure.db import Base
+
+engine = context.config.attributes.get("engine")
+if not isinstance(engine, Engine):
+    raise RuntimeError("run migrations through knowledge_engine.infrastructure.migrations")
+
+with engine.connect() as connection:
+    context.configure(
+        connection=connection,
+        target_metadata=Base.metadata,
+        # SQLite can't ALTER most things in place; batch mode copies the table
+        # instead, so future column changes still work.
+        render_as_batch=True,
+        compare_type=True,
+    )
+    with context.begin_transaction():
+        context.run_migrations()

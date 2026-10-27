@@ -9,5 +9,6 @@ Live ticket status for the build. The full ticket list is `docs/TICKETS.csv` (ke
 | FND-001 Bootstrap Python repository and tool configuration | VERIFIED | SESSION_LOG 2026-10-27 FND-001 |
 | FND-002 Environment and settings manager | VERIFIED | SESSION_LOG 2026-10-27 FND-002 |
 | FND-003 Relational persistence interface and SQLite engine | VERIFIED | SESSION_LOG 2026-10-27 FND-003 |
+| FND-004 Alembic migration baseline | VERIFIED | SESSION_LOG 2026-10-27 FND-004 |
 
-**Next unblocked:** FND-004 (Alembic baseline), FND-005 (domain models and stable IDs), OPS-008, EVAL-009.
+**Next unblocked:** FND-005 (domain models and stable IDs), then FND-006, FND-008, OPS-008, EVAL-009.
