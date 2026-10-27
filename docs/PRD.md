@@ -19,6 +19,9 @@ Large conversational archives are difficult to navigate, contain branching and c
 6. **Ask:** request a topic/decision/current-state answer; return source references, uncertainty and disagreement where necessary.
 7. **Extend:** import newer export/doc/video transcript; selectively reprocess changed nodes and regenerate dependent notes; preserve manual edits.
 8. **Review:** work through proposed taxonomy terms, ambiguous decisions, failed evidence checks and unresolved contradictions.
+9. **Re-export *(added 2026-10-27)*:** import a fresh full-history export that repeats almost everything; see a delta report (new, unchanged, revised, new branches, new media, missing assets, candidate duplicates, failed) and no duplicate conversations, messages or model calls.
+10. **Browse sources *(added 2026-10-27)*:** open any conversation as an LLM-free source note showing the active path, alternate branches, images (or honest missing markers), links and related chats, before any classification exists.
+11. **Follow references *(added 2026-10-27)*:** list every YouTube video and social account mentioned across the archive, with each citing message, and the transcript status of each video.
 
 ## 4. MVP scope (P0)
 - Versioned ChatGPT export parser: ZIP, one/multiple numbered JSON files, messages, speaker roles, timestamps, parent/child mappings, active path and alternatives, raw/unknown content.
@@ -30,9 +33,11 @@ Large conversational archives are difficult to navigate, contain branching and c
 - Individual Markdown conversation notes and project/topic masters with Obsidian-compatible YAML and source backlinks.
 - Exact full-text and metadata search, optional embedding search and grounded response via configured model provider.
 - CLI and minimal review/API endpoints; golden benchmark, reproducibility versions and bounded processing jobs.
+- *(Added 2026-10-27, see FR-25..FR-36.)* Read-only ingestion of the actual `raw/` layout (official export ZIP/folder and the split-wrapper directory), media blob/asset/occurrence linkage with honest missing states, native branch kinds, cross-conversation relationship candidates, logical identity across re-exports with delta reporting, deterministic URL/YouTube/social registries with transcript status, source-level browsing, and 50/100-conversation batch smoke gates.
 
 ## 5. Next release scope (P1)
 - PDF/DOCX/Markdown/web transcript import adapters; YouTube transcript supplied by user or acquired through authorised interfaces.
+  - *Audit amendment 2026-10-27:* YouTube **detection, canonical identity, mention provenance and transcript status** are now P0 (FR-31, FR-32). Only network transcript acquisition (INT-002) stays P1.
 - Relationship-assisted exploration, batch review UI, human correction longevity, live master-document dependency propagation.
 - Per-stage cost/token estimates, compare model policies on benchmark, export/import project bundles.
 
@@ -70,6 +75,25 @@ Large conversational archives are difficult to navigate, contain branching and c
 | FR-23 | P2 | Workspace permissions | Enforce at every retrieval/derivative and export operation |
 | FR-24 | P2 | Deletion/retention | Locate and purge derivatives with testable deletion manifest |
 
+### 8a. Requirements added by the 2026-10-27 specification audit
+Source: product-owner work order of 2026-10-27 and CLAUDE.md §2 A–D. Traceability: `docs/reviews/REQUIREMENTS_TRACEABILITY.md`.
+
+| ID | Priority | Requirement | Acceptance |
+|---|---|---|---|
+| FR-25 | P0 | Read-only ingestion of the actual raw layout | Official export (ZIP or folder, single or sharded JSON) and split-wrapper directory both import; `raw/` tree hash identical before and after; derived/non-conversation files reported, not parsed |
+| FR-26 | P0 | Media as blob, asset and occurrence | Same image bytes in N messages = 1 blob, N occurrences; states `available/missing/unresolved/ambiguous/unsupported` with evidence; thumbnails separate from originals; no OCR/vision by default |
+| FR-27 | P0 | Resolvable media links in notes | Every available image link in generated notes resolves; missing ones render an explicit marker naming pointer and reason |
+| FR-28 | P0 | Native branch kinds | Fork points classified `edit`/`regeneration`/`other`; active path from `current_node`; no transcript splices siblings |
+| FR-29 | P0 | Cross-conversation relationships | Typed, directional `continues/forked_from/quotes/references/related_to/same_project` links with evidence class, confidence, review state and history; similarity alone never yields `continues`/`forked_from`; nothing merged by similarity |
+| FR-30 | P0 | Logical identity and delta across re-exports | Native-ID-first identity with account namespace; delta categories reported per import; identical reimport = zero new logical records and zero model calls; absent conversation = `not_seen`, never deleted; ID collisions become review candidates |
+| FR-31 | P0 | URL occurrence registry | Every URL occurrence stored with exact span, context, actor, origin and canonical target; repeated URLs keep every occurrence |
+| FR-32 | P0 | YouTube video registry and transcript status | Supported URL forms canonicalised to one video per ID; original URL, timestamp and playlist kept; transcript status tracked; user-supplied transcripts attach with cues and provenance; no invented transcripts |
+| FR-33 | P0 | Social account registry | Profile URLs and platform-qualified handles create source-backed mentions in a deduplicated, browsable registry; bare `@name` stays ambiguous; no crawling or contact |
+| FR-34 | P0 | Source-level browsing before semantics | CLI inspect and LLM-free source notes for conversations, branches, media, links and related chats |
+| FR-35 | P0 | Batch-scale smoke gates | Import path smoke-tested at 50 and 100 conversations in M1; semantic path at 50 and 100 in M3, with timings, failures and stability recorded |
+| FR-36 | P0 | Type-safe model output | Every model output validated against a generated JSON Schema before persistence; one repair attempt then review; pinned model/prompt versions; run-to-run stability measured |
+| FR-37 | P1 | Corrections survive re-export | Reviewer overrides persist on unchanged content and become review items when content changes |
+
 ## 9. Success metrics and gates
 These targets are *proposed*, to be calibrated against a human-reviewed 30–50-conversation benchmark. Import integrity: 100% supported nodes accounted for or flagged. Schema-valid committed records: 100%. Reimport idempotency: zero duplicates. Unsupported user decisions: zero in release benchmark. Primary category agreement >=90%; explicit decision recall >=90%; asserted relationship precision >=90%; Recall@10 >=90% on benchmark; exact evidence anchor validity 100%. Report precision/recall **per type**, not a single inflated score.
 
@@ -83,13 +107,14 @@ These targets are *proposed*, to be calibrated against a human-reviewed 30–50-
 
 ## 11. Constraints and assumptions
 - Local-only by default; outbound model requests require configured permission and documented handling of private data.
+  - *Audit amendment 2026-10-27 (proposed, ADR-0007, OD-04):* the owner stated the workflow need not be 100% local. Proposed reading: the source layer stays deterministic and local; semantic stages may use cloud models once `text_llm` egress is enabled in the workspace profile; image/vision upload and URL/transcript fetching remain separate explicit switches. The default in code stays "off" until the owner confirms.
 - Text is first-class; non-text material is preserved and separately marked until a suitable extraction stage supports it.
 - A single conversation may contribute to multiple projects/topics.
 - Absence of a record is *unknown*, not proof of a negative.
 - Taxonomy approval remains controlled; system may recommend reviews rather than block the entire import.
 
 ## 12. Launch exit conditions
-Milestone M1: real export can import, preserve branches/unknown fields, inspect evidence and reimport idempotently. M2: golden extraction/classification produces correct actor attribution and current/historical decision state. M3: Obsidian export and query/search return traceable sources. M4: incremental import only updates affected derivatives. M5: multi-user isolation and privacy release checks (later).
+Milestone M1: real export can import, preserve branches/unknown fields, inspect evidence and reimport idempotently *(audit 2026-10-27: M1 now also covers media occurrences, delta report, source browsing and 50/100 batch smoke; link/YouTube/social registries form M2; see `docs/plans/IMPLEMENTATION_PLAN.md`)*. M2: golden extraction/classification produces correct actor attribution and current/historical decision state. M3: Obsidian export and query/search return traceable sources. M4: incremental import only updates affected derivatives. M5: multi-user isolation and privacy release checks (later).
 
 ## 13. Outstanding product decisions
 - Which model/provider can receive private source text and at what cost? **Unresolved; configurable.**
@@ -98,3 +123,4 @@ Milestone M1: real export can import, preserve branches/unknown fields, inspect 
 - Offline embeddings versus paid API embeddings? **Benchmark both; design provider interface.**
 - How are project merges/rebrands reviewed? **Manual review for high impact.**
 - Is all imported data user-owned and licit to process? **Explicit per-workspace attestation in future product.**
+- *(Added 2026-10-27)* Further open choices (original export availability, media storage mode, account namespace, cloud provider, transcript sources, tracker of record, Obsidian attachment strategy, packaging/licensing) are tracked in `docs/reviews/OPEN_DECISIONS.md`.

@@ -20,6 +20,8 @@ Build a local-first, provenance-preserving knowledge engine that imports source 
 6. `docs/HANDOFF.md`, status/deferral/session logs and all development/testing/validation/final skills present.
 7. Inspect `raw/` structurally, treating it as private read-only source; don't print its conversation text or sensitive filenames to logs.
 
+> **Path reconciliation (audit 2026-10-27):** of the files listed above, `docs/README.md`, `docs/TICKET_INDEX.md`, `docs/HANDOFF.md`, ADR files, `.agent-history/` logs and the Development/Testing/Validation/Final skills did not exist in the repository. `CLAUDE.md`, `AGENTS.md` and `README.md` live at the root, all other specs directly under `docs/`. ADRs now live in `docs/adr/`; the post-audit handoff is `docs/HANDOFF_AFTER_AUDIT.md`; review outputs are in `docs/reviews/` and plans in `docs/plans/`. Root files are authoritative over any nested copy. See `docs/reviews/SPEC_AUDIT.md` §2.
+
 Treat research prose as context, not as a substitute for contracts. The latest explicit product-owner requirements govern proposed spec changes; nontrivial conflicts must be visible in the audit.
 
 ## Engineering invariants

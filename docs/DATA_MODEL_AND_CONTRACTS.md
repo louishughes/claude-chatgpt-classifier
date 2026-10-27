@@ -131,3 +131,85 @@ New snapshot never overwrites previous one. Derived records refer to snapshot an
 
 ## 9. Ownership, security and deletion
 Every source, chunk, relationship and derived note is scoped by workspace. Audit permission checks on structured/FTS/vector/context hydration. A deletion request identifies source and all dependent derivatives; produce a manifest of removals, remove index/cache entries and verify post-deletion queries. Immutable means not silently rewritten; legally required deletion is permitted and logged without retaining deleted personal content.
+
+## 10. Source identity, media, links and relationships *(added by the 2026-10-27 audit; proposed, see ADR-0002..ADR-0006)*
+
+These tables refine §1 rather than adding competing copies. Reconciliation with §1:
+- `import_runs` is kept and becomes the **ImportBatch** ledger (one row per attempt). Snapshot identity stays in `source_snapshots`.
+- `sources` gains `source_system` and `account_ns`; for ChatGPT, one `sources` row = one logical conversation.
+- `content_nodes` stays the per-snapshot observation of a node (what a given file said). The new `message_nodes` / `message_revisions` hold the logical identity that survives re-exports. Derived stages key on `message_revisions`, never on per-snapshot rows.
+- `node_assets` is superseded by `media_blobs` + `media_assets` + `asset_occurrences`. It stays in §1 for history and should not be implemented.
+- `relationships` (§1) remains for knowledge-record relationships. Conversation-level links use `conversation_relationships`.
+
+| Table | Primary identity | Essential fields and constraints |
+|---|---|---|
+| `raw_roots` | raw_root_id | path (private, never rendered), format_detected, account_ns, read_only=true, last_tree_hash |
+| `source_files` | file_id | raw_root_id, relative_path_hash, size, sha256, role (`conversation_json`/`conversation_shard`/`split_wrapper`/`manifest`/`media`/`derived_artifact`/`unknown`); unique `(raw_root_id, relative_path_hash, sha256)` |
+| `import_batches` (= `import_runs`) | import_id | raw_root_id, started/finished, adapter+parser versions, status `running/succeeded/partial/failed/abandoned`, checkpoint, counts JSON, lock token |
+| `message_nodes` | node_key | conversation source_id, native_node_id; unique `(source_id, native_node_id)`; first_seen_import, last_seen_import, presence `present/not_seen` |
+| `message_revisions` | revision_id | node_key, canonical_content_hash, raw_payload_hash, role, create_time NULLABLE, content_type, snapshot_id of first observation; unique `(node_key, canonical_content_hash)` |
+| `graph_edges` | edge_id | child node_key, parent node_key NULLABLE, observed_in_import; unique `(child, parent)`; parent change flagged as anomaly |
+| `branch_points` | branch_point_id | parent node_key, kind `edit/regeneration/other`, child node_keys, active child (from current_node), classifier version |
+| `identity_candidates` | candidate_id | entity kind, left/right keys, reason (`missing_native_id`/`id_collision`/`prefix_match`), evidence JSON, review_state |
+| `media_blobs` | blob_sha256 | byte_size, mime (from header), width/height NULLABLE, storage_mode `copy/reference`, storage_ref (private), verified_at |
+| `media_assets` | asset_id | native_file_id NULLABLE, blob_sha256 NULLABLE, source_system; unique `(source_system, native_file_id)` when present |
+| `asset_occurrences` | occurrence_id | revision_id, part_index, pointer (verbatim), asset_id NULLABLE, availability `available/missing/unresolved/ambiguous/unsupported`, evidence JSON, declared size/dimensions; unique `(revision_id, part_index, pointer)` |
+| `derived_media` | derived_id | blob_sha256, kind (`thumbnail`/`header_meta`), generator version |
+| `link_targets` | target_id | canonical_url, host, kind (`web`/`youtube_video`/`social_profile`/`chatgpt_conversation`/`other`) unique canonical_url |
+| `link_occurrences` | link_occ_id | revision_id, start, end, original_text, target_id, origin (`message_text`/`citation_metadata`), actor; unique `(revision_id, start, end, origin)` |
+| `youtube_videos` | video_id (11-char) | first/last seen, mention_count (derived), transcript_status |
+| `youtube_mentions` | mention_id | link_occ_id, video_id, t_seconds NULLABLE, playlist_id NULLABLE, channel_hint NULLABLE |
+| `transcript_acquisitions` | acquisition_id | video_id, method (`user_supplied`/`provider:<name>`), status `not_requested/queued/succeeded/unavailable/permission_required/rate_limited/failed`, attempts, last_error, policy_version |
+| `transcript_snapshots` | transcript_id | video_id, sha256, language, provenance JSON (source, retrieved_at, permission note), immutable |
+| `transcript_cues` | cue_id | transcript_id, ordinal, start_ms, end_ms NULLABLE, text_offset range |
+| `social_accounts` | account_id | platform, stable_platform_id NULLABLE, canonical_handle NULLABLE, profile_url NULLABLE, display_name NULLABLE (only if evidenced), identity_status `confirmed/probable/ambiguous/rejected`; unique `(platform, stable_platform_id)` and `(platform, lower(canonical_handle))` |
+| `account_aliases` | alias_id | account_id, alias, kind (`handle`/`url`/`display_name`), evidence |
+| `account_mentions` | mention_id | revision_id, start, end, raw_text, platform NULLABLE, account_id NULLABLE, resolution `resolved/ambiguous/rejected`, actor, origin |
+| `conversation_relationships` | conv_rel_id | from_source_id, kind, to_source_id, direction semantics per kind, evidence_class, confidence, review_state, detector version; unique `(from, kind, to, detector)` |
+| `relationship_reviews` | review_id | conv_rel_id, action `accept/reject/supersede`, reviewer, at, note (append-only) |
+| `review_overrides` | override_id | target kind + logical key + revision_id, payload, reviewer, status `active/needs_review/retired` |
+
+### 10.1 Transactional responsibilities
+- One import batch commits per conversation group (configurable, default 50 conversations) in a single transaction: `source_files` → `message_nodes`/`message_revisions`/`graph_edges` → `branch_points` → `asset_occurrences` → `link_occurrences`/mentions → checkpoint update. The outbox event for the group is written in the same transaction.
+- `media_blobs` are hashed outside the DB transaction, then inserted with `ON CONFLICT DO NOTHING`; a blob row is only written after the hash is verified.
+- An import lock row (`import_batches.lock_token`, unique while `running`) prevents two writers. A stale lock older than the configured timeout is taken over only after marking the old batch `abandoned`.
+
+### 10.2 State transitions
+```text
+ImportBatch:          running → succeeded | partial | failed | abandoned   (never back to running)
+MessageNode presence: present → not_seen (absent from a later full export) → present (seen again)
+AssetOccurrence:      unresolved|missing → available (when bytes appear in a later import; new event, old state kept in history)
+TranscriptAcquisition: not_requested → queued → succeeded | unavailable | permission_required | failed
+                       queued → rate_limited → queued (bounded attempts)
+ConversationRelationship: candidate → accepted | rejected;  accepted → superseded
+SocialAccount identity: ambiguous → probable | confirmed | rejected (human or explicit evidence only)
+```
+
+### 10.3 Example DTOs (guidance, not code)
+```python
+class DeltaCategory(StrEnum):
+    NEW='new'; UNCHANGED='unchanged'; REVISED='revised'; NEW_BRANCH='new_branch'
+    NOT_SEEN='not_seen'; CANDIDATE_DUPLICATE='candidate_duplicate'; FAILED='failed'
+
+class AssetAvailability(StrEnum):
+    AVAILABLE='available'; MISSING='missing'; UNRESOLVED='unresolved'
+    AMBIGUOUS='ambiguous'; UNSUPPORTED='unsupported'
+
+class AssetOccurrenceDTO(BaseModel):
+    model_config = ConfigDict(extra='forbid', frozen=True)
+    revision_id: str
+    part_index: int = Field(ge=0)
+    pointer: str                       # verbatim from the export, never rewritten
+    asset_id: str | None               # None when unresolved
+    availability: AssetAvailability
+    evidence: dict[str, str] = {}      # e.g. {"manifest": "listed", "disk": "absent"}
+
+class ImportDeltaReport(BaseModel):
+    import_id: str
+    conversations: dict[DeltaCategory, int]
+    messages: dict[DeltaCategory, int]
+    new_branches: int; new_media: int; duplicate_assets: int; missing_assets: int
+    candidate_duplicates: int; failed: int
+    rebuild_footprint: dict[str, int]  # document/index kinds -> count to regenerate
+    model_calls_triggered: int         # must be 0 for an identical re-import
+```
