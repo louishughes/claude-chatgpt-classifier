@@ -124,3 +124,24 @@ A running, timestamped log of what is being worked on, the problems hit, how the
 **Why it matters:** an intermediate format made by an older tool has undocumented rules. The importer treats it as a lower-fidelity source and reports what it can't prove, and the original export ZIP (if still available) becomes the preferred input.
 **Talking points:**
 - "Know your data lineage: which tool produced the files you're importing?"
+
+### 19:10 — Prove the AI step before building around it
+**What:** Louis chose to run a small, throwaway experiment (a "spike") before starting the first milestone: label 50 real conversations twice, then 100, and measure whether the answers are reliable and consistent.
+**Why:** the earlier attempts failed at exactly this step (inconsistent labels, untyped output, timeouts at 20–50 chats). If the AI step can't be made stable, the rest of the plan changes, so it's the riskiest assumption and gets tested first.
+**Talking points:**
+- "Test the riskiest assumption first, cheaply, with code you're willing to throw away."
+- A spike answers one question. It is not the product.
+
+### 19:14 — Hybrid, not "AI everywhere"
+**What:** Louis asked how hybrid the system should be, noting BERT-style classifiers didn't give reliable results before. Answer: plain code for anything that must be exactly right (import, dedup, branches, images, links, YouTube IDs, social handles); a cloud LLM with a strict schema for judgement (topics, summaries, decisions); embeddings only to *suggest* related chats; small local classifiers maybe later, trained on reviewed LLM labels, once categories are stable. Added to ADR-0007.
+**Talking points:**
+- "Use the cheapest tool that is reliably right for each job."
+- "A small model trained on the big model's checked answers is a cost optimisation for later, not a starting point."
+
+### 19:20 — Spike built and tested offline
+**What:** Built `prototype/classification_spike/`: reads raw files read-only, follows each chat's active branch, sends user/assistant text only, and asks Claude to fill in a typed Pydantic form. Answers are validated; one repair attempt, then "needs review". Timeouts and rate limits get at most 3 calls with backoff. A hard cost cap is checked before every call, results are saved after every chat so a crash resumes, and a dry-run mode estimates cost before spending anything. 25 tests pass using a fake provider on synthetic data, including 50- and 100-chat batches with injected timeouts, bad output and refusals.
+**Challenge:** current Claude models reject `temperature`, the classic "make it deterministic" knob. Consistency has to come from the schema, a tight prompt, and measuring two runs against each other. Corrected ADR-0007, which still said "temperature 0".
+**Talking points:**
+- "My tests can simulate a timeout storm for free. The fake provider fails on command."
+- "If you can't set temperature to 0, you measure stability instead of assuming it."
+- "Checkpoint after every item; a crash at item 87 should cost one item, not 87."

@@ -1,0 +1,222 @@
+"""Unit and batch tests for the spike, using synthetic data and the fake provider."""
+
+import hashlib
+import json
+from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
+
+from conftest import make_conversation
+from loader import clip_text, load_conversation, sample_conversations
+from providers import FakeProvider, FatalError
+from report import consistency, run_stats
+from runner import CostMeter, label_one, load_records, run_once
+from schema import ConversationLabel
+import spike
+
+
+def no_sleep(_):
+    pass
+
+
+def conv_from(tmp_path, data):
+    p = tmp_path / "c.json"
+    p.write_text(json.dumps(data))
+    return load_conversation(p)
+
+
+# --- loader -----------------------------------------------------------------
+
+def test_follows_active_branch_and_drops_hidden_parts(tmp_path):
+    conv = conv_from(tmp_path, make_conversation("x", n_exchanges=2, branch=True))
+    text = conv.full_text()
+    assert "ALTERNATIVE BRANCH TEXT" not in text   # unselected regeneration
+    assert "secret reasoning" not in text          # thoughts
+    assert "system prompt" not in text             # system role
+    assert "hidden custom instructions" not in text
+    assert [t.role for t in conv.turns] == ["user", "assistant", "user", "assistant"]
+    assert conv.turns[0].image_refs == 1           # counted, not sent
+    assert conv.branch_points == 1
+
+
+def test_non_conversation_json_is_skipped(raw_dir):
+    root = raw_dir(3)
+    convs, skipped = sample_conversations(root, 10, seed=1)
+    assert len(convs) == 3
+    assert skipped["not_a_conversation"] == 1
+
+
+def test_sample_is_reproducible_and_nested(raw_dir):
+    root = raw_dir(20)
+    small, _ = sample_conversations(root, 5, seed=7)
+    again, _ = sample_conversations(root, 5, seed=7)
+    big, _ = sample_conversations(root, 10, seed=7)
+    ids = lambda cs: [c.conversation_id for c in cs]
+    assert ids(small) == ids(again)
+    assert ids(big)[:5] == ids(small)
+
+
+def test_clip_keeps_start_and_end():
+    text = "START" + "x" * 1000 + "END"
+    clipped, was = clip_text(text, 200)
+    assert was and clipped.startswith("START") and clipped.endswith("END")
+    assert clip_text("short", 200) == ("short", False)
+
+
+# --- schema -----------------------------------------------------------------
+
+def valid_label(**over):
+    base = dict(primary_category="games", secondary_categories=[], topics=["Unity"],
+                summary="s", user_decisions=[], confidence=0.5)
+    base.update(over)
+    return base
+
+
+def test_schema_accepts_valid_and_normalises_topics():
+    assert ConversationLabel(**valid_label()).topics == ["unity"]
+
+
+@pytest.mark.parametrize("bad", [
+    {"primary_category": "not_a_category"},
+    {"topics": [f"t{i}" for i in range(6)]},
+    {"topics": []},
+    {"summary": "x" * 301},
+    {"confidence": 1.5},
+    {"secondary_categories": ["games"] * 4},
+])
+def test_schema_rejects_contract_breaks(bad):
+    with pytest.raises(ValidationError):
+        ConversationLabel(**valid_label(**bad))
+
+
+# --- runner: one conversation ----------------------------------------------
+
+@pytest.fixture
+def conv(tmp_path):
+    return conv_from(tmp_path, make_conversation("conv-A"))
+
+
+def test_transient_errors_retry_then_succeed(conv):
+    p = FakeProvider({"conv-A": ["timeout", "rate_limit"]})
+    rec = label_one(conv, p, CostMeter(10), 24000, sleep=no_sleep)
+    assert rec.status == "ok" and rec.calls == 3
+    assert rec.transient_errors == {"timeout": 1, "rate_limit": 1}
+
+
+def test_gives_up_after_three_transient_failures(conv):
+    p = FakeProvider({"conv-A": ["timeout"] * 5})
+    rec = label_one(conv, p, CostMeter(10), 24000, sleep=no_sleep)
+    assert rec.status == "failed" and rec.calls == 3
+
+
+def test_one_schema_repair_then_ok(conv):
+    rec = label_one(conv, FakeProvider({"conv-A": ["schema"]}), CostMeter(10), 24000, sleep=no_sleep)
+    assert rec.status == "ok" and rec.repaired and rec.schema_failures == 1
+
+
+def test_second_schema_failure_goes_to_review(conv):
+    rec = label_one(conv, FakeProvider({"conv-A": ["schema", "schema"]}), CostMeter(10), 24000, sleep=no_sleep)
+    assert rec.status == "review_required" and rec.calls == 2
+
+
+def test_refusal_is_recorded(conv):
+    rec = label_one(conv, FakeProvider({"conv-A": ["refusal"]}), CostMeter(10), 24000, sleep=no_sleep)
+    assert rec.status == "refusal"
+
+
+def test_cost_cap_stops_before_calling(conv):
+    p = FakeProvider()
+    rec = label_one(conv, p, CostMeter(cap_usd=1, already_spent=1), 24000, sleep=no_sleep)
+    assert rec.status == "skipped_cost_cap" and p.calls == 0
+
+
+def test_quote_check_counts_only_real_quotes(conv):
+    rec = label_one(conv, FakeProvider(), CostMeter(10), 24000, sleep=no_sleep)
+    assert rec.decisions_total == rec.decisions_quote_found == 1
+    from runner import Record, check_quotes
+    fake = Record("x", "f", "ok", "fake", label=valid_label(
+        user_decisions=[{"statement": "s", "evidence_quote": "words nobody wrote"}]))
+    check_quotes(fake, conv.full_text())
+    assert fake.decisions_total == 1 and fake.decisions_quote_found == 0
+
+
+# --- runner: batches ---------------------------------------------------------
+
+@pytest.mark.parametrize("size", [50, 100])
+def test_batch_with_injected_failures_accounts_for_every_chat(raw_dir, tmp_path, size):
+    """The 50/100 batch gate on synthetic data: every chat ends in a known state."""
+    convs, _ = sample_conversations(raw_dir(size), size, seed=3)
+    plan = {"conv-001": ["timeout", "timeout", "timeout"],   # gives up
+            "conv-002": ["schema"],                          # repaired
+            "conv-003": ["schema", "schema"],                # review
+            "conv-004": ["refusal"],
+            "conv-005": ["server", "connection"]}            # recovers
+    out = tmp_path / "out"
+    out.mkdir()
+    runs = []
+    for i in (1, 2):
+        runs.append(run_once(convs, FakeProvider(plan), out / f"run-{i}.jsonl", CostMeter(10),
+                             24000, workers=8, backoff_s=0, progress=lambda *_: None))
+    stats = run_stats(runs[0])
+    assert stats["conversations"] == size
+    assert stats["status_counts"] == {"ok": size - 3, "failed": 1, "review_required": 1, "refusal": 1}
+    assert stats["repaired_ok"] == 1
+    # The fake provider is deterministic, so two runs must agree perfectly.
+    c = consistency(runs)[0]
+    assert c["primary_agreement_pct"] == 100.0 and c["topic_jaccard"] == 1.0
+
+
+def test_resume_skips_finished_and_retries_failed(raw_dir, tmp_path):
+    convs, _ = sample_conversations(raw_dir(10), 10, seed=1)
+    out = tmp_path / "run-1.jsonl"
+    first = FakeProvider({"conv-001": ["timeout"] * 3})
+    run_once(convs, first, out, CostMeter(10), 24000, backoff_s=0, progress=lambda *_: None)
+    second = FakeProvider()
+    run_once(convs, second, out, CostMeter(10), 24000, backoff_s=0, progress=lambda *_: None)
+    assert second.calls == 1   # only the chat that failed last time
+    assert all(r["status"] == "ok" for r in load_records(out).values())
+
+
+def test_fatal_error_stops_the_run(raw_dir, tmp_path):
+    convs, _ = sample_conversations(raw_dir(5), 5, seed=1)
+    with pytest.raises(FatalError):
+        run_once(convs, FakeProvider({"conv-": ["fatal"] * 99}), tmp_path / "r.jsonl",
+                 CostMeter(10), 24000, workers=1, progress=lambda *_: None)
+
+
+# --- command line ------------------------------------------------------------
+
+def tree_hash(root: Path) -> str:
+    h = hashlib.sha256()
+    for p in sorted(root.rglob("*")):
+        h.update(str(p.relative_to(root)).encode())
+        if p.is_file():
+            h.update(p.read_bytes())
+    return h.hexdigest()
+
+
+def test_cli_fake_run_writes_report_and_leaves_raw_untouched(raw_dir, tmp_path):
+    root = raw_dir(12)
+    before = tree_hash(root)
+    out = tmp_path / "out"
+    code = spike.main(["--raw-dir", str(root), "--out", str(out), "--sample", "10",
+                       "--runs", "2", "--provider", "fake", "--workers", "3"])
+    assert code == 0
+    assert tree_hash(root) == before
+    report = json.loads((out / "report.json").read_text())
+    assert report["consistency"][0]["primary_agreement_pct"] == 100.0
+    assert "Run-to-run consistency" in (out / "report.md").read_text()
+
+
+def test_cli_dry_run_makes_no_files(raw_dir, tmp_path):
+    out = tmp_path / "out"
+    assert spike.main(["--raw-dir", str(raw_dir(5)), "--out", str(out), "--dry-run"]) == 0
+    assert not out.exists()
+
+
+def test_cli_refuses_output_inside_a_git_repo(raw_dir, tmp_path):
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True)
+    code = spike.main(["--raw-dir", str(raw_dir(3)), "--out", str(repo / "out"), "--provider", "fake"])
+    assert code == 2
