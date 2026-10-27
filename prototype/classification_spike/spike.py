@@ -45,7 +45,7 @@ from discovery import to_markdown as discovery_markdown
 from gold import fingerprint, gold_stats, load_gold, pick_diverse, write_template
 from review import load_review, write_review_sheet
 from loader import clip_text, sample_conversations
-from providers import PRICES, AnthropicProvider, FakeProvider, FatalError
+from providers import PRICES, AnthropicProvider, FakeProvider, FatalError, PaidCallsDisabled
 from report import category_spread, consistency, run_stats, to_markdown
 from runner import CostMeter, load_records, run_once
 from schema import DECISIONS_PROMPT, DISCOVERY_PROMPT, DISCOVERY_VERSION, SYSTEM_PROMPT, TAXONOMY_VERSION
@@ -179,11 +179,15 @@ def main(argv: list[str] | None = None) -> int:
     else:
         # Haiku 5.5 has no server-side refusal fallback; asking for one is an error.
         fallback = not args.no_refusal_fallback and not args.model.startswith("claude-haiku")
-        provider = AnthropicProvider(args.model, args.effort, args.timeout_s, args.max_tokens,
-                                     refusal_fallback=fallback)
-        decisions_provider = AnthropicProvider(
-            d_model, args.decisions_effort, args.timeout_s, args.max_tokens,
-            refusal_fallback=not args.no_refusal_fallback and not d_model.startswith("claude-haiku"))
+        try:
+            provider = AnthropicProvider(args.model, args.effort, args.timeout_s, args.max_tokens,
+                                         refusal_fallback=fallback)
+            decisions_provider = AnthropicProvider(
+                d_model, args.decisions_effort, args.timeout_s, args.max_tokens,
+                refusal_fallback=not args.no_refusal_fallback and not d_model.startswith("claude-haiku"))
+        except PaidCallsDisabled as exc:
+            print(f"Refusing: {exc}", file=sys.stderr)
+            return 4
 
     # Spend already recorded in this folder counts towards the cap, so
     # resuming can't quietly double the budget.
@@ -247,9 +251,14 @@ def run_discovery(args: argparse.Namespace, out: Path, convs: list) -> int:
     if args.provider == "fake":
         provider = FakeProvider()
     else:
-        provider = AnthropicProvider(args.model, args.decisions_effort, args.timeout_s, max(args.max_tokens, 16000),
-                                     refusal_fallback=not args.no_refusal_fallback
-                                     and not args.model.startswith("claude-haiku"))
+        try:
+            provider = AnthropicProvider(args.model, args.decisions_effort, args.timeout_s,
+                                         max(args.max_tokens, 16000),
+                                         refusal_fallback=not args.no_refusal_fallback
+                                         and not args.model.startswith("claude-haiku"))
+        except PaidCallsDisabled as exc:
+            print(f"Refusing: {exc}", file=sys.stderr)
+            return 4
     previous = sum(r["cost_usd"] for i in range(1, args.runs + 1)
                    for r in load_records(out / f"discover-{i}.jsonl").values())
     meter = CostMeter(args.max_cost_usd, already_spent=previous)

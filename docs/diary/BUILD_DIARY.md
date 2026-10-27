@@ -7,6 +7,7 @@ A running, timestamped log of what is being worked on, the problems hit, how the
 - Never paste anything from `raw/` (conversation text, titles, filenames, images) or any secret, key or private ID. Counts and format descriptions are fine. The repository is public.
 - Append new entries at the bottom. Don't rewrite old ones; add a correction entry instead.
 - Each entry: **what happened**, **why** (the reasoning behind the plan), and **talking points** (2–4 short lines you could say out loud or post).
+- When the entry closes a PR that adds or changes code, add a **Teach-back** line before the talking points: one module from the PR (picked by Louis, or by the thread under blanket authority) explained in three plain sentences, the way Louis would say it in an interview. If three sentences aren't enough, the code comments need work first. (Added 2026-10-27, REV-005.)
 - Entries marked *(backfilled)* were reconstructed afterwards from the project thread, so their times are approximate.
 
 ---
@@ -463,6 +464,17 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "Delegating overnight works if every decision is labelled with who made it and when, so it can be undone."
 - "Tickets with a finish line and a 'don't touch' list are how you run several agents in parallel safely."
 
+### 22:25 — A lock on the paid API (REV-008)
+**What:** Earlier tonight Louis decided: no more paid API calls for now, do the work locally or with Claude inside the subscription. But the spike's real provider still built an Anthropic client straight from `ANTHROPIC_API_KEY`, which is set on his PC. One wrong command (forgetting `--provider fake` or `--dry-run`) would have spent money. So the rule became code: `AnthropicProvider` now refuses to start unless the environment variable `SPIKE_ALLOW_PAID=1` is set, and the error message names Louis's decision and the switch. The check runs before the SDK is even imported. Only the exact value `1` counts, so `0`, `true` or an empty value all keep it locked. `--dry-run` and the fake provider work as before without the switch.
+**Challenges:**
+- The provider is built outside the spike's existing error handling, so a plain error would have dumped a Python traceback. The command line now catches it and prints a one-line "Refusing: ..." message with exit code 4, in both label and discover modes.
+- Testing a "don't call the paid API" rule without calling the paid API: the tests only check that the provider refuses (or, with the switch on and a fake key, that it builds an object that's never used). Nothing touches the network.
+**Result:** 9 new tests, 62 pass in total, and none of the existing 53 tests were changed.
+**Talking points:**
+- "A rule in a doc is a hope. A rule in code is a guarantee."
+- "Make the expensive path opt-in and the free path the default."
+- "Fail loudly and early: the lock trips before any client exists that could spend money."
+
 ### 23:12 — Designing fewer, deeper import modules (REV-004)
 **What:** Wrote `docs/plans/M1_CONSOLIDATION.md`, the design note that turns the architecture review's advice into a concrete shape for the first milestone. Design only: no code or tests changed. Instead of about fifteen small classes that the caller has to call in the right order, M1 becomes four modules: a pure *conversation graph* (active path, message numbers, branches and broken-tree checks, worked out in one place), one *Import* module whose whole interface is `import_source(path, account_ns) -> ImportReport`, a narrow adapter seam where the two export formats really differ (finding the conversations), and rendering as planned.
 **Why:** the most important promise of the slice, "importing the same export again adds nothing and costs nothing", had no single owner. Now it does: one named test, `test_identical_reimport_adds_nothing`, calls one function twice and checks that every table has the same row count.
@@ -482,3 +494,11 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 **Talking points:**
 - "A decision you're already building on is a decision. Write it down as one, with who made it and how to undo it."
 - "Three ticket trackers is zero ticket trackers. I picked one and froze the others."
+
+### 23:14 — Small PRs and the teach-back rule (REV-005)
+**What:** Two new process rules, written into `AGENTS.md` (owner guardrail 4), `CLAUDE.md` §4 and the rules block at the top of this diary. First: a pull request carries at most two tickets, and one by default; anything bigger needs Louis's OK first. Second, the teach-back: before a PR with code in it merges, one module from it gets explained in three plain sentences in that day's diary entry, the way Louis would say it in an interview. If three sentences aren't enough, the comments in the code need work before it merges.
+**Why:** PR #3 was 8,485 lines across 92 files and six tickets. Louis is the reviewer and is learning Python. Nobody reads a PR that size; it gets "approved unread", and that's how the earlier attempts lost control. The project is meant to teach him and to be something he can explain to an employer, so being able to explain the code is part of "done".
+**Note:** tonight's three PRs (REV-001, REV-006 and this one) are documentation only, one ticket each, with no module to teach back.
+**Talking points:**
+- "An AI can write eight thousand lines in an hour. My rule: if I can't explain a module in three sentences, it doesn't merge."
+- "Small PRs aren't about tidiness. They're the only way the reviewer actually reviews."
