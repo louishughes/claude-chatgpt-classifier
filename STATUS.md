@@ -27,5 +27,11 @@ Live ticket status for the build. The full ticket list is `docs/TICKETS.csv` (ke
 | ING-011 ChatGPT split-wrapper directory adapter | VERIFIED (slice A2) | SESSION_LOG 2026-10-27 ING-011 |
 | ING-001 Secure archive storage and checksums | VERIFIED (slice I1) | SESSION_LOG 2026-10-27 ING-001 |
 | IMP-001 ImportBatch and source-file snapshot ledger | VERIFIED (slice I1) | SESSION_LOG 2026-10-27 IMP-001 |
+| ING-003 ImportCoordinator → import_source | VERIFIED (slice I2; `ke import` CLI wiring waits for Louis, see below) | SESSION_LOG 2026-10-27 ING-003 |
+| IMP-002 Logical identity resolver | IN_PROGRESS (keys done in I2; candidate matches in I4) | SESSION_LOG 2026-10-27 IMP-002 |
+| IMP-004 Transactional idempotent commit, resume and import locking | IN_PROGRESS (repeat + crash rerun in I2; concurrency in I5) | SESSION_LOG 2026-10-27 IMP-004 |
 
-**Next unblocked:** slice I2 (ING-003 import_source + IMP-002 keys + IMP-004 repeat). Order and module layout follow docs/plans/M1_CONSOLIDATION.md (adopted).
+**Next unblocked:** slice I3 (IMP-003 delta categories), then I4 (IMP-002 candidates). Order and module layout follow docs/plans/M1_CONSOLIDATION.md (adopted).
+
+**Needs Louis (logged, skipped, not waited on):**
+- Wiring `ke import` to `import_source` means retiring `tests/unit/test_cli.py::test_import_is_an_honest_placeholder`, which asserts the placeholder. Changing an existing test needs your OK (guardrail). Until then, imports run through `import_source(...)` in Python.
