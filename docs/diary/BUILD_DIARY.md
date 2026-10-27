@@ -319,7 +319,7 @@ Built step 2 of v3: one call per chat returns sections and typed items, each tie
 - "Delegating overnight works if every decision is labelled with who made it and when, so it can be undone."
 - "Tickets with a finish line and a 'don't touch' list are how you run several agents in parallel safely."
 
-### 22:24 — Committing to two milestones, not six (REV-001)
+### 22:16 — Committing to two milestones, not six (REV-001)
 **What:** Before going to bed, Louis asked for the direction review to be turned into tickets and implemented by agents, and gave blanket authority for the night ("do not ask me anything"). The first ticket narrows the commitment. Only M1 (importing chats faithfully) and M2 (links, YouTube and social registries) are committed now. M3 to M6 stay on the roadmap but get re-planned at gate G2, once real-data results exist. Thirteen product tickets (the web API, PostgreSQL, multi-user accounts, packaging and integrations) are labelled `parked` in GitHub Issues. Nothing was closed or renumbered.
 **Why:** a 122-ticket plan that includes an API and multi-user support before the core works on one real export is exactly failure mode F7 from the earlier attempts: too much system too early. Two committed milestones are a promise that can actually be kept.
 **Decision:** recorded in `docs/reviews/OPEN_DECISIONS.md` as "decided under delegated authority 2026-10-27, revisitable", so Louis can reverse it in the morning.
