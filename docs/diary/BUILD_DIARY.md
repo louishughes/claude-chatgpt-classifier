@@ -155,3 +155,10 @@ A running, timestamped log of what is being worked on, the problems hit, how the
 - "I asked an AI to write a post-mortem of my own failed project, then checked my new plan against it line by line."
 - "Passing tests that check the form is filled in isn't the same as being correct."
 - "Consistency isn't accuracy: five identical wrong answers are still wrong."
+
+### 19:36 — Correction: the full post-mortem arrived
+**What:** Louis uploaded the complete post-mortem as a Markdown file. The 19:31 entry said the transcript was truncated, but the reference doc now holds the full text, including the ending. Added its closing advice to the summary: give agents small tasks with clear "done" conditions, let code own identities, schemas, vocabulary and state, and never let an agent judge its own output. Also added three rows to the coverage table: separate classification dimensions (only partly covered, since a single "primary category" still exists), small agent tasks, and code-owned identity.
+**Why it matters:** the ending holds the most useful line. Consistency has to be designed into the data model and the evaluation. It can't be enforced with more prompts and repair loops.
+**Talking points:**
+- "When the shared link wouldn't load, exporting to Markdown was the reliable route. Plain files beat clever scraping."
+- "We were building a system to remember what we agreed, using agents that couldn't remember what *they'd* agreed."
