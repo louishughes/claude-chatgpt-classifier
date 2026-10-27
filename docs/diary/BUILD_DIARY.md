@@ -145,3 +145,13 @@ A running, timestamped log of what is being worked on, the problems hit, how the
 - "My tests can simulate a timeout storm for free. The fake provider fails on command."
 - "If you can't set temperature to 0, you measure stability instead of assuming it."
 - "Checkpoint after every item; a crash at item 87 should cost one item, not 87."
+
+### 19:31 — Saving ChatGPT's post-mortem of the old attempt
+**What:** Louis shared a ChatGPT conversation explaining why the earlier Hermes/Codex classifier failed. Saved it as `docs/reference/2026-10-27-why-the-classifier-failed.md`: a summary of the reasoning, a table mapping each lesson to where the new plan already covers it, and the transcript.
+**Challenge:** the share link couldn't be fetched. ChatGPT share pages only load the messages with JavaScript, the cloud sandbox's network proxy refused the connection, and the page's data endpoint blocks automated access. Louis pasted the text instead. The paste stops mid-sentence at the end, so the file says it is truncated rather than guessing the rest.
+**Key lessons recorded:** classify against a corpus-wide project registry, not one conversation at a time; lock the vocabulary instead of auto-promoting terms during a run (otherwise results depend on processing order); measure against a human-labelled reference set, not tag counts; track who proposed vs. who decided; retry only for transient errors, never for semantic mistakes; prove a small result before building more system.
+**Gap spotted:** the current classification spike measures whether two runs *agree*, not whether they're *right*. A model can be consistently wrong, so a small hand-labelled subset is worth adding before trusting it. Flagged as a question, not changed.
+**Talking points:**
+- "I asked an AI to write a post-mortem of my own failed project, then checked my new plan against it line by line."
+- "Passing tests that check the form is filled in isn't the same as being correct."
+- "Consistency isn't accuracy: five identical wrong answers are still wrong."
