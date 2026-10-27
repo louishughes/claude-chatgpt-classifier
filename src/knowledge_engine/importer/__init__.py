@@ -28,6 +28,7 @@ def import_source(
     *,
     format: str | None = None,  # noqa: A002 - matches the CLI flag and the design note
     settings: Settings | None = None,
+    full_export: bool = True,
 ) -> ImportReport:
     """Import one export (folder or ZIP) into the workspace and report what changed.
 
@@ -41,6 +42,9 @@ def import_source(
         format: Force an adapter (``chatgpt-export-v1`` or
             ``chatgpt-split-v1``); None probes.
         settings: Settings to use; loaded from the environment if None.
+        full_export: True when the source is a whole-history export, so a
+            conversation it lacks is marked ``not_seen``. False for a partial
+            source (one shared chat, a hand-picked folder): nothing is marked.
 
     Returns:
         The import report.
@@ -52,4 +56,10 @@ def import_source(
     """
     from knowledge_engine.importer.run import run_import
 
-    return run_import(path, account_ns, format_id=format, settings=settings or load_settings())
+    return run_import(
+        path,
+        account_ns,
+        format_id=format,
+        settings=settings or load_settings(),
+        full_export=full_export,
+    )

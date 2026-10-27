@@ -21,6 +21,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from knowledge_engine.domain.enums import DeltaCategory, SourceSystem
@@ -29,6 +30,7 @@ from knowledge_engine.domain.ids import (
     graph_edge_id,
     message_node_id,
     message_revision_id,
+    sha256_hex,
 )
 from knowledge_engine.graph.conversation import ConversationGraph
 from knowledge_engine.graph.nodes import canonical_json, canonical_node
@@ -37,6 +39,7 @@ from knowledge_engine.importer.records import (
     GraphEdgeRow,
     MessageNodeRow,
     MessageRevisionRow,
+    RevisionObservationRow,
 )
 
 
@@ -54,6 +57,9 @@ class ConversationDelta:
         messages: Message delta category -> count.
         changed_revisions: New revision IDs (new or revised messages).
         warnings: Warning code -> count.
+        new_branches: Forks that appeared in this import (a node gaining a
+            second child, e.g. a regenerated answer).
+        raw_observations: New raw forms of existing or new revisions.
     """
 
     conversation_id: str
@@ -61,6 +67,8 @@ class ConversationDelta:
     messages: Counter[str] = field(default_factory=Counter)
     changed_revisions: list[str] = field(default_factory=list)
     warnings: Counter[str] = field(default_factory=Counter)
+    new_branches: int = 0
+    raw_observations: int = 0
 
 
 def native_conversation_id(native: Mapping[str, Any]) -> str | None:
@@ -188,6 +196,31 @@ def apply_conversation(
                 ] += 1
             else:
                 delta.messages[DeltaCategory.UNCHANGED.value] += 1
+            observation_key = _observation_id(revision_key, canonical.raw_payload_hash)
+            if session.get(RevisionObservationRow, observation_key) is None:
+                session.add(
+                    RevisionObservationRow(
+                        observation_id=observation_key,
+                        revision_id=revision_key,
+                        raw_payload_hash=canonical.raw_payload_hash,
+                        first_snapshot_id=snapshot_id,
+                        first_import_id=import_id,
+                    )
+                )
+                delta.raw_observations += 1
+
+    # Forks are counted before new edges are written: a fork is new if its
+    # parent had fewer than two stored children until now.
+    session.flush()
+    for point in graph.branch_points:
+        parent_key = message_node_id(conv_key, point.parent_id)
+        stored = session.scalar(
+            select(func.count())
+            .select_from(GraphEdgeRow)
+            .where(GraphEdgeRow.parent_node_key == parent_key)
+        )
+        if (stored or 0) < 2:
+            delta.new_branches += 1
 
     for node in graph.nodes.values():
         if node.parent_id is None or node.parent_id not in graph.nodes:
@@ -208,7 +241,79 @@ def apply_conversation(
             changed_structure = True
 
     if not is_new_conversation:
+        # Nodes stored before but absent now: unknown, never deleted.
+        stored_nodes = session.scalars(
+            select(MessageNodeRow).where(
+                MessageNodeRow.conversation_id == conv_key,
+                MessageNodeRow.presence == "present",
+            )
+        ).all()
+        for row in stored_nodes:
+            if row.native_node_id not in graph.nodes:
+                row.presence = "not_seen"
+                if _has_revision(session, row.node_key):
+                    delta.messages[DeltaCategory.NOT_SEEN.value] += 1
+                changed_structure = True
         changed = changed_structure or bool(delta.changed_revisions)
         delta.category = DeltaCategory.REVISED if changed else DeltaCategory.UNCHANGED
     session.flush()
     return delta
+
+
+def mark_not_seen(
+    session: Session, *, workspace_id: str, account_namespace: str, import_id: str
+) -> tuple[int, int]:
+    """Mark conversations this import didn't see as ``not_seen``.
+
+    A conversation missing from a new export is *unknown*, never deleted
+    (owner requirement C). Its rows all stay; only the presence flag moves,
+    and it moves back to ``present`` if a later export has it again.
+
+    Args:
+        session: A write session.
+        workspace_id: The workspace.
+        account_namespace: Only this account's conversations are affected.
+        import_id: The finished import.
+
+    Returns:
+        ``(conversations, messages)`` newly marked ``not_seen``.
+    """
+    missing = session.scalars(
+        select(ConversationRow).where(
+            ConversationRow.workspace_id == workspace_id,
+            ConversationRow.source_system == SourceSystem.CHATGPT.value,
+            ConversationRow.account_namespace == account_namespace,
+            ConversationRow.presence == "present",
+            ConversationRow.last_import_id != import_id,
+        )
+    ).all()
+    messages = 0
+    for conversation in missing:
+        conversation.presence = "not_seen"
+        nodes = session.scalars(
+            select(MessageNodeRow).where(
+                MessageNodeRow.conversation_id == conversation.conversation_id,
+                MessageNodeRow.presence == "present",
+            )
+        ).all()
+        for node in nodes:
+            node.presence = "not_seen"
+            if _has_revision(session, node.node_key):
+                messages += 1
+    session.flush()
+    return len(missing), messages
+
+
+def _has_revision(session: Session, node_key: str) -> bool:
+    return (
+        session.scalar(
+            select(func.count())
+            .select_from(MessageRevisionRow)
+            .where(MessageRevisionRow.node_key == node_key)
+        )
+        or 0
+    ) > 0
+
+
+def _observation_id(revision_id: str, raw_payload_hash: str) -> str:
+    return sha256_hex(f"{revision_id}:{raw_payload_hash}".encode())

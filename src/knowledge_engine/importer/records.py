@@ -122,3 +122,23 @@ class GraphEdgeRow(Base):
         ForeignKey("message_nodes.node_key"), default=None
     )
     first_import_id: Mapped[str] = mapped_column(ForeignKey("import_batches.import_id"))
+
+
+class RevisionObservationRow(Base):
+    """One exact raw form in which a revision was seen (ADR-0003's raw hash).
+
+    The revision says *what the message says*; observations say *how each
+    export wrote it down*. Metadata drift between exports adds an
+    observation, never a revision, so nothing downstream is redone.
+    """
+
+    __tablename__ = "revision_observations"
+    __table_args__ = (UniqueConstraint("revision_id", "raw_payload_hash"),)
+
+    observation_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    revision_id: Mapped[str] = mapped_column(
+        ForeignKey("message_revisions.revision_id"), index=True
+    )
+    raw_payload_hash: Mapped[str] = mapped_column(String(64))
+    first_snapshot_id: Mapped[str] = mapped_column(ForeignKey("source_snapshots.snapshot_id"))
+    first_import_id: Mapped[str] = mapped_column(ForeignKey("import_batches.import_id"))
