@@ -220,3 +220,39 @@ def test_cli_refuses_output_inside_a_git_repo(raw_dir, tmp_path):
     (repo / ".git").mkdir(parents=True)
     code = spike.main(["--raw-dir", str(raw_dir(3)), "--out", str(repo / "out"), "--provider", "fake"])
     assert code == 2
+
+
+# --- gold set ----------------------------------------------------------------
+
+def test_gold_template_then_accuracy_in_report(raw_dir, tmp_path):
+    import csv
+    root = raw_dir(12)
+    out = tmp_path / "out"
+    base = ["--raw-dir", str(root), "--out", str(out), "--sample", "10", "--provider", "fake"]
+    assert spike.main(base + ["--gold-template", "4"]) == 0
+    rows = list(csv.DictReader((out / "gold_template.csv").open()))
+    assert len(rows) == 4 and rows[0]["title"] == "synthetic" and not (out / "run-1.jsonl").exists()
+
+    # Label two chats with the fake model's own answer and two with a wrong one.
+    assert spike.main(base + ["--runs", "1"]) == 0
+    model = load_records(out / "run-1.jsonl")
+    for i, row in enumerate(rows):
+        right = model[row["conversation_id"]]["label"]["primary_category"]
+        row["primary_category"] = right if i < 2 else ("games" if right != "games" else "other")
+    with (out / "gold.csv").open("w", newline="") as fh:
+        w = csv.DictWriter(fh, fieldnames=rows[0].keys())
+        w.writeheader()
+        w.writerows(rows)
+    assert spike.main(base + ["--runs", "1", "--gold", str(out / "gold.csv")]) == 0
+    report = json.loads((out / "report.json").read_text())
+    assert report["gold"][0]["scored"] == 4
+    assert report["gold"][0]["primary_accuracy_pct"] == 50.0
+    assert "Accuracy vs your hand labels" in (out / "report.md").read_text()
+
+
+def test_gold_rejects_unknown_category(tmp_path):
+    from gold import load_gold
+    p = tmp_path / "g.csv"
+    p.write_text("conversation_id,primary_category\nx,gamez\n")
+    with pytest.raises(ValueError, match="gamez"):
+        load_gold(p)

@@ -104,7 +104,8 @@ def category_spread(runs: list[dict[str, dict]]) -> dict[str, int]:
     return dict(sorted(spread.items(), key=lambda kv: -kv[1]))
 
 
-def to_markdown(meta: dict, stats: list[dict], cons: list[dict], spread: dict[str, int]) -> str:
+def to_markdown(meta: dict, stats: list[dict], cons: list[dict], spread: dict[str, int],
+                gold: list[dict] | None = None) -> str:
     lines = ["# Classification spike report", ""]
     lines += [f"- **{k}:** {v}" for k, v in meta.items()]
     lines += ["", "## Per run", "", "| metric | " + " | ".join(f"run {i}" for i in range(1, len(stats) + 1)) + " |",
@@ -118,6 +119,13 @@ def to_markdown(meta: dict, stats: list[dict], cons: list[dict], spread: dict[st
         lines += ["| " + " | ".join(str(c.get(k, "")) for k in keys) + " |" for c in cons]
     else:
         lines.append("Only one run, so nothing to compare.")
+    lines += ["", "## Accuracy vs your hand labels (gold set)", ""]
+    if gold:
+        keys = list(max(gold, key=len))
+        lines += ["| run | " + " | ".join(keys) + " |", "|---|" + "---|" * len(keys)]
+        lines += [f"| {i} | " + " | ".join(str(g.get(k, "")) for k in keys) + " |" for i, g in enumerate(gold, 1)]
+    else:
+        lines.append("No gold file given, so accuracy was not measured (only consistency).")
     lines += ["", "## Primary category spread (run 1)", ""]
     lines += [f"- {k}: {v}" for k, v in spread.items()]
     return "\n".join(lines) + "\n"

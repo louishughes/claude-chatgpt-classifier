@@ -145,3 +145,9 @@ A running, timestamped log of what is being worked on, the problems hit, how the
 - "My tests can simulate a timeout storm for free. The fake provider fails on command."
 - "If you can't set temperature to 0, you measure stability instead of assuming it."
 - "Checkpoint after every item; a crash at item 87 should cost one item, not 87."
+
+### 19:35 — Consistent isn't the same as correct
+**What:** A review of the earlier ChatGPT post-mortem pointed out a gap: the spike measured whether two runs agree, but not whether the labels are *right*. Added a small gold set: the spike writes a template of 15 sampled chats, Louis labels them by hand, and the report shows accuracy against his labels next to run-to-run agreement. Unknown category names in the file are rejected, so a typo can't masquerade as a model error. 27 tests pass.
+**Talking points:**
+- "A model can be consistently wrong. Measure agreement *and* accuracy."
+- "Fifteen hand labels is a cheap reality check, and it seeds the real evaluation set later."

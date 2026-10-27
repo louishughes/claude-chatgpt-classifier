@@ -11,6 +11,7 @@ The earlier attempts failed on three things: inconsistent labels, untyped output
 4. Validates every answer. One repair attempt, then `review_required`.
 5. Retries timeouts/rate limits/server errors at most 3 calls in total, with backoff. Stops before every call if the cost cap is reached. Saves after every chat, so a rerun resumes.
 6. Runs the whole sample twice and reports reliability, cost and run-to-run agreement (`report.md`, counts only).
+7. Optionally compares the model with **your own labels** for 10–20 chats (a gold set). Agreement between runs only proves consistency; a model can be consistently wrong.
 
 ## Files
 | File | Role |
@@ -20,8 +21,9 @@ The earlier attempts failed on three things: inconsistent labels, untyped output
 | `providers.py` | `AnthropicProvider` (real) and `FakeProvider` (tests), typed errors, prices |
 | `runner.py` | Retries, repair, cost cap, checkpoint/resume, evidence-quote check |
 | `report.py` | Metrics and the Markdown report |
+| `gold.py` | Hand-labelled gold set: template and accuracy vs your labels |
 | `spike.py` | Command line |
-| `tests/` | 25 tests on synthetic data, including 50- and 100-chat batches with injected failures |
+| `tests/` | 27 tests on synthetic data, including 50- and 100-chat batches with injected failures |
 
 ## Running it
 ```bash
@@ -32,7 +34,9 @@ python -m pytest -q tests                         # free, offline
 
 # Needs ANTHROPIC_API_KEY set in your shell. Never commit it.
 python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --dry-run          # cost estimate only
-python spike.py --raw-dir ../../raw --sample 50 --runs 2 --out ~/spike-out --max-cost-usd 5
+python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --gold-template 15   # optional: label these
+# fill in primary_category (and secondary_categories, ';'-separated), save as ~/spike-out/gold.csv
+python spike.py --raw-dir ../../raw --sample 50 --runs 2 --out ~/spike-out --max-cost-usd 5 --gold ~/spike-out/gold.csv
 python spike.py --raw-dir ../../raw --sample 100 --runs 2 --out ~/spike-out-100 --max-cost-usd 10
 ```
 Defaults: model `claude-opus-5-5`, effort `low`, 4 workers, 90 s timeout, 24,000 characters per chat. Server-side refusal fallback is on (the API retries a declined request on a fallback model and the report lists which model answered); `--no-refusal-fallback` turns it off.
@@ -48,6 +52,7 @@ Defaults: model `claude-opus-5-5`, effort `low`, 4 workers, 90 s timeout, 24,000
 | primary category agreement run 1 vs run 2 | ≥ 90% |
 | secondary category Jaccard | ≥ 0.75 |
 | decision evidence quotes found verbatim | ≥ 95% |
+| primary category matches your gold labels | ≥ 80% (≥ 90% counting secondaries) |
 | cost per 100 chats | reported, compared with the cap |
 
 Topic Jaccard is reported but not gated: free-text topics are expected to vary in wording. That is why the real system will map topics onto a governed taxonomy.

@@ -221,3 +221,12 @@ The owner is learning Python and wants the code to work as a portfolio piece and
 - Each ticket's diary entry ends with "What I learned" and "Talking points" (see `docs/diary/BUILD_DIARY.md`).
 
 Packaging and monetisation are recorded as a future option (OD-16) and do not enlarge the MVP. The one early action worth considering is choosing a licence, because the repository is public.
+
+## 12. Pre-M1 classification spike (owner decision, 2026-10-27)
+The owner chose to validate the AI labelling step before starting M1. `prototype/classification_spike/` is throwaway code that labels a reproducible sample of 50, then 100, real conversations twice with schema-checked output, and reports:
+- **Reliability:** ok rate, first-try schema failures, repairs, timeouts and rate limits, latency, cost.
+- **Consistency:** primary-category agreement and secondary/topic Jaccard between runs.
+- **Accuracy:** agreement with a small gold set of 10–20 chats that the owner hand-labels. Consistency alone is not enough, because a model can be consistently wrong.
+- **Evidence:** share of decision quotes found verbatim in the source.
+
+Targets are in the spike README. Results feed OD-05 (provider/model, cost cap), the FND-009 contract and the EVAL-001 golden set: the gold labels become its first entries. Nothing in `src/` will import the spike.

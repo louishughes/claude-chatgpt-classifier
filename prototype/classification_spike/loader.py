@@ -53,6 +53,7 @@ class Conversation:
 
     conversation_id: str
     source_file: str  # file name only, used for resume and debugging
+    title: str = ""  # only ever written to the private output folder
     turns: list[Turn] = field(default_factory=list)
     branch_points: int = 0  # nodes with more than one child (edits/regens)
 
@@ -139,9 +140,11 @@ def load_conversation(path: Path) -> Conversation | None:
     mapping = native["mapping"]
     turns = [t for t in (turn_from_node(n) for n in active_path(mapping, native.get("current_node"))) if t]
     conv_id = native.get("conversation_id") or native.get("id") or path.stem
+    title = native.get("title") or (data.get("title") if isinstance(data, dict) else "") or ""
     return Conversation(
         conversation_id=str(conv_id),
         source_file=path.name,
+        title=str(title),
         turns=turns,
         branch_points=count_branch_points(mapping),
     )

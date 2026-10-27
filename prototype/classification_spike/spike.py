@@ -8,6 +8,10 @@ Typical use on the PC that holds raw/:
     # 2. Two runs over 50 chats with a $5 cap, then the report.
     python spike.py --raw-dir ../../raw --sample 50 --runs 2 --out ~/spike-out --max-cost-usd 5
 
+    # Optional but recommended: hand-label 15 of the 50 first (see gold.py).
+    python spike.py --raw-dir ../../raw --sample 50 --out ~/spike-out --gold-template 15
+    python spike.py ... --gold ~/spike-out/gold.csv
+
     # 3. Same again at 100. The 100 sample contains the 50 sample.
     python spike.py --raw-dir ../../raw --sample 100 --runs 2 --out ~/spike-out-100 --max-cost-usd 10
 
@@ -28,11 +32,12 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from gold import gold_stats, load_gold, write_template
 from loader import clip_text, sample_conversations
 from providers import PRICES, AnthropicProvider, FakeProvider, FatalError
 from report import category_spread, consistency, run_stats, to_markdown
 from runner import CostMeter, load_records, run_once
-from schema import SYSTEM_PROMPT, TAXONOMY_VERSION
+from schema import CATEGORIES, SYSTEM_PROMPT, TAXONOMY_VERSION
 
 # Rough output size per call, including the model's thinking. Only used for
 # the dry-run estimate; the real run uses the API's exact token counts.
@@ -62,6 +67,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--timeout-s", type=float, default=90.0)
     p.add_argument("--workers", type=int, default=4)
     p.add_argument("--no-refusal-fallback", action="store_true")
+    p.add_argument("--gold-template", type=int, metavar="N",
+                   help="write a CSV of the first N sampled chats for hand-labelling, then stop")
+    p.add_argument("--gold", type=Path, help="filled-in gold CSV: adds accuracy to the report")
     p.add_argument("--dry-run", action="store_true", help="estimate cost, make no calls")
     p.add_argument("--allow-out-in-repo", action="store_true", help="tests only")
     return p.parse_args(argv)
@@ -77,6 +85,13 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Sampled {len(convs)} conversations (skipped: {skipped})")
     if not convs:
         return 1
+
+    if args.gold_template:
+        out.mkdir(parents=True, exist_ok=True)
+        write_template(convs[: args.gold_template], out / "gold_template.csv")
+        print(f"Wrote {out / 'gold_template.csv'}. Categories: {', '.join(CATEGORIES)}")
+        return 0
+    gold = load_gold(args.gold.expanduser()) if args.gold else {}
 
     model = "fake" if args.provider == "fake" else args.model
     sent_chars = sum(len(clip_text(c.full_text(), args.budget_chars)[0]) for c in convs)
@@ -123,9 +138,11 @@ def main(argv: list[str] | None = None) -> int:
         "budget_chars": args.budget_chars, "timeout_s": args.timeout_s,
         "total_cost_usd": round(meter.spent, 4),
     }
+    vs_gold = [gold_stats(r, gold) for r in runs] if gold else []
     (out / "report.json").write_text(json.dumps(
-        {"meta": meta, "runs": stats, "consistency": cons, "spread": category_spread(runs)}, indent=1))
-    (out / "report.md").write_text(to_markdown(meta, stats, cons, category_spread(runs)))
+        {"meta": meta, "runs": stats, "consistency": cons, "gold": vs_gold, "spread": category_spread(runs)},
+        indent=1))
+    (out / "report.md").write_text(to_markdown(meta, stats, cons, category_spread(runs), vs_gold))
     print(f"Report: {out / 'report.md'}")
     return 0
 
