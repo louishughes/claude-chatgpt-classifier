@@ -939,3 +939,6 @@ digest/stage.py (DigestStage via ModelStageRunner: active path + fork lines, unt
 
 ## 2026-10-28 13:55 NOTE-004 (#276)
 `ke digest run` (FileBatchProvider + DigestStage.run_all, --vault writes notes), stored_digest, rich_note digest wiring, docs chat v2 uses a stored digest, runbook section. Tests: tests/integration/test_digest_dry_run.py (3); test_rich_note.py unchanged.
+
+## 2026-10-28 15:55 NOTE-008 (#280)
+documents/categories.py (category_shares: domain terms by share of labelled messages, primary/secondary/side subject, segments, classifier evidence, reviewer verdict per segment; waiting_candidates: open add proposals citing the chat), rich_note Category section uses them. Tests: tests/integration/test_note_categories.py (2).

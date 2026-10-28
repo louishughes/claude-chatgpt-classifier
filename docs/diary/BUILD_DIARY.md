@@ -2872,3 +2872,24 @@ Talking points:
 - "A test that only failed on one OS and one Python version turned out to be a clock-resolution bug: Python 3.12 on Windows only ticks every 16 ms."
 - "I couldn't run Windows, so I faked a coarse clock in a test plugin to reproduce it deterministically before fixing it."
 - "When I couldn't reproduce the second flake, I didn't guess. I made CI print the full error so the next failure explains itself."
+
+### 15:55 — NOTE-008: the category section says how much of the chat, and who decided
+
+The classifier labels segments, because one chat can be about two things. The note used to show only the single rolled-up category. Now the Category and subcategory section lists every category the chat's segments got:
+
+- each with its **share of the chat** in messages ("primary, 67% of labelled messages"); the largest is the primary, the rest secondaries, and a label only ever given as a segment's side label is a "side subject" with no share;
+- which segments it came from and the messages the classifier cited, as `[m12]` links;
+- the **reviewer verdict** per segment: classifier only, reviewer agreed, reviewer changed it, set by a reviewer, or reviewed under an older vocabulary;
+- **candidates waiting for review**: open taxonomy proposals whose evidence points at this chat, shown as candidates and never as labels.
+
+The classifier stores no free-text reason, so the "why" is its cited messages; I didn't invent a sentence.
+
+**Teach-back (`category_shares`):** It goes through a chat's segments in order and, for each one, looks up its main category under the published vocabulary, counting the segment's messages towards that category. The category with the most messages is the chat's primary and the others are secondaries, each with its percentage, the messages the classifier pointed to, and whether a person checked it. A proposed new category is listed separately as waiting, so it can never be mistaken for a real label.
+
+Checks:
+```
+tests/integration/test_note_categories.py   2 passed (two-subject chat: 67% primary, 33% secondary; candidates shown only as candidates)
+```
+Fix attempts: 1 (my synthetic user turns were under 40 characters, so the segmenter treated them as short replies and never split the chat).
+
+**Next exact task:** NOTE-009 (related chats with reasons).
