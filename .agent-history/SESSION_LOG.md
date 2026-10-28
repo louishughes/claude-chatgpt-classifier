@@ -763,3 +763,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - retrieval/hybrid.py (Channel, fuse, Fused, HybridHit, HybridResult, HybridRetriever, query_words); retrieval/planner.py (Route, Plan, plan, codes, RecordAnswer, RouteResult, structured_answers, run_plan); `ke find`. No migration.
 - Tests: tests/unit/test_rank_fusion_and_routes.py (19), tests/integration/test_hybrid_and_routes.py (6). Full suite 1095 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: RET-006.
+
+## 2026-10-28 09:10 RET-006 (#95) + RET-007 (#96)
+- retrieval/citations.py (Citation, Rejected, Problem, citation_id, resolve, cite_message, quote, audit, ContextMessage, EvidenceBundle, Hydrated, hydrate); retrieval/answers.py (Sentence, GroundedAnswer, Evidence, Writer, ExtractiveWriter, ModelWriter, AnswerDraft, answer, to_json, MIN_SIMILARITY); HybridHit gains optional `similarity`; `ke ask`. No migration.
+- Tests: test_citations_and_answers.py (8). Full suite 1103 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: RET-008.

@@ -127,6 +127,8 @@ class HybridHit:
         snippet: The word index's extract, when it matched there.
         record_type: The record's kind (records only).
         trust: The record's trust (records only).
+        similarity: The best cosine similarity the meaning index gave it,
+            if it found it (the answer service's relevance gate, RET-007).
     """
 
     kind: str
@@ -141,6 +143,7 @@ class HybridHit:
     snippet: str | None = None
     record_type: str | None = None
     trust: str | None = None
+    similarity: float | None = None
 
     @property
     def revision_id(self) -> str | None:
@@ -176,6 +179,7 @@ class _Message:
     role: str | None
     best: dict[str, tuple[int, str]] = field(default_factory=dict)  # revision -> (rank, id)
     snippet: str | None = None
+    similarity: float | None = None
 
 
 class HybridRetriever:
@@ -239,6 +243,8 @@ class HybridRetriever:
             entry.best[hit.revision_id] = min(entry.best[hit.revision_id], (rank, hit.revision_id))
             if isinstance(hit, SearchHit) and entry.snippet is None:
                 entry.snippet = hit.snippet
+            if isinstance(hit, SemanticHit):
+                entry.similarity = max(entry.similarity or hit.score, hit.score)
             return hit.node_key
 
         if Channel.LEXICAL in wanted:
@@ -308,6 +314,7 @@ class HybridRetriever:
                 native_node_id=entry.native_node_id,
                 role=entry.role,
                 snippet=entry.snippet,
+                similarity=entry.similarity,
             )
 
         ordered = [build(k, True) for k in pinned_keys]

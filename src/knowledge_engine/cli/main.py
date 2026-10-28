@@ -905,6 +905,68 @@ def _find(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _ask(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Answer from the chats with a citation on every sentence, or abstain (RET-007)."""
+    import json
+
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.infrastructure.workspace import WorkspaceRow
+    from knowledge_engine.retrieval.answers import answer, to_json
+    from knowledge_engine.retrieval.embeddings import LocalHashEmbedder
+    from knowledge_engine.retrieval.hybrid import HybridRetriever
+    from knowledge_engine.retrieval.lexical import LexicalIndex, search_index_path, sync_index
+    from knowledge_engine.retrieval.semantic import (
+        SemanticIndex,
+        StaleIndexError,
+        semantic_index_path,
+        sync_semantic,
+    )
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "ask", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    answers: list[dict[str, object]] = []
+    try:
+        try:
+            semantic = SemanticIndex(
+                semantic_index_path(settings), LocalHashEmbedder(), rebuild=args.rebuild
+            )
+        except StaleIndexError as error:
+            return CommandResult(
+                "ask", ExitCode.ERROR, message=f"{error} (use --rebuild)", error_code="stale"
+            )
+        with (
+            Session(engine) as session,
+            semantic,
+            LexicalIndex(search_index_path(settings)) as lexical,
+        ):
+            sync_index(session, lexical)
+            sync_semantic(session, semantic, settings.egress)
+            retriever = HybridRetriever(session, lexical, semantic, settings.egress)
+            for workspace_id in session.scalars(select(WorkspaceRow.workspace_id)):
+                found = answer(
+                    session,
+                    args.question,
+                    retriever,
+                    lexical,
+                    workspace_id=workspace_id,
+                    limit=args.limit,
+                    as_of=args.as_of,
+                )
+                answers.append(json.loads(to_json(found)))
+    finally:
+        engine.dispose()
+    answered = [a for a in answers if a["status"] != "unknown"]
+    shown = (answered or answers or [{"answer": "no workspaces"}])[0]
+    return CommandResult("ask", data={"answers": answers}, message=str(shown["answer"]))
+
+
 def _state(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """What holds now or on a date, with the events behind it (REC-006); no text."""
     from datetime import UTC, datetime
@@ -1668,6 +1730,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--rebuild", action="store_true", help="rebuild a meaning index made by another embedder"
     )
     find.set_defaults(handler=_find)
+
+    ask = commands.add_parser(
+        "ask", help="answer from your chats, citing every sentence (or say it doesn't know)"
+    )
+    ask.add_argument("question", help="the question")
+    ask.add_argument("--limit", type=int, default=8, help="at most this many pieces of evidence")
+    ask.add_argument(
+        "--as-of", type=float, help="decision questions: the state at this time (epoch seconds)"
+    )
+    ask.add_argument(
+        "--rebuild", action="store_true", help="rebuild a meaning index made by another embedder"
+    )
+    ask.set_defaults(handler=_ask)
 
     related = commands.add_parser("related", help="links between conversations (forks, quotes)")
     related_commands = related.add_subparsers(
