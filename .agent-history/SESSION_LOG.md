@@ -957,3 +957,6 @@ evaluation/note_checks.py (check_note: citations_real, claims_cited, decisions_u
 
 ## 2026-10-28 16:10 NOTE-009 (#281)
 extraction/preamble.py (looks_like_preamble, shared by NOTE-005 and the detectors); relationships/detect.py skips a leading setup prompt in copied openings and setup-prompt paragraphs in quotes; relationships/related.py leaves them out of similarity profiles. Tests: tests/integration/test_note_related.py (3).
+
+## 2026-10-28 18:20 NOTE-022 (#321)
+documents/rich_note.py _prefer_model: records whose extraction run's segment also has a DONE run with a prompt version, and that have no prompt version themselves, are left out of the rich note; the Source paragraph counts them; nothing deleted. Tests: tests/integration/test_note_prefers_model_records.py (1).

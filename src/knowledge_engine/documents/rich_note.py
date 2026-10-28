@@ -28,6 +28,12 @@ How evidence is shown, and why (the old v2 notes drowned in it):
 * hashes, record IDs and stage keys go to a JSON sidecar in
   ``Knowledge/.meta/`` instead of the reader's way.
 
+Where a model extraction (NOTE-005) has finished for a segment, the older
+rule-extractor records of that segment are left out of the note (NOTE-022):
+they repeat what the model found and pick up pasted instructions and drafted
+text as if the user had said them. They stay stored, and the Source section
+says how many were held back.
+
 Only stored facts are used: nothing here calls a model, and a section with
 nothing behind it says so instead of guessing. DOC-003 stays the default
 note; this one is chosen with ``ke docs chat --template v2``.
@@ -59,6 +65,8 @@ from knowledge_engine.documents.notes import _branches, _images, _links, knowled
 from knowledge_engine.documents.render import transcript_stem
 from knowledge_engine.domain.models import EvidenceRef
 from knowledge_engine.extraction.records import KnowledgeRecord
+from knowledge_engine.extraction.runner import DONE as RUN_DONE
+from knowledge_engine.extraction.runner import ExtractionRunRow
 from knowledge_engine.extraction.store import KnowledgeRecordRow
 from knowledge_engine.importer.records import ConversationRow
 from knowledge_engine.relationships.view import RelatedLink, related_links
@@ -247,6 +255,47 @@ class _Sorted:
     stated: list[_Item]  # requirements, preferences and facts
     artefacts: list[_Item]
     references: list[_Item]
+
+
+def _prefer_model(session: Session, items: Sequence[_Item]) -> tuple[list[_Item], int]:
+    """Leave out rule records of segments a model extraction covers (NOTE-022).
+
+    A run is a model run when its versions name a prompt. Records with no
+    extraction run behind them (a person's, say) are always kept.
+
+    Returns:
+        The records to show, and how many were left out.
+    """
+    keys = {i.record.provenance.stage_key for i in items if i.record.provenance}
+    runs = {
+        r.stage_key: r
+        for r in session.scalars(
+            select(ExtractionRunRow).where(ExtractionRunRow.stage_key.in_(sorted(keys)))
+        )
+    }
+    segments = sorted({r.segment_id for r in runs.values()})
+    covered = {
+        r.segment_id
+        for r in session.scalars(
+            select(ExtractionRunRow).where(
+                ExtractionRunRow.segment_id.in_(segments), ExtractionRunRow.state == RUN_DONE
+            )
+        )
+        if "prompt" in json.loads(r.versions_json)
+    }
+    kept = []
+    for it in items:
+        provenance = it.record.provenance
+        run = runs.get(provenance.stage_key) if provenance else None
+        if (
+            run is not None
+            and provenance is not None
+            and provenance.prompt_version is None
+            and run.segment_id in covered
+        ):
+            continue
+        kept.append(it)
+    return kept, len(items) - len(kept)
 
 
 def _sort(items: Sequence[_Item]) -> _Sorted:
@@ -511,7 +560,9 @@ def rich_conversation_note(
     stem = transcript_stem(conversation_id, chat.title)
     citer = Citer(chat, stem)
     document = build_document(session, DocumentKind.CONVERSATION, conversation_id)
-    items = _load_items(session, [i for s in document.sections for i in s.items])
+    items, hidden = _prefer_model(
+        session, _load_items(session, [i for s in document.sections for i in s.items])
+    )
     sorted_ = _sort(items)
     labels = chat_labels(session, chat, taxonomy)
     links = related_links(session, [conversation_id])
@@ -695,6 +746,12 @@ def rich_conversation_note(
                 if digest is None
                 else f"summary and generated sections from a {digest.schema_version} digest, "
                 "not yet scored."
+            )
+            + (
+                f" {hidden} rule-based record(s) left out: a model extraction covers "
+                "their segments."
+                if hidden
+                else ""
             ),
             True,
         ),

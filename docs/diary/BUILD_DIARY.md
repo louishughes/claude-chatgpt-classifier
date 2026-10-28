@@ -3020,6 +3020,22 @@ Fix attempts: 1 (the first test run showed the copied-opening detector also need
 
 **Next exact task:** NOTE-012 dashboard chat view.
 
+### 18:20 — NOTE-022: the note prefers the model's records where the model ran
+
+The re-score found 57 noise lines in the "from the chat" sections, and 42 of them were pasted custom instructions. They came from the older rule extractors. Those records stay stored next to the newer model-extractor records (NOTE-005), so both showed up in the note.
+
+Now, when a model extraction has finished for a segment, the note leaves out the rule records from that segment. A segment the model hasn't covered keeps its rule records, so nothing goes missing in a chat that's only partly processed. Nothing is deleted. The Source section says how many records were held back ("3 rule-based record(s) left out: a model extraction covers their segments"). A run counts as a model run when its stored versions name a prompt, so the check uses only what the run recorded about itself.
+
+**Teach-back (`_prefer_model` in `rich_note.py`):** For each record in the note, it finds the extraction run that made it and that run's segment. If a model run has finished on that segment, a rule record from it is left out of the note, though it stays in the database. The note then says how many it held back, so nothing is hidden silently.
+
+Checks:
+```
+tests/integration/test_note_prefers_model_records.py   1 passed (segment 1: rule records out, model record in; segment 2: rule record kept; count shown; 5 records still stored)
+```
+Fix attempts: 1 (the test's "left out" check matched the Related chats subtitle).
+
+**Next exact task:** on the PC, re-render the 40 gold notes and re-score them (rich-notes thread).
+
 ### 15:25 — #288: the "import didn't finish" page that lied
 
 I was sent to build the integration tickets (INT-001..003), but they were already merged, so I took the one open integration-test problem nobody had claimed: a browser-import test that failed once on Windows + Python 3.12 and passed on the re-run.
