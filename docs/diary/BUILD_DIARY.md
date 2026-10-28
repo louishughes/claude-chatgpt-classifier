@@ -2984,6 +2984,24 @@ Fix attempts: 1 (the first test run showed the copied-opening detector also need
 
 **Next exact task:** NOTE-012 dashboard chat view.
 
+### 18:00 — EVAL-014: scoring against the per-chat answer key
+
+`ke gold score` couldn't read the real answer key (v1 or v2): the key is one JSON file per chat in the classification spike's shape, and the scorer wants one combined golden-set file. **`ke gold convert --key <folder>`** now reads the folder and writes a golden set to the workspace (git-ignored). It never writes to the key folder, it refuses an output path inside that folder, and it never overwrites a file.
+
+It converts only what maps exactly. Ideas, requirements, preferences, artefacts and open questions map one to one. A decision maps by its state: accepted or superseded becomes the user's decision at the message where they decided, rejected becomes a rejection, and proposed becomes a proposal by whoever made it. `fact`, `task`, `fact_about_owner`, `problem_fix` and an `unclear` decision are counted as unmapped and left out. Unverified items are also left out and counted. The spike's segment labels aren't taxonomy IDs, so segments are counted, not converted.
+
+The numbering trap from REV-010 is handled. A v2 item is placed by its native `message_id`, and if its number disagrees, that's counted. A v1 item has only a number, so its quote must be found in the numbered message, otherwise it's skipped. An off-by-one then shows up in the counts instead of moving an item to the wrong message.
+
+**Teach-back (`answer_key.py`):** It turns the answer key, written one file per chat, into the single file the scorer reads, and it only ever reads the key. Each item is pinned to its exact message by ID, or its quote must be found in the message its number points at. Anything with no exact equivalent in the engine is counted and left out, never guessed.
+
+Checks:
+```
+tests/integration/test_answer_key_convert.py   2 passed (synthetic key: 5 records placed, 3 unmapped, 1 unverified, 1 v1-style skip, 1 number mismatch, key folder hash unchanged, the output loads and `ke gold score` reads it; output inside the key folder refused)
+```
+Fix attempts: 0.
+
+**Next exact task:** on the PC, run `ke gold convert --key private/answer-key/v2`, then score. Check that v1's and v2's hashes are unchanged (the hashes are recorded in OPEN_DECISIONS).
+
 ### 15:25 — #288: the "import didn't finish" page that lied
 
 I was sent to build the integration tickets (INT-001..003), but they were already merged, so I took the one open integration-test problem nobody had claimed: a browser-import test that failed once on Windows + Python 3.12 and passed on the re-run.

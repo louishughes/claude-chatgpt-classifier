@@ -954,3 +954,6 @@ evaluation/note_checks.py (check_note: citations_real, claims_cited, decisions_u
 
 ## 2026-10-28 16:10 NOTE-009 (#281)
 extraction/preamble.py (looks_like_preamble, shared by NOTE-005 and the detectors); relationships/detect.py skips a leading setup prompt in copied openings and setup-prompt paragraphs in quotes; relationships/related.py leaves them out of similarity profiles. Tests: tests/integration/test_note_related.py (3).
+
+## 2026-10-28 18:00 EVAL-014 (#317)
+evaluation/answer_key.py convert_answer_key (per-chat spike key -> GoldSet; read only; idea/requirement/preference/artefact/open_question 1:1, decision by state, fact/task/fact_about_owner/problem_fix/unclear unmapped; v2 placed by message_id, v1 by number + quote check; unverified excluded; segments counted not converted); `ke gold convert --key --out --name`, refuses output inside the key folder. Tests: tests/integration/test_answer_key_convert.py (2), fixtures tests/fixtures/answer_key/.

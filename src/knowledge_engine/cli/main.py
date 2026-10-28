@@ -805,6 +805,70 @@ def _gold_template(settings: Settings, args: argparse.Namespace) -> CommandResul
     )
 
 
+def _gold_convert(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Turn a per-chat answer key folder into one golden set file (EVAL-014); counts only.
+
+    The key folder is only read. The output must be outside it, and an
+    existing file is never overwritten.
+    """
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.evaluation.answer_key import convert_answer_key
+    from knowledge_engine.evaluation.gold import write_gold
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+
+    name = "gold convert"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    key = args.key.resolve()
+    if not key.is_dir() or not any(key.glob("*.json")):
+        return CommandResult(
+            name,
+            ExitCode.USAGE,
+            message="no key files (*.json) in that folder",
+            error_code="missing",
+        )
+    out = (args.out or settings.workspace_root / "gold" / f"{args.name}.json").resolve()
+    if out.is_relative_to(key):
+        return CommandResult(
+            name,
+            ExitCode.USAGE,
+            message="the output must be outside the answer key folder",
+            error_code="inside_key",
+        )
+    if out.exists():
+        return CommandResult(
+            name, ExitCode.USAGE, message=f"already exists: {out.name}", error_code="exists"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            gold, report = convert_answer_key(
+                session,
+                key,
+                name=args.name,
+                taxonomy_version=args.taxonomy,
+                annotator=args.annotator,
+            )
+    finally:
+        engine.dispose()
+    write_gold(gold, out)
+    data = {**report.as_dict(), "file": out.name}
+    unmapped = sum(report.unmapped.values())
+    skipped = sum(report.skipped.values())
+    return CommandResult(
+        name,
+        data=data,
+        message=(
+            f"{report.records} records from {report.found} of {report.files} chats; "
+            f"{unmapped} unmapped, {skipped} skipped, {report.unverified} unverified left out"
+        ),
+    )
+
+
 def _gold_score(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Score this workspace's records against a private answer key; numbers only."""
     from sqlalchemy.orm import Session
@@ -3477,6 +3541,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-rules", action="store_true", help="don't run the rule extractors first"
     )
     score.set_defaults(handler=_gold_score)
+    convert = gold_commands.add_parser(
+        "convert", help="turn a per-chat answer key folder into one golden set (reads it only)"
+    )
+    convert.add_argument("--key", type=Path, required=True, help="the per-chat key folder")
+    convert.add_argument("--name", default="answer-key-v2", help="the golden set's name")
+    convert.add_argument("--out", type=Path, help="where to write it (default: workspace gold/)")
+    convert.add_argument("--taxonomy", default="none", help="recorded on the set (no labels)")
+    convert.add_argument(
+        "--annotator", default="answer-key", help="who wrote the key, as scores credit it"
+    )
+    convert.set_defaults(handler=_gold_convert)
     gold_commands.add_parser("schema", help="print the golden set JSON Schema").set_defaults(
         handler=_gold_schema
     )
