@@ -904,8 +904,20 @@ classification/store.py review_reason_kind; semantic_smoke review_reasons + repl
 ## 2026-10-28 11:17 PROD-003 (#128)
 ADR-0011; access/tenants.py; settings.tenants_root; api/deps get_settings by X-KE-Workspace; per-tenant job lists; hosted check_access; imports inbox-only; `ke tenant`. Tests: test_tenant_isolation.py (4). #255 replay on the PC: 53 evidence_outside_segment (all `[m:id]` tags, a parsing bug), 23 model_unsure.
 
+## 2026-10-28 12:55 OPS-009 (#201)
+smoke._peak_memory_mb: ctypes PeakWorkingSetSize on Windows, "unavailable_on_platform" otherwise; `ke inspect --redact`; G1 checklist uses --redact. Tests: test_redact_and_memory.py (3).
+
+## 2026-10-28 12:40 PERF-001 (#200)
+archive.put_file/put_bytes: hash first, write only new bytes; ledger skips re-verifying the file just checked; evaluation/import_timing.py (phase timer, synthetic tree). Tests: tests/unit/test_archive_reuse.py (5). Linux: re-import 7.47 → 5.79 s. Table in docs/evaluation/EVAL-010_SMOKE.md.
+
 ## 2026-10-28 11:24 m:ID fix (#255 follow-up)
 providers/base.py MessageRef/bare_message_id; classification evidence and extraction ModelQuote use it. Tests: tests/unit/test_message_ref.py (9).
 
 ## 2026-10-28 11:33 PROD-004 (#129)
 docs/operations/HOSTING_AND_SECURITY.md; OD-19; authz log by account ID; rotate_token, delete_account, delete_tenant; `ke access rotate|delete`, `ke tenant delete`. Tests: test_hosting_security.py (6). #255 fix replay on PC: 44/67 done, 23 model_unsure, 0 outside-segment.
+
+## 2026-10-28 11:42 INT-001 (#130)
+ingestion/web.py (allowlist, SSRF checks per hop, pinned connection, size/type caps, canonical anchoring, located blocks, snapshot), settings.web_allowlist, `ke web fetch`. Tests: test_web_fetch.py (24, no network). Docs: docs/operations/WEB_FETCH.md.
+
+## 2026-10-28 11:58 INT-002 (#131)
+links/youtube_captions.py (Data API v3 captions.list/download, OAuth token from env, statuses, spacing, ASR flag), ProviderAnswer.detail into provenance, settings.youtube_access_token, `ke transcript fetch`. Tests: test_youtube_captions.py (11, no network). Docs: docs/operations/YOUTUBE_CAPTIONS.md.
