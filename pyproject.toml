@@ -62,6 +62,10 @@ packages = ["src/knowledge_engine"]
 # under prototype/ has its own tests and its own dependencies.
 testpaths = ["tests"]
 addopts = ["--strict-markers", "--import-mode=importlib"]
+# Show failed asserts in full (no "..." in long strings) while the rest of
+# the output stays quiet. A Windows-only flake (#288) hid the job's error
+# message in the middle of a cut-short page, so CI couldn't say why.
+verbosity_assertions = 2
 
 # ------------------------------------------------------------------ ruff
 [tool.ruff]
