@@ -45,7 +45,9 @@ def test_a_conversation_the_importer_never_reads_is_a_silent_drop(tmp_path: Path
     result = evaluate_export(export, tmp_path / "scratch", name="stray", layout="official")
     assert result.source_conversations == 3 and result.stored_conversations == 2
     assert result.dropped_nodes == len(census(export).nodes[stray[0]["id"]])
-    assert result.verdict == "silent_drop"
+    # Was "silent_drop"; IMP-007 (#237) makes the importer warn about the
+    # stray file, so the drop is now admitted in the report.
+    assert result.verdict == "warned"
 
 
 @pytest.mark.parametrize(
