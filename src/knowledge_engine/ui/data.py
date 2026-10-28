@@ -182,16 +182,85 @@ class ChatRow:
     messages: int
 
 
+def _vocabulary_names(snapshot: Any) -> dict[str, tuple[str, str]]:
+    names = {t.term_id: (t.dimension, t.label) for t in snapshot.terms}
+    names |= {p.project_id: ("project", p.name) for p in snapshot.projects}
+    return names
+
+
+def vocabulary_choices(session: Session) -> list[dict[str, Any]]:
+    """Every approved term and project in the newest published vocabulary (UI-009).
+
+    For the search page's Category list. It reads only the published
+    snapshot, never the chats, so showing the form stays cheap on a big
+    archive. Sorted by dimension then label. Nothing published: empty.
+    """
+    from knowledge_engine.retrieval.filters import newest_snapshot
+
+    snapshot = newest_snapshot(session)
+    if snapshot is None:
+        return []
+    names = _vocabulary_names(snapshot)
+    return [
+        {"dimension": names[i][0], "id": i, "label": names[i][1]}
+        for i in sorted(names, key=lambda i: (names[i][0], names[i][1].casefold(), i))
+    ]
+
+
+def chat_categories(
+    session: Session,
+) -> tuple[list[dict[str, Any]], dict[str, frozenset[str]], frozenset[str]]:
+    """Approved terms and projects that label at least one chat, with counts (UI-009).
+
+    Uses the newest published vocabulary and labels in force, like search's
+    ``--term``. This reads every segment's labels once, so only the chats
+    page (which shows counts) calls it.
+
+    Returns:
+        The choices for the page (dimension, ID, label, chats) sorted by
+        dimension then label; ID -> the chats it labels; and every approved
+        ID, so an approved term on no chat yet is "0 chats", not "unknown".
+        Nothing published yet: all empty.
+    """
+    from knowledge_engine.retrieval.filters import chats_by_label, newest_snapshot
+
+    snapshot = newest_snapshot(session)
+    if snapshot is None:
+        return [], {}, frozenset()
+    labelled = chats_by_label(session, snapshot)
+    names = _vocabulary_names(snapshot)
+    # A label no longer approved in this version isn't offered.
+    offered = sorted(
+        (i for i in labelled if i in names),
+        key=lambda i: (names[i][0], names[i][1].casefold(), i),
+    )
+    choices: list[dict[str, Any]] = [
+        {"dimension": names[i][0], "id": i, "label": names[i][1], "chats": len(labelled[i])}
+        for i in offered
+    ]
+    return choices, {i: labelled[i] for i in offered}, frozenset(names)
+
+
 def list_conversations(
-    session: Session, query: str = "", offset: int = 0, limit: int = 100
+    session: Session,
+    query: str = "",
+    offset: int = 0,
+    limit: int = 100,
+    *,
+    since: float | None = None,
+    until: float | None = None,
+    only: frozenset[str] | None = None,
 ) -> tuple[list[ChatRow], int]:
-    """Return one page of conversations, newest first, optionally filtered by title.
+    """Return one page of conversations, newest first, optionally filtered.
 
     Args:
         session: A read session.
         query: Words to look for in titles (case-insensitive); empty for all.
         offset: How many to skip.
         limit: Page size.
+        since: Only chats started at or after this time (epoch seconds).
+        until: Only chats started before this time (epoch seconds).
+        only: Only these ``conv_`` IDs (a category filter), if given.
 
     Returns:
         The page and the total number of matches.
@@ -199,6 +268,13 @@ def list_conversations(
     from knowledge_engine.importer.records import MessageNodeRow, MessageRevisionRow
 
     where = []
+    # A chat with no start time can't be placed in a date range (UI-009).
+    if since is not None:
+        where.append(ConversationRow.create_time >= since)
+    if until is not None:
+        where.append(ConversationRow.create_time < until)
+    if only is not None:
+        where.append(ConversationRow.conversation_id.in_(sorted(only)))
     if query.strip():
         # Escape LIKE's wildcards so a search for "100%" means the text "100%".
         pattern = query.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")

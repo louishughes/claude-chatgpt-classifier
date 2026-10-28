@@ -420,3 +420,7 @@ blockquote.quote {
 
 /* Timeline page (UI-008): each record's events, oldest first. */
 .events { margin: .4rem 0 0; padding-left: 1.2rem; font-size: .9em; }
+
+/* Chat and search filters (UI-009): date, speaker and category side by side. */
+.filters { display: flex; flex-wrap: wrap; gap: .4rem .8rem; align-items: center; border: 0; padding: 0; margin: .6rem 0 0; }
+.filters select, .filters input[type="date"] { font: inherit; }

@@ -30,7 +30,7 @@ from datetime import datetime
 from pathlib import Path
 from socketserver import ThreadingMixIn
 from typing import Any
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urlencode, urlsplit
 from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
 from jinja2 import Environment, PackageLoader, select_autoescape
@@ -283,16 +283,50 @@ def _read(settings: Settings, read: Callable[[Session], Any]) -> Any:
 
 
 def _chats(settings: Settings, query: dict[str, list[str]]) -> Page:
+    from knowledge_engine.retrieval.filters import BadFilterDate, day_bounds
+
     words = query.get("q", [""])[0][:200]
+    category = query.get("category", [""])[0][:100]
+    since = query.get("since", [""])[0][:10]
+    until = query.get("until", [""])[0][:10]
     try:
         page_number = max(1, int(query.get("page", ["1"])[0]))
     except ValueError:
         page_number = 1
     offset = (page_number - 1) * _PAGE_SIZE
-    found = _read(
-        settings, lambda s: data.list_conversations(s, words, offset=offset, limit=_PAGE_SIZE)
+    problems = []  # every filter that couldn't be applied, each said once
+    try:
+        start, end = day_bounds(since or None, until or None)
+    except BadFilterDate as error:
+        problems.append(f"{error}. The date filter was not applied.")
+        start, end = None, None
+
+    def read(session: Session) -> tuple[list[data.ChatRow], int, list[dict[str, Any]], bool]:
+        categories, labelled, approved = data.chat_categories(session)
+        only = None
+        if category:
+            if category in approved:
+                # Approved but on no chat yet: an honest empty list.
+                only = labelled.get(category, frozenset())
+            else:
+                problems.append(
+                    "That category isn't in the published vocabulary, so it was not applied."
+                )
+        rows, total = data.list_conversations(
+            session, words, offset=offset, limit=_PAGE_SIZE, since=start, until=end, only=only
+        )
+        return rows, total, categories, only is not None
+
+    found = _read(settings, read)
+    rows, total, categories, by_category = found if found is not None else ([], 0, [], False)
+    # Paging links keep every filter the page was asked for.
+    keep = urlencode(
+        {
+            k: v
+            for k, v in (("q", words), ("category", category), ("since", since), ("until", until))
+            if v
+        }
     )
-    rows, total = found if found is not None else ([], 0)
     return Page(
         "200 OK",
         "chats.html",
@@ -300,6 +334,15 @@ def _chats(settings: Settings, query: dict[str, list[str]]) -> Page:
             "rows": rows,
             "total": total,
             "q": words,
+            "category": category,
+            "since": since,
+            "until": until,
+            "categories": categories,
+            # What was actually applied, not what was asked: a refused filter isn't.
+            "by_category": by_category,
+            "by_date": start is not None or end is not None,
+            "problems": problems,
+            "keep": keep,
             "page": page_number,
             "pages": max(1, -(-total // _PAGE_SIZE)),
         },
@@ -407,6 +450,12 @@ def _accounts(settings: Settings) -> Page:
 
 def _search(settings: Settings, query: dict[str, list[str]]) -> Page:
     from knowledge_engine.infrastructure.workspace import WorkspaceRow
+    from knowledge_engine.retrieval.filters import (
+        BadFilterDate,
+        BadFilterRole,
+        UnknownFilterTerm,
+        build_filters,
+    )
     from knowledge_engine.retrieval.lexical import (
         LexicalIndex,
         SearchMode,
@@ -418,24 +467,53 @@ def _search(settings: Settings, query: dict[str, list[str]]) -> Page:
     mode = query.get("mode", ["tokens"])[0]
     if mode not in _SEARCH_MODES:
         mode = "tokens"
-    values: dict[str, Any] = {"q": words, "mode": mode, "modes": _SEARCH_MODES, "hits": None}
-    if not words.strip():
-        return Page("200 OK", "search.html", values)
+    # RET-009 filters, checked by the same code as ke search and the API.
+    asked = {
+        name: query.get(name, [""])[0][:100] or None for name in ("since", "until", "role", "term")
+    }
+    values: dict[str, Any] = {
+        "q": words,
+        "mode": mode,
+        "modes": _SEARCH_MODES,
+        "hits": None,
+        "roles": ("user", "assistant", "tool", "system"),
+        "categories": [],
+        "problem": None,
+        "undated": 0,
+        **{name: value or "" for name, value in asked.items()},
+    }
 
-    def run(session: Session) -> list[dict[str, Any]]:
+    def run(session: Session) -> list[dict[str, Any]] | None:
         from sqlalchemy import select
 
+        values["categories"] = data.vocabulary_choices(session)
+        if not words.strip():
+            return None
+        try:
+            filters = build_filters(session, **asked)
+        except (BadFilterDate, BadFilterRole, UnknownFilterTerm) as error:
+            values["problem"] = f"{error}. Nothing was searched."
+            return None
         # The search file is a rebuildable cache; bringing it up to date is
         # the only write a page makes, and never to the archive itself.
         with LexicalIndex(search_index_path(settings)) as index:
             sync_index(session, index)
+            workspaces = list(session.scalars(select(WorkspaceRow.workspace_id)))
             hits = [
                 hit
-                for workspace_id in session.scalars(select(WorkspaceRow.workspace_id))
+                for workspace_id in workspaces
                 for hit in index.search(
-                    words, workspace_id=workspace_id, mode=SearchMode(mode), limit=_PAGE_SIZE
+                    words,
+                    workspace_id=workspace_id,
+                    mode=SearchMode(mode),
+                    limit=_PAGE_SIZE,
+                    filters=filters,
                 )
             ][:_PAGE_SIZE]
+            values["undated"] = sum(
+                index.undated(words, workspace_id=w, mode=SearchMode(mode), filters=filters)
+                for w in workspaces
+            )
         where = registries.places(session, (hit.revision_id for hit in hits))
         related = data.related_view(session, sorted({hit.conversation_id for hit in hits}))
         return [
@@ -447,7 +525,9 @@ def _search(settings: Settings, query: dict[str, list[str]]) -> Page:
             for hit in hits
         ]
 
-    values["hits"] = _read(settings, run) or []
+    found = _read(settings, run)
+    if words.strip() and values["problem"] is None:
+        values["hits"] = found or []
     return Page("200 OK", "search.html", values)
 
 
