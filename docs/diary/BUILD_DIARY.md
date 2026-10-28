@@ -809,6 +809,28 @@ Fix attempts: 0.
 **What:** `ke inspect <conversation>` now also lists role counts, content-type counts and the first 8 characters of each message ID on the active path. That's everything REV-009 asks to see on real data, still with no text, titles or file names. 1 new test, 555 in total.
 **Next:** run the REV-009 checkpoint and the real half of EVAL-010 on Louis's PC (read-only, outputs in the git-ignored workspace).
 
+### 00:15 — Two owner decisions: no tagging by Louis, and an easy interface
+**What:** Louis made two calls tonight, now recorded in `OPEN_DECISIONS.md` and the plan.
+- **"You perform the review."** Louis won't tag, label or review anything. Wherever the plan had him checking an answer key or giving yes/no verdicts, a separate Claude session now builds a *reference set* without seeing the output it will be compared with (ideally a different model), and the code checks still run. Disagreements go to another independent session, never to whoever produced either side. REV-003 and the evaluation tickets no longer wait on him.
+- **"Make sure there is also an easy to use interface."** A small local web app, started with `ke ui`, comes right after the import report: import history and reports, an Import button, and a chat browser with branches and images. Registry and search pages follow in M2, and a read-only view of AI suggestions in M3. It runs only on his machine, with no accounts. New tickets: UI-001 to UI-005.
+**Talking points:**
+- "Evaluation doesn't need me: an independent, blind reviewer builds the reference, and code checks the evidence."
+- "Everything the CLI does has a plain browser screen, local-only."
+
+### 00:19 — Wayfinder check: is the build on track?
+**What:** Louis asked for a "wayfinder" check that everything is on track. I compared the real state of the project with the plan: all GitHub issues (#4–#175), every merged PR, `IMPLEMENTATION_PLAN.md`, `M1_CONSOLIDATION.md`, `REVIEW_ACTION_PLAN.md`, ADR-0009 and `OPEN_DECISIONS.md`. Then I ran the full test suite myself on `main` instead of trusting the logs: 555 passed, 6 skipped.
+**Verdict:** on track. All of M1's code slices are merged in plan order, one or two tickets per PR. Every closed M1 issue has a merged PR behind it, and every code PR has a teach-back in this diary. The two open M1 issues (EVAL-010's real-data half and the REV-009 checkpoint) are honestly open. There's no paid-API code in `src/`. The only test files touched after they were written just gained new tests, so no existing test was changed.
+**Problems found:**
+- **Windows.** The rule says merge once tests pass on Linux *and* Windows, but only the first PR (#3) was ever run on Windows. The 19 slice PRs since then have only been tested on Linux. One of them has Windows-only code (the import lock). A Windows run is now a condition for passing gate G1.
+- **Who checks the answer key.** At 00:13 Louis said he won't do any tagging or reviewing. The coordinator had already recorded that in `OPEN_DECISIONS.md`. I re-scoped REV-003 (#137) so an independent Claude session reviews the key. ADR-0009, the review action plan, `TEST_STRATEGY.md` and AGENTS.md guardrail 1 still say "the owner approves" or "human-labelled", so they need a matching edit before M3 starts.
+- **Stale tracker.** The M1 map still said PR #3 was "waiting on review". The direction-review map listed only 4 of its 9 tickets. The M3–M6 maps still said "planned, not committed", even though Louis put everything back in scope at 23:32. The new UI tickets weren't attached to any milestone. I fixed all of these on GitHub without touching code.
+- **Order.** The plan now puts the local web UI (UI-001) next, but the build thread's status still says M2. I've let it know.
+**Why it matters:** an agent that builds fast can drift without anyone noticing. A check like this costs half an hour and compares the plan, the tracker and the code against each other, instead of trusting any one of them.
+**Talking points:**
+- "I don't trust a green tick in a log. The progress check reran the tests itself."
+- "The biggest risk wasn't the code. It was a process rule (test on Windows before merging) that quietly stopped being followed."
+- "When I stepped back from reviewing, the plan had to change too: an independent AI reviewer, kept separate from the AI being scored."
+
 ### 00:22 — UI-001: `ke ui` opens the archive in the browser
 **What:** `ke ui` starts a small website on this computer only and opens it. The home page shows how many chats are stored, how many were in the latest export, how many weren't (kept, never deleted), and every import. Each import has a report page in plain sentences ("3 new chats, 1 changed, 40 unchanged", "Your original files were not changed", "Some images couldn't be found: 2 missing"), with the full numbers behind a "details" toggle. 9 new tests, 564 in total.
 **Safety:** it refuses to listen on anything but 127.0.0.1, it answers only requests addressed to localhost (so another website can't reach it by a DNS trick), every page is auto-escaped, and pages carry a policy that allows no scripts at all. No accounts, nothing in the cloud. It reads the import ledger only; it computes nothing new.
