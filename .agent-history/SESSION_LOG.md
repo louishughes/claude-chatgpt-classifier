@@ -954,3 +954,6 @@ evaluation/note_checks.py (check_note: citations_real, claims_cited, decisions_u
 
 ## 2026-10-28 17:30 NOTE-018 (#309)
 documents/categories.py suggested_category (best primary domain candidate from review_required rows, weighed by segment messages; only when no settled share); rich note card "unclassified; suggested: X (waiting for review)" and a category-section line, front matter unchanged; classification/review_session.py review_flagged (review queue -> request files -> record_review per flagged field, reviewer "session:<ref>"; unsure or rule-breaking answers record nothing); store.flagged_fields made public; `ke classify review --taxonomy --run-id`. Tests: tests/integration/test_note_suggested_review.py (3).
+
+## 2026-10-28 16:10 NOTE-009 (#281)
+extraction/preamble.py (looks_like_preamble, shared by NOTE-005 and the detectors); relationships/detect.py skips a leading setup prompt in copied openings and setup-prompt paragraphs in quotes; relationships/related.py leaves them out of similarity profiles. Tests: tests/integration/test_note_related.py (3).
