@@ -65,6 +65,7 @@ from knowledge_engine.documents.categories import (
     suggested_category,
     waiting_candidates,
 )
+from knowledge_engine.documents.keywords import ChatKeywords, Tier
 from knowledge_engine.documents.model import DocItem, DocumentKind, build_document
 from knowledge_engine.documents.notes import _branches, _images, _links, knowledge_path
 from knowledge_engine.documents.render import transcript_stem
@@ -96,7 +97,13 @@ from knowledge_engine.rendering.transcript import (
 )
 from knowledge_engine.retrieval.citations import Citation, quote, resolve
 from knowledge_engine.segmentation.overrides import load_segments
-from knowledge_engine.taxonomy.registry import Dimension, TaxonomySnapshot, UnknownTermError
+from knowledge_engine.taxonomy.aliases import MatchStatus
+from knowledge_engine.taxonomy.registry import (
+    Dimension,
+    TaxonomySnapshot,
+    UnknownTermError,
+    normalise_alias,
+)
 
 TEMPLATE_VERSION = "note-001-v2"
 META_DIR = ".meta"
@@ -110,6 +117,9 @@ BUDGET_BASE = 6_000
 BUDGET_PER_MESSAGE = 250
 BUDGET_MAX = 40_000
 
+# The should-tier keywords shown in a note (all must-tier ones are shown):
+# enough to say what the chat is about without crowding the page.
+SHOWN_SHOULD = 8
 WAITING = "Not written yet: the digest step hasn't run for this chat."
 
 
@@ -546,6 +556,48 @@ class RichNote:
     meta: dict[str, object]
 
 
+def _keyword_lines(
+    digest: ConversationDigest | None, keywords: ChatKeywords | None, citer: Citer
+) -> list[str]:
+    """The "Keywords and topics" lines: keyword candidates, then the digest's topics.
+
+    A keyword cites the first message it appears in (a title word cites
+    none); keywords from the same message share one citation, as topics do
+    (NOTE-026). With keywords, topics are split by whether they name an
+    approved term: the others are only candidates, so a reader never
+    mistakes one for a tag.
+    """
+    lines = []
+    if keywords is not None:
+        shown = [k for k in keywords.keywords if k.tier is Tier.MUST]
+        shown += keywords.tier(Tier.SHOULD)[:SHOWN_SHOULD]
+        groups: dict[tuple[str, ...], list[str]] = {}
+        for k in shown:
+            first = next((m for m in k.message_ids if m in citer.chat.node_keys), None)
+            groups.setdefault((first,) if first else (), []).append(escape_text(k.term))
+        if groups:
+            parts = [
+                f"{', '.join(names)} {' '.join(citer.native(m) for m in cited)}".rstrip()
+                for cited, names in groups.items()
+            ]
+            lines.append("Keywords: " + "; ".join(parts))
+    if digest and digest.topics:
+        if keywords is None:
+            # Without keywords the line is the topics alone, as before NOTE-021.
+            lines.append(_topics_line(digest.topics, citer))
+        else:
+            matched = {
+                normalise_alias(t.text) for t in keywords.topics if t.status is MatchStatus.MATCHED
+            }
+            approved = [t for t in digest.topics if normalise_alias(t.text) in matched]
+            others = [t for t in digest.topics if normalise_alias(t.text) not in matched]
+            if approved:
+                lines.append("Topics (approved terms): " + _topics_line(approved, citer))
+            if others:
+                lines.append("Topic candidates (not tags): " + _topics_line(others, citer))
+    return lines
+
+
 def _artefact_names(session: Session, items: Sequence[_Item]) -> list[str]:
     """What the chat made, by name: "2 image(s) or file(s)", "code block (python)".
 
@@ -580,6 +632,7 @@ def rich_conversation_note(
     *,
     taxonomy: TaxonomySnapshot | None = None,
     digest: ConversationDigest | None = None,
+    keywords: ChatKeywords | None = None,
 ) -> RichNote:
     """Build one chat's rich note (template v2) from stored facts. Reads only.
 
@@ -589,6 +642,8 @@ def rich_conversation_note(
         taxonomy: The published version to show labels under, or None.
         digest: The chat's checked digest (NOTE-003), or None: its sections
             then say the digest hasn't run.
+        keywords: The chat's keyword candidates (NOTE-007, from
+            ``workspace_keywords``), or None to list only the digest's topics.
     """
     chat = load_conversation(session, conversation_id)
     stem = transcript_stem(conversation_id, chat.title)
@@ -766,16 +821,12 @@ def rich_conversation_note(
         ),
         BulletList(tuple(tag_lines), trusted=True),
     ]
-    topics: list[Block] = (
-        [BulletList((_topics_line(digest.topics, citer),), trusted=True)]
-        if digest and digest.topics
-        else []
-    )
+    topics = _keyword_lines(digest, keywords, citer)
     blocks += _section(
         "Keywords and topics",
         "Candidates; only approved terms become tags",
-        topics,
-        WAITING if digest is None else "None suggested.",
+        [BulletList(tuple(topics), trusted=True)] if topics else [],
+        WAITING if digest is None and keywords is None else "None suggested.",
     )
     blocks += _section(
         "Related chats",
@@ -858,13 +909,16 @@ def write_rich_note(
     *,
     taxonomy: TaxonomySnapshot | None = None,
     digest: ConversationDigest | None = None,
+    keywords: ChatKeywords | None = None,
 ) -> PurePosixPath:
     """Write a chat's rich note into ``vault_root/Knowledge``, its images and sidecar.
 
     It goes where the DOC-003 note would, so a vault holds one knowledge
     note per chat whichever template wrote it.
     """
-    note = rich_conversation_note(session, conversation_id, taxonomy=taxonomy, digest=digest)
+    note = rich_conversation_note(
+        session, conversation_id, taxonomy=taxonomy, digest=digest, keywords=keywords
+    )
     export_attachments(note.media, vault_root, blob_sources(session, store_root))
     title = session.get_one(ConversationRow, conversation_id).title
     relative = knowledge_path(conversation_id, title)

@@ -1117,6 +1117,7 @@ def _digest(settings: Settings, args: argparse.Namespace) -> CommandResult:
     from sqlalchemy.orm import Session
 
     from knowledge_engine.digest.stage import DigestStage
+    from knowledge_engine.documents.keywords import workspace_keywords
     from knowledge_engine.documents.rich_note import write_rich_note
     from knowledge_engine.importer.records import ConversationRow
     from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
@@ -1171,6 +1172,18 @@ def _digest(settings: Settings, args: argparse.Namespace) -> CommandResult:
                 chats = [load_conversation(session, cid) for cid in ids]
                 outcomes = stage.run_all(chats)
                 session.commit()  # the requests and answers are kept before any note is written
+                keywords = (
+                    workspace_keywords(
+                        session,
+                        topics={
+                            cid: [t.text for t in outcome.digest.topics]
+                            for cid, outcome in zip(ids, outcomes, strict=True)
+                            if outcome.digest is not None
+                        },
+                    )
+                    if args.vault is not None
+                    else {}
+                )
                 for conversation_id, outcome in zip(ids, outcomes, strict=True):
                     counts[outcome.state] += 1
                     if outcome.state == "done" and args.vault is not None:
@@ -1181,6 +1194,7 @@ def _digest(settings: Settings, args: argparse.Namespace) -> CommandResult:
                             settings.workspace_root / "archive",
                             taxonomy=taxonomy,
                             digest=outcome.digest,
+                            keywords=keywords.get(conversation_id),
                         )
                         counts["notes"] += 1
             except EgressDisabledError:
@@ -2776,10 +2790,14 @@ def _docs_note(settings: Settings, session: Any, args: argparse.Namespace) -> Co
         # v2 is the rich-note layout (NOTE-001); v1 (DOC-003) stays the default for now.
         if args.template == "v2":
             from knowledge_engine.digest.stage import stored_digest
+            from knowledge_engine.documents.keywords import workspace_keywords
             from knowledge_engine.rendering.transcript import load_conversation
 
             # A digest already collected (NOTE-004) fills the summary; none is asked for here.
             digest = stored_digest(session, load_conversation(session, conversation_id))
+            # Keywords are worked out across every chat: rarity means rare among all of them.
+            topics = {conversation_id: [t.text for t in digest.topics]} if digest else {}
+            keywords = workspace_keywords(session, taxonomy=snapshot, topics=topics)
             path = write_rich_note(
                 session,
                 conversation_id,
@@ -2787,6 +2805,7 @@ def _docs_note(settings: Settings, session: Any, args: argparse.Namespace) -> Co
                 settings.workspace_root / "archive",
                 taxonomy=snapshot,
                 digest=digest,
+                keywords=keywords.get(conversation_id),
             )
         else:
             path = write_conversation_note(

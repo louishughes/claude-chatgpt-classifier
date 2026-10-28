@@ -3444,3 +3444,31 @@ Talking points:
 - "The code only adds an open question when the model missed one, and it always says so."
 
 **Next exact task:** the extractor half of NOTE-023 once Louis answers, then the PRs in order.
+
+### 16:20 — NOTE-021 (#314): the keywords NOTE-007 works out now show in the note
+
+NOTE-007 (#296) added a keyword step (`documents/keywords.py`), but nothing called it, so the rich note's "Keywords and topics" section still listed only the digest's topics. I opened #314 for the follow-up and built it.
+
+**What changed.** `workspace_keywords(session, taxonomy=..., topics=...)` works out candidates for every chat in the workspace at once. Rarity only means something across the whole corpus: "cedar" is a keyword because the other chats don't say it. The note's section now has two lines:
+- **Keywords**: every must-tier keyword and the top 8 should-tier ones. Each cites the first message that says it (a title-only word cites none). Keywords from the same message share one citation, the rule NOTE-026 (#330) set for topics.
+- **Topics**: the digest's topics, split into "Topics (approved terms)" and "Topic candidates (not tags)", each through NOTE-026's grouped `_topics_line`.
+
+`ke docs chat --template v2` and `ke digest run --vault` pass the keywords in. Tags and front matter are unchanged: a candidate never becomes a tag.
+
+**Challenge:** the vault link check failed on the first try. The cause was the knowledge-card `\|` bug that #312 fixes, not this change. So this PR goes up after #312.
+
+**Decision:** without keywords (any other caller) the section renders exactly as before, so existing notes and tests don't move.
+
+**Teach-back (`documents/keywords.py` `workspace_keywords`):** It reads every chat in the workspace and asks NOTE-007's keyword step which words each one is really about: words in its title, named things, and phrases it says often that other chats rarely do. The rich note shows the strongest of those words, each linked to the message where it first appears, so a reader can check it. A digest topic that isn't an approved taxonomy term is labelled a candidate, so nobody mistakes it for a tag.
+
+Checks:
+```
+tests/integration/test_note_keywords.py   4 passed (cited keywords that the cited message really says; candidate topic not a tag; unchanged without keywords; CLI v2 note and vault check clean)
+```
+Fix attempts: 2 (the test fixture's digest needed status and intent, and the vault check needed #312; after rebasing onto NOTE-026, the test had to find "cedar" inside a group of keywords that share a citation).
+
+Talking points:
+- "Every keyword in a note links to the message that says it."
+- "A topic the taxonomy doesn't know is labelled a candidate in plain words. It never quietly becomes a tag."
+
+**Next exact task:** ask for more unclaimed tickets once my PRs are merged.
