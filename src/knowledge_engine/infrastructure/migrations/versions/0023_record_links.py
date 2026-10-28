@@ -10,6 +10,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
+from knowledge_engine.infrastructure.dialects import run_triggers
 from knowledge_engine.reconciliation.relations import APPEND_ONLY_TRIGGERS
 
 revision: str = "0023_record_links"
@@ -61,8 +62,7 @@ def upgrade() -> None:
         batch_op.create_index(
             batch_op.f("ix_record_link_reviews_link_id"), ["link_id"], unique=False
         )
-    for statement in APPEND_ONLY_TRIGGERS:
-        op.execute(statement)
+    run_triggers(APPEND_ONLY_TRIGGERS)
 
 
 def downgrade() -> None:
