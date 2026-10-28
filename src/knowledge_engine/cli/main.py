@@ -2027,6 +2027,84 @@ def _docs_check(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _docs_rubric(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Run the NOTE-011 code checks on chats' rich notes, built in memory (writes nothing)."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.digest.stage import stored_digest
+    from knowledge_engine.documents.rich_note import rich_conversation_note
+    from knowledge_engine.evaluation.note_checks import (
+        NOTE_CHECKS_VERSION,
+        CheckStatus,
+        check_note,
+        summarise,
+    )
+    from knowledge_engine.importer.records import ConversationRow
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.rendering.markdown import render_note
+    from knowledge_engine.rendering.transcript import find_conversation, load_conversation
+
+    name = "docs rubric"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            if args.all:
+                ids = list(
+                    session.scalars(
+                        select(ConversationRow.conversation_id).order_by(
+                            ConversationRow.conversation_id
+                        )
+                    )
+                )
+            else:
+                found = [find_conversation(session, ref) for ref in args.conversations]
+                if None in found or not found:
+                    return CommandResult(
+                        name, ExitCode.USAGE, message="no such conversation", error_code="not_found"
+                    )
+                ids = [cid for cid in found if cid is not None]
+            reports = []
+            for conversation_id in ids:
+                digest = stored_digest(session, load_conversation(session, conversation_id))
+                note = rich_conversation_note(session, conversation_id, digest=digest)
+                reports.append(check_note(session, conversation_id, render_note(note.model)))
+    finally:
+        engine.dispose()
+    failed = [r for r in reports if not r.passed]
+    data = {
+        "version": NOTE_CHECKS_VERSION,
+        "notes": len(reports),
+        "passed": len(reports) - len(failed),
+        "checks": summarise(reports),
+        "problems": [
+            {
+                "conversation_id": r.conversation_id,
+                "check": f.check,
+                "status": f.status.value,
+                "problems": list(f.problems),
+            }
+            for r in reports
+            for f in r.findings
+            if f.status is not CheckStatus.PASS
+        ],
+    }
+    if failed:
+        return CommandResult(
+            name,
+            ExitCode.ERROR,
+            data=data,
+            message=f"{len(failed)} of {len(reports)} note(s) failed a check",
+            error_code="rubric_failed",
+        )
+    return CommandResult(name, data=data, message=f"{len(reports)} note(s) passed every check")
+
+
 def _corrections(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """List human corrections and whether they still stand after re-imports (IMP-006)."""
     from sqlalchemy.orm import Session
@@ -3496,6 +3574,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     docs_check.add_argument("--vault", type=Path, required=True, help="the vault folder")
     docs_check.set_defaults(handler=_docs_check)
+    docs_rubric = docs_commands.add_parser(
+        "rubric", help="check chats' rich notes: real citations, cited claims, budget (NOTE-011)"
+    )
+    docs_rubric.add_argument("conversations", nargs="*", help="conv_ or export conversation IDs")
+    docs_rubric.add_argument("--all", action="store_true", help="every imported chat")
+    docs_rubric.set_defaults(handler=_docs_rubric)
 
     related = commands.add_parser("related", help="links between conversations (forks, quotes)")
     related_commands = related.add_subparsers(
