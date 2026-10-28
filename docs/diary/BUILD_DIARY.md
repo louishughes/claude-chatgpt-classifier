@@ -2437,3 +2437,17 @@ tests/integration/test_tenant_isolation.py   4 passed
 Fix attempts: 1 (the test read `items` where search answers `hits`).
 
 **Next exact task:** fix the `[m:id]` evidence parsing, then PROD-004.
+
+### 11:24 — Citations written as `[m:id]` now count
+
+The paid run's 53 "evidence outside the segment" flags were our bug. Requests show each message as `[m:ID] user:`, the model cited `[m:ID]` back, and the check compared that whole string with bare IDs. `providers/base.py` now has `MessageRef`, a string type whose validator turns `[m:abc]` or `m:abc` into `abc` and leaves everything else alone, so a real citation outside the segment is still caught. Classification evidence and extraction quotes both use it. The prompt, schema and stage keys are unchanged, so the saved answers still replay from the cache and can be re-checked for free.
+
+**Teach-back (`bare_message_id`):** We show the model each message with a tag like `[m:abc]`, and it tends to cite the message back in that same form. This takes the tag off, so the check compares plain IDs, and leaves anything that isn't that tag alone. Before this, nearly every model answer in the paid run was wrongly sent to review.
+
+Checks:
+```
+tests/unit/test_message_ref.py   9 passed
+```
+Fix attempts: 0.
+
+**Next exact task:** replay the paid run on Louis's PC with this fix (no calls), then PROD-004.
