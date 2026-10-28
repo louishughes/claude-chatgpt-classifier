@@ -847,3 +847,19 @@ pytest -q               # 564 passed, 6 skipped (9 new)
 Fix attempts: 0.
 
 **Next exact task:** UI-002 (import from the browser; wires `ke import` and replaces the placeholder test with a real one).
+
+### 00:27 — UI-002: an Import button, and `ke import` works
+**What:** the web interface has an Import page: paste the path of your export (the ZIP or its folder), press Import, and a progress page checks back every two seconds until the report appears. If it can't run, it says why in one plain sentence ("That isn't a ChatGPT export this version understands", "Another import is running") and never shows your file names. `ke import SOURCE` now runs the real importer too, with the same messages; `--partial` is for a source that's only some of your chats, so nothing else is marked "not seen". 8 new tests, 569 in total.
+**Safety:** the form carries a secret token that only this app's own pages know, and a request from another website's address is refused, so no web page can start an import behind your back. The path can't point inside the workspace.
+**Test change (recorded):** the old "`ke import` is an honest placeholder" test was replaced, not deleted, by real tests (missing source, unsupported source, import then repeat import). That was approved under Louis's delegated authority and logged in OPEN_DECISIONS.
+**Teach-back (`ui/jobs.py`):** "Pressing Import starts the real importer on a background thread, because a big export takes longer than a browser waits for a page. The progress page reloads itself until the job is finished, then sends you to the report. It's the same importer as the command line, and the workspace lock still means only one import runs at a time."
+**Talking points:**
+- "Importing is one button now, and the button can't be pressed by another website."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 90 source files
+pytest -q               # 569 passed, 6 skipped
+```
+Fix attempts: 1 (a missing path was reported as "unsupported format"; the CLI now checks it exists first).
+
+**Next exact task:** UI-003 (chat browser with branches and images).

@@ -128,11 +128,16 @@ def test_status_never_prints_raw_paths_or_secrets(
 # ---------------------------------------------------------------- errors
 
 
-def test_import_is_an_honest_placeholder(capsys: pytest.CaptureFixture[str]) -> None:
-    code, payload = _json(capsys, ["--json", "import", "somewhere"])
-    assert code == ExitCode.NOT_IMPLEMENTED
-    assert payload["error"] == {"code": "not_implemented"}
-    assert payload["data"]["ticket"] == "ING-003"
+def test_import_reports_a_missing_source_plainly(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Replaces the placeholder test now that `ke import` is wired (UI-002;
+    # retired under the owner's delegated authority, OPEN_DECISIONS).
+    monkeypatch.setenv("KE_WORKSPACE_ROOT", str(tmp_path / "ws"))
+    code, payload = _json(capsys, ["--json", "import", str(tmp_path / "nowhere")])
+    assert code == ExitCode.ERROR
+    assert payload["error"] == {"code": "not_found"}
+    assert str(tmp_path) not in payload["message"]  # never echoes the path
 
 
 def test_invalid_config_exits_with_config_code(

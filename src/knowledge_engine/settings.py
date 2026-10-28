@@ -207,6 +207,17 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("KE_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
     )
 
+    def account_for(self, source: Path) -> str:
+        """Return the account label of the raw root holding ``source``, else ``default``."""
+        try:
+            resolved = source.resolve()
+        except OSError:
+            return "default"
+        for root in self.raw_roots:
+            if resolved.is_relative_to(root.path.resolve()):
+                return root.account_namespace
+        return "default"
+
     @model_validator(mode="after")
     def _workspace_outside_raw_roots(self) -> Settings:
         """Reject a workspace inside (or equal to) any raw root, and vice versa.

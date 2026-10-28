@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Importing · Knowledge Engine{% endblock %}
+{% block head %}{% if job.state == "running" %}<meta http-equiv="refresh" content="2">{% endif %}{% endblock %}
+{% block main %}
+{% if job.state == "running" %}
+<h1>Importing…</h1>
+<p>This page checks again every two seconds. Large exports can take a few minutes; you can leave it open.</p>
+{% else %}
+<h1>The import didn't finish</h1>
+<p class="error" role="alert">{{ job.error }}</p>
+<p><a href="/import">Try again</a> · <a href="/">Your archive</a></p>
+{% endif %}
+{% endblock %}

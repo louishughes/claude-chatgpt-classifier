@@ -2,7 +2,8 @@
 {% block main %}
 <h1>Your archive</h1>
 {% if status is none %}
-<p>No imports yet. Import an export with the command line for now; an Import button is coming next.</p>
+<p>No imports yet.</p>
+<p><a class="button" href="/import">Import your ChatGPT export</a></p>
 {% else %}
 <ul class="tiles">
   <li><strong>{{ status.conversations }}</strong> chats stored</li>
@@ -11,6 +12,7 @@
   <li><strong>{{ status.imports }}</strong> imports</li>
 </ul>
 <h2>Imports</h2>
+<p><a class="button" href="/import">Import an export</a></p>
 {% if imports %}
 <table>
   <thead><tr><th>When</th><th>Result</th><th>New</th><th>Changed</th><th>Unchanged</th><th></th></tr></thead>
