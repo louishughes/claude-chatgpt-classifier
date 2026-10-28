@@ -3517,3 +3517,30 @@ One snag: the re-score needed a fresh import. The detectors never delete links t
 Talking points:
 - "Same answer key, same hash, one bug fixed: precision went from 0.80 to 0.95."
 - "Precision says the links it does suggest are right. Recall says it's still missing most of the 'related' links, and I report both."
+
+### 19:15 — NOTE-025 (#328) + NOTE-023 extractor half (#322): requirements and open endings in the extractor prompt
+
+The knowledge extractor (NOTE-005) knew four record types and had no word for a user's short constraint. "No repeats, 10 questions" came out as nothing, or as a decision. Its prompt also didn't mention the open endings that NOTE-023's digest half now catches.
+
+**What changed.** `extraction/model_knowledge.py` prompt is now `knowledge-v2`:
+- a fifth record type, **requirement**: a constraint the user sets, even a short one (a number, a limit, a rule, a must or never), quoted in the user's own words;
+- the question line now names the open endings: a draft the user never said was sent, a promise to report back, a choice put off. A thank-you or "done" leaves nothing open.
+
+The existing checks are unchanged and already cover requirements: a requirement quoted only from the assistant becomes the assistant's proposal (rule 1), and a pasted setup prompt gives no record (rule 3).
+
+**Decision (delegated by Louis, 18:52 UTC: "Use your best judgement and true to the spec and objective").** A new prompt version is the spec's rule for any prompt change, so cached answers to the old wording aren't reused. One existing test, `tests/integration/test_model_knowledge.py`, pinned the literal `"knowledge-v1"` to find model-made records. It now reads `PROMPT_VERSION`; its checks are unchanged. This is the only change to an existing test.
+
+**Teach-back (`extraction/model_knowledge.py`):** It asks the model to find the decisions, proposals, questions, rejections and now the user's requirements in a chat, each with an exact quote. It then checks every quote against the real messages and refuses to credit the user with words only the assistant said, or with a setup prompt they pasted in. Changing the wording gives the prompt a new version, so old answers are never mixed with new ones.
+
+Checks:
+```
+tests/integration/test_model_requirements.py   5 passed (prompt names requirement and endings; user constraint stored as the user's requirement; assistant's words become its proposal; setup prompt gives nothing; unsent draft kept as a question)
+tests/integration/test_model_knowledge.py      6 passed (version line reads PROMPT_VERSION)
+```
+Fix attempts: 1 (stored records carry no segment id, so the test groups them by the revision their evidence cites).
+
+Talking points:
+- "A short 'no repeats, 10 questions' is a requirement, and it's credited to whoever actually said it."
+- "Changing a prompt changes its version, so nothing cached from the old prompt sneaks through."
+
+**Next exact task:** the PC re-run and re-score with knowledge-v2 and digest-v4.
