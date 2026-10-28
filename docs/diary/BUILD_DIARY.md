@@ -2378,3 +2378,23 @@ backend_bench --conversations 200            rows_equal true, hits 120/120
 Fix attempts: 0.
 
 **Next exact task:** PROD-002.
+
+### 10:58 — PROD-002: accounts, roles and who did what
+
+- `access/policy.py`: four roles (viewer, editor, reviewer, owner) as fixed sets of six permissions, in one table. A **service account** (a program) may only be a viewer or editor, so automation can import and read but never confirm or reject knowledge.
+- `access/accounts.py` + migration 0029: accounts, tokens (only a SHA-256 is stored; the token is shown once), one role per account per workspace, and `authz_events`, an append-only log of every refusal, every allowed change and every membership change. It records the method and route, never the query text, because a search can be private words.
+- `api/access.py`: runs before every endpoint. No accounts means single-user mode, exactly as before (all earlier API tests pass unchanged). The first account turns checking on: 401 without a valid token, 403 `not_a_member`, 403 `forbidden`. The whole policy is `ROUTE_PERMISSIONS`, one line per endpoint; a test compares it with the OpenAPI routes, and once checking is on an unlisted route is refused.
+- A body's `reviewer`/`proposer` must be the caller (`identity_mismatch`), so "you can't review your own proposal" can't be dodged by typing someone else's name.
+- `ke access add|token|revoke|disable|grant|remove|list|log`.
+- One FastAPI detail: a route inside an included router only knows its own path (`/sources`), so the check adds `/api/v1` back before the table lookup.
+- The API serves the `default` workspace; several workspaces in one database is PROD-003.
+
+**Teach-back (`api/access.py`):** Before any endpoint runs, this checks who is calling and whether their role in the workspace allows that endpoint, using one table that lists every endpoint. Until I create an account nothing changes; after that every request needs a token, and an account from another workspace is refused everywhere. Refusals and changes go into a log nobody can edit, and nobody can act under someone else's name.
+
+Checks:
+```
+tests/integration/test_api_access.py   8 passed
+```
+Fix attempts: 1 (the route lookup missed the router prefix; a result-type bug in `members`).
+
+**Next exact task:** PROD-003 (tenant isolation through retrieval and exports).

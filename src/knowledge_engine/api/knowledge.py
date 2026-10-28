@@ -18,8 +18,9 @@ always refuses:
 Refusals come back as ``reviewer_not_allowed`` (403: no reviewer, the
 built-in validator's name, or the proposer reviewing their own proposal)
 or ``invalid_transition`` (409: anything the workflow doesn't allow). The
-reviewer is a name the caller gives: there are no accounts until PROD-002,
-so this is the same trust as ``ke ... --reviewer``.
+reviewer is a name the caller gives. Once accounts exist (PROD-002) that
+name must be the caller's own account, or the request is refused
+(``identity_mismatch``).
 
 Talking points:
     - "The API can't do anything the review rules forbid: no self-approval,
@@ -39,6 +40,7 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel, Field, ValidationError
 from sqlalchemy.orm import Session
 
+from knowledge_engine.api.access import AccessDep
 from knowledge_engine.api.deps import ApiError, SessionsDep
 from knowledge_engine.extraction.records import (
     KnowledgeRecord,
@@ -217,8 +219,11 @@ def get_proposals(
 
 
 @router.post("/taxonomy/proposals", status_code=201, tags=["taxonomy"])
-def post_proposal(body: ProposalRequest, sessions: SessionsDep) -> dict[str, Any]:
+def post_proposal(
+    body: ProposalRequest, sessions: SessionsDep, access: AccessDep
+) -> dict[str, Any]:
     """Record a proposal. Nothing in the vocabulary changes until it is approved."""
+    access.require_identity(body.proposer)
     with sessions.transaction() as session:
         try:
             row = propose(
@@ -235,9 +240,10 @@ def post_proposal(body: ProposalRequest, sessions: SessionsDep) -> dict[str, Any
 
 @router.post("/taxonomy/proposals/{proposal_id}/review", tags=["taxonomy"])
 def review_proposal(
-    proposal_id: str, body: ProposalDecision, sessions: SessionsDep
+    proposal_id: str, body: ProposalDecision, sessions: SessionsDep, access: AccessDep
 ) -> dict[str, Any]:
     """Approve or reject an open proposal; a refused decision changes nothing."""
+    access.require_identity(body.reviewer)
     with sessions.transaction() as session:
         row = session.get(TaxonomyProposalRow, proposal_id)
         if row is None:
@@ -304,8 +310,11 @@ def get_record(record_id: str, sessions: SessionsDep) -> dict[str, Any]:
 
 
 @router.post("/knowledge/{record_id}/review", tags=["knowledge"])
-def review_record(record_id: str, body: RecordDecision, sessions: SessionsDep) -> dict[str, Any]:
+def review_record(
+    record_id: str, body: RecordDecision, sessions: SessionsDep, access: AccessDep
+) -> dict[str, Any]:
     """Support, confirm or reject a gated record; a refused decision changes nothing."""
+    access.require_identity(body.reviewer)
     if body.reviewer.strip() == VALIDATOR:
         raise ApiError(403, "reviewer_not_allowed", "a decision needs a named reviewer")
     with sessions.transaction() as session:

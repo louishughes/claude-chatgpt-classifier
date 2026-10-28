@@ -894,3 +894,6 @@ api/documents.py (documents list/preview, exports by name into <workspace>/expor
 
 ## 2026-10-28 10:47 PROD-001 (#126)
 infrastructure/dialects.py (SQLite triggers -> plpgsql ke_refuse_change), run_import database_url, devtools/postgres.py (throwaway server), evaluation/backend_bench.py, postgres extra, docs/operations/POSTGRES_POC.md. Tests: test_postgres_backend.py (16, as non-root); bench 200 conv: 7.3 s vs 18.9 s, rows equal. API-003 merged (#258); API-004 PR #259.
+
+## 2026-10-28 10:58 PROD-002 (#127)
+access/policy.py, access/accounts.py, migration 0029_accounts, api/access.py (check_access on every route, ROUTE_PERMISSIONS, /access/me, identity_mismatch), `ke access`. Tests: test_api_access.py (8): cross-workspace account refused on every endpoint.
