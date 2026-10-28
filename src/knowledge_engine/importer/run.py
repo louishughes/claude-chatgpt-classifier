@@ -57,6 +57,7 @@ from knowledge_engine.ingestion.source import NativeConversation, SourceListing,
 from knowledge_engine.links.social_store import record_accounts
 from knowledge_engine.links.store import record_links
 from knowledge_engine.relationships.detect import detect_relationships
+from knowledge_engine.retention.tombstones import TombstoneKind, conversation_key, is_purged
 from knowledge_engine.retrieval.lexical import LexicalIndex, search_index_path, sync_index
 from knowledge_engine.settings import Settings
 
@@ -221,6 +222,14 @@ def _run(
                     candidates[CandidateReason.MISSING_NATIVE_ID.value] += 1
                     tally.conversations["failed"] += 1
                     continue
+                conv_key = conversation_id(
+                    workspace_id, SourceSystem.CHATGPT.value, account_ns, native_id
+                )
+                if is_purged(session, TombstoneKind.CONVERSATION, conversation_key(conv_key)):
+                    # Deleted on purpose (OPS-004): still in the export, never re-imported.
+                    conversations["purged"] += 1
+                    tally.conversations["purged"] += 1
+                    continue
                 digest = conversation_hash(item.native)
                 if native_id in seen:
                     if seen[native_id] == digest:
@@ -236,9 +245,7 @@ def _run(
                         workspace_id=workspace_id,
                         account_namespace=account_ns,
                         native_id=native_id,
-                        existing_conversation_id=conversation_id(
-                            workspace_id, SourceSystem.CHATGPT.value, account_ns, native_id
-                        ),
+                        existing_conversation_id=conv_key,
                         snapshot_id=snapshot_id,
                         source_index=item.locator.index,
                         import_id=import_id,

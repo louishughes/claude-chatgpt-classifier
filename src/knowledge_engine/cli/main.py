@@ -784,6 +784,71 @@ def _file_read(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _purge(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Plan, run or list purges of whole conversations (OPS-004)."""
+    from knowledge_engine.retention.purge import PurgeError, plan_purge, purge_log, run_purge
+
+    command = f"purge {args.purge_command}"
+    try:
+        if args.purge_command == "log":
+            events = purge_log(settings)
+            return CommandResult(
+                command, data={"purges": events}, message=f"{len(events)} purge(s)"
+            )
+        if args.purge_command == "plan":
+            plan = plan_purge(settings, args.conversations)
+            counts = plan.counts()
+            return CommandResult(
+                command,
+                data={"token": plan.token, **counts},
+                message=(
+                    f"would delete {counts['conversations']} conversation(s), "
+                    f"{counts['rows_total']} row(s) and {counts['files']} file(s); "
+                    f'to go ahead: ke purge run ... --confirm {plan.token} --reason "..."'
+                ),
+            )
+        result = run_purge(
+            settings,
+            args.conversations,
+            confirm=args.confirm,
+            reason=args.reason,
+            vault=args.vault,
+            taxonomy_version=args.taxonomy,
+        )
+    except PurgeError as error:
+        return CommandResult(command, ExitCode.USAGE, message=str(error), error_code="refused")
+    check = result.verification
+    data = {
+        "purge_id": result.purge_id,
+        **result.plan.counts(),
+        "verification": check.to_dict(),
+        "vault": result.vault,
+    }
+    outside = sum(result.plan.counts()["outside_engine"].values())
+    note = (
+        f"; {outside} copy(ies) outside the engine (your original export, older backups) "
+        "still hold it"
+        if outside
+        else ""
+    )
+    if not check.ok:
+        return CommandResult(
+            command,
+            ExitCode.ERROR,
+            data=data,
+            message=f"purged, but the check found traces left (purge {result.purge_id})",
+            error_code="residual",
+        )
+    return CommandResult(
+        command,
+        data=data,
+        message=(
+            f"purged and checked (purge {result.purge_id}): {check.probes} probe(s), "
+            f"nothing found{note}"
+        ),
+    )
+
+
 def _backup(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Create, verify or restore a local backup (OPS-003). Never overwrites anything."""
     from knowledge_engine.infrastructure.backup import (
@@ -2502,6 +2567,27 @@ def build_parser() -> argparse.ArgumentParser:
     score.set_defaults(handler=_gold_score)
     gold_commands.add_parser("schema", help="print the golden set JSON Schema").set_defaults(
         handler=_gold_schema
+    )
+    purge = commands.add_parser(
+        "purge", help="delete whole conversations and everything made from them"
+    )
+    purge_commands = purge.add_subparsers(dest="purge_command", required=True)
+    purge_plan = purge_commands.add_parser(
+        "plan", help="list what a purge would delete, and its token (reads only)"
+    )
+    purge_plan.add_argument("conversations", nargs="+", help="conv_ IDs or native IDs")
+    purge_plan.set_defaults(handler=_purge)
+    purge_run = purge_commands.add_parser(
+        "run", help="purge, leave tombstones and check nothing is left"
+    )
+    purge_run.add_argument("conversations", nargs="+", help="the same IDs as the plan")
+    purge_run.add_argument("--confirm", required=True, help="the token `ke purge plan` printed")
+    purge_run.add_argument("--reason", required=True, help="why, for the audit log")
+    purge_run.add_argument("--vault", type=Path, help="a vault to re-sync afterwards")
+    purge_run.add_argument("--taxonomy", help="the taxonomy version that vault uses")
+    purge_run.set_defaults(handler=_purge)
+    purge_commands.add_parser("log", help="every purge so far (counts only)").set_defaults(
+        handler=_purge
     )
     backup = commands.add_parser("backup", help="back up, verify and restore the workspace")
     backup_commands = backup.add_subparsers(dest="backup_command", required=True)
