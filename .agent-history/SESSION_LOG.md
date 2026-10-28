@@ -964,6 +964,9 @@ ui/notes.py (note_view: rich note built in memory with the newest taxonomy and s
 ## 2026-10-28 16:10 NOTE-009 (#281)
 extraction/preamble.py (looks_like_preamble, shared by NOTE-005 and the detectors); relationships/detect.py skips a leading setup prompt in copied openings and setup-prompt paragraphs in quotes; relationships/related.py leaves them out of similarity profiles. Tests: tests/integration/test_note_related.py (3).
 
+## 2026-10-28 18:20 NOTE-022 (#321)
+documents/rich_note.py _prefer_model: records whose extraction run's segment also has a DONE run with a prompt version, and that have no prompt version themselves, are left out of the rich note; the Source paragraph counts them; nothing deleted. Tests: tests/integration/test_note_prefers_model_records.py (1).
+
 ## 2026-10-28 18:00 EVAL-014 (#317)
 evaluation/answer_key.py convert_answer_key (per-chat spike key -> GoldSet; read only; idea/requirement/preference/artefact/open_question 1:1, decision by state, fact/task/fact_about_owner/problem_fix/unclear unmapped; v2 placed by message_id, v1 by number + quote check; unverified excluded; segments counted not converted); `ke gold convert --key --out --name`, refuses output inside the key folder. Tests: tests/integration/test_answer_key_convert.py (2), fixtures tests/fixtures/answer_key/.
 
