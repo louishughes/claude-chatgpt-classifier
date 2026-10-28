@@ -140,22 +140,28 @@ def _status(settings: Settings, _args: argparse.Namespace) -> CommandResult:
     return CommandResult("status", data=data, message=message)
 
 
-def _db_upgrade(settings: Settings, _args: argparse.Namespace) -> CommandResult:
-    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
-    from knowledge_engine.infrastructure.migrations import current_revision, upgrade_to_head
-
-    engine = create_sqlite_engine(database_path(settings))
-    try:
-        before = current_revision(engine)
-        upgrade_to_head(engine)
-        after = current_revision(engine)
-    finally:
-        engine.dispose()
-    return CommandResult(
-        "db upgrade",
-        data={"before": before or "none", "after": after or "none", "changed": before != after},
-        message="Database is up to date" if before == after else "Database upgraded",
+def _db_upgrade(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    from knowledge_engine.infrastructure.backup import BackupError
+    from knowledge_engine.infrastructure.upgrade import (
+        SchemaMismatchError,
+        default_backup_root,
+        safe_upgrade,
     )
+
+    root = None if args.no_backup else (args.backup_to or default_backup_root(settings))
+    try:
+        data = safe_upgrade(settings, root)
+    except (SchemaMismatchError, BackupError) as error:
+        return CommandResult(
+            "db upgrade", ExitCode.ERROR, message=str(error), error_code="upgrade_refused"
+        )
+    if not data["changed"]:
+        message = "Database is up to date"
+    elif data["backup"]:
+        message = f"Database upgraded (backup {data['backup']} taken first)"
+    else:
+        message = "Database upgraded"
+    return CommandResult("db upgrade", data=data, message=message)
 
 
 def _inventory(settings: Settings, args: argparse.Namespace) -> CommandResult:
@@ -2391,7 +2397,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     db = commands.add_parser("db", help="database maintenance")
     db_commands = db.add_subparsers(dest="db_command", metavar="ACTION", parser_class=_Parser)
-    upgrade = db_commands.add_parser("upgrade", help="apply pending migrations")
+    upgrade = db_commands.add_parser(
+        "upgrade", help="apply pending migrations (backs up first when there are any)"
+    )
+    upgrade.add_argument(
+        "--backup-to", type=Path, help="backup folder (default: <workspace>-backups next to it)"
+    )
+    upgrade.add_argument("--no-backup", action="store_true", help="migrate without a backup")
     upgrade.set_defaults(handler=_db_upgrade)
 
     raw = commands.add_parser("raw", help="read-only views of raw source folders")

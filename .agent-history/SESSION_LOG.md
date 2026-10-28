@@ -867,3 +867,9 @@ AnthropicProvider (pinned model, worst-case cost cap, thinking off) and `ke eval
 
 ## 2026-10-28 09:34 OPS-006
 Adversarial end-to-end suite (test_adversarial.py, 7). Fixed escape_text (brackets, backticks, ~~~) and line-start "[" in model input (quote_untrusted). Adapter fences input in <source_data>. Contracts in docs/operations/SOURCE_AS_DATA.md. ci 5/5.
+
+## 2026-10-28 09:44 EVAL-011 paid run
+One owner-approved run (08:54 UTC) on Louis's PC at 80fc4e0: 50 synthetic chats, haiku pinned, passed; 67 calls, 0 schema failures, 0 capped, $0.0169 of $0.50. All 67 segments routed to review (reason not itemised; follow-up). Egress and key removed afterwards. No further paid runs.
+
+## 2026-10-28 09:48 OPS-007 (#125)
+infrastructure/upgrade.py (safe_upgrade backs up first; require_current in import); devtools/release_check.py + release.yml (nightly, Linux and Windows); CHANGELOG.md 0.1.0; docs/runbooks/UPGRADE_AND_ROLLBACK.md. Tests: test_upgrade.py (4), test_release.py (2); release_check 6/6; ci 5/5.

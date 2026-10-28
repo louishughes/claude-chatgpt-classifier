@@ -26,7 +26,7 @@ The measured schema failure rate (about 0.14) matches the injected one-in-seven 
 - It shows the plumbing holds at 50 and 100 conversations. Every failure ends recorded: repaired, `review_required` with an error code, or `capped` and logged. Nothing invalid is stored, and a resumed run repeats no finished stage key.
 - Stability is 1.000 because the fake model is deterministic and the second run is answered from the cache. Real label stability needs a real model.
 - The generated conversations contain no decision or task cues, so extraction finds 0 records here. Extraction quality is measured by EVAL-004.
-- **Not done yet: the pinned real-provider run under a cost cap.** Louis approved one such run on 2026-10-28 (see below). Ticket EVAL-011 stays open until it has run and its cost is in the diary.
+- The pinned real-provider run under a cost cap ran once, at 50 conversations, on 2026-10-28 (results below). The 100 batch was run with the fake only: Louis approved one paid run, as small as the ticket allows.
 
 ## The real-provider run (one approved run)
 
@@ -49,3 +49,19 @@ ke eval semantic --synthetic 50 --provider anthropic --max-cost-usd 0.50
 ```
 
 The report's `provider` block gives calls, tokens, dollars spent, the cap, and how many requests the cap held back. It never includes any text.
+
+### Result of the one paid run, 2026-10-28
+
+Approved by Louis at 08:54 UTC ("Do a and b"). Run on Louis's PC at commit 80fc4e0, 09:41–09:44 UTC, with the key and egress set as environment variables for that one command and removed afterwards (`ke.toml` untouched):
+
+```
+ke --json eval semantic --synthetic 50 --provider anthropic --max-cost-usd 0.50
+```
+
+| Conversations | Segments | Model calls | Schema first-try failure | Repaired | Done | Review | Unvalidated outputs | Stability | Input / output tokens | Cost | Capped | Passed |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 50 | 67 | 67 | 0 | 0 | 0 | 67 | 0 | 1.000 | 101,846 / 13,390 | **$0.0169** of $0.50 | 0 | yes |
+
+- Every answer was valid JSON for the schema first time: no repairs, no timeouts, nothing capped.
+- **All 67 segments went to review, none to done.** That is the cautious outcome, not a failure: nothing unchecked was stored. The likely reason is that the smoke vocabulary has only three terms (Code, Images, Questions) and the generated chats don't fit them, so the model flagged itself unsure. This is **not confirmed**: the report counts outcomes but doesn't give the review reasons. Follow-up: give the report a count per kind of review reason (no text).
+- Stability 1.000 is again from the cache: the second pass reused the first pass's answers, so no second paid call was made. Real label stability would need a second, uncached paid run, which was not approved.

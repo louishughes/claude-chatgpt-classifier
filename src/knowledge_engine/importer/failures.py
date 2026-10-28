@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 from knowledge_engine.importer.archive import BlobStoreError
 from knowledge_engine.importer.lock import ImportLockTimeoutError
+from knowledge_engine.infrastructure.upgrade import SchemaMismatchError
 from knowledge_engine.ingestion.source import (
     SourceTooLargeError,
     UnsafeArchiveError,
@@ -57,6 +58,12 @@ def describe_failure(error: BaseException) -> ImportFailure | None:
             ImportLockTimeoutError,
             "busy",
             "Another import is running in this workspace. Try again when it finishes.",
+        ),
+        (
+            SchemaMismatchError,
+            "schema_mismatch",
+            "The database is from another version of the engine. Run `ke db upgrade` "
+            "(it backs up first), or `ke status` for details.",
         ),
         (
             BlobStoreError,

@@ -145,6 +145,8 @@ python -m knowledge_engine.devtools.ci --nightly  # release gate, variance, end-
 
 CI (`.github/workflows/ci.yml`) runs exactly these two commands, on Linux and Windows with Python 3.12 and 3.13 and a nightly schedule. It uses no secrets: every API key is removed from the checks' environment, so a check that needs a real model fails rather than passing on a machine that happens to have a key.
 
+Installing a release, upgrading (`ke db upgrade` backs up first) and rolling back are in `docs/runbooks/UPGRADE_AND_ROLLBACK.md`, and what each version changed is in `CHANGELOG.md`. `.github/workflows/release.yml` runs `python -m knowledge_engine.devtools.release_check` nightly. It installs the built wheel on a clean virtual environment, then upgrades and rolls back.
+
 Turn on the commit guard once per clone (it refuses commits that would include `raw/`, `private/`, `workspace/`, `ke.toml` or `.env`, and checks fixtures are marked synthetic):
 
 ```bash

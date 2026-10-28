@@ -1,0 +1,32 @@
+# OPS-007: the clean-machine release check, kept apart from ci.yml.
+# Builds the wheel, installs it into a fresh venv, imports a synthetic
+# export, upgrades from the previous schema (backup first) and restores
+# that backup. It needs the package index, so it runs nightly, on demand,
+# and for version tags, not on every push. No secrets, no model calls.
+name: release-check
+
+on:
+  schedule:
+    - cron: "47 3 * * *"
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  clean-install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e .
+      - run: python -m knowledge_engine.devtools.release_check
