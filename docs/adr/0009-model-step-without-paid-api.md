@@ -3,7 +3,7 @@
 ```yaml
 id: ADR-0009
 kind: architecture_decision
-status: proposed   # decided under delegated authority (owner, 2026-10-27 22:10 UTC), revisitable
+status: accepted   # decided under delegated authority (owner, 2026-10-27 22:10 UTC); REV-002 closed; revisitable
 recorded_at: 2026-10-27
 scope: providers/semantic-pipeline
 supersedes: []     # refines ADR-0007 §3, §4, §5 and §9 for as long as the no-paid-API rule holds; ADR-0007's two-layer and egress-switch policy stands
@@ -88,7 +88,7 @@ Tests drive `FileBatchProvider` with a **fake session**: a test helper that writ
 - **Stability is computed by code**, never by a session: per-field agreement for fixed-list fields, overlap for list fields, decision agreement by message number. Clipped and unclipped inputs are reported separately whenever clipping happens.
 - **The served model is recorded per response line.** On a subscription, the model can't be pinned the way an API model ID can. If run 1 and run 2 were served by different models, the stability report says so in its header and doesn't compare them as a like-for-like pair. That is the main weakness of this approach and it is stated in every report.
 - **Smoke-test metrics change.** Under this provider, "timeouts" and "retries" become: invalid-line rate, missing-line rate, repairs needed, `review_required` rate, batches per session window, and whether resume after a session stopped mid-file lost or duplicated anything.
-- Every report names its reviewer. Code-computed stability is a measurement. Accuracy needs the owner's approved answer key (REV-003) and counts only when scored against it.
+- Every report names its reviewer. Code-computed stability is a measurement. Accuracy needs an approved answer key (REV-003) and counts only when scored against it. Since 2026-10-28 the key is built and reviewed by an independent, blind Claude session (ideally a different model), not by the owner, who asked to stay out of tagging; the code checks stay (OPEN_DECISIONS, "Reference set").
 
 ### 5. Separation of roles
 
@@ -140,4 +140,4 @@ The money saved is real but small. The rule is mainly about not spending without
 
 ## Status
 
-Proposed, decided under delegated authority (owner, 2026-10-27 22:10 UTC) and revisitable. The owner can reverse it, or switch the provider back to the API, by saying so. Any change gets a new ADR that supersedes this one.
+Accepted, decided under delegated authority (owner, 2026-10-27 22:10 UTC) and revisitable. The owner can reverse it, or switch the provider back to the API, by saying so. Any change gets a new ADR that supersedes this one.

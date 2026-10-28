@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block main %}
+<h1>Your archive</h1>
+{% if status is none %}
+<p>No imports yet. Import an export with the command line for now; an Import button is coming next.</p>
+{% else %}
+<ul class="tiles">
+  <li><strong>{{ status.conversations }}</strong> chats stored</li>
+  <li><strong>{{ status.present }}</strong> in the latest export</li>
+  <li><strong>{{ status.not_seen }}</strong> not seen lately (kept)</li>
+  <li><strong>{{ status.imports }}</strong> imports</li>
+</ul>
+<h2>Imports</h2>
+{% if imports %}
+<table>
+  <thead><tr><th>When</th><th>Result</th><th>New</th><th>Changed</th><th>Unchanged</th><th></th></tr></thead>
+  <tbody>
+  {% for row in imports %}
+  <tr>
+    <td>{{ row.started_at | when }}</td>
+    <td><span class="status {{ row.status }}">{{ row.status }}</span></td>
+    <td>{{ row.conversations.get("new", 0) }}</td>
+    <td>{{ row.conversations.get("revised", 0) }}</td>
+    <td>{{ row.conversations.get("unchanged", 0) }}</td>
+    <td><a href="/imports/{{ row.import_id }}">Report</a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No imports yet.</p>
+{% endif %}
+{% endif %}
+{% endblock %}
