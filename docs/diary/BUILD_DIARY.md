@@ -3106,3 +3106,14 @@ Talking points:
 - "Before changing the answer key, the session proved the old one was untouched by its hash, and afterwards proved it again."
 - "Every answer in the key is checked by code against the real message: the quote, the speaker and the number."
 - "A checker that's never been shown to fail isn't proven, so we planted three mistakes and watched it catch them."
+
+### 17:45 — Third score: the noise is gone, and three clear gaps remain
+
+- `ke classify review`: a separate reviewer session settled 14 of the 18 unsure segments.
+- NOTE-022 (#324) drops the old rule records where the AI extraction ran. Re-rendering the 40 notes brought the noise down from 57 lines to 3 and readability from 19/30 to 25/30. Only 1 of the 15 scored chats is unclassified now (it was 4).
+- The answer key v2 scorer was F1 0.05. Much of that is a naming mismatch: the key calls an assistant suggestion an `idea`, the engine calls it a `proposal`. Louis is deciding whether those should count as a match.
+- Still to fix: open questions (0 of 9), short user constraints (13 of 22 missed), and stitched summaries on long chats.
+
+Talking points:
+- "Three scorings, same answer key: noise down from 57 lines to 3, and the remaining gaps are named and countable."
+- "Removing the old rules cost three true decisions. That trade-off only shows up because something independent is measuring it."
