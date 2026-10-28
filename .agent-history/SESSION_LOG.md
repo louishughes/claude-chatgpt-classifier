@@ -653,3 +653,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - segmentation/inventory.py (SegmentText, CorpusSummary, segment_texts, corpus_inventory, theme_words, summarise, sample, sample_ids); CLI `ke corpus`. taxonomy/projects.py (same_name_projects, propose_project); review.approve gains `label` override and the high-impact note rule for project rename/merge.
 - Tests: test_corpus_sample.py (5), test_corpus_inventory.py (2), test_project_proposals.py (5). Full suite 839 passed, 6 skipped. ruff, mypy OK; no migration drift.
 - Next: TAX-006/007.
+
+## 2026-10-28 05:10 TAX-006 + TAX-007 (#61, #62)
+- taxonomy/discovery.py (DiscoveryBackend, TfidfBackend, BertopicBackend, BackendUnavailable, Cluster, DiscoveryReport, discover, STOP_WORDS); taxonomy/changes.py (TaxonomyChangeRow, StageInvalidationRow, TaxonomyDiff, diff_snapshots, record_diff, invalidate, invalidated); migration 0017.
+- Tests: test_taxonomy_discovery.py (4), test_taxonomy_changes.py (3). Full suite 846 passed, 6 skipped. ruff, mypy OK; no migration drift.
+- Next: TAX-008 + CLS-001.

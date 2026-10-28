@@ -1182,3 +1182,18 @@ pytest -q               # 839 passed, 6 skipped
 Fix attempts: 1. Two of my own new tests were wrong: one rolled back a proposal it hadn't committed, the other assumed a segment's text starts with its first user message.
 
 **Next exact task:** TAX-006 (discovery candidates) + TAX-007 (version diff and invalidation).
+
+### 05:10 — TAX-006 + TAX-007: suggesting categories, and knowing what a new version changes
+**What:** where candidate categories come from, and how a new taxonomy version avoids redoing everything.
+- **Discovery (TAX-006).** `discover()` groups segments and files one `add` proposal per group. That is its only write: no term exists, and nothing reaches a published snapshot, until a different reviewer approves it. The default backend is plain and repeatable. It takes the word shared by the most remaining segments, ignoring a fixed list of filler words and anything in more than half the corpus, makes those segments a group, and repeats. Each group is labelled by its top TF-IDF words. BERTopic is an optional local backend; without the library it says so up front. Labels that already name an approved term are reported as *known*, and labels already waiting are not proposed twice. Evidence keeps the backend, its version, keywords, size and up to 50 segment IDs.
+- **Version diff (TAX-007).** `diff_snapshots(old, new)` lists IDs that were added, removed (merged or retired) and changed (label, aliases, definition or parent). `invalidate(diff, outputs)` marks only the saved outputs that cite a removed or changed ID, in an append-only table. When project A gets an alias, a classification that cites only project B or a topic is untouched. Stale outputs are flagged, never deleted. Migration 0017.
+
+**Teach-back (`taxonomy/changes.py`):** "When a new taxonomy version comes out, I compare it with the old one ID by ID. Only saved answers that mention an ID that changed get marked stale. Everything else keeps its cached answer, so nothing is redone or paid for twice."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 155 source files
+pytest -q               # 846 passed, 6 skipped
+```
+Fix attempts: 2. Grouping each segment by its single most distinctive word split one subject into several groups, so I switched to greedy grouping by shared word. Then filler words like "and" won ties, so I added a fixed stop list.
+
+**Next exact task:** TAX-008 (governance reports) + CLS-001 (classifier schema).
