@@ -43,7 +43,7 @@ from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 
 from knowledge_engine import __version__
-from knowledge_engine.api import imports, knowledge
+from knowledge_engine.api import imports, knowledge, retrieval
 from knowledge_engine.api.deps import (
     ApiError,
     ErrorBody,
@@ -137,6 +137,7 @@ def create_app(settings: Settings) -> FastAPI:
     _add_error_handlers(app)
     app.include_router(imports.router, prefix=PREFIX)
     app.include_router(knowledge.router, prefix=PREFIX)
+    app.include_router(retrieval.router, prefix=PREFIX)
 
     @app.middleware("http")
     async def local_only(
