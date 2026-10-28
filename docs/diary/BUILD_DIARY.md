@@ -2963,6 +2963,65 @@ Fix attempts: 2 (my FakeProvider digest left out the required intent; the table-
 
 **Next exact task:** keywords into the note (NOTE-007 wiring), then NOTE-008.
 
+### 15:25 — NOTE-010 (part 1): `ke docs check` now checks a note is readable, not just linked
+
+**What:** The rich-note plan (§7 of the gap analysis) promised that a note fits on a screen or two, that an empty section is one plain sentence, and that hashes and run IDs stay out of the front matter. Until now only `ke docs rubric` checked the first two, and only by rebuilding notes from the database. NOTE-010 wants the vault check itself to catch them, on the files Obsidian actually opens. `evaluation/readability.py` adds three rules to `ke docs check`:
+
+- **budget**: a rich note's body (the part above the vault's "write below this line" marker, so your own notes never count) stays under the budget for its chat's length, read from its own `messages` property;
+- **empty_evidence**: an evidence box (`> [!quote]`) in a section with no item in it fails, in any note;
+- **properties**: front matter holds plain values and flat lists Dataview can filter on; no nested maps, and no hashes or bookkeeping like `content_hash` (those go in the `.meta` sidecar).
+
+Older notes (DOC-003 knowledge notes, the masters) were never written to that standard, so they are counted as "not checked" rather than failed. The summary line now says how many rich notes were within budget.
+
+**Challenge:** the new test writes a rich note, with a fake digest, for every chat in every fixture export (24 exports), then runs the vault check. It failed straight away, and not on readability: the link checker said six citations were broken. They were the `[m4]` links inside the knowledge card table, where the alias pipe has to be written `\|` so it doesn't end the table cell. Obsidian reads that fine; the checker read the backslash as part of the link target. It's the same mistake the NOTE-011 checks hit earlier today, in a different file. The note was right, so the checker was fixed.
+
+**Also:** I'd claimed NOTE-012 (the dashboard) first, then found another thread already had it up as a PR. I dropped my half-built copy rather than open a duplicate.
+
+**Teach-back (`evaluation/readability.py`, `check_note`):** It reads one note file, front matter and body, and checks three promises: the note isn't longer than its chat deserves, no section shows an evidence box without anything for it to back up, and the front matter only holds simple values a reader or Dataview would use. Only notes whose `generator` says they use the new layout get the length and front-matter checks, because older notes never made those promises. It never opens the database, so it works on any vault folder.
+
+Checks:
+```
+tests/unit/test_readability.py                6 passed
+tests/integration/test_note_readability.py   25 passed (24 fixture exports, every rich note clean; CLI reports budget and empty-evidence problems)
+```
+Fix attempts: 2 (the table-cell pipe in the link checker; one fixture ships its export as a ZIP).
+
+Talking points:
+- "My vault checker now fails a note that's too long for its chat, not just one with a broken link."
+- "The first real run caught a bug in the checker, not the notes. Same bug I'd fixed in another checker that morning, which says the pipe-in-a-table rule deserves one shared helper."
+- "Two agents claimed the same ticket. The fix was simple: check the open PRs before starting, and back off when someone's ahead."
+
+### 15:45 — NOTE-010 (part 2): topic and project masters you can read
+
+The topic and project masters (DOC-004/005) were complete but hard going: every record printed as its claim, then a list of status, sources, record ID and event IDs, then its quotes in full. `documents/readable_master.py` renders the same document in the chat-note style, chosen with `ke docs topic|project --template v2` (the old layout stays the default, so nothing that uses it changes):
+
+- a **summary** box first, in the engine's own words ("3 items from 2 chats: 1 current, 2 replaced"), with the topic's definition;
+- **one line per item**: the claim in bold, its kind and who holds it, and short citations;
+- a citation is `[c2·m12]`, message 12 of chat 2. A master spans many chats, so the chats are numbered once in a **Chats** list at the end, which keeps every link short;
+- quotes **folded** under the item, at most two, each re-checked against the archive;
+- the DOC-004 rule still holds: a replaced choice says what replaced it, now in words ("Replaced by "…" (c2·m4)") instead of a record ID;
+- **How these connect** and the **Decision timeline** name items by their words and place too;
+- IDs and hashes go to a `.meta/` JSON sidecar; the front matter is flat counts and labels Dataview can filter on.
+
+Masters get their own budget in `ke docs check` (a base plus so much per item and per chat), since a topic grows with the archive.
+
+**Decision:** the place in brackets after a claim ("(c1·m2)") was added after I read the first rendered master. Two chats had made the same decision in the same words, so "How these connect" showed two identical lines. The place tells them apart without bringing record IDs back.
+
+**Teach-back (`documents/readable_master.py`):** It takes a topic's or project's list of knowledge items, already sorted into current, replaced, in conflict and suggestions, and writes it as a note a person can skim: a short summary, then one line per item with links to the exact messages. Each chat gets a number, so a link reads "c2·m12" instead of a long title. Anything only a program needs, like record IDs, goes in a separate file next to the note.
+
+Checks:
+```
+tests/integration/test_readable_masters.py   5 passed (summary first; every replaced line names its replacement; no IDs in the note; every c·m number is the transcript's; vault check clean; CLI v2)
+python -m knowledge_engine.devtools.ci       lint, format, types, guard ok; 1448 passed, 22 skipped
+```
+Fix attempts: 2 (a query result needed `.all()` before `dict()`; my test unpacked `write_transcript`'s return value wrongly).
+
+Talking points:
+- "A master note now reads like a briefing: summary, then one line per decision, with a link to the exact message."
+- "Old decisions are still labelled, just in words instead of IDs."
+
+**Next exact task:** NOTE-007 wiring (keyword candidates into the note's Keywords and topics section) once #296 merges.
+
 ### 15:55 — Step 4: tax-1 published, 40 real chats classified and digested, and the notes scored by a separate session
 
 Louis approved tax-1 and asked me to run the publish ("I need you to run it"); this PC's safety check had blocked my first try.
