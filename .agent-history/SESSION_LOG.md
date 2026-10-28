@@ -2,6 +2,8 @@
 
 Append-only record of each ticket closure: what changed, what ran, and the real results. Newest at the bottom.
 
+> **New entries live in [`sessions/`](sessions/), one file per entry** (from 2026-10-28, DOC-001, #343), so parallel PRs don't conflict here. This file keeps the earlier entries, unchanged.
+
 ## 2026-10-27 · FND-001 — Bootstrap Python repository and tool configuration
 
 **Dependencies:** none. **Status:** VERIFIED.
