@@ -539,3 +539,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - importer/integrity.py (source_counts from raw JSON, IntegrityTally, mismatches -> integrity_mismatch warning); ConversationDelta gains nodes/content_types/unparsed_parts; MediaDelta.duplicate_assets; MediaLibrary.referenced; ImportReport.integrity + summary(); cli `ke imports report [latest|ID]` reads the ledger only; nested dicts in text output are bracketed.
 - Tests: test_import_report.py (20, incl. all 14 fixture manifests). Full suite 524 passed, 6 skipped.
 - Next: slice R2 (MED-004).
+
+## 2026-10-28 00:04 MED-004 (slice R2)
+- rendering/media.py: MediaRef, attachment_path (OD-14), media_block (embed or warning marker with REASONS), load_media_refs, blob_sources, export_attachments (hash-verified temp+rename), check_embeds, media_counts.
+- Tests: test_media_embeds.py (7). Full suite 531 passed, 6 skipped.
+- Next: slice R3 (BRW-001).

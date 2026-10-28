@@ -749,3 +749,22 @@ pytest -q               # 524 passed, 6 skipped (20 new)
 Finish line: `ke imports report latest` matches each fixture manifest (14 cases), the identical re-import is all unchanged with 0 model calls, and `reexport_v1` → `v2` matches its answer key. Fix attempts: 1 (first draft of the report command called a method that doesn't exist; caught by mypy before any test ran).
 
 **Next exact task:** slice R2 (MED-004: image embeds and missing-image markers in notes).
+
+### 00:04 — MED-004: images show up in notes, or say why they can't
+**What:** Notes can now show images. An available image becomes an Obsidian embed pointing at a copy inside the vault, `_attachments/ab/<fingerprint>.png` (OD-14). Anything else becomes a visible warning that names the pointer and gives the reason in plain words, e.g. "Image missing: file-service://file-… (no file with this ID is in the export)". 7 new tests, 531 in total.
+**Key decisions and why:**
+- **Copies are named by fingerprint**, so the same image used in many chats is one file in the vault, and re-exporting copies nothing.
+- **Copies are checked while copying.** If the source's bytes don't match the fingerprint, the copy is thrown away and nothing reaches the vault.
+- **The vault never points outside itself.** Whether images were stored by reference or copied, notes only point into `_attachments/`. A test checks the note text contains no raw or workspace path.
+- **A link checker** (`check_embeds`) lists every embed whose file is missing. Escaped text from chats (`\[\[`) never counts as an embed.
+**Teach-back (`rendering/media.py`):** "An image in a note is a verified copy inside the vault, named by its fingerprint, so the vault never depends on where my raw files live. If the image isn't available, the note shows a warning with the pointer and the reason in its place. A link checker confirms every embed in a note points at a real file."
+**Talking points:**
+- "A note never lies about an image: it shows it, or says why it can't."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 79 source files
+pytest -q               # 531 passed, 6 skipped (7 new)
+```
+Finish line: link checker passes for all 5 available images (reference and copy modes); `asset_problems` renders 4 markers naming pointer and reason; no raw path in the note. Fix attempts: 0.
+
+**Next exact task:** slice R3 (BRW-001: browse a conversation from its source links; `ke inspect`).
