@@ -33,7 +33,7 @@ import hashlib
 import math
 import re
 from collections import Counter, defaultdict
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -85,10 +85,15 @@ class CorpusSummary:
     themes: int
 
 
-def segment_texts(conversation: StoredConversation) -> list[SegmentText]:
-    """Segment one stored conversation and attach each segment's text."""
+def segment_texts(
+    conversation: StoredConversation, overrides: Mapping[str, str] | None = None
+) -> list[SegmentText]:
+    """Segment one stored conversation and attach each segment's text.
+
+    ``overrides`` are the reviewer splits and merges in force (NRM-005).
+    """
     found = []
-    for segment in segment_conversation(conversation):
+    for segment in segment_conversation(conversation, overrides=overrides):
         text = "\n\n".join(
             conversation.messages[native].text
             for native in segment.messages
@@ -117,12 +122,14 @@ def corpus_inventory(session: Session, workspace_id: str | None = None) -> Itera
         Segments with text, one conversation at a time (memory stays small).
     """
     from knowledge_engine.importer.records import ConversationRow
+    from knowledge_engine.segmentation.overrides import active_overrides
 
     query = select(ConversationRow.conversation_id).order_by(ConversationRow.conversation_id)
     if workspace_id is not None:
         query = query.where(ConversationRow.workspace_id == workspace_id)
     for conversation_id in session.scalars(query).all():
-        yield from segment_texts(load_conversation(session, conversation_id))
+        overrides = active_overrides(session, conversation_id)
+        yield from segment_texts(load_conversation(session, conversation_id), overrides or None)
 
 
 def theme_words(items: Sequence[SegmentText]) -> dict[str, str]:

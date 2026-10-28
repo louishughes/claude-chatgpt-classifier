@@ -1517,3 +1517,27 @@ migration drift         # 0
 Fix attempts: 1. `dict()` over a SQLAlchemy result treats it as a mapping, so the trust counts are built from pairs.
 
 **Next exact task:** M4, starting with its first unblocked ticket (DEPENDENCY_MAP §4).
+
+### 06:20 — NRM-005 + REC-001: reviewers can fix segments; repeated claims are proposed, never merged
+**NRM-005.** Segment boundaries were only the machine's proposal. Now a reviewer can split or merge them.
+- Each decision (split, merge, clear) is one row in an append-only log, tied to the export's own message ID. Because those IDs are the same in every later export, the decisions are applied again after a re-import or any recomputation.
+- A split is only allowed where an exchange starts, so a short "no" is never cut off from what it rejects. Every message still lands in exactly one segment.
+- A segment a reviewer changed lists the automatic segments it came from (`derived_from`).
+- A decision that no longer fits the chat is reported as orphaned, not dropped.
+- `revalidation` lists the stored classifications and extraction runs that belong to segments that are no longer current. Nothing is deleted.
+
+**REC-001.** The same claim made in two chats should become one claim with two pieces of evidence, but only after a check.
+- Two records are compared only if they could be the same claim: same kind, same person, same reported speaker, same for or against, same projects.
+- Scores come from the share of content words in common. Numbers and negations are compared on their own: "port 8080" versus "port 8081", and "deploy with Docker" versus "don't", come out as **near misses** with the difference named.
+- Every pair, even a word-for-word repeat, stays `proposed` until a named reviewer decides. Confirming a near miss needs a reason. The records themselves are never touched.
+
+**Teach-back (`reconciliation/equivalence.py`):** "It looks for knowledge records that might say the same thing, but only compares records of the same kind, from the same person, about the same project. It scores how many meaningful words they share and flags differences in numbers or 'not', because those make a different decision. Nothing is merged by the machine: every pair waits for a named reviewer, and the decision is logged for good."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 129 source files
+pytest -q               # 1034 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 0. One test helper first lacked a scope ID, which the record contract requires.
+
+**Next exact task:** REC-002 (relationship candidate discovery), then REC-003.
