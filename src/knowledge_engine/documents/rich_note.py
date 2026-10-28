@@ -52,6 +52,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from knowledge_engine.classification.store import effective_labels
+from knowledge_engine.digest.contract import ConversationDigest, DigestItem
 from knowledge_engine.documents.model import DocItem, DocumentKind, build_document
 from knowledge_engine.documents.notes import _branches, _images, _links, knowledge_path
 from knowledge_engine.documents.render import transcript_stem
@@ -282,6 +283,27 @@ def _section(title: str, provenance: str, blocks: list[Block], empty: str) -> li
     return head + (blocks or [Paragraph(empty, True)])
 
 
+# ---------------------------------------------------------------- digest
+
+
+def _digest_line(item: DigestItem, citer: Citer) -> str:
+    """One digest item as a line: the model's words (escaped) and its citations."""
+    cites = " ".join(citer.native(m) for m in item.message_ids if m in citer.chat.node_keys)
+    text = escape_text(" ".join(item.text.split()))
+    return f"{text} {cites}".rstrip()
+
+
+def _digest_blocks(session: Session, items: Sequence[DigestItem], citer: Citer) -> list[Block]:
+    """Digest items as bullets, each with its folded, re-checked evidence."""
+    blocks: list[Block] = []
+    for item in items:
+        blocks.append(BulletList((_digest_line(item, citer),), trusted=True))
+        box = _evidence_callout(session, item.evidence, citer)
+        if box is not None:
+            blocks.append(box)
+    return blocks
+
+
 # ---------------------------------------------------------------- labels
 
 
@@ -447,7 +469,11 @@ def _cell(text: str) -> str:
 
 
 def rich_conversation_note(
-    session: Session, conversation_id: str, *, taxonomy: TaxonomySnapshot | None = None
+    session: Session,
+    conversation_id: str,
+    *,
+    taxonomy: TaxonomySnapshot | None = None,
+    digest: ConversationDigest | None = None,
 ) -> RichNote:
     """Build one chat's rich note (template v2) from stored facts. Reads only.
 
@@ -455,6 +481,8 @@ def rich_conversation_note(
         session: A read session.
         conversation_id: The ``conv_`` ID.
         taxonomy: The published version to show labels under, or None.
+        digest: The chat's checked digest (NOTE-003), or None: its sections
+            then say the digest hasn't run.
     """
     chat = load_conversation(session, conversation_id)
     stem = transcript_stem(conversation_id, chat.title)
@@ -476,11 +504,23 @@ def rich_conversation_note(
         {" ".join(i.record.entity.name.split()) for i in sorted_.references if i.record.entity}
     )
     made = _artefact_names(session, sorted_.artefacts)
+
+    def card_cell(item: DigestItem | None, missing: str) -> str:
+        return _cell(_digest_line(item, citer)) if item else missing
+
+    pending = "not written yet" if digest is None else "not stated"
     card = [
         "| | |",
         "|---|---|",
-        "| **Purpose** | not written yet |",
-        "| **Outcome** | not written yet |",
+        f"| **Purpose** | {card_cell(digest.purpose if digest else None, pending)} |",
+        f"| **Outcome** | {card_cell(digest.outcome if digest else None, pending)} |",
+    ]
+    if digest is not None:
+        status = digest.status.value if digest.status else "unknown"
+        intent = digest.intent.value if digest.intent else "unknown"
+        card.append(f"| **Status** | {status} |")
+        card.append(f"| **Intent** | {intent}: {card_cell(digest.intent_item, 'unknown')} |")
+    card += [
         f"| **Category** | {_cell(escape_text(where))} |",
         f"| **Project** | {_cell(escape_text(labels.project or 'none matched'))} |",
         "| **Tools and names** | "
@@ -491,8 +531,15 @@ def rich_conversation_note(
         f"branch(es), {len(refs)} image(s), {len(urls)} link(s) |",
     ]
 
+    summary = tuple(_digest_line(item, citer) for item in digest.summary) if digest else (WAITING,)
     blocks: list[Block] = [
-        Callout("summary", "Summary", (WAITING,), trusted=True, collapsed=False),
+        Callout(
+            "summary",
+            "Summary · generated, every sentence cited" if digest else "Summary",
+            summary,
+            trusted=True,
+            collapsed=False,
+        ),
         Heading("Knowledge card", 2),
         Paragraph("\n".join(card), True),
     ]
@@ -540,7 +587,8 @@ def rich_conversation_note(
     blocks += _section(
         "Open questions",
         "From the chat: asked and not answered",
-        [b for it in sorted_.questions for b in _item_blocks(session, it, citer)],
+        [b for it in sorted_.questions for b in _item_blocks(session, it, citer)]
+        + (_digest_blocks(session, digest.open_questions, citer) if digest else []),
         "None recorded.",
     )
     blocks += _section(
@@ -553,8 +601,20 @@ def rich_conversation_note(
         ],
         "None recorded.",
     )
-    for title in ("Insights", "Tensions and trade-offs", "Next steps"):
-        blocks += _section(title, "Generated (check before relying on it)", [], WAITING)
+    provenance = "Generated (check before relying on it)"
+    generated = (
+        ("Insights", "insights"),
+        ("Tensions and trade-offs", "tensions"),
+        ("Next steps", "next_steps"),
+    )
+    for title, name in generated:
+        if digest is None:
+            blocks += _section(title, provenance, [], WAITING)
+        else:
+            items_ = getattr(digest, name)
+            blocks += _section(
+                title, provenance, _digest_blocks(session, items_, citer), "None in this chat."
+            )
 
     if taxonomy is None:
         classified = "No taxonomy version was given, so labels aren't shown."
@@ -575,8 +635,16 @@ def rich_conversation_note(
         Paragraph("*Classification*", True),
         BulletList(tuple(tag_lines), trusted=True),
     ]
+    topics: list[Block] = (
+        [BulletList((", ".join(_digest_line(t, citer) for t in digest.topics),), trusted=True)]
+        if digest and digest.topics
+        else []
+    )
     blocks += _section(
-        "Keywords and topics", "Candidates; only approved terms become tags", [], WAITING
+        "Keywords and topics",
+        "Candidates; only approved terms become tags",
+        topics,
+        WAITING if digest is None else "None suggested.",
     )
     blocks += _section(
         "Related chats",
@@ -595,7 +663,12 @@ def rich_conversation_note(
         Heading("Source", 2),
         Paragraph(
             f"Full transcript: [[{stem}]]. Built from stored records by {TEMPLATE_VERSION}; "
-            "no summary has been written or scored yet.",
+            + (
+                "no summary has been written or scored yet."
+                if digest is None
+                else f"summary and generated sections from a {digest.schema_version} digest, "
+                "not yet scored."
+            ),
             True,
         ),
     ]
@@ -615,7 +688,8 @@ def rich_conversation_note(
         "related": related_notes,
         "transcript": f"[[{stem}]]",
         "taxonomy_version": taxonomy.version if taxonomy else "none",
-        "digest": "not written",
+        "digest": "not written" if digest is None else "generated, not scored",
+        "status": digest.status.value if digest and digest.status else None,
         "generator": TEMPLATE_VERSION,
     }
     meta: dict[str, object] = {
@@ -627,6 +701,7 @@ def rich_conversation_note(
         "revision_ids": list(document.revision_ids),
         "relationship_ids": [link.relationship_id for link in links],
         "taxonomy_version": taxonomy.version if taxonomy else None,
+        "digest_flags": len(digest.flags) if digest else None,
     }
     title = chat.title or "Untitled conversation"
     return RichNote(DocumentModel(title, properties, tuple(blocks)), tuple(refs), meta)
@@ -645,13 +720,14 @@ def write_rich_note(
     store_root: Path,
     *,
     taxonomy: TaxonomySnapshot | None = None,
+    digest: ConversationDigest | None = None,
 ) -> PurePosixPath:
     """Write a chat's rich note into ``vault_root/Knowledge``, its images and sidecar.
 
     It goes where the DOC-003 note would, so a vault holds one knowledge
     note per chat whichever template wrote it.
     """
-    note = rich_conversation_note(session, conversation_id, taxonomy=taxonomy)
+    note = rich_conversation_note(session, conversation_id, taxonomy=taxonomy, digest=digest)
     export_attachments(note.media, vault_root, blob_sources(session, store_root))
     title = session.get_one(ConversationRow, conversation_id).title
     relative = knowledge_path(conversation_id, title)

@@ -2667,3 +2667,21 @@ Talking points:
 - "Evidence is folded away, not deleted: open the box and the quote is there, re-checked against the archive."
 
 **Next exact task:** NOTE-006, the first taxonomy discovered from the real chats.
+
+### 13:55 — NOTE-004: digests from a Claude session, end to end
+
+- `ke digest run [IDs | --all] --run-id R [--vault V]`: the first run writes the digest requests into `private/model-batches/R/` and says how many are waiting; a Claude session fills the response files; running it again collects, checks every quote and writes the rich notes. All chats go in one submit, so the requests are packed into as few files as fit, not one file per chat.
+- `rich_note.py` now takes a digest: the summary box, purpose, outcome, status and intent in the knowledge card, insights, tensions and next steps (each with its folded, re-checked evidence), open questions from the digest under the extractor's, and topic candidates. Without a digest the note is exactly as before (the NOTE-001 tests are unchanged and pass).
+- `ke docs chat --template v2` uses a digest that was already collected, with model access off. `stored_digest` reads the stored answers only; it never asks.
+- The runbook (`docs/runbooks/LABELLING_SESSION.md`) has a digest section: write, answer in a fresh session with the deny rules, collect, what to do at a usage limit, and repairs.
+
+**Teach-back (`ke digest run`):** The first time it runs, it writes every chat's digest question into request files and stops, because the answers come from a Claude session on my subscription, not from a paid API. Once the session has written its answers next to them, the same command reads them back, throws out any sentence whose quotes aren't really in the chat, and writes a readable note for each chat that passed. Running it a third time asks nothing new, because every answer is already stored.
+
+Checks:
+```
+tests/integration/test_digest_dry_run.py   3 passed (egress off writes nothing; 3 chats end to end; docs chat reuses the digest)
+tests/integration/test_rich_note.py        10 passed (unchanged)
+```
+Fix attempts: 1 (the first version wrote one request file per chat; now one submit for all).
+
+**Next exact task:** NOTE-005 (model-backed knowledge extractor).

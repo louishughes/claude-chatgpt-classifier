@@ -954,6 +954,90 @@ def _access(settings: Settings, args: argparse.Namespace) -> CommandResult:
         engine.dispose()
 
 
+def _digest(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Ask for chat digests through request files a Claude session answers (NOTE-004).
+
+    Run it once to write the request files; a session fills the response
+    files (docs/runbooks/LABELLING_SESSION.md); run it again to collect,
+    check every quote and, with ``--vault``, write the rich notes.
+    """
+    from collections import Counter
+
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.digest.stage import DigestStage
+    from knowledge_engine.documents.rich_note import write_rich_note
+    from knowledge_engine.importer.records import ConversationRow
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.providers.file_batch import FileBatchProvider
+    from knowledge_engine.providers.ledger import ModelStageRunner
+    from knowledge_engine.rendering.transcript import find_conversation, load_conversation
+    from knowledge_engine.settings import EgressDisabledError
+
+    name = "digest run"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            if args.all:
+                ids = list(
+                    session.scalars(
+                        select(ConversationRow.conversation_id).order_by(
+                            ConversationRow.conversation_id
+                        )
+                    )
+                )
+            else:
+                found = [find_conversation(session, ref) for ref in args.conversations]
+                if None in found or not found:
+                    return CommandResult(
+                        name, ExitCode.USAGE, message="no such conversation", error_code="not_found"
+                    )
+                ids = [cid for cid in found if cid is not None]
+            provider = FileBatchProvider(settings.model_batch_root, args.run_id, settings.egress)
+            stage = DigestStage(ModelStageRunner(session, provider, settings.egress))
+            counts: Counter[str] = Counter()
+            try:
+                chats = [load_conversation(session, cid) for cid in ids]
+                outcomes = stage.run_all(chats)
+                session.commit()  # the requests and answers are kept before any note is written
+                for conversation_id, outcome in zip(ids, outcomes, strict=True):
+                    counts[outcome.state] += 1
+                    if outcome.state == "done" and args.vault is not None:
+                        write_rich_note(
+                            session,
+                            conversation_id,
+                            args.vault,
+                            settings.workspace_root / "archive",
+                            digest=outcome.digest,
+                        )
+                        counts["notes"] += 1
+            except EgressDisabledError:
+                return CommandResult(
+                    name,
+                    ExitCode.USAGE,
+                    message="text_llm is off: turn it on in [egress] to write request files",
+                    error_code="egress_off",
+                )
+    finally:
+        engine.dispose()
+    data = {k: counts.get(k, 0) for k in ("done", "pending", "review_required", "notes")}
+    data["chats"] = len(ids)
+    return CommandResult(
+        name,
+        data=data,
+        message=(
+            f"{data['done']} done, {data['pending']} waiting for answers, "
+            f"{data['review_required']} need review, {data['notes']} note(s) written"
+        ),
+    )
+
+
 def _web(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Fetch one web page safely and show where it came from (INT-001)."""
     from knowledge_engine.ingestion.web import WebFetchError, fetch_page, save_snapshot
@@ -1827,14 +1911,28 @@ def _docs_note(settings: Settings, session: Any, args: argparse.Namespace) -> Co
                 command, ExitCode.USAGE, message="no such conversation", error_code="not_found"
             )
         # v2 is the rich-note layout (NOTE-001); v1 (DOC-003) stays the default for now.
-        writer = write_rich_note if args.template == "v2" else write_conversation_note
-        path = writer(
-            session,
-            conversation_id,
-            args.vault,
-            settings.workspace_root / "archive",
-            taxonomy=snapshot,
-        )
+        if args.template == "v2":
+            from knowledge_engine.digest.stage import stored_digest
+            from knowledge_engine.rendering.transcript import load_conversation
+
+            # A digest already collected (NOTE-004) fills the summary; none is asked for here.
+            digest = stored_digest(session, load_conversation(session, conversation_id))
+            path = write_rich_note(
+                session,
+                conversation_id,
+                args.vault,
+                settings.workspace_root / "archive",
+                taxonomy=snapshot,
+                digest=digest,
+            )
+        else:
+            path = write_conversation_note(
+                session,
+                conversation_id,
+                args.vault,
+                settings.workspace_root / "archive",
+                taxonomy=snapshot,
+            )
         # The file name holds the (private) chat title, so only its ID part is printed.
         # Plain "..." because a Windows console can't print the ellipsis character.
         shown = f"{path.parent.as_posix()}/... ({path.stem.rsplit('(', 1)[-1]}.md"
@@ -3007,6 +3105,18 @@ def build_parser() -> argparse.ArgumentParser:
     backup_restore.add_argument("folder", type=Path, help="the backup folder")
     backup_restore.add_argument("--to", type=Path, required=True, help="an empty folder")
     backup_restore.set_defaults(handler=_backup)
+    digest = commands.add_parser(
+        "digest", help="summarise chats through request files a Claude session answers"
+    )
+    digest_commands = digest.add_subparsers(dest="digest_command", required=True)
+    digest_run = digest_commands.add_parser(
+        "run", help="write digest requests, or collect answers and write notes (run again)"
+    )
+    digest_run.add_argument("conversations", nargs="*", help="conv_ or export conversation IDs")
+    digest_run.add_argument("--all", action="store_true", help="every imported chat")
+    digest_run.add_argument("--run-id", required=True, help="the batch folder name, e.g. gold-40")
+    digest_run.add_argument("--vault", type=Path, help="write each finished chat's rich note here")
+    digest.set_defaults(handler=_digest)
     web = commands.add_parser("web", help="fetch web pages (allowlisted, network_fetch on)")
     web_commands = web.add_subparsers(dest="web_command", required=True)
     web_fetch = web_commands.add_parser("fetch", help="fetch one page into located blocks")

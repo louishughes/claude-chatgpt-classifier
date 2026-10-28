@@ -32,9 +32,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
+
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from knowledge_engine.digest.contract import (
     DIGEST_SCHEMA_VERSION,
@@ -47,7 +50,7 @@ from knowledge_engine.domain.enums import Role
 from knowledge_engine.extraction.text import ExtractionMessage, exchanges_of
 from knowledge_engine.orchestration.stage_keys import stage_key
 from knowledge_engine.providers.base import ModelRequest, quote_untrusted
-from knowledge_engine.providers.ledger import ModelStageRunner
+from knowledge_engine.providers.ledger import ModelOutputRow, ModelStageRunner
 from knowledge_engine.rendering.transcript import StoredConversation
 from knowledge_engine.segmentation.segmenter import SegmenterSettings, split_parts
 
@@ -134,6 +137,59 @@ def branch_summary(conversation: StoredConversation) -> str:
     return "\n".join(lines)
 
 
+def digest_requests(
+    conversation: StoredConversation, max_characters: int = SegmenterSettings().max_characters
+) -> list[ModelRequest]:
+    """The requests for one chat: one, or one per part of a long chat."""
+    messages = chat_messages(conversation)
+    branches = branch_summary(conversation)
+    parts = split_parts(exchanges_of(messages), max_characters)
+    by_id = {m.native_id: m for m in messages}
+    return [
+        _request(
+            [by_id[i] for i in part.messages],
+            branches,
+            part_label=f"Part {n} of {len(parts)}" if len(parts) > 1 else None,
+        )
+        for n, part in enumerate(parts, start=1)
+    ]
+
+
+def _request(
+    messages: Sequence[ExtractionMessage], branches: str, *, part_label: str | None
+) -> ModelRequest:
+    sections = []
+    if part_label:
+        sections.append(f"{part_label} of a longer chat.")
+    if branches:
+        sections.append(f"Forks in this chat:\n{branches}")
+    sections.append(
+        "\n\n".join(
+            f"[m:{m.native_id}] {m.role.value}:\n{quote_untrusted(m.text)}" for m in messages
+        )
+    )
+    input_text = "\n\n".join(sections)
+    content = json.dumps(
+        [part_label, branches, [[m.revision_id, m.role.value, m.text] for m in messages]],
+        ensure_ascii=False,
+    )
+    versions = {
+        "code": STAGE_VERSION,
+        "prompt": PROMPT_VERSION,
+        "schema": DIGEST_SCHEMA_VERSION,
+    }
+    key = stage_key(STAGE_ID, hashlib.sha256(content.encode("utf-8")).hexdigest(), versions)
+    return ModelRequest(
+        request_id=key,
+        stage_id=STAGE_ID,
+        instructions=INSTRUCTIONS,
+        input_text=input_text,
+        output_model=DigestAnswer,
+        prompt_version=PROMPT_VERSION,
+        schema_version=DIGEST_SCHEMA_VERSION,
+    )
+
+
 @dataclass
 class DigestStage:
     """Asks for, checks and merges the digest of whole chats."""
@@ -143,71 +199,45 @@ class DigestStage:
 
     def requests(self, conversation: StoredConversation) -> list[ModelRequest]:
         """The requests for one chat: one, or one per part of a long chat."""
-        messages = chat_messages(conversation)
-        branches = branch_summary(conversation)
-        parts = split_parts(exchanges_of(messages), self.max_characters)
-        by_id = {m.native_id: m for m in messages}
-        return [
-            self._request(
-                [by_id[i] for i in part.messages],
-                branches,
-                part_label=f"Part {n} of {len(parts)}" if len(parts) > 1 else None,
-            )
-            for n, part in enumerate(parts, start=1)
-        ]
-
-    def _request(
-        self, messages: Sequence[ExtractionMessage], branches: str, *, part_label: str | None
-    ) -> ModelRequest:
-        sections = []
-        if part_label:
-            sections.append(f"{part_label} of a longer chat.")
-        if branches:
-            sections.append(f"Forks in this chat:\n{branches}")
-        sections.append(
-            "\n\n".join(
-                f"[m:{m.native_id}] {m.role.value}:\n{quote_untrusted(m.text)}" for m in messages
-            )
-        )
-        input_text = "\n\n".join(sections)
-        content = json.dumps(
-            [part_label, branches, [[m.revision_id, m.role.value, m.text] for m in messages]],
-            ensure_ascii=False,
-        )
-        versions = {
-            "code": STAGE_VERSION,
-            "prompt": PROMPT_VERSION,
-            "schema": DIGEST_SCHEMA_VERSION,
-        }
-        key = stage_key(STAGE_ID, hashlib.sha256(content.encode("utf-8")).hexdigest(), versions)
-        return ModelRequest(
-            request_id=key,
-            stage_id=STAGE_ID,
-            instructions=INSTRUCTIONS,
-            input_text=input_text,
-            output_model=DigestAnswer,
-            prompt_version=PROMPT_VERSION,
-            schema_version=DIGEST_SCHEMA_VERSION,
-        )
+        return digest_requests(conversation, self.max_characters)
 
     def run(self, conversation: StoredConversation) -> DigestOutcome:
-        """Ask (or read the cache), then check and merge the answers.
+        """Ask (or read the cache) for one chat, then check and merge the answers.
 
         Raises:
             EgressDisabledError: If the ``text_llm`` switch is off; nothing
                 has been sent or written.
         """
-        requests = self.requests(conversation)
-        ids = tuple(r.request_id for r in requests)
-        first = self.runner.submit(requests)
+        [outcome] = self.run_all([conversation])
+        return outcome
+
+    def run_all(self, conversations: Sequence[StoredConversation]) -> list[DigestOutcome]:
+        """The same for many chats in one submit and one collect.
+
+        With the file-batch provider this packs the chats' requests into as
+        few request files as fit, instead of one file per chat.
+        """
+        asked = [(chat, self.requests(chat)) for chat in conversations]
+        everything = [r for _, requests in asked for r in requests]
+        first = self.runner.submit(everything)
         outputs = dict(first.outputs)
         failed = set(first.review_required)
-        if len(outputs) + len(failed) < len(requests):
-            later = self.runner.collect(requests)
+        if len(outputs) + len(failed) < len(everything):
+            later = self.runner.collect(everything)
             outputs.update(later.outputs)
             failed |= set(later.review_required)
+        return [self._outcome(chat, requests, outputs, failed) for chat, requests in asked]
+
+    @staticmethod
+    def _outcome(
+        conversation: StoredConversation,
+        requests: Sequence[ModelRequest],
+        outputs: Mapping[str, BaseModel],
+        failed: set[str],
+    ) -> DigestOutcome:
+        ids = tuple(r.request_id for r in requests)
         cid = conversation.conversation_id
-        if failed:
+        if failed & set(ids):
             return DigestOutcome(cid, "review_required", None, ids)
         if any(i not in outputs for i in ids):
             return DigestOutcome(cid, "pending", None, ids)
@@ -218,6 +248,28 @@ class DigestStage:
             answers.append(answer)
         digest = resolve_digest(merge_answers(answers), chat_messages(conversation))
         return DigestOutcome(cid, "done" if digest.usable else "review_required", digest, ids)
+
+
+def stored_digest(
+    session: Session,
+    conversation: StoredConversation,
+    *,
+    max_characters: int = SegmenterSettings().max_characters,
+) -> ConversationDigest | None:
+    """The chat's digest from answers already stored, without asking anyone.
+
+    For writing notes: no provider and no egress switch are involved, and
+    a chat whose answers are not all in (or whose summary didn't survive
+    the quote check) gets None, so the note says the digest isn't written.
+    """
+    answers = []
+    for request in digest_requests(conversation, max_characters):
+        row = session.get(ModelOutputRow, request.request_id)
+        if row is None:
+            return None
+        answers.append(DigestAnswer.model_validate_json(row.output_json))
+    digest = resolve_digest(merge_answers(answers), chat_messages(conversation))
+    return digest if digest.usable else None
 
 
 def merge_answers(answers: Sequence[DigestAnswer]) -> DigestAnswer:
