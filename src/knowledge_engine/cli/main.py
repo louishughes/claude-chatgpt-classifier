@@ -378,6 +378,41 @@ def _transcript_status(settings: Settings, args: argparse.Namespace) -> CommandR
     return CommandResult("transcript status", data=data, message="Transcript status")
 
 
+def _transcript_find(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Find transcript lines; each hit names the moment and every chat citing the video."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.documents.registries import find_cues
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "transcript find", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            hits = [
+                {
+                    "video_id": h.video_id,
+                    "transcript_id": h.transcript_id,
+                    "cue": h.ordinal,
+                    "start_seconds": h.start_seconds,
+                    "url": h.url,
+                    "text": h.text,
+                    "conversations": list(h.conversations),
+                    "revisions": list(h.revisions),
+                }
+                for h in find_cues(session, args.words, limit=args.limit)
+            ]
+    finally:
+        engine.dispose()
+    return CommandResult(
+        "transcript find", data={"hits": hits}, message=f"{len(hits)} transcript line(s)"
+    )
+
+
 def _transcript_data(session: Any, transcript_id: str) -> dict[str, Any]:
     from sqlalchemy import func, select
 
@@ -1933,6 +1968,12 @@ def build_parser() -> argparse.ArgumentParser:
     status_cmd = transcript_commands.add_parser("status", help="a video's transcript status")
     status_cmd.add_argument("video", help="the 11-character YouTube video ID")
     status_cmd.set_defaults(handler=_transcript_status)
+    cue_find = transcript_commands.add_parser(
+        "find", help="find words in attached transcripts (with the chats citing each video)"
+    )
+    cue_find.add_argument("words", help="every word must appear in the line")
+    cue_find.add_argument("--limit", type=int, default=20, help="at most this many lines")
+    cue_find.set_defaults(handler=_transcript_find)
 
     accounts = commands.add_parser("accounts", help="social accounts mentioned in your chats")
     accounts.add_argument("--platform", help="only this platform, e.g. github")

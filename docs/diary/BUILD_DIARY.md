@@ -1870,3 +1870,26 @@ migration drift         # 0
 Fix attempts: 1 (the test export reused node IDs across chats, which REL-002 rightly read as forks; gave each chat its own IDs).
 
 **Next exact task:** YTB-003 + SOC-003.
+
+### 12:50 — YTB-003 + SOC-003: video notes, transcript search and the account registry
+`documents/registries.py` adds three kinds of note to the managed vault.
+
+- **Video notes** (`Videos/YouTube <id> (video).md`). Each one opens with the transcript status in words, which is never blank: "No transcript: none attached and none requested." counts as an answer. It then lists:
+  - every message that links to the video, as a wikilink, with the link's own timestamp and playlist;
+  - every chat that cites the video;
+  - the cues of an attached transcript, each with a `^cue-N` anchor and a link that opens the video at that second.
+- **Cue search** (`find_cues`, `ke transcript find`). It matches every word asked for in the newest transcript of each video. Each hit resolves to the moment's URL and to every chat and message revision that links to the video. Cue text only ever comes from a transcript file.
+- **Account registry** (`Accounts/Account registry.md`). It lists every account by platform, with its status, counts, dates and a link to the account's own note. Bare @names are never filed under an account, so they get a separate "Needs review" section. Rejected accounts are listed apart. Each account note shows its aliases, every mention linked to its message, and its chats. Handles appear in code spans and cue text is escaped.
+
+I proved it on two synthetic chats: one video linked three times (once with `t=75`), one video with no transcript, a GitHub account and a bare @name. A cue search lands on 1:15 and lists both chats. The video with no transcript states "none attached and none requested". The bare @name is only under "Needs review". Every account link in the registry has its note in the vault, and a second vault sync writes nothing.
+
+**Teach-back (`documents/registries.py`):** "Each YouTube video gets a note saying whether it has a transcript, which messages linked to it and at what time, and, if there's a transcript, every line with a link to that second of the video. Searching transcript lines takes me to the moment and to the chats that cited the video. Accounts get a registry page and one page each, and a bare @name stays in a 'needs review' list instead of being guessed onto an account."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 157 source files
+pytest -q               # 1139 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 1 (my test assumed cue ordinals start at 1; they start at 0, as YTB-002 stores them).
+
+**Next exact task:** EVAL-002.

@@ -798,3 +798,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - relationships/related.py (suggest_related, RELATED_DETECTOR, SAME_PROJECT_DETECTOR); relationships/view.py (RelatedLink, revision_ids_in, related_links, related_by_conversation); documents/render.relationship_lines; Related sections in conversation notes, project and topic masters; `ke find` related map; UI chat page and search show related chats; `ke related suggest`. No migration.
 - Tests: test_related_conversations.py (5). Full suite 1134 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: YTB-003 + SOC-003.
+
+## 2026-10-28 12:50 YTB-003 (#106) + SOC-003 (#107)
+- documents/registries.py (STATUS_WORDS, watch_url, video_path, video_mentions, video_note, CueHit, find_cues, registry_path, account_path, account_registry_note, account_note); vault plans video, registry and account notes; `ke transcript find`. No migration.
+- Tests: test_registry_notes.py (5). Full suite 1139 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: EVAL-002.
