@@ -188,17 +188,6 @@ def _judge(
     return OverrideCheck(kind, ref, state, changes)
 
 
-def _revision_ids(value: object) -> list[str]:
-    """Every ``rev_`` ID anywhere in a JSON value (relationship evidence)."""
-    if isinstance(value, str):
-        return [value] if value.startswith("rev_") else []
-    if isinstance(value, dict):
-        return [r for v in value.values() for r in _revision_ids(v)]
-    if isinstance(value, list):
-        return [r for v in value for r in _revision_ids(v)]
-    return []
-
-
 def check_overrides(session: Session) -> list[OverrideCheck]:
     """Every human correction's standing against the newest revisions. Reads only."""
     from knowledge_engine.classification.store import ClassificationReviewRow
@@ -208,6 +197,7 @@ def check_overrides(session: Session) -> list[OverrideCheck]:
         ConversationRelationshipRow,
         RelationshipReviewRow,
     )
+    from knowledge_engine.relationships.view import revision_ids_in
     from knowledge_engine.segmentation.overrides import SegmentOverrideRow
 
     pairs: dict[tuple[OverrideKind, str], list[tuple[str, str]]] = defaultdict(list)
@@ -229,7 +219,7 @@ def check_overrides(session: Session) -> list[OverrideCheck]:
     for rel in session.scalars(select(ConversationRelationshipRow)):
         if rel.relationship_id in reviewed:
             evidence = json.loads(rel.evidence_json or "{}")
-            cited[(OverrideKind.RELATIONSHIP, rel.relationship_id)] = _revision_ids(evidence)
+            cited[(OverrideKind.RELATIONSHIP, rel.relationship_id)] = revision_ids_in(evidence)
     node_of = _nodes_of(session, [r for revs in cited.values() for r in revs])
     for key, revisions in cited.items():
         pairs[key] = [(node_of[r], r) for r in revisions if r in node_of]

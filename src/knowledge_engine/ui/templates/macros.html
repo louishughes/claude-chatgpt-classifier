@@ -1,3 +1,9 @@
 {% macro where(place) -%}
 {% if place %}<a href="/chats/{{ place.conversation_id }}#{{ place.anchor }}">{{ place.title }}</a> <span class="muted">· {{ place.role or "unknown" }}{% if place.when %} · {{ place.when | when }}{% endif %}</span>{% else %}<span class="muted">(message not found)</span>{% endif %}
 {%- endmacro %}
+
+{% macro related(links) -%}
+{% if links %}<ul class="related muted">
+{% for r in links %}<li>{% if r.outgoing %}This chat {{ r.words }} <a href="/chats/{{ r.other }}">{{ r.other_title }}</a>{% else %}<a href="/chats/{{ r.other }}">{{ r.other_title }}</a> {{ r.words }} this chat{% endif %} ({{ "suggested" if r.state == "candidate" else r.state }}{% if r.because %}: {{ r.because | join("; ") }}{% endif %})</li>
+{% endfor %}</ul>{% endif %}
+{%- endmacro %}

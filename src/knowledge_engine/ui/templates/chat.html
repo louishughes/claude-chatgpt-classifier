@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ chat.title }} · Knowledge Engine{% endblock %}
+{% from "macros.html" import related %}
 {% macro show(m) %}
 <article class="message {{ m.role }}" id="{{ m.anchor }}">
   <p class="who"><a href="#{{ m.anchor }}">{% if m.number %}{{ m.number }} · {% endif %}{{ m.role }}</a></p>
@@ -44,5 +45,10 @@
 <p class="muted">The export's message tree is damaged here; these are shown so nothing is lost.</p>
 {% for m in section.messages %}{{ show(m) }}{% endfor %}
 {% endfor %}
+{% if chat.related %}
+<h2>Related chats</h2>
+<p class="muted">Links found between chats. Suggested ones are not confirmed; rejected ones are not shown.</p>
+{{ related(chat.related) }}
+{% endif %}
 <p class="muted">Chat ID <code>{{ chat.conversation_id }}</code>. Same as <code>ke inspect {{ chat.conversation_id }}</code>.</p>
 {% endblock %}

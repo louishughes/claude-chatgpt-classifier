@@ -40,7 +40,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from sqlalchemy import or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from knowledge_engine.classification.store import FieldLabels, effective_labels
@@ -49,15 +49,15 @@ from knowledge_engine.documents.render import (
     Mode,
     SourceLink,
     knowledge_note,
+    relationship_lines,
     source_links,
     transcript_stem,
 )
-from knowledge_engine.domain.enums import ReviewState
 from knowledge_engine.importer.records import ConversationRow
 from knowledge_engine.links.social_store import AccountMentionRow
 from knowledge_engine.links.store import LinkOccurrenceRow
 from knowledge_engine.links.youtube import YouTubeMentionRow, YouTubeVideoRow
-from knowledge_engine.relationships.store import ConversationRelationshipRow
+from knowledge_engine.relationships.view import related_links
 from knowledge_engine.rendering.markdown import (
     Block,
     BulletList,
@@ -215,7 +215,7 @@ def _code(text: str) -> str:
 
 @dataclass(frozen=True)
 class Related:
-    """One relationship as a note shows it (rejected ones are never built)."""
+    """One relationship as a chat's note shows it (rejected ones are never built)."""
 
     relationship_id: str
     kind: str
@@ -224,62 +224,32 @@ class Related:
     evidence_class: str
     confidence: float
     review_state: str
+    because: tuple[str, ...] = ()
+    revisions: tuple[str, ...] = ()
 
 
 def related_conversations(session: Session, conversation_id: str) -> list[Related]:
     """Links to and from a chat, in either direction, except rejected ones."""
-    rows = session.scalars(
-        select(ConversationRelationshipRow)
-        .where(
-            or_(
-                ConversationRelationshipRow.from_conversation_id == conversation_id,
-                ConversationRelationshipRow.to_conversation_id == conversation_id,
-            ),
-            ConversationRelationshipRow.review_state != ReviewState.REJECTED.value,
+    return [
+        Related(
+            link.relationship_id,
+            link.kind,
+            "to" if link.from_conversation_id == conversation_id else "from",
+            link.other(conversation_id),
+            link.evidence_class,
+            link.confidence,
+            link.review_state,
+            link.because,
+            link.revisions,
         )
-        .order_by(ConversationRelationshipRow.relationship_id)
-    )
-    found = []
-    for row in rows:
-        outgoing = row.from_conversation_id == conversation_id
-        found.append(
-            Related(
-                row.relationship_id,
-                row.kind,
-                "to" if outgoing else "from",
-                row.to_conversation_id if outgoing else row.from_conversation_id,
-                row.evidence_class,
-                row.confidence,
-                row.review_state,
-            )
-        )
-    return found
+        for link in related_links(session, [conversation_id])
+    ]
 
 
 def _related_lines(session: Session, conversation_id: str) -> list[str]:
-    related = related_conversations(session, conversation_id)
-    titles = {
-        c: t
-        for c, t in session.execute(
-            select(ConversationRow.conversation_id, ConversationRow.title).where(
-                ConversationRow.conversation_id.in_([r.other for r in related])
-            )
-        )
-    }
-    lines = []
-    for r in related:
-        other = f"[[{transcript_stem(r.other, titles.get(r.other))}]]"
-        # Read in the stored direction: "this chat continues X" or "X continues this chat".
-        phrase = (
-            f"this chat **{r.kind}** {other}"
-            if r.direction == "to"
-            else (f"{other} **{r.kind}** this chat")
-        )
-        lines.append(
-            f"{phrase} ({r.evidence_class}, confidence {r.confidence:.2f}, "
-            f"{r.review_state}, `{r.relationship_id}`)"
-        )
-    return lines
+    return relationship_lines(
+        session, related_links(session, [conversation_id]), here=conversation_id
+    )
 
 
 def _section(title: str, lines: list[str], empty: str) -> list[Block]:
@@ -475,6 +445,9 @@ def topic_master(
     blocks += _section(
         "Sources", [f"[[{note}]] (`{conv}`)" for conv, note in sorted(chats.items())], "none"
     )
+    related = relationship_lines(session, related_links(session, chats))
+    if related:
+        blocks += _section("Related conversations", related, "")
     properties: dict[str, PropertyValue] = {
         "ke_type": "topic_master",
         "term_id": term_id,

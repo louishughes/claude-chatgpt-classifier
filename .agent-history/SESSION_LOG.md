@@ -793,3 +793,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - importer/corrections.py (OverrideKind, OverrideState, OverrideAnchorRow, APPEND_ONLY_TRIGGERS, anchor, Change, OverrideCheck, newest_revisions, check_overrides, segment_messages, node_revision); migration 0027_override_anchors; record_override and record_review anchor themselves (record_review gains optional conversation_id); ImportReport.corrections; `ke corrections`.
 - Tests: test_corrections_survive.py (3). Full suite 1129 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: REL-003.
+
+## 2026-10-28 12:20 REL-003 (#104) + REL-004 (#105)
+- relationships/related.py (suggest_related, RELATED_DETECTOR, SAME_PROJECT_DETECTOR); relationships/view.py (RelatedLink, revision_ids_in, related_links, related_by_conversation); documents/render.relationship_lines; Related sections in conversation notes, project and topic masters; `ke find` related map; UI chat page and search show related chats; `ke related suggest`. No migration.
+- Tests: test_related_conversations.py (5). Full suite 1134 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: YTB-003 + SOC-003.

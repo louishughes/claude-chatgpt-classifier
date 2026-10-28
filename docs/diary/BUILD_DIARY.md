@@ -1848,3 +1848,25 @@ migration drift         # 0
 Fix attempts: 0.
 
 **Next exact task:** REL-003.
+
+### 12:20 — REL-003 + REL-004: related chats, suggested with reasons and shown everywhere
+`relationships/related.py` (REL-003) suggests links between chats that are *about the same thing*:
+- `same_project` when both chats carry the same approved project label;
+- `related_to` when they share a distinctive approved topic or named entity (a book, game...), or their words are close in meaning (local embedder, cosine >= 0.55).
+
+Each suggestion is a `candidate` with plain reasons (`because`) and the message revisions behind them. It is never `continues` or `forked_from` (that needs REL-002's proof), never accepted on its own, and a pair someone already reviewed is left alone. Topics or entities shared by more than 10 chats don't count, and each chat keeps at most 5 partners per kind. Entity names stay private: matched entities use their approved ID, others a hash. It compares every pair, so it runs on request (`ke related suggest`), not in every import.
+
+`relationships/view.py` (REL-004) is the one reader every view uses: rejected links are hidden (their history stays), and the stored direction is kept. Conversation notes, project masters and topic masters list related chats with kind, state, reasons and wikilinks to the cited messages. `ke find` returns a `related` map, and the web chat page and search results show related chats in plain words ("This chat is related to …").
+
+Proved on three synthetic chats (two about one shed, one about bread, the bread chat naming the same book as the first): exactly one `same_project` and two `related_to` suggestions, all candidates; a re-run adds nothing and leaves a rejection alone; the `similar_unrelated` fixture gets at most a `related_to` candidate. After accepting one link and rejecting another, the notes, the project and topic masters, `ke find` and both web pages show the accepted one in its direction with its evidence and hide the rejected one, whose review history is kept.
+
+**Teach-back (`relationships/related.py`):** "It looks for chats that share a project, a topic, a named thing or similar wording, and suggests they're related, writing down why. Looking alike is never taken as proof that one chat was copied from another, and nothing it suggests counts until a person accepts it. Very common topics are ignored and each chat gets only its five best suggestions, so the review list stays short."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 156 source files
+pytest -q               # 1134 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 1 (the test export reused node IDs across chats, which REL-002 rightly read as forks; gave each chat its own IDs).
+
+**Next exact task:** YTB-003 + SOC-003.
