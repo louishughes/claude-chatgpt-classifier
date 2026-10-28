@@ -976,3 +976,6 @@ taxonomy/refresh.py (queue: unlabelled / review_required / new_chat per segment,
 
 ## 2026-10-28 16:21 NOTE-024 (#323)
 documents/rich_note.py: card "Tools and names" keeps only names with a letter; with a digest, Purpose/Outcome rows appear only when the digest has the item (no "not stated"); without a digest both say "not written yet". Tests: tests/integration/test_rich_note_card.py (1, fails on the old code).
+
+## 2026-10-28 19:35 NOTE-026 (#329)
+documents/rich_note.py _topics_line: digest topics grouped by the messages they cite, each group written once with one link per message. Tests: tests/integration/test_note_topic_citations.py (1, fails on the old code).

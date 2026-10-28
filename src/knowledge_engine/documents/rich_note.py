@@ -348,6 +348,25 @@ def _digest_line(item: DigestItem, citer: Citer) -> str:
     return f"{text} {cites}".rstrip()
 
 
+def _topics_line(topics: Sequence[DigestItem], citer: Citer) -> str:
+    """Topics on one line, grouped by the messages they cite (NOTE-026).
+
+    Several topics often come from the same message; citing it after each
+    one repeated the same link on one line. Topics that cite the same
+    messages share one citation ("raised beds, cedar [m5]"), in the order
+    the topics were given.
+    """
+    groups: dict[tuple[str, ...], list[str]] = {}
+    for item in topics:
+        cited = tuple(dict.fromkeys(m for m in item.message_ids if m in citer.chat.node_keys))
+        groups.setdefault(cited, []).append(escape_text(" ".join(item.text.split())))
+    parts = []
+    for cited, names in groups.items():
+        cites = " ".join(citer.native(m) for m in cited)
+        parts.append(f"{', '.join(names)} {cites}".rstrip())
+    return "; ".join(parts)
+
+
 def _digest_blocks(session: Session, items: Sequence[DigestItem], citer: Citer) -> list[Block]:
     """Digest items as bullets, each with its folded, re-checked evidence."""
     blocks: list[Block] = []
@@ -746,7 +765,7 @@ def rich_conversation_note(
         BulletList(tuple(tag_lines), trusted=True),
     ]
     topics: list[Block] = (
-        [BulletList((", ".join(_digest_line(t, citer) for t in digest.topics),), trusted=True)]
+        [BulletList((_topics_line(digest.topics, citer),), trusted=True)]
         if digest and digest.topics
         else []
     )
