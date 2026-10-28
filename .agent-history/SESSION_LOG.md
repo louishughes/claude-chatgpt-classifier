@@ -903,3 +903,6 @@ classification/store.py review_reason_kind; semantic_smoke review_reasons + repl
 
 ## 2026-10-28 11:17 PROD-003 (#128)
 ADR-0011; access/tenants.py; settings.tenants_root; api/deps get_settings by X-KE-Workspace; per-tenant job lists; hosted check_access; imports inbox-only; `ke tenant`. Tests: test_tenant_isolation.py (4). #255 replay on the PC: 53 evidence_outside_segment (all `[m:id]` tags, a parsing bug), 23 model_unsure.
+
+## 2026-10-28 13:05 REV-011 (#186)
+ANNOTATION_GUIDE "Three rules for every item" (numbering, verbatim quote, owner facts cite user); gold.py optional `quote` on GoldRecord/GoldForbidden. Tests: tests/unit/test_gold_quote.py (3).
