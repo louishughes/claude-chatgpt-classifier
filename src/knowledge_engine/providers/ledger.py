@@ -63,7 +63,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from knowledge_engine.infrastructure.db import Base
 from knowledge_engine.infrastructure.logs import EventLog, null_log
-from knowledge_engine.orchestration.limits import RunBudget
+from knowledge_engine.orchestration.limits import RunBudget, estimate_tokens, estimated_tokens
 from knowledge_engine.providers.base import (
     BatchHandle,
     ModelRequest,
@@ -560,3 +560,38 @@ def not_answered(session: Session, stage_id: str | None = None) -> Mapping[str, 
         "too_big": sum(1 for r in rows if r.last_error in TOO_BIG),
         "provider_failed": sum(1 for r in rows if r.transient_failures >= MAX_TRANSIENT_FAILURES),
     }
+
+
+# The stage families ``token_estimates`` reports, by the first part of a stage ID.
+TOKEN_STAGES = ("digest", "extract", "classify")
+
+
+def token_estimates(session: Session) -> dict[str, dict[str, int]]:
+    """Estimated tokens per stage family, from the ledger alone (OPS-010).
+
+    No text is read out and nothing is sent: input is estimated from the
+    characters each request sent (repairs and re-sends included), output
+    from the stored answers. ``cached`` counts requests whose answer is
+    stored, which a re-run gets from the cache with no model call.
+
+    Returns:
+        Family (``digest``, ``extract``, ``classify``, then ``other``) ->
+        ``requests``, ``cached``, ``input_tokens``, ``output_tokens``.
+    """
+    totals = {
+        family: dict.fromkeys(("requests", "cached", "input_tokens", "output_tokens"), 0)
+        for family in (*TOKEN_STAGES, "other")
+    }
+    outputs = dict(
+        session.execute(select(ModelOutputRow.stage_key, ModelOutputRow.output_json)).tuples().all()
+    )
+    for row in session.scalars(select(ModelRequestRow)):
+        family = row.stage_id.split(".", 1)[0]
+        bucket = totals[family if family in TOKEN_STAGES else "other"]
+        bucket["requests"] += 1
+        bucket["input_tokens"] += estimated_tokens(row.characters)
+        answer = outputs.get(row.stage_key)
+        if answer is not None:
+            bucket["cached"] += 1
+            bucket["output_tokens"] += estimate_tokens(answer)
+    return totals

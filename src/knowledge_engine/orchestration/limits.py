@@ -42,6 +42,15 @@ def estimated_tokens(characters: int) -> int:
     return math.ceil(characters / CHARS_PER_TOKEN)
 
 
+def estimate_tokens(text: str) -> int:
+    """The token estimate for a text (OPS-010): characters / 4, rounded up.
+
+    An estimate for planning, not a billing figure: real tokenisers differ
+    by model and language. The run budget's size check uses the same rule.
+    """
+    return estimated_tokens(len(text))
+
+
 @dataclass
 class RunBudget:
     """What one run may still spend, shared by every stage of the run.

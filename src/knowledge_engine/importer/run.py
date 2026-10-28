@@ -24,9 +24,13 @@ Talking points:
 
 from __future__ import annotations
 
+import math
 import sqlite3
+import time
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
+from dataclasses import replace
 from itertools import islice
 from pathlib import Path
 
@@ -47,7 +51,7 @@ from knowledge_engine.importer.integrity import IntegrityTally
 from knowledge_engine.importer.ledger import ImportBatchRow, ImportLedger
 from knowledge_engine.importer.lock import import_lock
 from knowledge_engine.importer.media import MediaDelta, MediaLibrary, record_occurrences
-from knowledge_engine.importer.report import ImportReport
+from knowledge_engine.importer.report import TIMING_STAGES, ImportReport
 from knowledge_engine.infrastructure.db import SessionFactory, create_sqlite_engine, database_path
 from knowledge_engine.infrastructure.dialects import create_postgres_engine
 from knowledge_engine.infrastructure.migrations import upgrade_to_head
@@ -88,6 +92,7 @@ def run_import(
     """
     if limit is not None:
         full_export = False
+    started = time.perf_counter()
     before = tree_signature(path)
     adapter = select_adapter(path, default_adapters(), format_id)
     listing = adapter.open(
@@ -127,7 +132,7 @@ def run_import(
                 settings.media_storage_mode,
                 listing.declared_media,
             )
-            return _run(
+            report = _run(
                 path,
                 account_ns,
                 listing,
@@ -138,9 +143,45 @@ def run_import(
                 settings,
                 full_export,
                 limit,
+                started,
             )
         finally:
             engine.dispose()
+    return report
+
+
+class _Stopwatch:
+    """Seconds spent per stage of one import (IMP-008), added up over the run."""
+
+    def __init__(self) -> None:
+        self.seconds = dict.fromkeys(TIMING_STAGES, 0.0)
+
+    @contextmanager
+    def stage(self, name: str) -> Iterator[None]:
+        start = time.perf_counter()
+        try:
+            yield
+        finally:
+            self.seconds[name] += time.perf_counter() - start
+
+    def timed(self, name: str, items: Iterable[NativeConversation]) -> Iterator[NativeConversation]:
+        # Parsing is lazy: the adapter parses a chat when it is asked for the
+        # next one, so the time to parse is the time spent waiting on next().
+        iterator = iter(items)
+        while True:
+            with self.stage(name):
+                item = next(iterator, None)
+            if item is None:
+                return
+            yield item
+
+    def rounded(self) -> dict[str, float]:
+        # Milliseconds: parts round down and the total rounds up, so the
+        # parts never add up to more than the total they are part of.
+        return {
+            name: (math.ceil if name == "total" else math.floor)(value * 1000) / 1000
+            for name, value in self.seconds.items()
+        }
 
 
 def _run(
@@ -154,7 +195,10 @@ def _run(
     settings: Settings,
     full_export: bool,
     limit: int | None = None,
+    started: float | None = None,
 ) -> ImportReport:
+    clock = _Stopwatch()
+    started = time.perf_counter() if started is None else started
     versions = {
         "code": __version__,
         "adapter": listing.format_id,
@@ -163,7 +207,7 @@ def _run(
     }
     files: Counter[str] = Counter()
     snapshots: dict[str, str] = {}
-    with factory.transaction() as session:
+    with clock.stage("archive"), factory.transaction() as session:
         workspace_id = WorkspaceRepo(session).get_or_create(DEFAULT_WORKSPACE_NAME).workspace_id
         ledger = ImportLedger(session, archive)
         batch = ledger.start(
@@ -203,9 +247,10 @@ def _run(
     # with it, to tell an exact duplicate from an ID collision.
     seen: dict[str, str] = {}
     group_size = settings.limits.max_conversations_per_batch
-    stream = listing.conversations()
+    stream: Iterator[NativeConversation] = listing.conversations()
     if limit is not None:
         stream = islice(stream, limit)
+    stream = clock.timed("parse", stream)
     for group in _groups(stream, group_size):
         with factory.transaction() as session:
             for item in group:
@@ -270,14 +315,15 @@ def _run(
                     tally.conversations["candidate"] += 1
                     continue
                 seen[native_id] = digest
-                delta = apply_conversation(
-                    session,
-                    item.native,
-                    workspace_id=workspace_id,
-                    account_namespace=account_ns,
-                    import_id=import_id,
-                    snapshot_id=snapshot_id,
-                )
+                with clock.stage("identity_revisions"):
+                    delta = apply_conversation(
+                        session,
+                        item.native,
+                        workspace_id=workspace_id,
+                        account_namespace=account_ns,
+                        import_id=import_id,
+                        snapshot_id=snapshot_id,
+                    )
                 conversations[delta.category.value] += 1
                 messages.update(delta.messages)
                 warnings.update(delta.warnings)
@@ -286,31 +332,33 @@ def _run(
                 raw_observations += delta.raw_observations
                 tally.add(item.native, delta)
                 file_ids.update(p.file_id for _, p in delta.pointers if p.file_id)
-                record_occurrences(
-                    session,
-                    delta.pointers,
-                    library,
-                    media,
-                    workspace_id=workspace_id,
-                    import_id=import_id,
-                    conversation_native_id=native_id,
-                )
-                link_counts.update(
-                    record_links(
+                with clock.stage("media"):
+                    record_occurrences(
                         session,
-                        delta.links,
-                        conversation_id=delta.conversation_id,
+                        delta.pointers,
+                        library,
+                        media,
+                        workspace_id=workspace_id,
                         import_id=import_id,
+                        conversation_native_id=native_id,
                     )
-                )
-                account_counts.update(
-                    record_accounts(
-                        session,
-                        delta.accounts,
-                        conversation_id=delta.conversation_id,
-                        import_id=import_id,
+                with clock.stage("links_mentions"):
+                    link_counts.update(
+                        record_links(
+                            session,
+                            delta.links,
+                            conversation_id=delta.conversation_id,
+                            import_id=import_id,
+                        )
                     )
-                )
+                    account_counts.update(
+                        record_accounts(
+                            session,
+                            delta.accounts,
+                            conversation_id=delta.conversation_id,
+                            import_id=import_id,
+                        )
+                    )
 
     warnings.update(media.warnings)
     integrity = tally.to_dict(
@@ -344,7 +392,7 @@ def _run(
     if changed:
         # Whole-workspace and idempotent; skipped when nothing changed, so
         # an identical re-import does no extra work.
-        with factory.transaction() as session:
+        with clock.stage("relationships"), factory.transaction() as session:
             relationship_counts = detect_relationships(
                 session, workspace_id=workspace_id, import_id=import_id
             )
@@ -385,13 +433,15 @@ def _run(
         raw_tree_hash_before=before,
         raw_tree_hash_after=after,
     )
+    clock.seconds["total"] = time.perf_counter() - started
+    report = replace(report, timings=clock.rounded())
     with factory.transaction() as session:
         batch_row = session.get(ImportBatchRow, import_id)
         assert batch_row is not None
         ImportLedger(session, archive).finish(
             batch_row,
             status,
-            counts={k: v for k, v in report.to_dict().items() if k != "warnings"},
+            counts={k: v for k, v in report.to_stored().items() if k != "warnings"},
             warnings=dict(warnings),
             tree_hash=after,
         )
