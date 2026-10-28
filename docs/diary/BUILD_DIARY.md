@@ -2010,3 +2010,23 @@ ke eval gate            # BLOCKED: 3 BLOCKED, 2 REVIEW, 8 PASS (0 FAIL)
 Fix attempts: 1 (my drifting fake first answered "needs review" only once, and the retry hid it; it now never labels the first segment it sees).
 
 **Next exact task:** check UI-005 (#175) against STATUS and close it if done; then M5.
+
+### 08:10 UTC — EVAL-001: the real 40-chat answer key, made and checked by two separate Claude sessions
+**What:** I built the real golden set (`golden-v1`) on Louis's PC. It covers 40 chats picked by the seeded sampler, with 398 records that must be found and 64 that must never be claimed. It lives only in the git-ignored workspace. What's committed is the review record, `docs/reviews/GOLD_REAL_V1_REVIEW.md`, which holds counts and the file's hash, but no chat IDs, titles or text.
+
+**How:** I imported the whole export into a fresh workspace inside the project folder (1,158 chats, 0 failures) and ran `ke gold template --count 40`. A small read-only script then turned those 40 raw chats into plain transcripts, showing message IDs, speakers and branches. One Claude session on a different model from mine annotated them, and it saw only the transcripts, the guide and the schema. It saw no classifier output, ledger or report. A third session, on another model, reviewed the work against the same transcripts and corrected the key. I did the plumbing and ran the code checks, and labelled nothing myself.
+
+**Challenges:**
+- **No taxonomy existed yet.** The guide only allows labels from a published vocabulary, and none had been published. Rather than invent one, I left segment labels empty (`tax-none`). The set scores extraction now, and classification once the first taxonomy is locked.
+- **Short replies got skipped.** I'd asked for evidence quotes of at least 5 words, so the annotator left out replies like "no" and "do that", which are exactly where rejections and decisions live. I told it a whole short message counts, and it added them. The reviewer then found 28 more missed records, plus 6 must-fix errors in type, speaker or acceptance.
+- **My checker counted the reviewer's findings files as answer keys** (a glob of `batch*.json` matched `batch1.findings.json`). I narrowed the glob.
+
+**Checks:** every cited message exists in its chat, and every quote appears in it word for word. Every user decision, rejection, preference or requirement cites a user message. `gold.py` validates the whole set, `ke gold schema` runs, and the gold tests pass (16 passed). I changed no tests or criteria.
+
+**Talking points:**
+- "The answer key was written by one AI session and checked by another, each on a different model, and neither saw what the system produced."
+- "Code checks every piece of evidence in the key: the message has to exist, the speaker has to match and the quote has to be word for word."
+- "The key has 56 assistant suggestions but only 12 real user decisions. Telling those apart is the whole job."
+- "When there was no vocabulary to label against, I left the labels empty instead of making one up."
+
+**Next exact task:** discover and publish the first taxonomy. After that, add segment labels to `golden-v1` with a fresh annotation and review pass.
