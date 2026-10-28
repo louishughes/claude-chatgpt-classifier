@@ -33,58 +33,40 @@ Talking points:
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Iterator
-from typing import Annotated
+from collections.abc import Awaitable, Callable
 from urllib.parse import urlsplit
 
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 
 from knowledge_engine import __version__
+from knowledge_engine.api import imports
+from knowledge_engine.api.deps import (
+    ApiError,
+    ErrorBody,
+    ErrorDetail,
+    ProviderDep,
+    SessionsDep,
+    SettingsDep,
+    get_jobs,
+    get_provider,
+    get_sessions,
+    get_settings,
+)
 from knowledge_engine.infrastructure.db import SessionFactory, database_path
 from knowledge_engine.infrastructure.migrations import current_revision, head_revision
-from knowledge_engine.infrastructure.upgrade import SchemaMismatchError, require_current
-from knowledge_engine.providers.base import StructuredModelProvider
-from knowledge_engine.providers.file_batch import FileBatchProvider
 from knowledge_engine.settings import Capability, Settings
 from knowledge_engine.ui.app import is_loopback
 from knowledge_engine.ui.data import workspace_status
 
 API_VERSION = "v1"
 PREFIX = f"/api/{API_VERSION}"
-
-
-class ApiError(Exception):
-    """A failure an endpoint reports on purpose, with a stable code.
-
-    Attributes:
-        status: The HTTP status, e.g. 404.
-        code: A short machine-readable name, e.g. ``not_found``.
-        message: One sentence for a person. Never private text.
-    """
-
-    def __init__(self, status: int, code: str, message: str) -> None:
-        """Describe the failure (see the class attributes)."""
-        super().__init__(message)
-        self.status = status
-        self.code = code
-        self.message = message
-
-
-class ErrorDetail(BaseModel):
-    """The inside of every error answer."""
-
-    code: str
-    message: str
-
-
-class ErrorBody(BaseModel):
-    """What every failed request gets back."""
-
-    error: ErrorDetail
+_SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+# Re-exported so tests and later endpoints have one place to import from.
+__all__ = ["ApiError", "create_app", "get_jobs", "get_provider", "get_sessions", "get_settings"]
 
 
 class Health(BaseModel):
@@ -131,52 +113,6 @@ def _error(status: int, code: str, message: str) -> JSONResponse:
     return JSONResponse(body.model_dump(), status_code=status)
 
 
-# --------------------------------------------------------------- dependencies
-# Each of these is what an endpoint asks for. Tests swap them out with
-# app.dependency_overrides[get_settings] = lambda: test_settings, and so on.
-
-
-def get_settings(request: Request) -> Settings:
-    """The workspace settings the app was created with."""
-    settings: Settings = request.app.state.settings
-    return settings
-
-
-def get_sessions(settings: Annotated[Settings, Depends(get_settings)]) -> Iterator[SessionFactory]:
-    """A database session factory, only if the schema matches this code.
-
-    Raises:
-        ApiError: ``no_database`` (503) before the first import, or
-            ``schema_mismatch`` (503) when ``ke db upgrade`` is needed or
-            the database is from a newer version.
-    """
-    if not database_path(settings).exists():
-        raise ApiError(503, "no_database", "nothing has been imported into this workspace yet")
-    sessions = SessionFactory.from_settings(settings)
-    try:
-        try:
-            require_current(sessions.engine)
-        except SchemaMismatchError as error:
-            raise ApiError(503, "schema_mismatch", str(error)) from error
-        yield sessions
-    finally:
-        sessions.dispose()
-
-
-def get_provider(settings: Annotated[Settings, Depends(get_settings)]) -> StructuredModelProvider:
-    """The model provider: by default the file-batch one (ADR-0009).
-
-    It writes request files for a Claude Code session to answer; it refuses
-    to write any while ``[egress] text_llm`` is off. Tests swap in a fake.
-    """
-    return FileBatchProvider(settings.model_batch_root, "api", settings.egress)
-
-
-SettingsDep = Annotated[Settings, Depends(get_settings)]
-SessionsDep = Annotated[SessionFactory, Depends(get_sessions)]
-ProviderDep = Annotated[StructuredModelProvider, Depends(get_provider)]
-
-
 # ------------------------------------------------------------------ the app
 
 
@@ -199,6 +135,7 @@ def create_app(settings: Settings) -> FastAPI:
     )
     app.state.settings = settings
     _add_error_handlers(app)
+    app.include_router(imports.router, prefix=PREFIX)
 
     @app.middleware("http")
     async def local_only(
@@ -208,6 +145,16 @@ def create_app(settings: Settings) -> FastAPI:
         # before any endpoint runs.
         if not host_is_local(request.headers.get("host", "")):
             return _error(400, "host_not_local", "this API only answers requests to this computer")
+        if request.method not in _SAFE_METHODS:
+            # A web page elsewhere can make the browser POST here (the Host is
+            # then 127.0.0.1), but only as a form or plain text, and with its
+            # own Origin. JSON bodies need a CORS preflight, which this API
+            # never grants, so requiring JSON plus a local Origin stops it.
+            origin = request.headers.get("origin")
+            if origin is not None and not host_is_local(urlsplit(origin).netloc):
+                return _error(403, "origin_not_local", "requests from other sites are refused")
+            if request.headers.get("content-type", "").split(";")[0].strip() != "application/json":
+                return _error(415, "json_required", "send the request body as application/json")
         return await call_next(request)
 
     @app.get(f"{PREFIX}/health", response_model=Health, tags=["system"])

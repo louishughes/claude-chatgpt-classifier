@@ -2276,3 +2276,25 @@ ci                              5/5 ok
 Fix attempts: 1 (an error-handler parameter named `_error` hid the `_error` helper; the provider identity field is `provider_id`).
 
 **Next exact task:** API-002 (import and job status endpoints).
+
+### 10:09 — API-002: imports, jobs, sources and messages over the API
+
+- `POST /api/v1/imports` starts the import on a background thread (the same job runner as the Import button) and answers **202** with `{"job_id", "state": "running"}` at once. The test holds the importer until the test releases it, so it proves the answer can't be a premature "done". `GET /jobs/{id}` then shows `done` with the import ID, or `failed` with a plain reason and no paths.
+- `GET /imports` and `GET /imports/{id}` read the ledger: status (`partial` included), counts, summary and warnings by kind.
+- `GET /sources` pages through conversations (`q` filters titles). `GET /sources/{id}` gives branch points with their kind, graph issues and related chats. `GET /sources/{id}/nodes` gives messages in transcript order: active path first, then alternates, each once, with `parent_id` and `children` so a program rebuilds the real tree instead of a flattened chat, plus media uses with availability.
+- Every list: `offset`, `limit` (max 500), `total`, `next_offset`.
+- New rule for anything but GET: the body must be JSON, and an `Origin` header must be this computer. Otherwise any website could make your browser POST an import to 127.0.0.1 (the Host check alone doesn't stop that, because the Host really is 127.0.0.1).
+- The dependencies moved to `api/deps.py` so endpoint modules can use them without importing the app.
+- Two API-001 test lines changed with it (my own tests from the previous PR): the 405 check now sends a JSON body, since a non-JSON POST is refused earlier with 415; the OpenAPI check now says the three API-001 paths are present and every path is under `/api/v1`, instead of "exactly these three".
+
+**Teach-back (`api/imports.py`):** Starting an import over the API gives back a job number straight away, and the import runs in the background; asking about the job later says running, done with its report, or failed with a reason. Listing a chat's messages gives each one with its parent, active path first, so a program can rebuild every branch exactly. Long lists come in pages that say how many there are and where the next page starts.
+
+Checks:
+```
+tests/integration/test_api_imports.py   9 passed
+tests/integration/test_api.py           8 passed
+ci                                      5/5 ok, 1224 passed, 7 skipped
+```
+Fix attempts: 0.
+
+**Next exact task:** API-003 (taxonomy, review and knowledge endpoints).

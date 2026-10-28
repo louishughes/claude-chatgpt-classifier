@@ -150,12 +150,13 @@ def test_errors_share_one_shape_and_never_echo_input(settings: Settings) -> None
     missing = client.get(f"{PREFIX}/nowhere")
     assert missing.status_code == 404
     assert missing.json()["error"]["code"] == "not_found"
-    wrong = client.post(f"{PREFIX}/health")
+    wrong = client.post(f"{PREFIX}/health", json={})
     assert wrong.json()["error"]["code"] == "method_not_allowed"
 
 
 def test_openapi_is_versioned_and_under_the_prefix(settings: Settings) -> None:
     document = _client(create_app(settings)).get(f"{PREFIX}/openapi.json").json()
     assert document["info"]["version"] == __version__
-    assert set(document["paths"]) == {f"{PREFIX}/health", f"{PREFIX}/status", f"{PREFIX}/counts"}
+    assert {f"{PREFIX}/health", f"{PREFIX}/status", f"{PREFIX}/counts"} <= set(document["paths"])
+    assert all(path.startswith(PREFIX) for path in document["paths"])
     assert "ErrorBody" in document["components"]["schemas"]
