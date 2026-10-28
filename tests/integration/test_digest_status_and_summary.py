@@ -168,5 +168,4 @@ def test_a_repeated_sentence_is_said_once(session: Session) -> None:
     assert [item.text for item in digest.summary] == [
         "They picked blue.",
         "Then they painted the shed.",
-        "Then they painted the shed",  # all it says: kept, so its citations stay
-    ]
+    ]  # the third said nothing new: it joined the second (NOTE-030)

@@ -305,25 +305,39 @@ def _said(text: str) -> str:
 
 
 def tidy_summary(digest: ConversationDigest) -> ConversationDigest:
-    """The summary with each sentence said once (NOTE-029).
+    """The summary with each sentence said once (NOTE-029, NOTE-030).
 
     The parts of a long chat can each summarise the same exchange, and a
     model sometimes repeats a sentence inside one item. A sentence already
-    said, in this item or an earlier one, is dropped, unless it is all the
-    item says: an item never disappears, so its citations stay.
+    said, in this item or an earlier one, is dropped. An item with nothing
+    new left joins the item that first said it: its citations move there,
+    so every part stays represented and no evidence is lost.
     """
-    said: set[str] = set()
+    home: dict[str, int] = {}  # sentence -> the kept item that first said it
     kept: list[DigestItem] = []
     for item in digest.summary:
         sentences = [x for x in _SENTENCE_END.split(item.text.strip()) if x]
-        fresh = []
+        fresh: dict[str, str] = {}
         for sentence in sentences:
-            if _said(sentence) not in said:
-                said.add(_said(sentence))
-                fresh.append(sentence)
-        text = " ".join(fresh) if fresh else sentences[0]
+            if _said(sentence) not in home:
+                fresh.setdefault(_said(sentence), sentence)
+        if not fresh and sentences:
+            target = home[_said(sentences[0])]
+            earlier = kept[target]
+            kept[target] = earlier.model_copy(
+                update={
+                    "message_ids": tuple(dict.fromkeys((*earlier.message_ids, *item.message_ids))),
+                    "evidence": tuple(dict.fromkeys((*earlier.evidence, *item.evidence))),
+                }
+            )
+            continue
+        for key in fresh:
+            home[key] = len(kept)
+        text = " ".join(fresh.values()) or item.text
         kept.append(item if text == item.text else item.model_copy(update={"text": text}))
-    if all(a is b for a, b in zip(kept, digest.summary, strict=True)):
+    if len(kept) == len(digest.summary) and all(
+        a is b for a, b in zip(kept, digest.summary, strict=True)
+    ):
         return digest
     return digest.model_copy(update={"summary": tuple(kept)})
 
