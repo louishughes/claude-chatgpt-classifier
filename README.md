@@ -139,8 +139,11 @@ The package lives in `src/knowledge_engine/` and needs Python 3.12 or newer. Fro
 python -m venv .venv
 # Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
 pip install -e ".[dev]"
-ruff check . && ruff format --check . && mypy && pytest
+python -m knowledge_engine.devtools.ci            # lint, format, types, guard, all tests
+python -m knowledge_engine.devtools.ci --nightly  # release gate, variance, end-to-end (fake model)
 ```
+
+CI (`.github/workflows/ci.yml`) runs exactly these two commands, on Linux and Windows with Python 3.12 and 3.13 and a nightly schedule. It uses no secrets: every API key is removed from the checks' environment, so a check that needs a real model fails rather than passing on a machine that happens to have a key.
 
 Turn on the commit guard once per clone (it refuses commits that would include `raw/`, `private/`, `workspace/`, `ke.toml` or `.env`, and checks fixtures are marked synthetic):
 
