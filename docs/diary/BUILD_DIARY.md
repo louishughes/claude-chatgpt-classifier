@@ -1736,3 +1736,43 @@ migration drift         # 0
 Fix attempts: 0.
 
 **Next exact task:** DOC-001 (document model and dependency tracking).
+
+### 10:10 — DOC-001 + DOC-004: documents as data, exact rebuild lists, and a labelled project master
+**DOC-001.** `documents/model.py` builds a conversation, project or topic document as plain data. Its sections come in a fixed order (current, in conflict, waiting for a check, date unknown, replaced, suggestions, other). Each item has its REC-006 status, the events behind it and the messages it cites.
+- Records a reviewer rejected are left out.
+- One selector, `subjects_of`, decides which documents a record belongs to.
+- `documents/dependencies.py` adds two append-only tables (migration 0026):
+  - each build whose content changed, plus the records and revisions it used;
+  - an unchanged rebuild adds nothing.
+- `affected_documents` returns the documents to rebuild, with reasons:
+  - documents whose latest build used the record (`depends`);
+  - documents the selector would now put it in (`selects`).
+- Proved:
+  - one record maps to exactly its chat's document;
+  - a brand-new record maps to its chat's document and its project's document, though neither was ever built with it;
+  - after the reconciler runs, only the one changed chat gets a new build.
+
+**DOC-004.** `documents/render.py` turns any knowledge document into an Obsidian note.
+- Every record is an escaped paragraph with a `^krec-…` anchor, followed by an engine-written label line:
+  - **Current**, **Replaced** (with a "replaced by" link) or **In conflict** (with a link to the other side);
+  - sources, linked to the exact message blocks in the BRW-001 transcript notes;
+  - record and event IDs.
+- The project master adds three sections: Dependencies (typed REC-007 edges), a Decision timeline and Sources.
+- Modes are current, history and all. A mode only links to records it shows.
+- Proved:
+  - every project record carries a label;
+  - each replaced Unity decision links to the Godot decision that replaced it;
+  - current mode doesn't mention a replaced record even as a link;
+  - every source link resolves to a block in a written transcript;
+  - a rewrite is byte-identical.
+
+**Teach-back (`documents/dependencies.py`):** "Every time a note's content actually changes, it writes down which records and messages that version used, and never edits that list afterwards. When a record changes, it looks up which notes last used it, and also which notes the record now belongs in, so a brand-new record isn't missed. That gives the exact list of notes to rebuild, each with the reason, and nothing more."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 150 source files
+pytest -q               # 1115 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 1 (current mode linked to replaced records through the dependency list; now only records the mode shows are linked).
+
+**Next exact task:** DOC-003 (conversation knowledge notes), then DOC-005.

@@ -1007,6 +1007,68 @@ def _eval_retrieval(settings: Settings, args: argparse.Namespace) -> CommandResu
     )
 
 
+def _docs(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Build document contents and track dependencies, or list what a change affects (DOC-001)."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.documents.dependencies import affected_documents, register
+    from knowledge_engine.documents.model import build_all
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "docs", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            if args.docs_command == "project":
+                from knowledge_engine.documents.render import Mode, write_project_master
+
+                path = write_project_master(session, args.project, args.vault, mode=Mode(args.mode))
+                return CommandResult(
+                    "docs project",
+                    data={"note": path.as_posix(), "mode": args.mode},
+                    message=f"wrote {path.as_posix()}",
+                )
+            if args.docs_command == "affected":
+                found = affected_documents(session, args.ids)
+                return CommandResult(
+                    "docs affected",
+                    data={
+                        "documents": [
+                            {
+                                "document_id": a.document_id,
+                                "kind": a.kind.value,
+                                "subject_id": a.subject_id,
+                                "reasons": list(a.reasons),
+                            }
+                            for a in found
+                        ]
+                    },
+                    message=f"{len(found)} document(s) to rebuild",
+                )
+            built = build_all(session)
+            changed = [d for d in built if register(session, d).changed]
+            session.commit()
+    finally:
+        engine.dispose()
+    by_kind: dict[str, int] = {}
+    for document in built:
+        by_kind[document.kind.value] = by_kind.get(document.kind.value, 0) + 1
+    return CommandResult(
+        "docs build",
+        data={
+            "documents": len(built),
+            "by_kind": by_kind,
+            "changed": [d.document_id for d in changed],
+            "unchanged": len(built) - len(changed),
+        },
+        message=f"{len(built)} document(s); {len(changed)} changed",
+    )
+
+
 def _state(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """What holds now or on a date, with the events behind it (REC-006); no text."""
     from datetime import UTC, datetime
@@ -1789,6 +1851,27 @@ def build_parser() -> argparse.ArgumentParser:
         "--rebuild", action="store_true", help="rebuild a meaning index made by another embedder"
     )
     ask.set_defaults(handler=_ask)
+
+    docs = commands.add_parser("docs", help="knowledge documents and what a change affects")
+    docs_commands = docs.add_subparsers(dest="docs_command", metavar="ACTION", parser_class=_Parser)
+    docs_build = docs_commands.add_parser(
+        "build", help="build every document's content and record what it depends on"
+    )
+    docs_build.set_defaults(handler=_docs)
+    docs_affected = docs_commands.add_parser(
+        "affected", help="the documents to rebuild after these records or revisions changed"
+    )
+    docs_affected.add_argument("ids", nargs="+", help="krec_ or rev_ IDs")
+    docs_affected.set_defaults(handler=_docs)
+    docs_project = docs_commands.add_parser(
+        "project", help="write a project's master note (current, history or all) into a vault"
+    )
+    docs_project.add_argument("project", help="the project ID")
+    docs_project.add_argument("--vault", type=Path, required=True, help="the vault folder")
+    docs_project.add_argument(
+        "--mode", choices=["current", "history", "all"], default="all", help="default: all"
+    )
+    docs_project.set_defaults(handler=_docs)
 
     related = commands.add_parser("related", help="links between conversations (forks, quotes)")
     related_commands = related.add_subparsers(
