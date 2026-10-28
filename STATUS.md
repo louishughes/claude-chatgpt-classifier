@@ -153,6 +153,8 @@ Live ticket status for the build. The original ticket list is `docs/TICKETS.csv`
 | PERF-001 Re-import slower than import | VERIFIED (importer/archive.py: bytes already stored are hashed once and the stored copy checked once, nothing written (no temp copy, no fsync); files ≤16 MB read once; ledger skips a second check of the file just checked; new bytes stored as before; evaluation/import_timing.py phase timer on a synthetic 2,215-file export: re-import 7.47 s → 5.79 s, archive fsync on re-import 0.89 s → 0; tests/unit/test_archive_reuse.py, 5; table in docs/evaluation/EVAL-010_SMOKE.md) | SESSION_LOG 2026-10-28 PERF-001 |
 | NOTE-005 Model-backed knowledge extractor (#277) | VERIFIED (FakeProvider tests; a real run is NOTE-013) | SESSION_LOG 2026-10-28 NOTE-005 |
 | NOTE-018 Suggested category and reviewer session (#309) | VERIFIED (fixture chat; the real 18 segments are the PC thread's run) | SESSION_LOG 2026-10-28 NOTE-018 |
+| NOTE-015 `ke extract run` through request files (#306) | VERIFIED (dry run on 3 fixture chats; the real run is the PC thread's) | SESSION_LOG 2026-10-28 NOTE-015 |
+| NOTE-020 `ke digest run --taxonomy` (#311) | VERIFIED | SESSION_LOG 2026-10-28 NOTE-020 |
 | NOTE-009 Related chats in the rich note (#281) | VERIFIED (synthetic fixture; reasons are the detectors' own "because" lines, not a model-written sentence) | SESSION_LOG 2026-10-28 NOTE-009 |
 | NOTE-007 Keyword and topic candidates (#279) | VERIFIED (unit tests on synthetic chats; shown in the note later, with NOTE-008) | SESSION_LOG 2026-10-28 NOTE-007 |
 

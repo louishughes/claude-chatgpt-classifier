@@ -251,7 +251,11 @@ def _one(
         for record in records:
             gate(session, record.record_id)
     except PendingAnswer:
-        savepoint.rollback()
+        # Keep what the stage runner stored (the request and which batch file
+        # it went to): rolling it back made the next run ask again in a new
+        # file instead of collecting the answer (NOTE-015). No record has
+        # been added yet, since the answer is what's missing.
+        savepoint.commit()
         report.pending.append(row.stage_key)
         return
     except Exception as error:  # noqa: BLE001 - one extractor must not stop the rest
