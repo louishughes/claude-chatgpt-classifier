@@ -41,6 +41,7 @@ from knowledge_engine.importer.delta import (
     native_conversation_id,
 )
 from knowledge_engine.importer.identity import CandidateReason, conversation_hash, record_candidate
+from knowledge_engine.importer.integrity import IntegrityTally
 from knowledge_engine.importer.ledger import ImportBatchRow, ImportLedger
 from knowledge_engine.importer.lock import import_lock
 from knowledge_engine.importer.media import MediaDelta, MediaLibrary, record_occurrences
@@ -150,6 +151,8 @@ def _run(
     raw_observations = 0
     candidates: Counter[str] = Counter()
     media = MediaDelta()
+    tally = IntegrityTally()
+    file_ids: set[str] = set()
     # Native ID -> content hash of the first conversation this import saw
     # with it, to tell an exact duplicate from an ID collision.
     seen: dict[str, str] = {}
@@ -158,9 +161,11 @@ def _run(
     for group in _groups(stream, group_size):
         with factory.transaction() as session:
             for item in group:
+                tally.conversations_read += 1
                 warnings.update(w.code for w in item.warnings)
                 if not item.native:
                     conversations[DeltaCategory.FAILED.value] += 1
+                    tally.conversations["failed"] += 1
                     continue
                 native_id = native_conversation_id(item.native)
                 snapshot_id = snapshots[item.locator.file]
@@ -182,12 +187,14 @@ def _run(
                         import_id=import_id,
                     )
                     candidates[CandidateReason.MISSING_NATIVE_ID.value] += 1
+                    tally.conversations["failed"] += 1
                     continue
                 digest = conversation_hash(item.native)
                 if native_id in seen:
                     if seen[native_id] == digest:
                         # The same chat twice in one export: nothing new.
                         warnings["duplicate_conversation_in_source"] += 1
+                        tally.conversations["duplicate_in_source"] += 1
                         continue
                     # Same ID, different chat: never merged, kept for review.
                     record_candidate(
@@ -206,6 +213,7 @@ def _run(
                     )
                     candidates[CandidateReason.ID_COLLISION.value] += 1
                     conversations[DeltaCategory.CANDIDATE_DUPLICATE.value] += 1
+                    tally.conversations["candidate"] += 1
                     continue
                 seen[native_id] = digest
                 delta = apply_conversation(
@@ -222,6 +230,8 @@ def _run(
                 changed.extend(delta.changed_revisions)
                 new_branches += delta.new_branches
                 raw_observations += delta.raw_observations
+                tally.add(item.native, delta)
+                file_ids.update(p.file_id for _, p in delta.pointers if p.file_id)
                 record_occurrences(
                     session,
                     delta.pointers,
@@ -233,6 +243,11 @@ def _run(
                 )
 
     warnings.update(media.warnings)
+    integrity = tally.to_dict(
+        media_listed=len(listing.media_files), media_referenced=library.referenced(file_ids)
+    )
+    if not integrity["reconciled"]:
+        warnings["integrity_mismatch"] += 1
     after = tree_signature(path)
     if after == before and full_export:
         with factory.transaction() as session:
@@ -267,6 +282,8 @@ def _run(
         candidate_matches=dict(candidates),
         media=media.counts(),
         asset_occurrences=dict(media.availability),
+        duplicate_assets=media.duplicate_assets(),
+        integrity=integrity,
         raw_tree_hash_before=before,
         raw_tree_hash_after=after,
     )

@@ -86,9 +86,11 @@ class CommandResult:
         return "\n".join(lines)
 
 
-def _text_value(value: Any) -> str:
+def _text_value(value: Any, *, nested: bool = False) -> str:
     if isinstance(value, dict):
-        return ", ".join(f"{k}={_text_value(v)}" for k, v in sorted(value.items())) or "-"
+        text = ", ".join(f"{k}={_text_value(v, nested=True)}" for k, v in sorted(value.items()))
+        # Brackets keep a dict inside a dict readable: a=(b=1, c=2), d=3.
+        return (f"({text})" if nested else text) if text else "-"
     if isinstance(value, list):
         return ", ".join(_text_value(v) for v in value) or "-"
     return str(value)
@@ -181,6 +183,47 @@ def _inventory(settings: Settings, args: argparse.Namespace) -> CommandResult:
     return CommandResult("raw inventory", data=data, message="Raw source inventory (read-only)")
 
 
+def _imports_report(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Print a stored import report. Reads the ledger only; recomputes nothing."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.importer.ledger import ImportBatchRow
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "imports report", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    query = select(ImportBatchRow)
+    if args.which == "latest":
+        query = query.order_by(ImportBatchRow.started_at.desc()).limit(1)
+    else:
+        query = query.where(ImportBatchRow.import_id == args.which)
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            batch = session.scalars(query).first()
+            if batch is not None:
+                session.expunge(batch)
+    finally:
+        engine.dispose()
+    if batch is None:
+        return CommandResult(
+            "imports report", ExitCode.ERROR, message="no such import", error_code="not_found"
+        )
+    data: dict[str, Any] = {
+        "import_id": batch.import_id,
+        "status": batch.status,
+        "started_at": batch.started_at.isoformat(),
+        "finished_at": batch.finished_at.isoformat() if batch.finished_at else None,
+        **json.loads(batch.counts_json or "{}"),
+        "warnings": json.loads(batch.warnings_json or "{}"),
+    }
+    return CommandResult("imports report", data=data, message=f"Import report ({batch.status})")
+
+
 def _not_built(name: str, ticket: str) -> Callable[[Settings, argparse.Namespace], CommandResult]:
     def handler(_settings: Settings, _args: argparse.Namespace) -> CommandResult:
         return CommandResult(
@@ -224,6 +267,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--show-names", action="store_true", help="show real file names (local use only)"
     )
     inv.set_defaults(handler=_inventory)
+
+    imports = commands.add_parser("imports", help="past imports and their reports")
+    imports_commands = imports.add_subparsers(
+        dest="imports_command", metavar="ACTION", parser_class=_Parser
+    )
+    report = imports_commands.add_parser("report", help="show a stored import report")
+    report.add_argument(
+        "which", nargs="?", default="latest", help="`latest` (default) or an import ID"
+    )
+    report.set_defaults(handler=_imports_report)
 
     importer = commands.add_parser("import", help="import an export (not built yet)")
     importer.add_argument("source", type=Path, help="export ZIP or folder")

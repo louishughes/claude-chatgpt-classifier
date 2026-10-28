@@ -43,6 +43,9 @@ class ImportReport:
         media: ``new_blobs``, ``new_assets`` and ``new_occurrences``.
         asset_occurrences: Availability state -> count, over every image or
             attachment reference this import saw.
+        duplicate_assets: Assets seen whose bytes equal another asset's.
+        integrity: ING-007's reconciliation of source counts with stored
+            counts, plus a fidelity summary.
         candidate_matches: Candidate reason -> count: conversations whose
             identity is ``review_required`` (never merged automatically).
     """
@@ -63,6 +66,8 @@ class ImportReport:
     candidate_matches: Mapping[str, int] = field(default_factory=dict)
     media: Mapping[str, int] = field(default_factory=dict)
     asset_occurrences: Mapping[str, int] = field(default_factory=dict)
+    duplicate_assets: int = 0
+    integrity: Mapping[str, Any] = field(default_factory=dict)
     extra: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -83,4 +88,31 @@ class ImportReport:
             "candidate_matches": dict(sorted(self.candidate_matches.items())),
             "media": dict(sorted(self.media.items())),
             "asset_occurrences": dict(sorted(self.asset_occurrences.items())),
+            "integrity": dict(self.integrity),
+            "summary": self.summary(),
+        }
+
+    def summary(self) -> dict[str, Any]:
+        """Return IMP-005's audit headline: what changed and what needs a look.
+
+        Returns:
+            ``new_media``, ``duplicate_assets``, ``missing_assets`` (pointers
+            with no file), ``asset_problems`` (every state but available),
+            ``candidate_duplicates``, ``failed`` and ``rebuild`` (how many
+            conversations and revisions later stages must redo).
+        """
+        return {
+            "new_media": self.media.get("new_assets", 0),
+            "duplicate_assets": self.duplicate_assets,
+            "missing_assets": self.asset_occurrences.get("missing", 0),
+            "asset_problems": sum(
+                count for state, count in self.asset_occurrences.items() if state != "available"
+            ),
+            "candidate_duplicates": sum(self.candidate_matches.values()),
+            "failed": self.conversations.get("failed", 0),
+            "rebuild": {
+                "conversations": self.conversations.get("new", 0)
+                + self.conversations.get("revised", 0),
+                "revisions": len(self.changed_revisions),
+            },
         }
