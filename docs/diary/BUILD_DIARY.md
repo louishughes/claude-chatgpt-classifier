@@ -3121,7 +3121,7 @@ Fix attempts: 1 (the first test run showed the copied-opening detector also need
 
 **Next exact task:** NOTE-012 dashboard chat view.
 
-### 21:50 — REL-005: related chats without paid labels
+### 19:50 — REL-005: related chats without paid labels
 
 The real relationship score passed on precision (0.952) but found only 20 of the key's 49 links, and none were `related_to` or `same_project`. The "related" suggester leaned on three signals. Two of them, approved topic labels and named entities, only exist after paid classifier and extraction runs, and the real archive has had neither. The third, the local hashed embedding, counts every word: on a synthetic check it put two chats on different subjects at 0.35 and two on the same subject at 0.42. Fed whole chats, it passes the 0.55 floor for almost any pair. In the new test it linked every one of twelve unrelated chats to the others.
 
