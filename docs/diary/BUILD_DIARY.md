@@ -3138,3 +3138,37 @@ Talking points:
 - "Before changing the answer key, the session proved the old one was untouched by its hash, and afterwards proved it again."
 - "Every answer in the key is checked by code against the real message: the quote, the speaker and the number."
 - "A checker that's never been shown to fail isn't proven, so we planted three mistakes and watched it catch them."
+
+
+### 15:20 UTC — NOTE-014: the taxonomy keeps up as new chats arrive
+
+Louis approved the plan for the taxonomy and added one requirement: it has to keep working when new conversations are imported later, and update as more notes are processed. A vocabulary built once from today's chats would slowly go stale: every new subject would come out of the classifier with no label at all, because the classifier may only use approved terms.
+
+The tension is with a guardrail from the failed Hermes/Codex attempt: the vocabulary must stay frozen during a classification run. So the loop never changes terms mid-run. Instead it works in rounds:
+
+- **Queue.** After any import or run, the code works out which segments the current version doesn't cover: no label, waiting for review, or from a chat imported since the last refresh. It isn't stored anywhere; it's recomputed from the classifications, so it can't drift out of date.
+- **Refresh pack.** `ke taxonomy refresh --out ...` builds the same kind of pack as the first bootstrap, but only from the queued segments, and lists the existing vocabulary so the proposer doesn't suggest what's there. One Claude session proposes, a different one reviews, Louis publishes `tax-N+1`. The first-plan rule "must have categories" is relaxed for refresh plans, because a refresh may only need one new topic.
+- **Relabel.** After publishing, `ke taxonomy relabel tax-1 tax-2` redoes only segments the new version can change: ones with no label, ones whose labels cite a term that changed (TAX-007 marks those stale), and ones whose text names a newly added term. Every other answer is *carried* into the new version as a new row, checked against the new version's answer schema, with no classifier call. Old rows and Louis's (or a reviewer's) corrections are append-only, so nothing is overwritten. With `--vault` the notes are rewritten through DOC-006, which only touches files whose content changed.
+- **Dashboard.** The home page gets a Vocabulary row: chats with no label yet, chats waiting for review, chats new since the last refresh, proposals waiting for a reviewer.
+
+Challenges:
+- My first fixture failed for a test-only reason: the second "export" gave old chats new dates (I numbered days by sorted position, and adding chats shifted them), so the importer correctly saw them as edited and gave them new segment IDs. Real re-exports keep dates; the fixture now does too.
+- The test session held an SQLite read snapshot open across the second import, so it couldn't see the new chats until it committed.
+- An added term changes no existing ID, so TAX-007 alone would invalidate nothing. That's why "text names a new term" is its own relabel reason: an old garden chat that mentions a hive gets asked again once "Beekeeping" exists.
+
+Once NOTE-007 (#296) merged, I rebased onto it and wired it in. Each `ke taxonomy refresh` takes the uncovered chats' digest topics, checks them against the published terms, and files the ones that match nothing as proposals. A topic is never filed twice: not while it's waiting, not after a reviewer has rejected it, and not when a term with that label has been approved but not yet published. Chats with no digest yet have nothing to offer here; their segments still go into the refresh pack.
+
+**Teach-back (`taxonomy/refresh.py`, `relabel`):** When a new vocabulary version is published, this decides, segment by segment, whether the old label can stay. If the segment had no label, cited a term that changed, or mentions a term that's new, it is classified again; otherwise its old answer is copied into the new version unchanged. The old answers and every human correction are never edited, so you can always see what changed and why.
+
+Checks:
+```
+tests/integration/test_taxonomy_refresh.py   7 passed (finish line: import 2 adds beekeeping chats, the refresh proposes a term, after tax-2 only the 2 new segments and 1 hive-mentioning old one are relabelled, 3 carried, tax-1 rows identical, the correction still stands; a changed definition marks only answers citing it; unmatched digest topics filed once, rejected ones never again; CLI and dashboard counts)
+```
+Fix attempts: 3 (fixture dates; test read snapshot; my topic test mapped chat IDs before the second import). All three were mistakes in my own new tests, not changes to existing tests or criteria.
+
+Talking points:
+- "New chats don't mean redoing everything: only the segments a new term could change get relabelled; the rest carry their answers forward."
+- "The vocabulary never moves mid-run. New subjects queue up, one Claude proposes, a different Claude reviews, and I publish."
+- "Adding a word changes no existing ID, so 'what's stale' isn't enough: the loop also asks which old chats *mention* the new word."
+
+**Next exact task:** run the refresh loop on the real archive on the PC after the next export (proposer and reviewer sessions named in the diary).
