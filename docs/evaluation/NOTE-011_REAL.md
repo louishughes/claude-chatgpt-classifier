@@ -123,3 +123,53 @@ A third fresh scorer session (Claude Opus) used the same 15 references, which ar
 1. **Open questions:** 0 of 9 found. The extractor and digest need to read how a chat ends (an unanswered check-in, an unsent letter, a promise to report back, an option never chosen).
 2. **User constraints and decisions:** 13 of 22 missed, mostly short user instructions such as numbers, limits and "no repeats". The extractor prompt should treat a user's own constraint as a requirement even when it isn't phrased as "I decided".
 3. **Long, multi-part chats:** summaries are stitched together, with chunk wording left in. These chats hold 6 of the 10 unsupported claims, including one misread request that caused a fabricated decision. The fix is a merge step for multi-part digests.
+
+## Fourth score: the knowledge-v2 extractor and new digest prompts (NOTE-023/025/016)
+
+**Run:**
+- On main `44adc42`, the extractor (prompt knowledge-v2) and digest were re-run on the 40 gold chats: 85 + 51 requests, answered by 9 fresh Claude Sonnet sessions, every quote checked in code. That stored 233 records and 40 digests (one invalid answer got its single repair, as designed).
+- The 40 notes were re-rendered. The code rubric passes 32 of 40: all 8 failures are size only, and the new part-wording check passes 40 of 40.
+- A fresh scorer session (Claude Opus) scored the notes against the same 15 references.
+
+**A correction to the earlier extraction scores:** the 10 chats in answer key v2 are *not* among the 40 gold chats. So the strict F1 0.050 / mapped 0.149 above measured only the old rule-extractor records on those 10 chats. The AI extractor has now run on them too (15 segments, 115 records, the same request-file flow, a separate session that never opened the key). Both key fingerprints were checked again and are unchanged.
+
+### Extraction against answer key v2 (10 chats)
+
+| | Strict | `--count-as idea=proposal` |
+|---|---|---|
+| Precision | 0.177 | 0.269 |
+| Recall | 0.367 | 0.556 |
+| F1 | **0.239** (was 0.050) | **0.362** (was 0.149) |
+
+The mapped run in detail:
+
+| Type | Precision | Recall |
+|---|---|---|
+| Decision | 0.80 | 0.67 |
+| Idea (as proposal) | 1.00 | 0.53 |
+| Requirement | 0.30 | 0.91 |
+| Rejection | 0.44 | 1.00 |
+| Question | 0.11 | 0.67 |
+
+The key has no actions, references or bare proposals, so every one of those (66 records) counts as a false positive. That keeps precision low.
+
+### Notes against the 15 references
+
+| Measure | 1st | 2nd | 3rd | **4th** |
+|---|---|---|---|---|
+| Summary (of 30) | 23 | 24 | 25 | **25** |
+| Category exact / top only / miss / unclassified | 8/3/0/4 | 8/3/0/4 | 9/4/1/1 | 9/4/1/1 |
+| Status matches | 12 | 12 | 12 | **9** |
+| Decisions found (of 22) | 5 | 12 | 9 | **20** (2 fabricated) |
+| Open questions found (of 9) | 1 | 0 | 0 | **7** |
+| Key points (of 75) | 58 | 59 | 59 | **62** |
+| Unsupported claims | 9 | 9 | 10 | **4** |
+| Noise lines | – | 57 | 3 | **37** (almost all duplicates) |
+| Readability (of 30) | 26 | 19 | 25 | 22 |
+
+**What it shows:** the extractor and digest changes fixed the two biggest gaps. Decisions went from 9 to 20 of 22 and open questions from 0 to 7 of 9, and unsupported claims halved.
+
+**What's left (in order):**
+1. **Duplicates.** Overlapping segments and repeated asks produce the same requirement several times. One note lists 28 requirement entries for about 12 ideas. This needs a per-chat merge of equivalent records (REC-001 already proposes equivalences; the note should show one per group).
+2. **Status leans "settled".** 6 chats that ended on an unanswered offer or with no final choice are marked settled. The digest's status rule should follow the open questions it found.
+3. **Small accuracy slips.** There are 12: a complaint about a missing element read as a rejection, pasted custom instructions read as the request, a returned image missed, and miscounts.
