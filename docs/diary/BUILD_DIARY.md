@@ -830,3 +830,20 @@ Fix attempts: 0.
 - "I don't trust a green tick in a log. The progress check reran the tests itself."
 - "The biggest risk wasn't the code. It was a process rule (test on Windows before merging) that quietly stopped being followed."
 - "When I stepped back from reviewing, the plan had to change too: an independent AI reviewer, kept separate from the AI being scored."
+
+### 00:22 — UI-001: `ke ui` opens the archive in the browser
+**What:** `ke ui` starts a small website on this computer only and opens it. The home page shows how many chats are stored, how many were in the latest export, how many weren't (kept, never deleted), and every import. Each import has a report page in plain sentences ("3 new chats, 1 changed, 40 unchanged", "Your original files were not changed", "Some images couldn't be found: 2 missing"), with the full numbers behind a "details" toggle. 9 new tests, 564 in total.
+**Safety:** it refuses to listen on anything but 127.0.0.1, it answers only requests addressed to localhost (so another website can't reach it by a DNS trick), every page is auto-escaped, and pages carry a policy that allows no scripts at all. No accounts, nothing in the cloud. It reads the import ledger only; it computes nothing new.
+**Also:** STATUS's header no longer calls TICKETS.csv "kept in sync" (it's frozen), ADR-0009 is now `accepted` and says the answer key is reviewed by an independent session. AGENTS.md guardrail 1 still says the owner approves the gold set; agents can't edit AGENTS.md, so that line is listed for Louis.
+**Teach-back (`ui/app.py`):** "`ke ui` runs a tiny web server that only listens on my own computer and only answers requests addressed to localhost. Each page reads what the importer already stored and fills an HTML template that escapes everything, so chat text can never become code. The report page turns the stored import receipt into plain sentences, with the raw numbers one click away."
+**Talking points:**
+- "One command opens my archive in the browser: local only, no accounts."
+- "The web pages reuse the same stored data as the command line; they're another view, not another system."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 87 source files
+pytest -q               # 564 passed, 6 skipped (9 new)
+```
+Fix attempts: 0.
+
+**Next exact task:** UI-002 (import from the browser; wires `ke import` and replaces the placeholder test with a real one).

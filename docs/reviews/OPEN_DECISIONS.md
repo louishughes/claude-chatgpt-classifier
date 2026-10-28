@@ -44,3 +44,4 @@
   3. **Small PRs**: one or two tickets each, on their own branches.
   4. **The build agent merges its own PRs** once tests are green on Linux and Windows, then works from `main`.
   5. **Guardrails unchanged.** No paid API calls. If a ticket needs Louis (changing tests or the gold set, three failed fix attempts), stop that ticket, log it in `STATUS.md` and move on.
+- **Retiring the `ke import` placeholder test** (2026-10-28, under the owner's delegated authority for the night, "you have all the access and authority needed"; relayed by the coordinator): when `ke import` is wired to `import_source` (UI-002), `tests/unit/test_cli.py::test_import_is_an_honest_placeholder` is replaced by a real test that imports a fixture through the CLI. Replaced, never just deleted. Revisitable.

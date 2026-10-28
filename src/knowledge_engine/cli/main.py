@@ -224,6 +224,34 @@ def _imports_report(settings: Settings, args: argparse.Namespace) -> CommandResu
     return CommandResult("imports report", data=data, message=f"Import report ({batch.status})")
 
 
+def _ui(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Run the local web interface until Ctrl+C. Listens on 127.0.0.1 only."""
+    import webbrowser
+
+    from knowledge_engine.ui.app import serve
+
+    try:
+        server = serve(settings, port=args.port)
+    except OSError:
+        return CommandResult(
+            "ui",
+            ExitCode.ERROR,
+            message=f"port {args.port} is busy; try --port",
+            error_code="port_busy",
+        )
+    url = f"http://127.0.0.1:{server.server_port}/"
+    print(f"Knowledge Engine is open at {url} (Ctrl+C to stop)", flush=True)
+    if not args.no_browser:
+        webbrowser.open(url)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+    return CommandResult("ui", data={"url": url}, message="Stopped the web interface")
+
+
 def _inspect(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Show stored conversations as counts only; optionally write a transcript note."""
     from sqlalchemy import func, select
@@ -413,6 +441,11 @@ def build_parser() -> argparse.ArgumentParser:
     smoke.add_argument("--seed", type=int, default=1, help="seed for --synthetic (default 1)")
     smoke.add_argument("--limit", type=int, metavar="N", help="import only the first N")
     smoke.set_defaults(handler=_eval_smoke)
+
+    ui = commands.add_parser("ui", help="open the local web interface (this computer only)")
+    ui.add_argument("--port", type=int, default=8765, help="port on 127.0.0.1 (default 8765)")
+    ui.add_argument("--no-browser", action="store_true", help="don't open a browser window")
+    ui.set_defaults(handler=_ui)
 
     importer = commands.add_parser("import", help="import an export (not built yet)")
     importer.add_argument("source", type=Path, help="export ZIP or folder")

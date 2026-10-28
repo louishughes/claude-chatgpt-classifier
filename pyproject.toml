@@ -23,6 +23,7 @@ dependencies = [
     "sqlalchemy>=2.0.36,<2.1",    # database access and transactions (FND-003)
     "alembic>=1.14,<2",           # versioned schema migrations (FND-004)
     "pyyaml>=6.0.2,<7",           # Obsidian frontmatter, written and checked (DOC-002)
+    "jinja2>=3.1.4,<4",           # HTML pages of the local web interface, auto-escaped (UI-001)
 ]
 
 [project.scripts]

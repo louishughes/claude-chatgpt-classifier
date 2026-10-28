@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Knowledge Engine{% endblock %}</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header>
+  <a class="brand" href="/">Knowledge Engine</a>
+  <span class="muted">local only · v{{ version }}</span>
+</header>
+<main>
+{% block main %}{% endblock %}
+</main>
+<footer class="muted">Workspace: {{ workspace }}. Nothing on this page leaves your computer.</footer>
+</body>
+</html>

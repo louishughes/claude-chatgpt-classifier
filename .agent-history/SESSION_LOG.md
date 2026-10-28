@@ -555,3 +555,9 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - evaluation/smoke.py run_smoke (import, re-import, render, 7 checks, counts/timings only); run_import(limit=N) (limited run never marks not_seen); CLI `ke eval smoke [ROOT --limit N | --synthetic N --seed S]` writes JSON reports under <workspace>/smoke/.
 - docs/evaluation/EVAL-010_SMOKE.md: synthetic 50/100 results. Real-data half pending (Louis's PC, with REV-009). #39 stays open.
 - Tests: test_smoke.py (4). Full suite 554 passed, 6 skipped.
+
+## 2026-10-28 00:22 UI-001
+- ui/app.py (WSGI app, routes / and /imports/<id>, /style.css; loopback-only serve(); Host header check; CSP default-src 'none'; quiet handler), ui/data.py (workspace_status, list_imports, load_report, plain_words), Jinja2 templates (autoescape). CLI `ke ui [--port N] [--no-browser]`. jinja2>=3.1.4,<4 added.
+- Docs: STATUS header (TICKETS.csv frozen), ADR-0009 status accepted + independent answer-key review; OPEN_DECISIONS: placeholder-test retirement under delegated authority.
+- Tests: test_ui.py (9). Full suite 564 passed, 6 skipped. ruff, mypy, git_guard OK.
+- Next: UI-002.
