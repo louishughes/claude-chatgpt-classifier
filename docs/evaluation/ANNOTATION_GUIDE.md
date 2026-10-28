@@ -47,6 +47,30 @@ Set `"records_annotated": true` only once you have listed **every** record in th
 - **Artefact**: something the assistant or a tool produced (an image, a file, code).
 - **Reference**: a named game, piece of software, book, film or creator.
 
+## Three rules for every item (REV-011)
+
+The REV-003 review (#137) traced most annotation errors to these three rules not being written down. They apply to segments, records and `forbidden` items alike.
+
+### 1. Number every message on the active branch
+
+Count every message on the active (selected) branch from 1, in tree order, **whatever its type**: text, code, tool calls, execution output, images. Never skip a type and never count an alternative branch. This is the numbering the engine uses (`ConversationGraph.message_number`), and the one transcript notes, the UI and import reports show, so a number in the gold set means the same message everywhere. When a record needs a message, give its `message_id`; use the number only in notes and review comments.
+
+*Example:* user question (1), assistant code (2), execution output (3), assistant explanation (4), user "yes, use that" (5). The acceptance is message **5**, not 4: the code and its output count.
+
+### 2. Every item carries a verbatim quote
+
+Each record and each `forbidden` item has a `quote`: words copied exactly from the message it cites (the `message_id`). No paraphrase, no fixed-up spelling, no joining words from two messages. Shorten with `…` only between whole copied pieces. If you can't find words to quote, the item probably isn't in the chat.
+
+The schema field is `quote` on records and `forbidden` items. It is optional in the schema so answer keys written before this rule stay valid, and the evaluators don't score it: it is there so a reviewer can check the item against the chat. Add it to every new or edited item. In the real set the quote is private text, which is one more reason that file never leaves the workspace.
+
+*Example:* a requirement cites message 7 with `"quote": "it has to run offline"`, not "must work without internet".
+
+### 3. Owner facts and ideas cite a user message
+
+A fact about the owner, an idea of the owner's, or the owner's decision must cite a message whose role is **user**. Something the assistant said is never the owner's fact, idea or decision, even if the user didn't object. If only the assistant said it, record it as the assistant's (a proposal, a reference), or leave it out.
+
+*Example:* the assistant writes "since you live near the coast…" and the user never says so: there is no owner fact. The user writes "I live near the coast": owner fact, citing that user message.
+
 ## Records that must never appear (`forbidden`)
 
 List the mistakes that would do real harm, each with a short `reason`. Above all:

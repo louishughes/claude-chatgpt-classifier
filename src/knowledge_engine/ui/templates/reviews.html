@@ -1,62 +1,65 @@
 {% extends "base.html" %}
 {% block title %}Reviews · Knowledge Engine{% endblock %}
 {% block main %}
-<h1>Review decisions</h1>
-<p class="muted">Every decision a named reviewer made, and the reason they gave. Reviewers are usually independent AI review sessions, not you: a name here is who decided, nothing more. The automatic evidence check is counted separately at the bottom. This page only shows; it changes nothing.</p>
+<header class="page-head">
+  <p class="eyebrow">Check the AI</p>
+  <h1>Review decisions</h1>
+  <p class="lede">Every decision a named reviewer made, and the reason they gave. Reviewers are usually independent AI review sessions, not you: a name here is who decided, nothing more. The automatic evidence check is counted separately at the bottom. This page only shows; it changes nothing.</p>
+</header>
 
 <h2>Knowledge records</h2>
 {% if found.record_decisions %}
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>When</th><th>Reviewer</th><th>Record</th><th>Change</th><th>Reason</th></tr></thead>
   <tbody>
   {% for d in found.record_decisions %}
   <tr><td class="muted">{{ d.at | when }}</td><td>{{ d.reviewer }}</td><td>{{ d.type }}: {{ d.assertion }}</td><td>{{ d.change }}</td><td>{{ d.note or "(no reason given)" }}</td></tr>
   {% endfor %}
   </tbody>
-</table>
-{% else %}<p>No reviewer decisions on knowledge records yet.</p>{% endif %}
+</table></div>
+{% else %}<div class="empty"><p class="what">No reviewer decisions on knowledge records yet.</p><p class="next">Decisions appear here when an independent review session confirms or rejects a suggestion.</p></div>{% endif %}
 
 <h2>Vocabulary proposals</h2>
 <p class="muted">{{ found.open_proposals }} still open.</p>
 {% if found.taxonomy %}
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>When</th><th>Reviewer</th><th>Change</th><th>Proposed by</th><th>Outcome</th><th>Reason</th></tr></thead>
   <tbody>
   {% for t in found.taxonomy %}
   <tr><td class="muted">{{ t.at | when }}</td><td>{{ t.reviewer }}</td><td>{{ t.operation }}</td><td>{{ t.proposer }}</td><td>{{ t.status }}</td><td>{{ t.note or "(no reason given)" }}</td></tr>
   {% endfor %}
   </tbody>
-</table>
-{% else %}<p>No vocabulary proposals decided yet.</p>{% endif %}
+</table></div>
+{% else %}<div class="empty"><p class="what">No vocabulary proposals decided yet.</p></div>{% endif %}
 
 <h2>Topic labels</h2>
 {% if found.labels %}
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>When</th><th>Reviewer</th><th>Segment</th><th>Field</th><th>Label set</th><th>Reason</th></tr></thead>
   <tbody>
   {% for l in found.labels %}
   <tr><td class="muted">{{ l.at | when }}</td><td>{{ l.reviewer }}</td><td>{{ l.segment_id }}</td><td>{{ l.field }}</td><td>{{ l.primary or "none" }}{% if l.secondary %} + {{ l.secondary | join(", ") }}{% endif %} <span class="muted">({{ l.version }})</span></td><td>{{ l.note or "(no reason given)" }}</td></tr>
   {% endfor %}
   </tbody>
-</table>
-{% else %}<p>No label corrections yet.</p>{% endif %}
+</table></div>
+{% else %}<div class="empty"><p class="what">No label corrections yet.</p></div>{% endif %}
 
 <h2>Conversation links</h2>
 {% if found.links %}
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>When</th><th>Reviewer</th><th>Link</th><th>Action</th><th>Change</th><th>Reason</th></tr></thead>
   <tbody>
   {% for k in found.links %}
   <tr><td class="muted">{{ k.at | when }}</td><td>{{ k.reviewer }}</td><td>{{ k.relationship_id }}</td><td>{{ k.action }}</td><td>{{ k.change }}</td><td>{{ k.note or "(no reason given)" }}</td></tr>
   {% endfor %}
   </tbody>
-</table>
-{% else %}<p>No link decisions yet.</p>{% endif %}
+</table></div>
+{% else %}<div class="empty"><p class="what">No link decisions yet.</p></div>{% endif %}
 
 <h2>Automatic evidence check</h2>
 <p class="muted">Not a person: the validator checks that every quote really is in the chat and said by the right speaker.</p>
 {% if found.validator %}
 <p>{% for state, n in found.validator %}moved to {{ state }}: {{ n }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
 {% if found.problems %}<p>Problems found: {% for p, n in found.problems %}{{ p }} ({{ n }}){% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
-{% else %}<p>Nothing checked yet.</p>{% endif %}
+{% else %}<div class="empty"><p class="what">Nothing checked yet.</p></div>{% endif %}
 {% endblock %}

@@ -2563,6 +2563,39 @@ Fix attempts: 1 (the test fixture keyed tokens by workspace instead of owner).
 
 **Next exact task:** open the queued PRs in order (PROD-001, PROD-002, #255, PROD-003, `[m:id]` fix, PROD-004), then INT-001.
 
+### 13:15 — IMP-007: a stray file of chats is now reported, not silently skipped
+
+- EVAL-002 found that an official export with a second JSON file of chats (say `stray.json` from a hand-merged re-export) lost those chats without a word in the report.
+- The official adapter now opens every other `.json` in the export (folder or ZIP) and, if it holds at least one conversation object (anything with a `mapping`), adds an `unread_conversation_file` warning. It still doesn't import the file: which one is authoritative is Louis's call. Known side files (`user.json`, `message_feedback.json`, `shared_conversations.json` and friends) aren't even opened.
+- The EVAL-002 reproduction's expected verdict changed from `silent_drop` to `warned`, as #237 asked; only that value changed in the existing test.
+
+**Teach-back (`_holds_conversations`):** When the importer skips a JSON file, it now looks inside to see whether the file has any chats in it. If it does, the import report says so with a counted warning, so nothing disappears quietly. It never imports that file on its own, because choosing which copy is right is the owner's decision.
+
+Checks:
+```
+tests/integration/test_unread_conversation_file.py   6 passed
+tests/integration/test_import_fidelity.py            8 passed (one expected value changed per #237)
+```
+Fix attempts: 0.
+
+**Next exact task:** merge the open PRs; then the next unblocked ticket.
+
+### 13:05 — REV-011: three annotation rules, written down
+
+- The annotation guide gains "Three rules for every item": number every message on the active branch whatever its type (the same numbering as `ConversationGraph.message_number`; the ticket's `loader.py` doesn't exist, the graph is where it lives); every record and `forbidden` item carries a verbatim quote; an owner fact, idea or decision must cite a user message. One example each.
+- The gold schema gains an optional `quote` on records and forbidden items. Optional, so golden-v1 on Louis's PC stays valid without being touched; the evaluators don't score it. It's for reviewers checking an item against the chat.
+
+**Teach-back (the `quote` field):** Each answer-key item can now carry the exact words it is based on. A reviewer can then check the item against the chat without hunting for it. It's optional and not scored, so older answer keys still load and the scores don't change.
+
+Checks:
+```
+tests/unit/test_gold_quote.py   3 passed
+gold tests (-k gold)            23 passed (unchanged)
+```
+Fix attempts: 0.
+
+**Next exact task:** IMP-007 (#237).
+
 ### 11:42 — INT-001: fetching a web page without opening a door into my network
 
 - `ingestion/web.py`: off unless `network_fetch` is on **and** the host is on `web_allowlist` (empty by default).
@@ -2599,6 +2632,25 @@ Fix attempts: 0.
 
 **Next exact task:** open the queued PRs, then INT-003 (watched folders).
 
+### 13:05 — NOTE-002: the conversation digest contract
+
+Louis approved the rich-notes plan (`docs/plans/RICH_NOTES_GAP_ANALYSIS.md`), so the NOTE tickets come next. This one is the shape of the *digest*: what a model writes about a whole chat so the note reads well.
+
+- `digest/contract.py`: `DigestAnswer` is what the model must return: 1 to 4 summary sentences, purpose, outcome, status (open, settled, abandoned), intent, topics, insights, tensions, open questions and next steps. `extra="forbid"` everywhere, and every item needs at least one short quote (300 characters at most) naming its message.
+- `resolve_digest` looks each quote up in the real message (the same matching as the extractor, LEG-004) and turns it into exact, fingerprinted evidence. If any quote of an item is wrong (a message that isn't in the chat, or words that aren't in that message), the whole item is dropped and a flag says why. A status or intent that can't be backed becomes "unknown" rather than a guess. A digest with no surviving summary sentence is not usable and goes to review.
+- Whether a section is "From the chat" or "Generated" is fixed in `FIELD_PROVENANCE`, not chosen by the model. Only open questions count as from the chat; everything else is the model's own wording, so the note labels it generated (decision D3).
+- It is a separate thing from knowledge records (decision D5), so a generated insight can never pass for a confirmed decision.
+
+**Teach-back (`resolve_digest`):** The model hands back a summary and the other sections, and each sentence has to point at the messages it came from with a few exact words. This function checks those words really are in those messages and swaps them for precise positions and a fingerprint. Any sentence with even one bad citation is thrown out and noted, so what reaches the note is fully backed by the chat.
+
+Checks:
+```
+tests/unit/test_digest_contract.py   11 passed
+```
+Fix attempts: 0.
+
+**Next exact task:** NOTE-003 (the digest stage behind the provider switch).
+
 ### 13:20 — NOTE-001 (#273): the rich-note layout, built from what the engine already stores
 
 Louis approved all eight recommendations at 12:50 ("Go ahead with the recommendations and verifications"), so the gap analysis now records them as decisions. The build thread opened issues #273 to #285 for NOTE-001 to 013 and we split the work: this thread owns NOTE-001, the real-corpus taxonomy (NOTE-006), the real-chat scoring half of NOTE-011 and the ladder run (NOTE-013). The build thread takes the digest, the extractor and the code checks.
@@ -2630,6 +2682,44 @@ Talking points:
 - "Evidence is folded away, not deleted: open the box and the quote is there, re-checked against the archive."
 
 **Next exact task:** NOTE-006, the first taxonomy discovered from the real chats.
+
+### 13:30 — A design pass on the dashboard (`ke ui`)
+
+Louis asked for the local dashboard to be easier to use and nicer to look at. It worked, but it was a page of links separated by dots, long grey tables and raw state names like `review_required`, and on a phone the tables pushed the whole page sideways.
+
+What changed (templates, CSS and one line in `ui/app.py`; no new routes, still read-only):
+
+- **One visual system** in `style.css`: every colour is a named token, and dark mode only swaps the tokens. Colour always means something: green fine, amber look at this, red wrong, and **violet for "an AI said so, not the owner"**.
+- **A sidebar grouped by purpose** (Your archive / Found in chats / Check the AI / Add) that highlights where you are. `app.py` now passes the current address to the templates for that. On a phone it becomes a wrapping top bar.
+- **Tables** sit in their own scrolling box, with small-caps headers and right-aligned numbers, so a wide table never drags the page sideways.
+- **Plain labels**: trust states are pills that say "review required" instead of `review_required`, the filter links are chips with counts, and long hashes are folded under "Fingerprints".
+- **Empty states** say what's missing and the next step ("Run `ke extract`…", "Import your ChatGPT export").
+- **Charts on the Evaluation page**: a stacked bar per record type (found and expected / found but not expected / expected but missed) and one for how far each output got (trust). Score tiles get a thin meter. Every score block carries "Scored against: AI check (not owner-verified)", in violet.
+
+Challenges:
+
+- **The page's security policy blocks scripts and inline styles.** That's on purpose (chat text must never become code), but it rules out chart libraries and `style="width: 40%"`. The fix: draw the bars as plain SVG from the template, where `width="40%"` is an attribute, not a style, and colour them from the stylesheet. Hover text comes from SVG `<title>`, which needs no script.
+- **Tests pin exact HTML** (for example `<td>(\d+)</td>` for the message count). My first pass added `class="num"` to those cells and broke two tests. Tests can't be changed without Louis, so I put the cells back and right-aligned the columns from CSS instead.
+- **The sidebar stopped halfway down** long pages in full-page screenshots, because a sticky box is only one screen tall. Painting the sidebar's panel onto the page background fixed it at any length.
+
+Before and after screenshots, all from synthetic test fixtures: `docs/diary/img/ui-design-2026-10-28/`.
+
+**Teach-back (`stackbar` in `ui/templates/macros.html`):** It draws one horizontal bar made of coloured pieces, such as found and expected, found but not expected, and missed. Every bar on a chart shares one scale, the biggest total, so you can compare their lengths fairly. It's plain SVG with percentage widths and a hover title, because the page isn't allowed to run scripts.
+
+Checks:
+```
+pytest tests/   1340 passed, 22 skipped (no test changed)
+ruff check src/knowledge_engine/ui   clean
+Screenshots: 11 pages, light and dark, plus 400px phone width
+```
+Fix attempts: 1 (the two HTML-pinning tests above).
+
+Talking points:
+- "My dashboard has no JavaScript at all, for security, so the charts are SVG drawn by the server-side template."
+- "Colour carries meaning: violet always means an AI checked this, not me, so a score can't look more certain than it is."
+- "The tests guard the exact numbers on the page, so a redesign that broke them got caught straight away."
+
+**Next exact task:** Louis looks at the screenshots and says what to change; possible follow-ups are a light/dark switch and a chart on the segment-labels page.
 
 ### 13:50 — CI: why main kept going red on Windows + Python 3.12 only
 
