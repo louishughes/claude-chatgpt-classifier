@@ -2052,6 +2052,12 @@ def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
 
     from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
     from knowledge_engine.infrastructure.workspace import WorkspaceRow
+    from knowledge_engine.retrieval.filters import (
+        BadFilterDate,
+        BadFilterRole,
+        UnknownFilterTerm,
+        build_filters,
+    )
     from knowledge_engine.retrieval.lexical import (
         LexicalIndex,
         SearchMode,
@@ -2067,7 +2073,26 @@ def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
     engine = create_sqlite_engine(db)
     try:
         with Session(engine) as session, LexicalIndex(search_index_path(settings)) as index:
+            try:
+                filters = build_filters(
+                    session,
+                    since=args.since,
+                    until=args.until,
+                    role=args.role,
+                    term=args.term,
+                    taxonomy=args.taxonomy,
+                )
+            except (BadFilterDate, BadFilterRole) as error:
+                return CommandResult(
+                    "search", ExitCode.USAGE, message=str(error), error_code="bad_filter"
+                )
+            except UnknownFilterTerm as error:
+                return CommandResult(
+                    "search", ExitCode.USAGE, message=str(error), error_code="unknown_term"
+                )
             added = sync_index(session, index)
+            workspaces = list(session.scalars(select(WorkspaceRow.workspace_id)))
+            mode = SearchMode(args.mode)
             hits = [
                 {
                     "conversation_id": hit.conversation_id,
@@ -2076,21 +2101,38 @@ def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
                     "role": hit.role,
                     "snippet": hit.snippet,
                 }
-                for workspace_id in session.scalars(select(WorkspaceRow.workspace_id))
+                for workspace_id in workspaces
                 for hit in index.search(
                     args.query,
                     workspace_id=workspace_id,
-                    mode=SearchMode(args.mode),
+                    mode=mode,
                     limit=args.limit,
                     conversation_id=args.conversation,
+                    filters=filters,
                 )
             ][: args.limit]
+            undated = sum(
+                index.undated(
+                    args.query,
+                    workspace_id=workspace_id,
+                    mode=mode,
+                    conversation_id=args.conversation,
+                    filters=filters,
+                )
+                for workspace_id in workspaces
+            )
     finally:
         engine.dispose()
+    data: dict[str, object] = {"mode": args.mode, "hits": hits, "newly_indexed": added}
+    message = f"{len(hits)} matching message(s)"
+    if filters is not None and filters.dated:
+        data["undated_left_out"] = undated
+        if undated:
+            message += f"; {undated} more match but have no date, so a date filter leaves them out"
     return CommandResult(
         "search",
-        data={"mode": args.mode, "hits": hits, "newly_indexed": added},
-        message=f"{len(hits)} matching message(s)",
+        data=data,
+        message=message,
     )
 
 
@@ -4291,6 +4333,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     search.add_argument("--limit", type=int, default=20, help="at most this many hits")
     search.add_argument("--conversation", help="only this conv_ ID")
+    search.add_argument("--since", help="only messages on or after this day (YYYY-MM-DD, UTC)")
+    search.add_argument("--until", help="only messages on or before this day (YYYY-MM-DD, UTC)")
+    search.add_argument(
+        "--role", choices=["user", "assistant", "tool", "system"], help="only this speaker"
+    )
+    search.add_argument(
+        "--term", help="only messages in segments labelled with this term_ or project ID"
+    )
+    search.add_argument(
+        "--taxonomy", help="the published version --term is checked in (default: the newest)"
+    )
     search.set_defaults(handler=_search)
 
     similar = commands.add_parser("similar", help="find messages close in meaning (local)")
