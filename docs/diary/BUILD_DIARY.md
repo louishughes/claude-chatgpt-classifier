@@ -2735,6 +2735,24 @@ Fix attempts: 0.
 
 **Next exact task:** NOTE-003 (the digest stage behind the provider switch).
 
+### 13:30 — NOTE-003: the digest stage
+
+- `digest/stage.py`: `DigestStage.run(chat)` sends one request per chat through `ModelStageRunner`, so it gets the cache, the single repair, `review_required` and the egress switch for free. No new retry or cache code.
+- The model sees the chat's active path (the version the user ended on), every message tagged `[m:ID] role:` and escaped as untrusted data, plus one line per fork ("after [m:X]: edit fork, 1 other version(s) not shown"). The other versions are not sent; the note's Branches section shows them from the stored tree.
+- A chat over the size budget is split between exchanges, with one shared exchange between neighbours (the segmenter's rule), never inside a message. Each part is labelled "Part n of N" and the answers are merged in code: purpose and intent from the first part, outcome and status from the last, summary sentences round-robin (at most 4), lists de-duplicated.
+- The stage key covers the exact text, the fork lines, the part label and the code, prompt and schema versions.
+- A repair is a new ask, so with a batch provider it is answered on a later run: the first run says `pending`, the next one finishes. A digest whose summary sentences all fail the quote check is `review_required`, not a note.
+
+**Teach-back (`DigestStage`):** For each chat it builds one request holding the conversation as the user finally left it, plus a note of where the chat forked, and hands it to the same stage runner every model step uses. That runner answers from the cache if it has seen the exact same request, allows one repair for a malformed answer, and refuses to send anything if model access is switched off. When the answer comes back it is checked quote by quote, and long chats are asked in parts and stitched back together without ever cutting a message.
+
+Checks:
+```
+tests/integration/test_digest_stage.py   7 passed (FakeProvider, no network)
+```
+Fix attempts: 1 (my new test expected a repair to finish in the same run; it arrives on the next one, as with any batch answer).
+
+**Next exact task:** NOTE-004 (runbook and synthetic dry run), then NOTE-005.
+
 ### 13:20 — NOTE-001 (#273): the rich-note layout, built from what the engine already stores
 
 Louis approved all eight recommendations at 12:50 ("Go ahead with the recommendations and verifications"), so the gap analysis now records them as decisions. The build thread opened issues #273 to #285 for NOTE-001 to 013 and we split the work: this thread owns NOTE-001, the real-corpus taxonomy (NOTE-006), the real-chat scoring half of NOTE-011 and the ladder run (NOTE-013). The build thread takes the digest, the extractor and the code checks.
@@ -2766,6 +2784,24 @@ Talking points:
 - "Evidence is folded away, not deleted: open the box and the quote is there, re-checked against the archive."
 
 **Next exact task:** NOTE-006, the first taxonomy discovered from the real chats.
+
+### 13:55 — NOTE-004: digests from a Claude session, end to end
+
+- `ke digest run [IDs | --all] --run-id R [--vault V]`: the first run writes the digest requests into `private/model-batches/R/` and says how many are waiting; a Claude session fills the response files; running it again collects, checks every quote and writes the rich notes. All chats go in one submit, so the requests are packed into as few files as fit, not one file per chat.
+- `rich_note.py` now takes a digest: the summary box, purpose, outcome, status and intent in the knowledge card, insights, tensions and next steps (each with its folded, re-checked evidence), open questions from the digest under the extractor's, and topic candidates. Without a digest the note is exactly as before (the NOTE-001 tests are unchanged and pass).
+- `ke docs chat --template v2` uses a digest that was already collected, with model access off. `stored_digest` reads the stored answers only; it never asks.
+- The runbook (`docs/runbooks/LABELLING_SESSION.md`) has a digest section: write, answer in a fresh session with the deny rules, collect, what to do at a usage limit, and repairs.
+
+**Teach-back (`ke digest run`):** The first time it runs, it writes every chat's digest question into request files and stops, because the answers come from a Claude session on my subscription, not from a paid API. Once the session has written its answers next to them, the same command reads them back, throws out any sentence whose quotes aren't really in the chat, and writes a readable note for each chat that passed. Running it a third time asks nothing new, because every answer is already stored.
+
+Checks:
+```
+tests/integration/test_digest_dry_run.py   3 passed (egress off writes nothing; 3 chats end to end; docs chat reuses the digest)
+tests/integration/test_rich_note.py        10 passed (unchanged)
+```
+Fix attempts: 1 (the first version wrote one request file per chat; now one submit for all).
+
+**Next exact task:** NOTE-005 (model-backed knowledge extractor).
 
 ### 13:30 — A design pass on the dashboard (`ke ui`)
 
@@ -2804,3 +2840,35 @@ Talking points:
 - "The tests guard the exact numbers on the page, so a redesign that broke them got caught straight away."
 
 **Next exact task:** Louis looks at the screenshots and says what to change; possible follow-ups are a light/dark switch and a chart on the segment-labels page.
+
+### 13:50 — CI: why main kept going red on Windows + Python 3.12 only
+
+Louis was getting a stream of "Run failed" emails. I read every failing run on main and on the PR branches.
+
+What was actually failing:
+
+- **On main (3 out of 3 red runs: 9b5e807, 94a7cc0, b8046be)** the same unit test, `test_interrupted_batch_is_abandoned_never_succeeded`, failed on `windows-latest, 3.12` only. Every one of those PRs had passed all four jobs before it merged, so this wasn't merging early. It was a flaky test that only shows up sometimes.
+- **On PR branches (OPS-009 at 4e5e54e and 1b80610)** a 64-bit Windows ctypes crash in the peak-memory code. That thread fixed it on its own branch (13fa9a5) before merging, so it's not on main.
+- **Once, on main (b8046be)**, the browser-import test (`test_import_from_the_browser_runs_and_shows_the_report`, issue #288) saw the import job end as "didn't finish". The reason was in the page, but pytest cut the page short with `...` right where the reason was.
+
+The root cause of the main failure: the import ledger says "the latest import is the one with the newest start time". Python 3.12 on Windows reads the clock in steps of about 16 milliseconds (3.13 switched to the precise clock, which is why the 3.13 Windows job never failed). The test starts a batch, "crashes", and starts another one straight after; if both land in the same 16 ms step they get identical start times and "latest" is a coin toss. It's a real bug, not just a test problem: `ke status` and the home page in the web UI use the same ordering.
+
+How I proved it: I couldn't run Windows here, so I wrote a throwaway pytest plugin (kept out of the repo) that makes the clock tick in coarse steps. With a coarse enough tick the test fails every time on Linux; with the fix it passes at both the 16 ms and an exaggerated 2 s tick.
+
+The fix (`importer/ledger.py`): when a batch starts, its start time is "now, or one microsecond after the newest batch, whichever is later". Start times are now strictly increasing, so all three readers agree on which import is latest. No test, threshold or evaluation rule was changed.
+
+For #288 I couldn't reproduce it (25 runs on Linux, all passed), and guessing a fix would be dishonest. Instead `pyproject.toml` now sets `verbosity_assertions = 2`, so a failed assert prints long strings in full while the rest of the output stays quiet. Next time it fails, CI will show the job's actual error. #288 stays open.
+
+**Teach-back (`importer/ledger.py`, `_next_start_time`):** Every import gets a start time, and "the latest import" means the one with the newest time. On some Windows setups the clock only moves every 16 milliseconds, so two quick imports could tie and the app couldn't tell which was newer. Now a new import's time is always at least a microsecond after the previous one, so there's never a tie.
+
+Checks:
+```
+python -m knowledge_engine.devtools.ci   lint, format, types, guard ok; 1353 passed, 22 skipped
+coarse-clock plugin, 2 s tick:  before the fix 1 failed / after 49 passed (ledger + UI tests)
+```
+Fix attempts: 1.
+
+Talking points:
+- "A test that only failed on one OS and one Python version turned out to be a clock-resolution bug: Python 3.12 on Windows only ticks every 16 ms."
+- "I couldn't run Windows, so I faked a coarse clock in a test plugin to reproduce it deterministically before fixing it."
+- "When I couldn't reproduce the second flake, I didn't guess. I made CI print the full error so the next failure explains itself."

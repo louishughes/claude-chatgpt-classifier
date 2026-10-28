@@ -29,7 +29,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +40,7 @@ from sqlalchemy import (
     ForeignKey,
     String,
     Text,
+    func,
     select,
 )
 from sqlalchemy.orm import Mapped, Session, mapped_column
@@ -188,6 +189,7 @@ class ImportLedger:
         self.abandon_stale()
         batch = ImportBatchRow(
             import_id=uuid.uuid4().hex,
+            started_at=self._next_start_time(),
             workspace_id=workspace_id,
             account_namespace=account_namespace,
             root_fingerprint=root_fingerprint(root),
@@ -199,6 +201,26 @@ class ImportLedger:
         self._session.add(batch)
         self._session.flush()
         return batch
+
+    def _next_start_time(self) -> datetime:
+        """Return now, or just after the newest batch if the clock hasn't moved.
+
+        ``latest()``, ``ke status`` and the web home page all treat the batch
+        with the newest ``started_at`` as the latest import. On Windows with
+        Python 3.12 the clock only ticks every ~16 ms, so two batches started
+        back to back can get the same time and "latest" becomes a coin toss.
+        Nudging the new batch one microsecond past the newest keeps start
+        times strictly increasing. ``start`` holds the write lock, so no other
+        batch can be started between this read and the insert.
+        """
+        now = _utc_now()
+        newest = self._session.scalar(select(func.max(ImportBatchRow.started_at)))
+        if newest is None:
+            return now
+        if newest.tzinfo is None:
+            # SQLite hands datetimes back without a timezone; they were stored as UTC.
+            newest = newest.replace(tzinfo=UTC)
+        return max(now, newest + timedelta(microseconds=1))
 
     def abandon_stale(self) -> int:
         """Mark batches left ``running`` by a crash as ``abandoned``.
