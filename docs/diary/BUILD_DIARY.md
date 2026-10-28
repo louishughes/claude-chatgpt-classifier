@@ -1112,3 +1112,23 @@ So REV-009 (#143) and EVAL-010 (#39) are closed.
 **Talking points:**
 - "The gate isn't my tests passing in the cloud. It's the real export, on the real machine, unchanged afterwards."
 - "Doubling the chats barely changed the time. That tells you the cost is somewhere else."
+
+### 03:30 — NRM-004: where a chat changes subject
+**What:** a segmenter that splits each chat into topic segments without any model, so later labels are about one subject at a time. It works in four steps:
+1. It cuts only *between exchanges*: a user question and its answers stay together. A short reply such as "no" never starts a segment, because it answers what came before.
+2. A pause of six hours or more starts a new segment.
+3. Where the words of the two exchanges before a point share almost nothing with the two after it, and that is a local low point, a new segment starts. Words that appear in most of the chat ("the", the chat's running theme, and every fixture's "Synthetic") are ignored first. This is a simplified TextTiling.
+4. A segment over the size budget (24,000 characters) is not clipped. It becomes overlapping parts that each share one exchange with the next, so the first and last messages are always included. A single huge exchange becomes its own part and is flagged.
+
+Every message in every section (the active path, each alternate branch, anything outside the tree) lands in exactly one segment, and branches are never mixed. `ke segments <conv>` shows boundaries and sizes without showing any text.
+**Fixture:** `topic_segments` covers a garden shed, then sourdough in the same sitting, then Python packaging eight hours later. The "no shingles" reply stays in the shed segment. Boundary precision, recall and F1 are all 1.0, and a one-topic chat stays whole.
+**LEG-005:** the no-clipping half is done (overlapping parts, `truncation_count` = 0). The "late short no comes out as rejected" check and accuracy by chat length need the extractor and the scoring runner, so #193 stays open.
+**Teach-back (`segmentation/segmenter.py`):** "I group messages into question-and-answer exchanges and only ever cut between them. A long pause or a sudden change of vocabulary starts a new topic. A topic too long for one model request is split into overlapping parts instead of being cut short."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 136 source files
+pytest -q               # 803 passed, 6 skipped
+```
+Fix attempts: 0. The 1,000 generated chats: full coverage, zero truncation, 2.5 s.
+
+**Next exact task:** TAX-001 + TAX-002 (taxonomy registry and published snapshots).

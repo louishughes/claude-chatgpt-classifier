@@ -1122,6 +1122,125 @@ def _search_cases() -> list[Case]:
     ]
 
 
+def _segment_cases() -> list[Case]:
+    """NRM-004 / LEG-005: annotated topic changes, and a chat that stays on one topic."""
+    conv = "c0000010-0000-4000-8000-000000000001"
+    builder = ConversationBuilder(conv, "Synthetic three topics", BASE_EPOCH + 86_400 * 45)
+    t = builder.start
+    node = builder.add(f"{conv}-sys", builder.root, "system", [""], timestamp=t)
+    script = [
+        # Topic 1: a garden shed.
+        (
+            "shed-u1",
+            "user",
+            "Synthetic: planning a garden shed, what base works under the shed floor?",
+        ),
+        (
+            "shed-a1",
+            "assistant",
+            "Synthetic: a gravel shed base with timber bearers keeps the shed floor dry.",
+        ),
+        ("shed-u2", "user", "Synthetic: which timber for the shed floor and the shed frame?"),
+        (
+            "shed-a2",
+            "assistant",
+            "Synthetic: treated timber for the floor; the frame timber can be lighter.",
+        ),
+        ("shed-u3", "user", "Synthetic: and the shed roof, felt or shingles over the timber?"),
+        (
+            "shed-a3",
+            "assistant",
+            "Synthetic: felt on the shed roof is cheapest; shingles over timber last longer.",
+        ),
+        # A short reply rejecting the suggestion: stays with the shed topic.
+        ("shed-u4", "user", "Synthetic: no shingles."),
+        ("shed-a4", "assistant", "Synthetic: understood, felt on the shed roof then."),
+        # Topic 2: sourdough, same sitting.
+        (
+            "bread-u1",
+            "user",
+            "Synthetic: different question, how do I feed a sourdough starter with flour?",
+        ),
+        (
+            "bread-a1",
+            "assistant",
+            "Synthetic: feed the sourdough starter equal flour and water daily.",
+        ),
+        ("bread-u2", "user", "Synthetic: what hydration should the sourdough loaf dough have?"),
+        (
+            "bread-a2",
+            "assistant",
+            "Synthetic: a sourdough loaf dough at seventy percent hydration is easy to shape.",
+        ),
+        ("bread-u3", "user", "Synthetic: how hot should the oven be for the sourdough loaf?"),
+        (
+            "bread-a3",
+            "assistant",
+            "Synthetic: a hot oven with steam gives the sourdough loaf a crust.",
+        ),
+    ]
+    for offset, (node_id, role, text) in enumerate(script, start=1):
+        node = builder.add(node_id, node, role, [text], timestamp=t + 60 * offset)
+    # Topic 3: python packaging, eight hours later.
+    later = t + 8 * 3600
+    for offset, (node_id, role, text) in enumerate(
+        [
+            ("py-u1", "user", "Synthetic: how do I build a python package wheel from pyproject?"),
+            (
+                "py-a1",
+                "assistant",
+                "Synthetic: run python -m build; the wheel follows your pyproject.",
+            ),
+            ("py-u2", "user", "Synthetic: how do I install that python package wheel locally?"),
+            (
+                "py-a2",
+                "assistant",
+                "Synthetic: pip install the wheel file to install the python package.",
+            ),
+        ],
+        start=1,
+    ):
+        node = builder.add(node_id, node, role, [text], timestamp=later + 60 * offset)
+    single = _chat(
+        "c0000010-0000-4000-8000-000000000002",
+        "Synthetic one topic",
+        46,
+        [
+            (
+                "Synthetic: what base works under a garden shed floor?",
+                "Synthetic: a gravel shed base.",
+            ),
+            (
+                "Synthetic: which timber for the shed floor joists?",
+                "Synthetic: treated timber joists.",
+            ),
+            (
+                "Synthetic: how far apart should the shed floor joists be?",
+                "Synthetic: 400 mm joists.",
+            ),
+            ("Synthetic: and what goes on the shed floor joists?", "Synthetic: shed floor boards."),
+        ],
+    )
+    return [
+        Case(
+            "topic_segments",
+            "NRM-004: annotated topic starts (a vocabulary change and an eight-hour pause); "
+            "a short 'no' stays with the suggestion it rejects; a one-topic chat stays whole.",
+            "official",
+            [builder.native(), single.native()],
+            expected={
+                "conversations": 2,
+                "topic_starts": {
+                    conv: ["bread-u1", "py-u1"],
+                    single.conversation_id: [],
+                },
+                "boundary_reasons": {"bread-u1": "vocabulary", "py-u1": "gap"},
+                "same_segment": [["shed-u3", "shed-u4", "shed-a4"]],
+            },
+        )
+    ]
+
+
 def without_children(native: JsonDict) -> JsonDict:
     """Return a copy of a native conversation with every ``children`` list removed."""
     copy: JsonDict = json.loads(json.dumps(native))
@@ -1141,6 +1260,7 @@ def all_cases() -> list[Case]:
         *_legacy_cases(),
         *_relationship_cases(),
         *_search_cases(),
+        *_segment_cases(),
     ]
 
 
