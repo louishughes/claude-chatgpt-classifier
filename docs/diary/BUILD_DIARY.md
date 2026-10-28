@@ -2982,6 +2982,44 @@ Fix attempts: 0.
 
 **Next exact task:** the Notes page shows the suggestion too, once NOTE-012 (#302) is merged.
 
+### 16:45 — NOTE-012: the knowledge note beside the chat, and a Notes page
+
+The dashboard's chat page now has two columns on a wide screen: the chat's rich note on the left (it stays in view while you scroll) and the transcript on the right. On a phone they stack. Every `m3` in the note is a link to message 3 on the same page, which is highlighted when you land on it. A new **Notes** page (sidebar, under Chats) lists every chat grouped by category, with its status and how many open questions the digest found.
+
+- `ui/notes.py` builds the note in memory, the same way `ke docs rubric` does: the newest published taxonomy, the stored digest, nothing written.
+- The Markdown-to-HTML step only knows the shapes our own notes use (headings, bullets, callouts, the card table, bold, italics, wikilinks). Every character of text is HTML-escaped first, so chat text can't become markup; the test chat contains a `<script>` tag to prove it.
+- A link to another chat's note goes to that chat's page; any other link is shown as plain words.
+- If a note can't be built, the page says so and still shows the transcript.
+
+A small trap I hit: the page template's sidebar already uses a variable called `groups`, so the first Notes page rendered four empty tables. The categories are now passed as `categories`.
+
+**Teach-back (`note_html`):** It turns one of our rich notes into HTML for the dashboard. It escapes all the text first and only recognises the few shapes our own notes use, so nothing from a chat can sneak in as markup. Citations become links to the message's spot on the same page, so you can check every claim with one click.
+
+Checks:
+```
+tests/integration/test_ui_notes.py   5 passed (summary, card and decisions shown; every m-number opens the message it names; no script tag survives; Notes page grouping; converter shapes)
+```
+Fix attempts: 1 (the `groups` name clash; a whole-transcript link was counted as a citation).
+
+**Next exact task:** merge the open PRs on green, then the NOTE-007 keyword section in the note.
+
+### 15:55 — Step 4: tax-1 published, 40 real chats classified and digested, and the notes scored by a separate session
+
+Louis approved tax-1 and asked me to run the publish ("I need you to run it"); this PC's safety check had blocked my first try.
+
+- `ke classify run` (new): the same request-file flow as `ke digest run`. The engine writes requests, fresh Claude sessions on the subscription answer them, and the engine validates every answer against the pinned version. 85 segments: 67 labelled, 18 to review.
+- Digests for all 40 chats came from 4 fresh sessions, with every quote checked in code. That gave 40 rich notes; the code rubric passes 36 and fails 4 on size only.
+- **Independent score:** one session (a different model) wrote reference summaries for 15 sampled chats without seeing the notes. A third session scored the notes against them. Summary mean 1.53/2; top-level category right 11 of 11 where given; but decisions were found for only 5 of 22 and open questions for 1 of 9. Full report: `docs/evaluation/NOTE-011_REAL.md`.
+- The honest headline: the notes now say what happened and where it sits, but not yet what Louis decided. The model extractor (NOTE-005) hasn't run on these chats yet, and pasted custom instructions are polluting the requirement lists.
+
+Challenges: the config file's `text_llm = false` overrides the environment variable, so the labelling runs use a private copy of the config with it switched on. One labeller's first script crashed after writing two lines; append-only meant nothing was lost or duplicated.
+
+Talking points:
+- "Three different AI sessions: one wrote the notes, one wrote the answer key without seeing them, one marked the difference. That's how I know decisions are the weak spot."
+- "Every label the classifier gives has to be a term from the published list, checked in code, so it can't make up categories."
+
+**Next exact task:** run the NOTE-005 extractor on the 40 chats, re-render, re-score against the same references.
+
 ### 17:00 — NOTE-015 and NOTE-020: running the extractor for real, and labels in digest notes
 
 The first real score (`docs/evaluation/NOTE-011_REAL.md`) found decisions and open questions nearly empty, because the model-backed extractor (NOTE-005) had no way to run outside tests. **`ke extract run`** now works the same way as `ke digest run` and `ke classify run`: the first run writes request files for a Claude session to answer, and the next run collects the answers, applies NOTE-005's three attribution checks and the evidence gate, and stores the records. Segments already done are skipped, so a third run asks for nothing.
@@ -3085,3 +3123,16 @@ Talking points:
 - "Precision for links needs a closed world: the key lists every chat it covers, so a link it doesn't contain really is wrong."
 - "A link pointing the wrong way and a link of the wrong kind need different fixes, so they're counted separately from invented ones."
 - "The answer key is written by a session that never saw the engine's output, and code checks every quote before a single point is scored."
+
+### 16:05 UTC — REV-010: answer key v2, written beside v1
+
+Louis approved both answer-key changes on a decision card ("Approve both", 15:42 UTC), so REV-010 ran as a Remote Control session on his PC, where the private chats live. It checked v1's hash first (unchanged), wrote v2 in a new folder, and proved every item with code: 113 of 113 quotes found in the cited message, right speaker, right message number. It also planted three deliberate mistakes in a copy to show the checker catches them. Only hashes and counts came back here; the hashes are in `docs/reviews/OPEN_DECISIONS.md`.
+
+The surprise: the brief said two chats were misnumbered, but **all ten** were. The engine numbers every message on the active path, hidden system messages and tool output included, and v1 had skipped those. v2 now stores each message's native ID next to its number, so the number can always be rechecked.
+
+The second surprise: `ke gold score` can't read this answer key at all (v1 or v2), because the key is per-chat and the scorer expects one combined golden-set file. That's a converter ticket, not something to patch into the key.
+
+Talking points:
+- "Before changing the answer key, the session proved the old one was untouched by its hash, and afterwards proved it again."
+- "Every answer in the key is checked by code against the real message: the quote, the speaker and the number."
+- "A checker that's never been shown to fail isn't proven, so we planted three mistakes and watched it catch them."

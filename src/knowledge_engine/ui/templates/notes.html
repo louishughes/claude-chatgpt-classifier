@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Notes · Knowledge Engine{% endblock %}
+{% block main %}
+<header class="page-head">
+  <p class="eyebrow">Your archive</p>
+  <h1>Notes</h1>
+  <p class="lede">Every chat's knowledge note, grouped by category. Open one to read the note beside the chat.</p>
+</header>
+<p class="muted">{{ total }} chat{{ "" if total == 1 else "s" }}. {% if taxonomy_version %}Categories under {{ taxonomy_version }}.{% else %}No taxonomy published yet, so every chat is unclassified.{% endif %}</p>
+{# not "groups": base.html uses that name for the sidebar #}
+{% for group in categories %}
+<h2>{{ group.name }} <span class="muted">({{ group.chats | length }})</span></h2>
+<div class="table-wrap"><table class="notes-list">
+  <thead><tr><th>Chat</th><th>Subcategory</th><th>Status</th><th class="num">Open questions</th></tr></thead>
+  <tbody>
+  {% for row in group.chats %}
+  <tr>
+    <td><a href="/chats/{{ row.conversation_id }}">{{ row.title }}</a></td>
+    <td>{{ row.subcategory or "" }}</td>
+    <td>{% if row.digest %}{{ row.status or "not stated" }}{% else %}<span class="muted">no digest yet</span>{% endif %}</td>
+    <td class="num">{% if row.open_questions is none %}<span class="muted">–</span>{% else %}{{ row.open_questions }}{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endfor %}
+{% if pages > 1 %}
+<p>
+  {% if page > 1 %}<a href="/notes?page={{ page - 1 }}">← Previous</a>{% endif %}
+  Page {{ page }} of {{ pages }}
+  {% if page < pages %}<a href="/notes?page={{ page + 1 }}">Next →</a>{% endif %}
+</p>
+{% endif %}
+{% if total == 0 %}
+<div class="empty"><p class="what">No chats yet.</p><p class="next"><a href="/import">Import your ChatGPT export</a> to fill this list.</p></div>
+{% endif %}
+{% endblock %}

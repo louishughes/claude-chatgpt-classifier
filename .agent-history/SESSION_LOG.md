@@ -955,6 +955,9 @@ evaluation/note_checks.py (check_note: citations_real, claims_cited, decisions_u
 ## 2026-10-28 17:30 NOTE-018 (#309)
 documents/categories.py suggested_category (best primary domain candidate from review_required rows, weighed by segment messages; only when no settled share); rich note card "unclassified; suggested: X (waiting for review)" and a category-section line, front matter unchanged; classification/review_session.py review_flagged (review queue -> request files -> record_review per flagged field, reviewer "session:<ref>"; unsure or rule-breaking answers record nothing); store.flagged_fields made public; `ke classify review --taxonomy --run-id`. Tests: tests/integration/test_note_suggested_review.py (3).
 
+## 2026-10-28 16:45 NOTE-012 (#284)
+ui/notes.py (note_view: rich note built in memory with the newest taxonomy and stored digest; note_html: escaped converter for the note's own shapes, citations -> #node anchors; notes_index: chats by category with status and open questions), /notes page, chat page two-column layout, sidebar link. Tests: tests/integration/test_ui_notes.py (5).
+
 ## 2026-10-28 17:00 NOTE-015 (#306) + NOTE-020 (#311)
 `ke extract run` (request files, knowledge_extractor, runner.run; egress checked first); runner keeps ledger rows on PendingAnswer (they were rolled back, so file-batch answers were never collected); `ke digest run --taxonomy` (default newest) passed to write_rich_note. Tests: tests/integration/test_extract_run.py (4).
 

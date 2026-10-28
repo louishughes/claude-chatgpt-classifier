@@ -390,3 +390,25 @@ blockquote.quote {
 @media (prefers-reduced-motion: no-preference) {
   .nav a, .card, .filters a, button { transition: background-color .12s, border-color .12s; }
 }
+
+/* NOTE-012: the knowledge note beside the transcript. Side by side on wide
+   screens (the note stays in view while the chat scrolls), stacked on phones. */
+.chat-layout { display: grid; gap: 1.5rem; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 70rem) {
+  .chat-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .note-pane { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
+}
+.note-pane {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: .5rem 1rem 1rem;
+}
+.note { overflow-wrap: anywhere; }
+.note h3 { margin: 1.2rem 0 .3rem; font-size: 1rem; }
+.note ul { padding-left: 1.1rem; }
+.note .callout { border-left: 4px solid var(--fill-info); background: var(--sunken); padding: .4rem .8rem; margin: .6rem 0; border-radius: 0 6px 6px 0; }
+.note .callout.summary { border-left-color: var(--ai); background: var(--ai-soft); }
+.note .callout-title, .note summary { font-weight: 600; margin: .2rem 0; cursor: default; }
+.note summary { cursor: pointer; color: var(--muted); }
+.note .callout p { margin: .25rem 0; }
+.note a.cite { font-family: var(--mono); font-size: .85em; padding: 0 .2em; border-radius: 4px; background: var(--accent-soft); text-decoration: none; }
+.note-card td:first-child { white-space: nowrap; width: 1%; }
