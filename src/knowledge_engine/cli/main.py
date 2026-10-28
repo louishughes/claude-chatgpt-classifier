@@ -2508,20 +2508,32 @@ def _docs_check(settings: Settings, args: argparse.Namespace) -> CommandResult:
         "broken_links": [list(b) for b in check.broken_links],
         "broken_embeds": [list(b) for b in check.broken_embeds],
         "bad_frontmatter": check.bad_frontmatter,
+        # NOTE-010: notes written to the rich-note layout, and what's wrong with any note.
+        "readable_notes": check.readable,
+        "readability": [
+            {"note": p.note, "check": p.check, "detail": p.detail} for p in check.readability
+        ],
     }
     if not check.clean:
         broken = len(check.broken_links) + len(check.broken_embeds) + len(check.bad_frontmatter)
+        problems = broken + len(check.readability)
         return CommandResult(
             "docs check",
             ExitCode.ERROR,
             data=data,
-            message=f"{broken} problem(s) in {check.notes} notes",
-            error_code="broken_links",
+            message=(
+                f"{problems} problem(s) in {check.notes} notes "
+                f"({broken} link or header, {len(check.readability)} readability)"
+            ),
+            error_code="broken_links" if broken else "readability",
         )
     return CommandResult(
         "docs check",
         data=data,
-        message=f"{check.notes} notes: {check.links} links and {check.embeds} embeds all resolve",
+        message=(
+            f"{check.notes} notes: {check.links} links and {check.embeds} embeds all resolve; "
+            f"{check.readable} rich note(s) within budget"
+        ),
     )
 
 
@@ -2729,9 +2741,19 @@ def _docs_note(settings: Settings, session: Any, args: argparse.Namespace) -> Co
                 error_code="no_taxonomy",
             )
         try:
-            path = write_topic_master(
-                session, args.topic, snapshot, args.vault, mode=Mode(args.mode)
-            )
+            if args.template == "v2":
+                # The readable layout (NOTE-010); v1 (DOC-005) stays the default.
+                from knowledge_engine.documents.readable_master import (
+                    write_readable_topic_master,
+                )
+
+                path = write_readable_topic_master(
+                    session, args.topic, snapshot, args.vault, mode=Mode(args.mode)
+                )
+            else:
+                path = write_topic_master(
+                    session, args.topic, snapshot, args.vault, mode=Mode(args.mode)
+                )
         except TopicNotFound as error:
             return CommandResult(command, ExitCode.USAGE, message=str(error), error_code="no_topic")
     return CommandResult(
@@ -2758,7 +2780,19 @@ def _docs(settings: Settings, args: argparse.Namespace) -> CommandResult:
             if args.docs_command == "project":
                 from knowledge_engine.documents.render import Mode, write_project_master
 
-                path = write_project_master(session, args.project, args.vault, mode=Mode(args.mode))
+                if args.template == "v2":
+                    # The readable layout (NOTE-010); v1 (DOC-004) stays the default.
+                    from knowledge_engine.documents.readable_master import (
+                        write_readable_project_master,
+                    )
+
+                    path = write_readable_project_master(
+                        session, args.project, args.vault, mode=Mode(args.mode)
+                    )
+                else:
+                    path = write_project_master(
+                        session, args.project, args.vault, mode=Mode(args.mode)
+                    )
                 return CommandResult(
                     "docs project",
                     data={"note": path.as_posix(), "mode": args.mode},
@@ -4167,6 +4201,12 @@ def build_parser() -> argparse.ArgumentParser:
     docs_project.add_argument(
         "--mode", choices=["current", "history", "all"], default="all", help="default: all"
     )
+    docs_project.add_argument(
+        "--template",
+        choices=("v1", "v2"),
+        default="v1",
+        help="v1: the DOC-004 master; v2: the readable layout (summary first, one line per item)",
+    )
     docs_project.set_defaults(handler=_docs)
     docs_chat = docs_commands.add_parser(
         "chat", help="write a chat's knowledge note (labels, quotes, branches, images, links)"
@@ -4190,6 +4230,12 @@ def build_parser() -> argparse.ArgumentParser:
     docs_topic.add_argument(
         "--mode", choices=["current", "history", "all"], default="all", help="default: all"
     )
+    docs_topic.add_argument(
+        "--template",
+        choices=("v1", "v2"),
+        default="v1",
+        help="v1: the DOC-005 master; v2: the readable layout (summary first, one line per item)",
+    )
     docs_topic.set_defaults(handler=_docs)
     docs_vault = docs_commands.add_parser(
         "vault",
@@ -4199,7 +4245,9 @@ def build_parser() -> argparse.ArgumentParser:
     docs_vault.add_argument("--taxonomy", help="taxonomy version for labels and topic notes")
     docs_vault.set_defaults(handler=_docs)
     docs_check = docs_commands.add_parser(
-        "check", help="check every link, embed and note header in a vault (changes nothing)"
+        "check",
+        help="check every link, embed and note header, and each note's length and empty "
+        "sections, in a vault (changes nothing)",
     )
     docs_check.add_argument("--vault", type=Path, required=True, help="the vault folder")
     docs_check.set_defaults(handler=_docs_check)
