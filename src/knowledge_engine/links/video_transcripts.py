@@ -16,8 +16,8 @@ Two ways a video gets a transcript:
 
 Transcript text only ever comes from a file or a provider. Nothing here
 writes, summarises or guesses words, and no provider is built in yet:
-YTB-002 defines the contract; a real one needs an authorised source
-(INT-002).
+YTB-002 defines the contract; ``links/youtube_captions.py`` is the one
+authorised source (INT-002).
 
 Talking points:
     - "With the network switch off, asking for a transcript can't reach the
@@ -29,7 +29,7 @@ Talking points:
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
@@ -144,6 +144,8 @@ class ProviderAnswer:
         language: Its language tag, if known.
         source_url: Where it was fetched from.
         reason: A short reason for anything but success.
+        detail: Extra provenance kept with the snapshot (e.g. which caption
+            track, and whether it was machine-generated).
     """
 
     status: TranscriptStatus
@@ -152,6 +154,7 @@ class ProviderAnswer:
     language: str | None = None
     source_url: str | None = None
     reason: str | None = None
+    detail: dict[str, str] = field(default_factory=dict)
 
 
 class TranscriptProvider(Protocol):
@@ -263,7 +266,8 @@ def request_transcript(
                 language=answer.language,
                 max_bytes=settings.limits.max_source_file_bytes,
             )
-            provenance = {
+            provenance: dict[str, str | None] = {
+                **answer.detail,
                 "method": method,
                 "source_url": answer.source_url,
                 "retrieved_at": _utc_now().isoformat(),
