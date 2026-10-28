@@ -17,7 +17,7 @@
 </article>
 {% endmacro %}
 {% block main %}
-<p><a href="/chats">← All chats</a></p>
+<p class="back"><a href="/chats">← All chats</a></p>
 <h1>{{ chat.title }}</h1>
 <p class="muted">
   {{ chat.created | when }} · {{ chat.messages }} messages · {{ chat.branch_points }} branch point{{ "" if chat.branch_points == 1 else "s" }} · {{ chat.images }} image link{{ "" if chat.images == 1 else "s" }}

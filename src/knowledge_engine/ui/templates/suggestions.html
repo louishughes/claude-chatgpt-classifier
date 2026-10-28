@@ -2,34 +2,37 @@
 {% from "macros.html" import where %}
 {% block title %}Suggestions · Knowledge Engine{% endblock %}
 {% block main %}
-<h1>AI suggestions</h1>
-<p class="muted">Decisions, preferences, actions and references the extractors proposed, and how far each one got. A suggestion is not a decision: only a reviewer can confirm one, and nothing here is your own approval unless a reviewer named you. This page only shows; it changes nothing.</p>
-<p>
-{% for t, n, words in found.counts %}<a href="/suggestions?trust={{ t }}"{% if found.trust == t %} class="current"{% endif %}>{{ t }}</a> {{ n }} <span class="muted">({{ words }})</span>{% if not loop.last %} · {% endif %}{% endfor %}
-· <a href="/suggestions">all {{ found.total }}</a>
-</p>
-<form method="get" action="/suggestions">
+<header class="page-head">
+  <p class="eyebrow">Check the AI</p>
+  <h1>AI suggestions</h1>
+  <p class="lede">Decisions, preferences, actions and references the extractors proposed, and how far each one got. A suggestion is not a decision: only a reviewer can confirm one, and nothing here is your own approval unless a reviewer named you. This page only shows; it changes nothing.</p>
+</header>
+<ul class="filters">
+<li><a href="/suggestions"{% if not found.trust %} class="current"{% endif %}>all <span class="n">{{ found.total }}</span></a></li>
+{% for t, n, words in found.counts %}<li><a href="/suggestions?trust={{ t }}"{% if found.trust == t %} class="current"{% endif %} title="{{ t }}">{{ words }} <span class="n">{{ n }}</span></a></li>{% endfor %}
+</ul>
+<form method="get" action="/suggestions" class="filter">
   <input type="hidden" name="trust" value="{{ found.trust }}">
   <label>Type <select name="type"><option value="">any</option>{% for t in found.types %}<option{% if found.record_type == t %} selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
   <button>Filter</button>
 </form>
 {% if found.records %}
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>Type</th><th>Suggestion</th><th>Whose</th><th>Trust</th><th>Why / reviewer</th><th>Quotes</th></tr></thead>
   <tbody>
   {% for r in found.records %}
   <tr>
     <td>{{ r.type }}</td>
     <td>{{ r.assertion }}<br><span class="muted">{{ r.extractor or "reviewer entry" }}</span></td>
-    <td>{{ r.actor }}{% if r.attributed_to %} <span class="muted">(reports {{ r.attributed_to }})</span>{% endif %}<br><span class="muted">acceptance: {{ r.acceptance }}</span></td>
-    <td>{{ r.trust }}<br><span class="muted">{{ r.trust_words }}</span></td>
+    <td>{{ r.actor }}{% if r.attributed_to %} <span class="muted">(reports {{ r.attributed_to }})</span>{% endif %}<br><span class="muted">acceptance: {{ r.acceptance | replace("_", " ") }}</span></td>
+    <td><span class="pill {{ {"supported": "info", "confirmed": "good", "review_required": "look", "rejected": "bad"}.get(r.trust, "") }}" title="{{ r.trust }}">{{ r.trust | replace("_", " ") }}</span><br><span class="muted">{{ r.trust_words }}</span></td>
     <td>{% if r.why %}{{ r.why }}{% endif %}{% if r.reviewer %}<br>reviewer: {{ r.reviewer }}{% endif %}</td>
     <td>{% for q in r.quotes %}{{ where(q.place) }} <span class="muted">({{ q.speaker }} said it)</span><br>{% else %}<span class="muted">none</span>{% endfor %}</td>
   </tr>
   {% endfor %}
   </tbody>
-</table>
+</table></div>
 {% else %}
-<p>No suggestions{% if found.trust or found.record_type %} match this filter{% else %} yet. Run extraction first{% endif %}.</p>
+<div class="empty"><p class="what">No suggestions{% if found.trust or found.record_type %} match this filter{% else %} yet. Run extraction first{% endif %}.</p><p class="next">{% if found.trust or found.record_type %}<a href="/suggestions">Show all suggestions</a>.{% else %}Run <code>ke extract</code> on your imported chats; what it proposes appears here.{% endif %}</p></div>
 {% endif %}
 {% endblock %}

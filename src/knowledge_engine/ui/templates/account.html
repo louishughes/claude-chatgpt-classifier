@@ -2,16 +2,16 @@
 {% from "macros.html" import where %}
 {% block title %}Account · Knowledge Engine{% endblock %}
 {% block main %}
-<p><a href="/accounts">← All accounts</a></p>
+<p class="back"><a href="/accounts">← All accounts</a></p>
 <h1>{% if account.handle %}@{{ account.handle }}{% else %}ID {{ account.stable_id }}{% endif %} <span class="muted">on {{ account.platform }}</span></h1>
 <p class="muted">Identity: {{ account.identity_status }}.{% if account.profile_url %} Profile: <a href="{{ account.profile_url }}" rel="noreferrer noopener">{{ account.profile_url }}</a> (opens the real site).{% endif %}</p>
 <h2>Written as</h2>
 <ul>{% for kind, alias in account.aliases %}<li><code>{{ alias }}</code> <span class="muted">({{ kind }})</span></li>{% endfor %}</ul>
 <h2>Mentioned {{ account.mentions | length }} time{{ "" if account.mentions | length == 1 else "s" }}</h2>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>Where</th><th>As written</th></tr></thead>
   <tbody>
   {% for m in account.mentions %}<tr><td>{{ where(m.place) }}</td><td class="wrap"><code>{{ m.written }}</code></td></tr>{% endfor %}
   </tbody>
-</table>
+</table></div>
 {% endblock %}

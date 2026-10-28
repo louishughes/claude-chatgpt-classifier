@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% block title %}Import · Knowledge Engine{% endblock %}
 {% block main %}
-<p><a href="/">← Your archive</a></p>
-<h1>Import an export</h1>
-<p>Point at a ChatGPT export: the ZIP you downloaded, its unzipped folder, or a split-export folder. It is only read, never changed. Importing the same export again adds nothing.</p>
+<p class="back"><a href="/">← Your archive</a></p>
+<header class="page-head">
+  <p class="eyebrow">Add</p>
+  <h1>Import an export</h1>
+  <p class="lede">Point at a ChatGPT export: the ZIP you downloaded, its unzipped folder, or a split-export folder. It is only read, never changed. Importing the same export again adds nothing.</p>
+</header>
 {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 <form method="post" action="/import">
   <input type="hidden" name="token" value="{{ form_token }}">

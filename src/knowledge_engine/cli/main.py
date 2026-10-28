@@ -269,6 +269,92 @@ def _import(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _watch(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Import exports as they land in a folder, once each (INT-003)."""
+    import time
+
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.importer import import_source
+    from knowledge_engine.importer.failures import describe_failure
+    from knowledge_engine.importer.report import ImportReport
+    from knowledge_engine.importer.watch import FolderWatcher, TickReport, WatchError
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+
+    def importer(source: Path) -> ImportReport:
+        account = args.account or settings.account_for(source)
+        return import_source(source, account, settings=settings, full_export=not args.partial)
+
+    def describe(error: BaseException) -> str | None:
+        failure = describe_failure(error) if isinstance(error, Exception) else None
+        return failure.code if failure else None
+
+    stages = {}
+    if args.vault is not None:
+        vault: Path = args.vault
+
+        def sync() -> dict[str, int]:
+            from knowledge_engine.documents.vault import sync_vault
+
+            engine = create_sqlite_engine(database_path(settings))
+            try:
+                with Session(engine) as session:
+                    return sync_vault(session, vault, settings.workspace_root / "archive").counts()
+            finally:
+                engine.dispose()
+
+        stages["vault"] = sync
+    try:
+        watcher = FolderWatcher(
+            settings, args.folder, importer, settle_s=args.settle, stages=stages, describe=describe
+        )
+    except WatchError as error:
+        return CommandResult("watch", ExitCode.USAGE, message=str(error), error_code="bad_folder")
+
+    total = TickReport()
+
+    def add(tick: TickReport) -> None:
+        total.unchanged, total.waiting = tick.unchanged, tick.waiting
+        total.same_contents += tick.same_contents
+        total.imported += tick.imported
+        total.changed_revisions += tick.changed_revisions
+        for code, count in tick.failed.items():
+            total.failed[code] = total.failed.get(code, 0) + count
+        total.stages.update(tick.stages)
+
+    add(watcher.tick())
+    if args.once:
+        # One pass still needs two looks, so a half-copied export waits.
+        time.sleep(args.settle)
+        add(watcher.tick())
+    else:
+        try:
+            while True:
+                time.sleep(args.interval)
+                tick = watcher.tick()
+                add(tick)
+                if tick.busy and not args.json:
+                    print(  # noqa: T201 - progress for a long-running command
+                        f"imported {len(tick.imported)}, unchanged contents "
+                        f"{tick.same_contents}, failed {sum(tick.failed.values())}",
+                        flush=True,
+                    )
+        except KeyboardInterrupt:
+            pass
+    data = total.to_dict()
+    return CommandResult(
+        "watch",
+        ExitCode.ERROR if total.failed else ExitCode.OK,
+        data=data,
+        message=(
+            f"{data['imported']} imported, {total.unchanged} unchanged, "
+            f"{total.same_contents} same contents, {total.waiting} still changing, "
+            f"{sum(total.failed.values())} failed"
+        ),
+        error_code="import_failed" if total.failed else None,
+    )
+
+
 def _transcript_add(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Attach a user-supplied transcript to a linked video (YTB-002)."""
     from sqlalchemy.orm import Session
@@ -3343,6 +3429,19 @@ def build_parser() -> argparse.ArgumentParser:
     api.add_argument("--port", type=int, default=8766, help="port on 127.0.0.1 (default 8766)")
     api.set_defaults(handler=_api)
 
+    watch = commands.add_parser(
+        "watch", help="import exports as they land in a folder (once each; only read)"
+    )
+    watch.add_argument("folder", type=Path, help="the folder to watch (e.g. your downloads)")
+    watch.add_argument("--account", metavar="LABEL", help="account label for these exports")
+    watch.add_argument("--partial", action="store_true", help="exports hold only some chats")
+    watch.add_argument("--vault", type=Path, help="also keep this vault up to date")
+    watch.add_argument("--interval", type=float, default=5.0, help="seconds between looks")
+    watch.add_argument(
+        "--settle", type=float, default=3.0, help="seconds an export must stay unchanged"
+    )
+    watch.add_argument("--once", action="store_true", help="look twice, act, then stop")
+    watch.set_defaults(handler=_watch)
     importer = commands.add_parser("import", help="import an export (folder or ZIP; only read)")
     importer.add_argument("source", type=Path, help="export ZIP or folder")
     importer.add_argument(

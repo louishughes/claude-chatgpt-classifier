@@ -7,3 +7,45 @@
 {% for r in links %}<li>{% if r.outgoing %}This chat {{ r.words }} <a href="/chats/{{ r.other }}">{{ r.other_title }}</a>{% else %}<a href="/chats/{{ r.other }}">{{ r.other_title }}</a> {{ r.words }} this chat{% endif %} ({{ "suggested" if r.state == "candidate" else r.state }}{% if r.because %}: {{ r.because | join("; ") }}{% endif %})</li>
 {% endfor %}</ul>{% endif %}
 {%- endmacro %}
+
+{# An empty state: what isn't here yet, and the next step to get it. #}
+{% macro empty(what, next="") -%}
+<div class="empty"><p class="what">{{ what }}</p>{% if next %}<p class="next">{{ next }}</p>{% endif %}</div>
+{%- endmacro %}
+
+{# The small violet tag on every score: who checked the answer key it was
+   scored against. A score without one would look more certain than it is. #}
+{% macro checked_by(key) -%}
+{% if key %}<p class="checked-by{% if key.kind == 'owner' %} owner{% endif %}">Scored against: {{ key.heading }}</p>{% endif %}
+{%- endmacro %}
+
+{# A thin meter for a 0-1 score. It is SVG with width attributes because the
+   page's security policy blocks inline style="" (no scripts, no inline CSS). #}
+{% macro meter(value) -%}
+{% if value is not none %}<svg class="meter" aria-hidden="true" focusable="false"><rect class="track" width="100%" height="6" rx="3"></rect><rect class="fill" width="{{ (value * 100) | round(1) }}%" height="6" rx="3"></rect></svg>{% endif %}
+{%- endmacro %}
+
+{# One horizontal stacked bar. "parts" is a list of (css class, count, words);
+   "scale" is the biggest total on the chart, so every bar shares one scale.
+   Hovering a segment shows its words and count (SVG <title>, no script). #}
+{% macro stackbar(label, parts, scale, href="") -%}
+{% set total = parts | sum(attribute=1) %}
+<div class="chart-row">
+  <span class="label">{% if href %}<a href="{{ href }}">{{ label }}</a>{% else %}{{ label }}{% endif %}</span>
+  <svg class="bar" role="img" aria-label="{{ label }}: {% for cls, n, words in parts if n %}{{ n }} {{ words }}{% if not loop.last %}, {% endif %}{% endfor %}">
+    <rect class="track" width="100%" height="14" rx="3"></rect>
+    {% set ns = namespace(x=0) %}
+    {% for cls, n, words in parts if n %}
+    {% set w = n / (scale or 1) * 100 %}
+    <rect class="{{ cls }}" x="{{ ns.x | round(2) }}%" width="{{ w | round(2) }}%" height="14" rx="3"><title>{{ words }}: {{ n }}</title></rect>
+    {% set ns.x = ns.x + w %}
+    {% endfor %}
+  </svg>
+  <span class="total">{{ total }}</span>
+</div>
+{%- endmacro %}
+
+{# The legend for stacked bars: a colour swatch beside its words. #}
+{% macro legend(items) -%}
+<ul class="legend">{% for cls, words in items %}<li><svg aria-hidden="true"><rect class="{{ cls }}" width="10" height="10" rx="2"></rect></svg>{{ words }}</li>{% endfor %}</ul>
+{%- endmacro %}
