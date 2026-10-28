@@ -916,6 +916,12 @@ providers/base.py MessageRef/bare_message_id; classification evidence and extrac
 ## 2026-10-28 11:33 PROD-004 (#129)
 docs/operations/HOSTING_AND_SECURITY.md; OD-19; authz log by account ID; rotate_token, delete_account, delete_tenant; `ke access rotate|delete`, `ke tenant delete`. Tests: test_hosting_security.py (6). #255 fix replay on PC: 44/67 done, 23 model_unsure, 0 outside-segment.
 
+## 2026-10-28 13:15 IMP-007 (#237)
+chatgpt_export: `unread_conversation_file` warning for other JSON files holding conversations (folder and ZIP); side files skipped; EVAL-002 reproduction expected verdict silent_drop → warned per #237. Tests: test_unread_conversation_file.py (6).
+
+## 2026-10-28 13:05 REV-011 (#186)
+ANNOTATION_GUIDE "Three rules for every item" (numbering, verbatim quote, owner facts cite user); gold.py optional `quote` on GoldRecord/GoldForbidden. Tests: tests/unit/test_gold_quote.py (3).
+
 ## 2026-10-28 11:42 INT-001 (#130)
 ingestion/web.py (allowlist, SSRF checks per hop, pinned connection, size/type caps, canonical anchoring, located blocks, snapshot), settings.web_allowlist, `ke web fetch`. Tests: test_web_fetch.py (24, no network). Docs: docs/operations/WEB_FETCH.md.
 
