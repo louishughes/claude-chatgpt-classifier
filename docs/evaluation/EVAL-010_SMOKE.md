@@ -28,6 +28,20 @@ Each run uses a fresh scratch workspace under `<workspace>/smoke/` and writes it
 
 The generated batches include edits, regenerations, reused images and missing images. Missing images render as markers, so they don't count as broken embeds.
 
-## Real data (pending)
+## Real data (passed, 2026-10-28, Louis's PC, Windows)
 
-The real-data half (50 and 100 conversations from `raw/`, read-only) runs on Louis's PC as part of the REV-009 checkpoint (#143): `ke eval smoke raw --limit 50` and `--limit 100`, with outputs only in the git-ignored workspace. It has not been run yet. Until it has, EVAL-010 (#39) stays open.
+The real-data half ran read-only on `raw/` in a Remote Control session on Louis's PC. It ran on `main` at d878333, with Python 3.13.2 and outputs in the git-ignored `workspace\rev009\`. Nothing was committed from the PC.
+
+| Run | Import | Re-import | Render | Peak memory | Warnings | All checks |
+|---|---|---|---|---|---|---|
+| 50 conversations | 409.8 s | 856.1 s | 23.2 s | not measured on Windows | `format_lacks_account_id` ×1, `non_conversation_file_skipped` ×2 | passed |
+| 100 conversations | 489.3 s | 864.6 s | 14.8 s | not measured on Windows | same | passed |
+
+Every check passed in both runs: `all_rendered`, `no_broken_embeds`, `raw_unchanged`, `reconciled`, `reimport_adds_nothing`, `reimport_all_unchanged` and `zero_model_calls`. stderr was empty. The `raw/` folder holds 2,074 files and none was modified.
+
+Spot checks with `ke inspect` covered three conversations: the largest (45 nodes) and two smaller ones. All three have zero graph issues and one regeneration branch each, with the system node off the active path. Message counts are consistent: messages = nodes − 1, and the active path is one shorter than that. None had images, so image states on real data are still unchecked in `inspect`. The import report counts them.
+
+Found and filed as follow-ups (they don't fail the gate):
+- **Speed.** Time barely grows with the number of conversations (50 → 100 adds about 80 s), and a re-import takes about twice as long as the first import. Something done once per run over the whole `raw/` tree dominates, probably hashing all files including about 900 images, and the re-import does it again.
+- **Peak memory** is `null` on Windows, because the measurement uses the Unix-only `resource` module.
+- **`ke inspect`** prints the full native conversation ID. Reports elsewhere use 8-character prefixes.

@@ -628,3 +628,7 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - providers/base.py (ModelRequest, ProviderResult, BatchHandle, StructuredModelProvider protocol, validate_output, FakeProvider, ReplayProvider, read_response_lines), providers/file_batch.py (FileBatchProvider, ChangedRequestFileError), providers/ledger.py (ModelRequestRow, ModelOutputRow, ModelStageRunner, repair_id, usage), migration 0014, Settings.model_batch_root, docs/runbooks/LABELLING_SESSION.md.
 - Tests: test_providers.py (10), test_model_ledger.py (4). Full suite 780 passed, 6 skipped. ruff, mypy, git_guard OK; no migration drift.
 - Next: NRM-004.
+
+## 2026-10-28 03:05 M1 gate (REV-009 #143, EVAL-010 #39)
+- Results from the Windows RC session: pytest 589 passed / 6 skipped / 0 failed at d878333; real smoke 50 (import 409.8 s, reimport 856.1 s) and 100 (489.3 s, 864.6 s), all checks true; inspect x3 clean; ke ui 200 with 50 chat links.
+- Recorded in docs/evaluation/EVAL-010_SMOKE.md and STATUS. Follow-ups filed: PERF-001 #200, OPS-009 #201. Closing #143 and #39.
