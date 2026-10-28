@@ -3130,3 +3130,27 @@ Talking points:
 - "Adding a word changes no existing ID, so 'what's stale' isn't enough: the loop also asks which old chats *mention* the new word."
 
 **Next exact task:** run the refresh loop on the real archive on the PC after the next export (proposer and reviewer sessions named in the diary).
+
+### 16:21 UTC — NOTE-024: two small honesty fixes on the knowledge card
+
+The re-score of the real notes (NOTE-011) found two things on the knowledge card that read wrong:
+
+- **"48" listed as a tool.** The entity extractor records a name only after a cue like "playing", and its title pattern accepts numbers so titles like "Factorio 2" work. So "playing 48 levels a night" produced a game called "48". The card now leaves out any name with no letters in it. The record stays stored; it just isn't shown as a name.
+- **"not stated" next to a digest.** When a chat's digest has no purpose or no outcome, the card wrote "not stated", which reads like a claim about the chat. The other notes thread pointed out that the wording only appears in that case, so the fix is to leave the empty row out. Without any digest, both rows still say "not written yet", because that is true and tells you the step hasn't run.
+
+Before writing the fix, I checked who held which ticket. NOTE-018 (#309) already had a PR from the rich-notes thread, and NOTE-022 (#321) was built there too, so I took only this one.
+
+**Teach-back (`rich_conversation_note`, the card):** The card is the short table at the top of each chat note. It now shows only names that contain a letter, so a number the extractor caught by accident doesn't appear as a tool. It shows Purpose and Outcome only when the digest actually found them, so it never states something about the chat that nobody checked.
+
+Checks:
+```
+tests/integration/test_rich_note_card.py   1 passed (fails on the old code: '48' was in '48, Celeste')
+tests/integration/test_rich_note.py, test_note_checks.py   unchanged, pass
+```
+Fix attempts: 0.
+
+Talking points:
+- "A number is not a name: the card checks for a letter before listing something as a tool."
+- "An empty row that says 'not stated' still reads like a fact, so the card leaves it out."
+
+**Next exact task:** none in this thread; the remaining NOTE tickets are with the rich-notes threads.
