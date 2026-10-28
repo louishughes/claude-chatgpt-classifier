@@ -2938,6 +2938,38 @@ Fix attempts: 2 (my FakeProvider digest left out the required intent; the table-
 
 **Next exact task:** keywords into the note (NOTE-007 wiring), then NOTE-008.
 
+### 15:25 — #288: the "import didn't finish" page that lied
+
+I was sent to build the integration tickets (INT-001..003), but they were already merged, so I took the one open integration-test problem nobody had claimed: a browser-import test that failed once on Windows + Python 3.12 and passed on the re-run.
+
+**Reading the failure properly.** The issue guessed the import itself had failed (a file still open, a read-only archive file). The CI log said otherwise: the page *did* contain the word "Importing" but had no auto-refresh tag. "Importing" is in the page title on every job page, so that check proved nothing. What actually happened is a race between two threads:
+
+1. The page code asks "is the job done?" and gets "running".
+2. In that instant, the background import finishes and sets the state to "done".
+3. The template asks again, gets "done", so it leaves out the refresh tag and draws the "The import didn't finish" branch, with an empty error.
+
+So a real user could, once in a while, see a failure page (that never refreshes) for an import that succeeded. Windows schedules threads differently, which is why it showed up there first.
+
+**Fix.** The job page reads the state once and hands that single value to the template (`ui/app.py`, `ui/templates/job.html`). One read, one decision.
+
+**Teach-back (the `/jobs/<id>` page in `ui/app.py`):** When you start an import in the browser, it runs on a separate thread and this page tells you how it's going. The page now looks at the job's state once and uses that one answer both to decide whether to send you to the report and to draw the page. Before, it looked twice, and if the import finished in between, the two answers disagreed and the page showed a failure that hadn't happened.
+
+**Proving it without waiting for luck.** A new test uses a stand-in job whose state flips from "running" to "done" the moment it's read a second time. That makes the unlucky timing happen every run. It failed on the old code and passes on the new. No existing test was changed.
+
+Checks:
+```
+tests/integration/test_ui.py -k mid_request   old code: 1 failed; fixed code: 1 passed
+tests/integration/test_ui.py + test_api_imports.py   52 passed
+```
+Fix attempts: 1.
+
+**Talking points:**
+- "A flaky test isn't noise: this one was a real race condition a user could hit."
+- "I read the CI log instead of trusting the first guess, and the evidence pointed somewhere else."
+- "I turned a once-in-a-while timing bug into a test that fails every time on the broken code."
+
+**Next exact task:** watch three Windows CI runs pass, then close #288.
+
 ### 15:45 UTC — EVAL-012: a scorer for links between chats (and a slice that was already done)
 
 This thread was started to build the web API and product tickets. They were already finished: API-001 to 005, OPS-007 and PROD-001 to 004 were merged earlier today (PRs #254 to #266). I re-ran their tests (109 passed, 15 skipped because the PostgreSQL tests need a live server) and handed the slice back. The coordinator then gave me EVAL-012 and REV-010.
