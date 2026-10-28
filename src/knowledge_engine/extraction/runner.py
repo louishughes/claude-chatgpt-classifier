@@ -53,7 +53,7 @@ from knowledge_engine.extraction.records import (
 )
 from knowledge_engine.extraction.store import add_candidates, gate
 from knowledge_engine.extraction.text import ExtractionMessage, quote
-from knowledge_engine.graph.offsets import find_all
+from knowledge_engine.graph.offsets import find_quote
 from knowledge_engine.infrastructure.db import Base
 from knowledge_engine.infrastructure.logs import EventLog, null_log
 from knowledge_engine.orchestration.limits import Deadline
@@ -359,9 +359,9 @@ def _from_model(
         dropped = 0
         for cited in item.quotes:
             message = by_id.get(cited.message_id)
-            spans = find_all(message.text, cited.text) if message else []
+            spans = find_quote(message.text, cited.text) if message else []
             if message is None or not spans:
-                dropped += 1  # not in this segment, or not word for word
+                dropped += 1  # not in this segment, or not the same words (LEG-004)
                 continue
             evidence.append(quote(message, spans[0]))
         if not evidence:

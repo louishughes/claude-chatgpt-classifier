@@ -18,6 +18,8 @@ Jobs write one JSON object per line to `<workspace>/logs/events-YYYYMMDD.jsonl`.
 | `model.repair` | `collect` (one repair sent) | stage_key, attempts, characters |
 | `model.stored` | `collect` (valid answer stored) | stage_key, attempts, model |
 | `model.review_required` | `collect` (failed twice) | stage_key, attempts |
+| `model.transient` | `collect` (provider failed: error envelope, rate limit, 5xx; LEG-003) | stage_key, attempts |
+| `model.trimmed` | `collect` (an over-long list cut back to the schema maximum; LEG-003) | stage_key, count |
 | `model.timeout` | `collect` (waited past `provider_timeout_s`) | stage_key, attempts |
 | `limit.reached` | `RunBudget`, extraction `run` (OPS-002) | limit_name, limit, value, stage_key |
 | `extract.run` | `extraction.runner.run` | stage_key, segment_id, extractor, version, state, records, attempts, error_type, duration_ms, outcome |
