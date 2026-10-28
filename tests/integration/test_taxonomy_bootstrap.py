@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from knowledge_engine.importer.run import run_import
 from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
-from knowledge_engine.segmentation.inventory import corpus_inventory
+from knowledge_engine.segmentation.inventory import SegmentText, corpus_inventory
 from knowledge_engine.settings import Settings
 from knowledge_engine.taxonomy.bootstrap import (
     EXCERPT_CHARS,
@@ -23,6 +23,7 @@ from knowledge_engine.taxonomy.bootstrap import (
     PlanTerm,
     Review,
     apply_review,
+    boilerplate,
     build_pack,
     file_plan,
     pack_sha256,
@@ -105,9 +106,25 @@ def _plan(pack: dict[str, Any]) -> Plan:
 
 def test_pack_is_a_fair_sample_with_short_excerpts(session: Session) -> None:
     pack = _pack(session)
-    assert pack["corpus"] == {"conversations": 6, "segments": 6, "sampled": 6}
+    assert pack["corpus"] == {
+        "conversations": 6,
+        "segments": 6,
+        "sampled": 6,
+        "boilerplate_paragraphs": 0,
+    }
     assert all(len(s["excerpt"]) <= EXCERPT_CHARS + 2 for s in pack["segments"])
     assert pack_sha256(pack) == pack_sha256(_pack(session))  # same seed, same pack
+
+
+def test_boilerplate_paragraphs_are_left_out_of_excerpts() -> None:
+    preamble = "The user provided the following information about themselves."
+    items = [
+        SegmentText(f"seg_{i}", f"conv_{i}", "active", 2, f"{preamble}\n\nTopic number {i}.")
+        for i in range(7)
+    ]
+    assert boilerplate(items) == {preamble}
+    pack = build_pack(items, size=7, seed="s")
+    assert all(s["excerpt"].startswith("Topic number") for s in pack["segments"])
 
 
 def test_a_plan_that_does_not_fit_the_pack_is_refused(session: Session) -> None:

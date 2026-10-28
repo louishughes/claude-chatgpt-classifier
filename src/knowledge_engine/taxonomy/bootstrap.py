@@ -79,8 +79,28 @@ PLAN_DIMENSIONS = {
 # ---------------------------------------------------------------- the pack
 
 
-def _excerpt(text: str) -> str:
-    line = " ".join(text.split())
+# A paragraph found in more segments than this is boilerplate (custom
+# instructions, tool notices) and is left out of excerpts, so each excerpt
+# shows what the segment is about rather than the same preamble 100 times.
+BOILERPLATE_MIN_SEGMENTS = 5
+
+
+def _paragraphs(text: str) -> list[str]:
+    return [" ".join(p.split()) for p in text.split("\n\n") if p.strip()]
+
+
+def boilerplate(items: Sequence[SegmentText]) -> set[str]:
+    """Paragraphs that repeat across many segments (see ``BOILERPLATE_MIN_SEGMENTS``)."""
+    seen: Counter[str] = Counter()
+    for item in items:
+        seen.update(set(_paragraphs(item.text)))
+    floor = max(BOILERPLATE_MIN_SEGMENTS, len(items) // 100)
+    return {p for p, n in seen.items() if n > floor}
+
+
+def _excerpt(text: str, skip: set[str] | None = None) -> str:
+    kept = [p for p in _paragraphs(text) if p not in (skip or set())]
+    line = " ".join(kept) or " ".join(text.split())
     if len(line) <= EXCERPT_CHARS:
         return line
     return line[:EXCERPT_CHARS].rsplit(" ", 1)[0] + " …"
@@ -98,6 +118,7 @@ def build_pack(items: Sequence[SegmentText], *, size: int, seed: str) -> dict[st
         seed: Same seed, same sample.
     """
     drawn = sample(items, size, seed=seed)
+    skip = boilerplate(items)
     groups = TfidfBackend().cluster(drawn)
     summary = summarise(items)
     return {
@@ -108,6 +129,7 @@ def build_pack(items: Sequence[SegmentText], *, size: int, seed: str) -> dict[st
             "conversations": summary.conversations,
             "segments": summary.segments,
             "sampled": len(drawn),
+            "boilerplate_paragraphs": len(skip),
         },
         "hints": [
             {
@@ -122,7 +144,7 @@ def build_pack(items: Sequence[SegmentText], *, size: int, seed: str) -> dict[st
                 "segment_id": s.segment_id,
                 "conversation_id": s.conversation_id,
                 "messages": s.messages,
-                "excerpt": _excerpt(s.text),
+                "excerpt": _excerpt(s.text, skip),
             }
             for s in drawn
         ],
