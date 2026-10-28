@@ -177,9 +177,14 @@ def _route(
     if path.startswith("/jobs/"):
         job = ctx.jobs.get(path.removeprefix("/jobs/"))
         if job is not None:
-            if job.state == "done" and job.import_id:
+            # Read the state once. The import runs on another thread and can
+            # finish between two reads: checking "running" here and then
+            # "done" inside the template drew a page with no refresh tag and
+            # an empty failure message (#288). One read means one decision.
+            state = job.state
+            if state == "done" and job.import_id:
                 return Page("303 See Other", "", {}, location=f"/imports/{job.import_id}")
-            return Page("200 OK", "job.html", {"job": job})
+            return Page("200 OK", "job.html", {"state": state, "error": job.error})
     if path == "/chats":
         return _chats(settings, query)
     if path == "/notes":
