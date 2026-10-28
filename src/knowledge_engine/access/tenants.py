@@ -26,6 +26,7 @@ Talking points:
 from __future__ import annotations
 
 import re
+import shutil
 from pathlib import Path
 
 from knowledge_engine.access.accounts import add_account, grant, issue_token
@@ -108,3 +109,37 @@ def create_tenant(settings: Settings, name: str, owner: str) -> str:
             return issue_token(session, owner)
     finally:
         sessions.dispose()
+
+
+def delete_tenant(settings: Settings, name: str, confirm: str) -> list[str]:
+    """Delete a whole workspace: its folder and its inbox (PROD-004).
+
+    This is the erasure of everything one tenant stored. No other folder is
+    opened. Backups taken earlier are separate copies and are not touched;
+    the operator deletes those by the backup policy.
+
+    Args:
+        settings: The engine's settings (with ``tenants_root``).
+        name: The workspace.
+        confirm: The same name again, so a slip of the keyboard can't do it.
+
+    Returns:
+        The folders removed, relative to ``tenants_root``.
+
+    Raises:
+        TenantError: Unknown workspace, or ``confirm`` doesn't match.
+    """
+    if confirm != name:
+        raise TenantError("to delete a workspace, repeat its name exactly to confirm")
+    if not tenant_exists(settings, name):
+        raise TenantError(f"no workspace named {name!r}")
+    root = _root(settings)
+    removed = []
+    for folder in (root / "workspaces" / name, root / "inbox" / name):
+        # Never follow a link out of tenants_root: check where it really is.
+        if folder.is_symlink() or not folder.resolve().is_relative_to(root):
+            raise TenantError("a workspace folder points outside tenants_root; delete it by hand")
+        if folder.exists():
+            shutil.rmtree(folder)
+            removed.append(str(folder.relative_to(root)))
+    return removed

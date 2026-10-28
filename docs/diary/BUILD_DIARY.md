@@ -2509,3 +2509,21 @@ tests/unit/test_message_ref.py   9 passed
 Fix attempts: 0.
 
 **Next exact task:** replay the paid run on Louis's PC with this fix (no calls), then PROD-004.
+
+### 11:33 — PROD-004: the security review, deletion and rotation
+
+- `docs/operations/HOSTING_AND_SECURITY.md`: what is protected and where; a threat model of 14 threats, each with its control and the test that checks it; secrets and rotation; backups per workspace; a deletion table (login, conversations, whole workspace); a UK GDPR review marked as not legal advice; a hosted release checklist.
+- **The log no longer holds names.** The authorisation log now stores the account's random ID; names are looked up only when it is shown. After `ke access delete`, old rows read `deleted-1a2b3c4d`, and the test VACUUMs the database and checks the name's bytes are gone. (This changes PROD-002's unreleased log format; its tests are unchanged and still pass, because the display resolves IDs back to names.)
+- `ke access rotate` (revoke all, issue one), `ke access delete NAME --confirm NAME`, `ke tenant delete NAME --confirm NAME` (removes exactly its workspace and inbox folders; refuses a folder that is a link pointing elsewhere).
+- Honest status: I wrote the threat model and checked it against the code. That isn't an independent review, so OD-19 records that one is needed (plus a data-protection opinion) before anyone else's data goes into a hosted engine. Louis's own single-user use doesn't need either.
+
+**Teach-back (`delete_account`):** Deleting an account removes its login, its tokens and its roles straight away. The access log keeps its history but only ever wrote down a random ID, so once the account is gone nothing connects those rows to a person. Deleting a whole workspace removes its two folders and nothing else.
+
+Checks:
+```
+tests/integration/test_hosting_security.py   6 passed
+tests/integration/test_api_access.py, test_tenant_isolation.py   12 passed (unchanged)
+```
+Fix attempts: 1 (the test fixture keyed tokens by workspace instead of owner).
+
+**Next exact task:** open the queued PRs in order (PROD-001, PROD-002, #255, PROD-003, `[m:id]` fix, PROD-004), then INT-001.
