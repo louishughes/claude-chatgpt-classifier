@@ -918,3 +918,6 @@ links/youtube_captions.py (Data API v3 captions.list/download, OAuth token from 
 
 ## 2026-10-28 13:05 NOTE-002 (#274)
 digest/contract.py (DigestAnswer extra=forbid, cited items, FIELD_PROVENANCE, resolve_digest drops an item on any bad quote and flags it). Tests: tests/unit/test_digest_contract.py (11).
+
+## 2026-10-28 13:30 NOTE-003 (#275)
+digest/stage.py (DigestStage via ModelStageRunner: active path + fork lines, untrusted quoting, split_parts without clipping, merge_answers, stage key over text and versions). Tests: tests/integration/test_digest_stage.py (7).

@@ -2582,3 +2582,21 @@ tests/unit/test_digest_contract.py   11 passed
 Fix attempts: 0.
 
 **Next exact task:** NOTE-003 (the digest stage behind the provider switch).
+
+### 13:30 — NOTE-003: the digest stage
+
+- `digest/stage.py`: `DigestStage.run(chat)` sends one request per chat through `ModelStageRunner`, so it gets the cache, the single repair, `review_required` and the egress switch for free. No new retry or cache code.
+- The model sees the chat's active path (the version the user ended on), every message tagged `[m:ID] role:` and escaped as untrusted data, plus one line per fork ("after [m:X]: edit fork, 1 other version(s) not shown"). The other versions are not sent; the note's Branches section shows them from the stored tree.
+- A chat over the size budget is split between exchanges, with one shared exchange between neighbours (the segmenter's rule), never inside a message. Each part is labelled "Part n of N" and the answers are merged in code: purpose and intent from the first part, outcome and status from the last, summary sentences round-robin (at most 4), lists de-duplicated.
+- The stage key covers the exact text, the fork lines, the part label and the code, prompt and schema versions.
+- A repair is a new ask, so with a batch provider it is answered on a later run: the first run says `pending`, the next one finishes. A digest whose summary sentences all fail the quote check is `review_required`, not a note.
+
+**Teach-back (`DigestStage`):** For each chat it builds one request holding the conversation as the user finally left it, plus a note of where the chat forked, and hands it to the same stage runner every model step uses. That runner answers from the cache if it has seen the exact same request, allows one repair for a malformed answer, and refuses to send anything if model access is switched off. When the answer comes back it is checked quote by quote, and long chats are asked in parts and stitched back together without ever cutting a message.
+
+Checks:
+```
+tests/integration/test_digest_stage.py   7 passed (FakeProvider, no network)
+```
+Fix attempts: 1 (my new test expected a repair to finish in the same run; it arrives on the next one, as with any batch answer).
+
+**Next exact task:** NOTE-004 (runbook and synthetic dry run), then NOTE-005.
