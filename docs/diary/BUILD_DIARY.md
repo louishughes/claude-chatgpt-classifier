@@ -1894,6 +1894,122 @@ Fix attempts: 1 (my test assumed cue ordinals start at 1; they start at 0, as YT
 
 **Next exact task:** EVAL-002.
 
+### 13:30 — EVAL-002 + EVAL-005: nothing lost quietly, and "later" never quietly means "instead"
+**EVAL-002** (`evaluation/import_fidelity.py`, `ke eval fidelity`) gives the import a third opinion. It walks every JSON file of an export itself, inside folders and ZIPs, and lists each conversation's node IDs. It then imports the export into a scratch workspace and checks node by node. Each export gets a verdict:
+- `ok`;
+- `warned`: everything is stored but the report flags something, or nodes are missing and the report says so;
+- `silent_drop`: a node is missing and nothing admits it. This fails the run.
+
+It also reports branch retention, missing images and the unknown payload audit. Across all 24 fixtures, 380 of 380 nodes were stored and 13 of 13 off-path nodes were kept: 18 ok, 6 warned, 0 silent drops. Report: `docs/evaluation/EVAL-002_FIDELITY.md`.
+
+Failing-case reproduction: a second JSON file of conversations sitting next to `conversations.json` is never read by the official adapter, and nothing says so. EVAL-002 calls it a `silent_drop`. I filed this as #237 rather than widening this PR.
+
+**EVAL-005** (`evaluation/temporal_bench.py`, `ke eval temporal`) has two parts.
+- **Curated pairs.** 31 earlier/later pairs go through REC-005's own `evaluate`. They cover true replacements, eight hypotheticals, scope change, contradiction without "instead", weak acceptance, unknown or reversed order, adjacent subjects and unrelated pairs.
+- **Pipeline.** The `engine_switch` fixture runs end to end. The replaced decision shows as superseded now and is explained by its event. It is still current as of just before the switch, and current again after the replacement is withdrawn.
+
+The first run found two problems:
+1. **A benchmark artifact.** A shared "Synthetic:" prefix counted as a shared subject, so the pair texts now carry no marker word.
+2. **A real false supersession.** "We'll use Blender instead of Maya for the shed game models" replaced the decision to use Unity for the shed game, because it shared the project, the word "game" and a firm "instead".
+
+The fix is REC-005 v2's eighth test, **target**. A replacement must name what it replaces (the head of the phrase after "instead of", "rather than", "no longer using", "replace"...), and the earlier record must mention it.
+- If it names something else, the pair is `unrelated`.
+- If it names nothing ("switching to Godot", "scrap that"), an otherwise clean pair goes to review instead of being recorded.
+
+The cost is two true replacements in the benchmark that now wait for review. The benchmark reports them openly. Result: 0 false supersessions, and all existing reconciliation tests unchanged and passing.
+
+**Teach-back (`evaluation/temporal_bench.py`):** "It feeds the reconciler pairs of decisions built to trick it: 'what if' questions, other projects, other parts of the same project, wobbly acceptances. The rule is that nothing may be recorded as replaced unless it really was, and that already-replaced decisions stay visible when you ask what was true at the time. When a newer statement doesn't say what it replaces, it goes to review instead of being guessed."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 159 source files
+pytest -q               # 1150 passed, 7 skipped
+migration drift         # 0
+ke eval fidelity        # PASS: 24 exports, 18 ok, 6 warned, 0 silent_drop
+ke eval temporal        # PASS: 29 of 31 as expected, 0 false supersessions, history kept
+```
+Fix attempts: 2 (target = first word after the marker misread "replace the shed game's pixel font"; then the phrase head, with articles skipped).
+
+**Next exact task:** EVAL-006.
+
+### 14:10 — EVAL-006: a ZIP all the way to Obsidian, then click every link
+**EVAL-006** (`evaluation/end_to_end.py`, `ke eval e2e`) runs one pinned path through the whole engine with no model and no network: import a ZIP, classify under a small published taxonomy, run the rule extractors, reconcile, build the vault, and search. The input is `tests/fixtures/e2e/export.zip`: the existing synthetic ZIP plus two new synthetic chats about a garden shed. Between them they carry a decision, a preference, a requirement, YouTube and GitHub links, the same image used again, and a follow-up that changes the roof. A builder makes the ZIP and a test checks it rebuilds byte for byte.
+
+Then it reads the vault the way Obsidian does:
+- every YAML header parses;
+- every `[[link]]`, `[[note#^anchor]]`, `[[note#Heading]]`, same-note `[[#^anchor]]` and `![[embed]]` resolves (escaped links and links in code are skipped; a name two notes share counts as broken, since Obsidian would have to guess);
+- every chat has its source note, and every knowledge note links to it (sources before knowledge, BRW-001);
+- the search hit lands on a note that exists.
+
+The **golden** (`tests/fixtures/e2e/vault_golden.json`) is the vault's shape, not its words: each note's path, kind and link, embed and anchor counts. Conversation and account IDs are random per workspace, so they appear as `conv-*` and `acct-*`. Two runs give the same golden. Result: 13 notes, 35 links, 4 embeds, all resolve, golden matches.
+
+The checker is also a user command: `ke docs check --vault PATH` checks any vault and changes nothing. This is the Gate G4 link check.
+
+Limits: no project or topic master is in this vault, because machine topic labels aren't approved by a person. The acceptance "sounds good, let's do that" of the timber frame isn't captured by the rule extractor (3 records). Both are recorded in the golden rather than fixed here.
+
+**Teach-back (`evaluation/end_to_end.py`):** "It takes a small fake ChatGPT export and runs it through every step until it's an Obsidian vault, with no AI and no internet. Then it opens every note and follows every link, picture and anchor, and fails if any of them points nowhere. It also compares the vault's layout with a saved copy, so any change in what gets written shows up in review."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 160 source files
+pytest -q               # 1155 passed, 7 skipped
+migration drift         # 0
+ke eval e2e             # PASS: 13 notes, 35 links and 4 embeds all resolve; matches the golden
+```
+Fix attempts: 2 (a taxonomy alias equal to its own label collides with the label; a root-level note was listed twice by name and path, which counted as ambiguous).
+
+**Next exact task:** EVAL-007.
+
+### 14:50 — EVAL-007: one pass, four labels, then stop
+**EVAL-007** (`evaluation/gate.py`, `ke eval gate`) is the release gate. It runs twelve checks against the proposed release thresholds in TEST_STRATEGY §6, each **exactly once**, then stops. Nothing is re-run to get a better answer. If a check crashes, that check is a FAIL and the rest still run. Each line carries:
+- a label: PASS, FAIL, REVIEW (the hard rule held but some cases wait for a person) or BLOCKED (can't be measured here);
+- the threshold next to the measured number;
+- which data it was measured on (`synthetic` or `real`);
+- the command that runs it alone.
+
+The overall result is the worst label. The gate fails only on a FAIL. REVIEW and BLOCKED are filed, not hidden.
+
+Result (`docs/evaluation/EVAL-007_GATE.md`): 7 PASS, 2 REVIEW, 3 BLOCKED, 0 FAIL.
+- **REVIEW:** the synthetic golden set has no ambiguous segments, so "ambiguous cases flagged, not forced" can't be shown (the gold set isn't mine to change); and two true replacements wait for review (EVAL-005).
+- **BLOCKED:** directional relationship precision has no answer key (filed as EVAL-012, #240); the private golden set is scored on Louis's PC; the paid-provider smoke is parked.
+
+Every PASS is on synthetic fixtures, and the report says so on every line.
+
+**Teach-back (`evaluation/gate.py`):** "It runs every quality check once and writes one table: pass, fail, needs a person, or can't be measured yet, with the target next to each number. It never retries to get a nicer result, and if one check crashes the rest still run and the crash shows as a failure. Anything measured only on fake data is labelled as such, so a green line can't be mistaken for real-world quality."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 161 source files
+pytest -q               # 1159 passed, 7 skipped
+migration drift         # 0
+ke eval gate            # BLOCKED: 3 BLOCKED, 2 REVIEW, 7 PASS (0 FAIL; gate passes)
+```
+Fix attempts: 0.
+
+**Next exact task:** EVAL-008.
+
+### 15:20 — EVAL-008: any order, same answers
+**EVAL-008** (`evaluation/variance.py`, `ke eval variance`) imports five synthetic exports in three seeded orders. The order of the exports, the chats inside each and the segments reaching each stage are all shuffled. Each run classifies through the model path with a pinned fake model, extracts and reconciles.
+
+Each run becomes a **canonical view** keyed only by what the export itself names: native conversation and message IDs, record type and the quoted words. Workspace IDs are random, so they can't be compared. The view holds each segment's labels and each record's trust, standing and replacements. Any key whose value differs between runs becomes a **review item**, with every run's value side by side. Nothing is averaged or quietly picked.
+
+The first run also asks the pinned model twice more. The answers must be identical and come from the ledger, with 0 new requests.
+
+Result: 17 segments and 26 records give identical answers in all three orders, including the engine_switch replacement. The repeats made 0 new requests.
+
+Failing-case reproduction: a fake model that never labels the first segment it sees (so its answers depend on order) produces review items, never silent drift.
+
+The gate gains a thirteenth line, `variance.order_and_repeats`: PASS when nothing differs, REVIEW when differences are listed, FAIL only if a repeat changed, asked the model again, or a difference went unlisted. Regenerated `docs/evaluation/EVAL-007_GATE.md`: 8 PASS, 2 REVIEW, 3 BLOCKED, 0 FAIL.
+
+**Teach-back (`evaluation/variance.py`):** "It imports the same fake chats in three different orders and asks the same pinned model twice, then compares the labels and the 'what is current' answers using only names that come from the export. If anything changes with the order, that item is listed for a person with each run's answer next to the others. Asking again must give the same answer without calling the model again."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 162 source files
+pytest -q               # 1163 passed, 7 skipped
+migration drift         # 0
+ke eval variance        # PASS: 17 segments and 26 records gave the same answers in 3 orders; repeats made 0 new requests
+ke eval gate            # BLOCKED: 3 BLOCKED, 2 REVIEW, 8 PASS (0 FAIL)
+```
+Fix attempts: 1 (my drifting fake first answered "needs review" only once, and the retry hid it; it now never labels the first segment it sees).
+
+**Next exact task:** check UI-005 (#175) against STATUS and close it if done; then M5.
 ### 08:10 UTC — EVAL-001: the real 40-chat answer key, made and checked by two separate Claude sessions
 **What:** I built the real golden set (`golden-v1`) on Louis's PC. It covers 40 chats picked by the seeded sampler, with 398 records that must be found and 64 that must never be claimed. It lives only in the git-ignored workspace. What's committed is the review record, `docs/reviews/GOLD_REAL_V1_REVIEW.md`, which holds counts and the file's hash, but no chat IDs, titles or text.
 

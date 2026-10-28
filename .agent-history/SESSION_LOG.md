@@ -803,3 +803,23 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - documents/registries.py (STATUS_WORDS, watch_url, video_path, video_mentions, video_note, CueHit, find_cues, registry_path, account_path, account_registry_note, account_note); vault plans video, registry and account notes; `ke transcript find`. No migration.
 - Tests: test_registry_notes.py (5). Full suite 1139 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: EVAL-002.
+
+## 2026-10-28 13:30 EVAL-002 (#108) + EVAL-005 (#109)
+- evaluation/import_fidelity.py (census, ExportFidelity, FidelityReport, evaluate_export, evaluate_fixtures, verdict, to_dict, to_markdown); evaluation/temporal_bench.py (CASES, run_pairs, run_pipeline, TemporalReport, run_benchmark, to_dict, to_markdown); reconciliation/supersession.py v2 target test; `ke eval fidelity`, `ke eval temporal`; reports docs/evaluation/EVAL-002_FIDELITY.md, EVAL-005_TEMPORAL.md. Filed #237 (stray conversations file read by no adapter).
+- Tests: test_import_fidelity.py (8), test_temporal_bench.py (3). Full suite 1150 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: EVAL-006.
+
+## 2026-10-28 14:10 EVAL-006 (#110)
+- evaluation/end_to_end.py (check_vault, LinkCheck, NoteShape, golden_key, vault_golden, golden_diff, run_end_to_end, EndToEndReport, to_dict, build_fixture, E2E_FIXTURE, E2E_GOLDEN); fixtures tests/fixtures/e2e/export.zip + vault_golden.json; `ke eval e2e [--update-golden]`, `ke docs check --vault`. No migration.
+- Tests: test_end_to_end.py (5). Full suite 1155 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: EVAL-007.
+
+## 2026-10-28 14:50 EVAL-007 (#111)
+- evaluation/gate.py (Status, Outcome, Check, GateInputs, Result, GateReport, CHECKS, run_gate, classification_report, extraction_report, to_dict, to_markdown); `ke eval gate [--fixtures] [--out] [--commit]`; report docs/evaluation/EVAL-007_GATE.md. Filed #240 (EVAL-012 relationship answer key). No migration.
+- Tests: test_gate.py (4). Full suite 1159 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: EVAL-008.
+
+## 2026-10-28 15:20 EVAL-008 (#112)
+- evaluation/variance.py (SEEDS, SOURCES, ReviewItem, RunView, VarianceReport, shuffled_export, pinned_fake, run_order, differences, run_variance, to_dict); gate line `variance.order_and_repeats`; `ke eval variance [--fixtures]`; docs/evaluation/EVAL-007_GATE.md regenerated (8 PASS, 2 REVIEW, 3 BLOCKED, 0 FAIL). No migration.
+- Tests: test_variance.py (4). Full suite 1163 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: check UI-005 issue #175, then M5.
