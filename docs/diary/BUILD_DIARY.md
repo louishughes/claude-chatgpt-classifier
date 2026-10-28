@@ -2093,3 +2093,24 @@ migration drift         # 0
 Fix attempts: 1 (my first paragraph/underlined-heading loop was tangled; rewrote it as one loop that turns a paragraph into a heading when an `===`/`---` line follows).
 
 **Next exact task:** OPS-003 (local backups and verified restore).
+
+### 17:10 — OPS-003: a backup that proves it restores
+**OPS-003** (`infrastructure/backup.py`, `ke backup`) has three commands. None of them overwrites anything.
+- **create** copies the database with SQLite's own online-backup API, which gives a consistent copy even while it's open. It also copies the archive of original files and images, checking each against the hash it's named by. It holds the import lock while doing this, so no import is half-way through. The backup is built in a temporary folder and renamed only when finished, and it must sit outside the workspace. Its `manifest.json` lists every file's SHA-256 and size, the schema revision and every table's row count. The search indexes are left out because `ke index` rebuilds them.
+- **verify** re-hashes every file, runs SQLite's integrity check and recounts every table.
+- **restore** only goes into an empty folder, and only from a backup that verifies. Then it checks the restored copy the same way.
+
+The acceptance check is that restored hashes and record counts match the baseline. A restored workspace also re-imports the same export with 0 new conversations.
+
+Failing-case reproduction: my tampering test deleted rows from the backup's database, but the file's hash didn't change. The copy had inherited WAL mode, so the change went into a side file. A backup should be one self-contained file, so the copy is now switched to ordinary journal mode. After that, both the hash and the row count catch it, and the restore refuses.
+
+**Teach-back (`infrastructure/backup.py`):** "A backup is a folder with a copy of the database, the original files, and a list of every file's fingerprint and every table's row count. Verifying re-checks all of that, and a restore only goes into an empty folder and then proves it got everything back. Nothing is ever overwritten, and a backup that doesn't check out is never restored."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 166 source files
+pytest -q               # 1177 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 1 (the WAL-mode copy hid a change from the file hash; the backup copy now uses journal_mode=DELETE).
+
+**Next exact task:** OPS-004 (data deletion and downstream purge).
