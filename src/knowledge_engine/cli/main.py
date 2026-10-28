@@ -3590,6 +3590,38 @@ def _eval_relationships(settings: Settings, args: argparse.Namespace) -> Command
     return CommandResult(name, data=data, message=f"PASS: precision {measured}")
 
 
+def _eval_links(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Link, video and account counts for the first N chats (EVAL-010c); reads only."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.evaluation.link_counts import link_counts
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+
+    name = "eval links"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            data = link_counts(session, args.limit)
+    finally:
+        engine.dispose()
+    links, youtube, social = data["links"], data["youtube"], data["social"]
+    return CommandResult(
+        name,
+        data=data,
+        message=(
+            f"{data['conversations']} chats: {links['occurrences']} links to "
+            f"{links['distinct_targets']} targets, {youtube['distinct_videos']} videos "
+            f"({youtube['mentions']} mentions), {social['distinct_accounts']} accounts, "
+            f"{social['ambiguous_handles']} ambiguous @names"
+        ),
+    )
+
+
 def _eval_review_reasons(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Why a smoke run's answers went to review, by kind (#255); no model calls.
 
@@ -3830,6 +3862,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-cost-usd", type=float, default=0.0, help="hard cost cap for --provider anthropic"
     )
     semantic.set_defaults(handler=_eval_semantic)
+    links_eval = eval_commands.add_parser(
+        "links",
+        help="link, YouTube and social-account counts for the first N chats (no text, no calls)",
+    )
+    links_eval.add_argument("--limit", type=int, default=100, help="first N chats (default 100)")
+    links_eval.set_defaults(handler=_eval_links)
     reasons = eval_commands.add_parser(
         "review-reasons",
         help="why classifications went to review, counted by kind (no text, no model calls)",

@@ -3121,6 +3121,22 @@ Fix attempts: 1 (the first test run showed the copied-opening detector also need
 
 **Next exact task:** NOTE-012 dashboard chat view.
 
+### 21:20 — EVAL-010c: link, video and account counts for Gate G2
+
+Closing the milestone maps showed one gate with no evidence at all. G2 asks for link, YouTube and social counts on 100 real chats, and nothing produced them: all nine M2 tickets were closed, but the check itself was never built. `ke eval links --limit 100` now counts what the registries already hold for a batch of chats. It reads only, makes no calls, and prints numbers and kinds, never a URL or a handle, so the PC can paste its output.
+
+One thing the fixture showed: two URL forms of the same video are two link targets but one video. That's by design. The link registry keeps each URL as written, and the video registry deduplicates by ID, so the report gives both counts.
+
+**Teach-back (`link_counts` in `evaluation/link_counts.py`):** It takes the first N chats and counts, from the stored tables, the links in them, the videos those links point to, and the social accounts and bare @names they mention. Everything is a number or a count per kind, so it can be shared without showing any private link. An @name with no platform is counted as ambiguous, which shows the import didn't guess an account for it.
+
+Checks:
+```
+tests/integration/test_eval_links.py   1 passed (no imports refused; batch of 1 exact; all chats; no URL, ID, handle or title in the JSON)
+```
+Fix attempts: 1 (the test expected the wrong error exit code and one target too few; the code was right).
+
+**Next exact task:** on the PC, `ke --json eval links --limit 100` on the real workspace, counts into EVAL-010_SMOKE.md, then close map #5.
+
 ### 19:35 — NOTE-026: one citation per message on the topics line
 
 The third score found the same message link up to three times on one bullet, in "Keywords and topics". Each digest topic carried its own citation, and a model usually takes several topics from one message. Now topics that cite the same messages are grouped and share one citation, "raised beds, cedar, drainage [m1]; watering [m3]", in the order the digest gave them. Repeats across sections stay: one item, one citation, is intended.
