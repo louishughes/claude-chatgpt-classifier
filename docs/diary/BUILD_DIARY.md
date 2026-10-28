@@ -2663,6 +2663,41 @@ Fix attempts: 0.
 
 **Next exact task:** open the queued PRs, then INT-003 (watched folders).
 
+### 14:05 — NOTE-006 (#278): a taxonomy discovered from the real chats, reviewed by a separate Claude
+
+Nothing can be classified until there's a published vocabulary, and the real workspace had none. That's why every chat note so far said "unclassified".
+
+What I built (`taxonomy/bootstrap.py`, runbook `docs/runbooks/TAXONOMY_BOOTSTRAP.md`):
+
+- `ke taxonomy pack`: a fair sample of segments, rare themes first (the NRM-006 sampler), with a short excerpt each and the TF-IDF groups as hints. It writes only to a private folder, and the CLI refuses any other path.
+- The proposer writes a JSON plan, and code checks it before anything is filed. It must match the pack's fingerprint, cite only sampled segments, have no duplicates and stop at two levels. `ke taxonomy propose` files TAX-004 proposals. Subcategories wait until their category is approved.
+- `ke taxonomy sheet` / `review` / `summary` / `publish`. TAX-004 already refuses a reviewer who is also the proposer.
+
+The real run (no paid API; everything private stays in `private/taxonomy/tax-1/`):
+
+- The workspace was backed up first. The pack is 300 segments from 1,743 segments in 1,158 chats.
+- **First problem:** about a third of the excerpts began with the same pasted custom-instructions text, so they all looked alike. The fix leaves out any paragraph repeated across many segments: 59 paragraphs were dropped, and the excerpts now show what each segment is actually about.
+- **Proposer:** this thread proposed 12 categories with 37 subcategories, 9 activities and 6 outputs, each with a definition and the segments it rests on.
+- **Reviewer:** a separate Claude session on a different model, named `claude-session-tax-reviewer-b`, read only the pack and the review sheets. Over 3 rounds it approved 64 terms, relabelled 2 ("Play" became "Casual Fun"; "Quick Everyday Questions" became "Identify and Translate Things") and rejected 3 with reasons: a catch-all "Advice and How-To", a "VR Development Practice" subcategory (VR is better as a tag than a subject) and a duplicate. It also found a real gap, no category for programming outside game engines, so I proposed "Software and Scripting" and it approved it.
+- **Second problem:** in round 1 the reviewer admitted it had only read the first ~150 characters of each excerpt. I asked it to re-check every round-1 approval against the full excerpts. All 26 held.
+- **Third problem:** relabelling exposed a bug. Re-running the plan re-filed "Play", because the approved term was now called "Casual Fun", and subcategories couldn't find a renamed parent. A term approved under a new label now still counts as known, and there is a test for it.
+- The result: 13 categories with 37 subcategories, 8 activities and 6 outputs. The governance report finds no issues and no open proposals. **Not published:** publishing is Louis's decision (D2), made from `private/taxonomy/tax-1/summary.md`.
+
+Checks:
+```
+tests/integration/test_taxonomy_bootstrap.py   5 passed
+```
+Fix attempts: 3 (newline escaping in a patch script, the boilerplate excerpts, the relabel bug).
+
+**Teach-back (`taxonomy/bootstrap.py`):** It turns a sample of my chats into a first list of categories without anyone checking their own work: one Claude proposes the categories with evidence, a different Claude approves or rejects each one with a reason, and code refuses anything that doesn't point at real sampled chats. Subcategories only get filed once their parent category has been approved. Nothing becomes the official vocabulary until I publish it.
+
+Talking points:
+- "One AI proposed the categories, a different AI reviewed them, and I approve the publish. Nobody marks their own homework."
+- "The reviewer admitted it had only skimmed the first pass, so I made it re-check everything against the full text. It held up."
+- "A third of my chats started with the same pasted instructions; the sampler now ignores repeated boilerplate so the categories come from what I actually talked about."
+
+**Next exact task:** Louis publishes tax-1 (or asks for changes), then classify the 40 gold chats under it.
+
 ### 12:20 — INT-003: watched folders
 
 - `importer/watch.py`: `FolderWatcher.tick()` looks at a folder once. Each top-level export folder or ZIP must have the same metadata fingerprint on two looks at least `settle_s` apart (so a half-downloaded ZIP waits), then it is compared with the watch state: same metadata is skipped unread, the same contents (touched, re-downloaded, or a second copy under another name) are recorded without importing, and only new contents go to the importer.

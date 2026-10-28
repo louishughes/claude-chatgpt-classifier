@@ -1335,6 +1335,127 @@ def _taxonomy_report(settings: Settings, args: argparse.Namespace) -> CommandRes
     )
 
 
+def _private_target(settings: Settings, path: Path) -> bool:
+    """A file holding chat text may only go in the workspace or a ``private`` folder."""
+    target = path.resolve()
+    if target.is_relative_to(settings.workspace_root.resolve()):
+        return True
+    return any(part.lower() == "private" for part in target.parent.parts)
+
+
+def _write_private(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def _taxonomy_bootstrap(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """NOTE-006: pack, propose, sheet, review, summary and publish (one handler)."""
+    from dataclasses import asdict
+
+    from pydantic import ValidationError
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.segmentation.inventory import corpus_inventory
+    from knowledge_engine.taxonomy import bootstrap
+    from knowledge_engine.taxonomy.registry import TaxonomyRegistry
+
+    command = f"taxonomy {args.taxonomy_command}"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            command, ExitCode.ERROR, message="no database yet", error_code="no_database"
+        )
+    out: Path | None = getattr(args, "out", None)
+    if out is not None and not _private_target(settings, out):
+        return CommandResult(
+            command,
+            ExitCode.USAGE,
+            message="this file can hold private text: write it in the workspace or private/",
+            error_code="not_private",
+        )
+    kind = args.taxonomy_command
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            if kind == "pack" and out is not None:
+                pack = bootstrap.build_pack(
+                    list(corpus_inventory(session)), size=args.sample, seed=args.seed
+                )
+                _write_private(out, json.dumps(pack, ensure_ascii=False, indent=1))
+                return CommandResult(
+                    command,
+                    data={"sha256": bootstrap.pack_sha256(pack), **pack["corpus"]},
+                    message=f"pack written ({pack['corpus']['sampled']} segments)",
+                )
+            if kind == "propose":
+                pack = json.loads(args.pack.read_text(encoding="utf-8"))
+                try:
+                    plan = bootstrap.Plan.model_validate_json(args.plan.read_text(encoding="utf-8"))
+                    filed = bootstrap.file_plan(session, plan, pack)
+                except (ValidationError, bootstrap.PlanError) as problem:
+                    session.rollback()
+                    return CommandResult(
+                        command, ExitCode.USAGE, message=str(problem)[:2000], error_code="bad_plan"
+                    )
+                session.commit()
+                return CommandResult(
+                    command,
+                    data=asdict(filed),
+                    message=(
+                        f"{len(filed.proposed)} proposed, {filed.waiting_for_parent} waiting for "
+                        "an approved category"
+                    ),
+                )
+            if kind == "sheet" and out is not None:
+                sheet = bootstrap.review_sheet(session)
+                _write_private(out, json.dumps(sheet, ensure_ascii=False, indent=1))
+                return CommandResult(
+                    command, data={"open": len(sheet)}, message=f"{len(sheet)} open proposal(s)"
+                )
+            if kind == "review":
+                try:
+                    review = bootstrap.Review.model_validate_json(
+                        args.review.read_text(encoding="utf-8")
+                    )
+                except ValidationError as problem:
+                    return CommandResult(
+                        command,
+                        ExitCode.USAGE,
+                        message=str(problem)[:2000],
+                        error_code="bad_review",
+                    )
+                applied = bootstrap.apply_review(session, review)
+                session.commit()
+                return CommandResult(
+                    command,
+                    data=asdict(applied),
+                    message=(
+                        f"{len(applied.approved)} approved, {len(applied.rejected)} rejected, "
+                        f"{len(applied.refused)} refused"
+                    ),
+                )
+            if kind == "summary" and out is not None:
+                _write_private(out, bootstrap.summary_markdown(session))
+                return CommandResult(command, data={}, message="summary written")
+            try:
+                snapshot = TaxonomyRegistry(session).publish(
+                    args.version, author=args.author, note=args.note
+                )
+            except ValueError as problem:
+                return CommandResult(
+                    command, ExitCode.USAGE, message=str(problem), error_code="bad_version"
+                )
+            session.commit()
+            return CommandResult(
+                command,
+                data={"version": snapshot.version, "terms": len(snapshot.terms)},
+                message=f"published {snapshot.version} ({len(snapshot.terms)} terms)",
+            )
+    finally:
+        engine.dispose()
+
+
 def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Search message text (RET-001). Brings the search index up to date first."""
     from sqlalchemy import select
@@ -3230,6 +3351,42 @@ def build_parser() -> argparse.ArgumentParser:
         "report", help="duplicates, parent loops, orphans and review activity (read-only)"
     )
     tax_report.set_defaults(handler=_taxonomy_report)
+    # NOTE-006: bootstrap the first taxonomy (proposer and reviewer are separate sessions).
+    tax_pack = taxonomy_commands.add_parser(
+        "pack", help="write a private sample pack for the proposer session"
+    )
+    tax_pack.add_argument("--out", type=Path, required=True, help="inside a private folder")
+    tax_pack.add_argument("--sample", type=int, default=300, help="segments to sample")
+    tax_pack.add_argument("--seed", default="tax-v1", help="same seed, same sample")
+    tax_pack.set_defaults(handler=_taxonomy_bootstrap)
+    tax_propose = taxonomy_commands.add_parser(
+        "propose", help="file a proposer's plan as proposals (run again after each review)"
+    )
+    tax_propose.add_argument("plan", type=Path, help="the plan JSON")
+    tax_propose.add_argument("--pack", type=Path, required=True, help="the pack it was written for")
+    tax_propose.set_defaults(handler=_taxonomy_bootstrap)
+    tax_sheet = taxonomy_commands.add_parser(
+        "sheet", help="write the open proposals for a reviewer"
+    )
+    tax_sheet.add_argument("--out", type=Path, required=True, help="inside a private folder")
+    tax_sheet.set_defaults(handler=_taxonomy_bootstrap)
+    tax_review = taxonomy_commands.add_parser(
+        "review", help="apply a reviewer's decisions (never the proposer's own)"
+    )
+    tax_review.add_argument("review", type=Path, help="the review JSON")
+    tax_review.set_defaults(handler=_taxonomy_bootstrap)
+    tax_summary = taxonomy_commands.add_parser(
+        "summary", help="write a one-page summary of the vocabulary for the owner"
+    )
+    tax_summary.add_argument("--out", type=Path, required=True, help="inside a private folder")
+    tax_summary.set_defaults(handler=_taxonomy_bootstrap)
+    tax_publish = taxonomy_commands.add_parser(
+        "publish", help="freeze the approved vocabulary as a version (the owner's decision)"
+    )
+    tax_publish.add_argument("version", help="e.g. tax-1")
+    tax_publish.add_argument("--author", required=True, help="who decided to publish")
+    tax_publish.add_argument("--note", help="why")
+    tax_publish.set_defaults(handler=_taxonomy_bootstrap)
 
     search = commands.add_parser("search", help="find messages by words, phrase or exact text")
     search.add_argument("query", help="what to look for")
