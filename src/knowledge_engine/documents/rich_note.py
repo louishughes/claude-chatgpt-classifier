@@ -53,6 +53,7 @@ from sqlalchemy.orm import Session
 
 from knowledge_engine.classification.store import effective_labels
 from knowledge_engine.digest.contract import ConversationDigest, DigestItem
+from knowledge_engine.documents.categories import category_shares, waiting_candidates
 from knowledge_engine.documents.model import DocItem, DocumentKind, build_document
 from knowledge_engine.documents.notes import _branches, _images, _links, knowledge_path
 from knowledge_engine.documents.render import transcript_stem
@@ -392,6 +393,28 @@ def chat_labels(
     )
 
 
+def _category_lines(
+    session: Session, chat: StoredConversation, taxonomy: TaxonomySnapshot, citer: Citer
+) -> list[str]:
+    """One line per domain term (NOTE-008), then the candidates waiting for review."""
+    lines = []
+    for share in category_shares(session, chat, taxonomy):
+        segments = ", ".join(str(n) for n in share.segments)
+        cites = " ".join(citer.native(n) for n in share.evidence if n in chat.node_keys)
+        amount = f", {round(100 * share.share)}% of labelled messages" if share.share else ""
+        line = f"**{escape_text(share.label)}**, {share.rank}{amount}, from segment(s) {segments}."
+        if cites:
+            line += f" Classifier cited {cites}."
+        if share.verdicts:
+            line += " " + "; ".join(share.verdicts).capitalize() + "."
+        lines.append(line)
+    waiting = waiting_candidates(session, chat)
+    if waiting:
+        names = ", ".join(f'"{escape_text(w)}"' for w in waiting)
+        lines.append(f"Candidates waiting for review (not labels): {names}.")
+    return lines
+
+
 # ---------------------------------------------------------------- related chats
 
 
@@ -626,13 +649,17 @@ def rich_conversation_note(
             f"from {labels.segments} labelled segment(s)."
         )
     tag_lines = [classified]
+    if taxonomy is not None:
+        tag_lines += _category_lines(session, chat, taxonomy, citer)
     if labels.tags:
         tag_lines.append("Topics: " + ", ".join(escape_text(t) for t in labels.tags))
     for facet, values in (labels.facets or {}).items():
         tag_lines.append(f"{facet.capitalize()}: " + ", ".join(escape_text(v) for v in values))
     blocks += [
         Heading("Category and subcategory", 2),
-        Paragraph("*Classification*", True),
+        Paragraph(
+            f"*Classification under {taxonomy.version}*" if taxonomy else "*Classification*", True
+        ),
         BulletList(tuple(tag_lines), trusted=True),
     ]
     topics: list[Block] = (
