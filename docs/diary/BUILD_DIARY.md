@@ -2054,3 +2054,18 @@ migration drift         # 0
 Fix attempts: 0.
 
 **Next exact task:** check UI-005 (#175) against STATUS and close it if done; then M5.
+
+### 16:05 — The first real number, and a hash that depended on Windows
+The PC session scored the rule extractors against the real key with `ke gold score`, and I merged its report as #246 (`docs/evaluation/EVAL-004_REAL.md`, counts only). The result was P 0.124, R 0.058 and F1 0.079 over 398 expected records. The hard gate held: 0 forbidden records, 0 unsupported decisions in current truth, every anchor valid, and the actor right on all 23 matches. Recall is 0 for decisions, facts, ideas, questions, recommendations and preferences. That's the baseline any model extractor has to beat, and it shows how little hand-written rules catch in real chats.
+
+One thing didn't line up. The report's review-record hash wasn't the hash of the record in Git, because Windows checks text files out with CRLF line endings. A hash meant to name a record shouldn't depend on the computer. `sha256_review` now reads CRLF as LF before hashing; the synthetic review record (already LF) keeps its hash. The real report gets a comment naming both hashes rather than being rewritten.
+
+**Teach-back (`evaluation/report_labels.py`, `sha256_review`):** "Every scored report prints the fingerprint of the review record it relied on. Windows and Linux store line endings differently, so the fingerprint is now taken as if every line ended the Linux way. The same record gets the same fingerprint on every computer."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 163 source files
+pytest -q               # 1166 passed, 7 skipped
+```
+Fix attempts: 0.
+
+**Next exact task:** ING-008 + ING-009.

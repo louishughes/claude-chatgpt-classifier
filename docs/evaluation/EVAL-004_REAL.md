@@ -1,3 +1,5 @@
+<!-- The review-file SHA-256 below was taken from a Windows (CRLF) checkout of docs/reviews/GOLD_REAL_V1_REVIEW.md. Since the line-ending fix, `ke gold score` hashes review records with CRLF read as LF, which gives 9f193a8f2b489d5c7390e03e5d8897b68aa0197fc511417f0a81e0f5e99c0d11 for the same record. -->
+
 # Extraction baseline (golden-v1)
 
 ## AI check (not owner-verified)
