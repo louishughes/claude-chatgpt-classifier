@@ -1,8 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Links · Knowledge Engine{% endblock %}
 {% block main %}
-<h1>Links</h1>
-<p class="muted">Every web address mentioned in your chats, once each, with every place it was mentioned. Nothing here is fetched.</p>
+<header class="page-head">
+  <p class="eyebrow">Found in chats</p>
+  <h1>Links</h1>
+  <p class="lede">Every web address mentioned in your chats, once each, with every place it was mentioned. Nothing here is fetched.</p>
+</header>
 <form method="get" action="/links" class="search">
   <label for="q">Find in the address</label>
   <input id="q" name="q" type="text" value="{{ q }}">
@@ -10,18 +13,18 @@
 </form>
 <p class="muted">{{ total }} address{{ "" if total == 1 else "es" }}{% if q %} containing "{{ q }}"{% endif %}.</p>
 {% if rows %}
-<table>
-  <thead><tr><th>Address</th><th>Mentions</th><th>Chats</th></tr></thead>
+<div class="table-wrap"><table>
+  <thead><tr><th>Address</th><th class="num">Mentions</th><th class="num">Chats</th></tr></thead>
   <tbody>
   {% for row in rows %}
   <tr>
-    <td class="wrap"><a href="/links/{{ row.target_id }}">{{ row.url }}</a>{% if row.kind == "youtube_video" %} <span class="status">video</span>{% endif %}</td>
-    <td>{{ row.mentions }}</td>
-    <td>{{ row.conversations }}</td>
+    <td class="wrap"><a href="/links/{{ row.target_id }}">{{ row.url }}</a>{% if row.kind == "youtube_video" %} <span class="pill info">video</span>{% endif %}</td>
+    <td class="num">{{ row.mentions }}</td>
+    <td class="num">{{ row.conversations }}</td>
   </tr>
   {% endfor %}
   </tbody>
-</table>
+</table></div>
 {% if pages > 1 %}
 <p>
   {% if page > 1 %}<a href="/links?q={{ q | urlencode }}&amp;page={{ page - 1 }}">← Previous</a>{% endif %}
@@ -29,5 +32,7 @@
   {% if page < pages %}<a href="/links?q={{ q | urlencode }}&amp;page={{ page + 1 }}">Next →</a>{% endif %}
 </p>
 {% endif %}
+{% elif not q %}
+<div class="empty"><p class="what">No links found yet.</p><p class="next">Links appear here once an imported chat mentions a web address.</p></div>
 {% endif %}
 {% endblock %}

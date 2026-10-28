@@ -2,7 +2,11 @@
 {% from "macros.html" import where, related %}
 {% block title %}Search · Knowledge Engine{% endblock %}
 {% block main %}
-<h1>Search messages</h1>
+<header class="page-head">
+  <p class="eyebrow">Your archive</p>
+  <h1>Search messages</h1>
+  <p class="lede">Find words in any message of any chat. Results link straight to the message.</p>
+</header>
 <form method="get" action="/search" class="search">
   <label for="q">Words to find in any message</label>
   <input id="q" name="q" type="text" value="{{ q }}">
@@ -24,5 +28,6 @@
   {{ related(item.related) }}
 </article>
 {% endfor %}
+{% if not hits %}<div class="empty"><p class="what">No messages match.</p><p class="next">Try fewer words, or choose "all the words, any order".</p></div>{% endif %}
 {% endif %}
 {% endblock %}

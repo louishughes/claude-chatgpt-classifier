@@ -1,12 +1,21 @@
-{# Who checked the answer key: printed above every score (LEG-002, REV-012). #}
+{# Who checked the answer key: printed above every score (LEG-002, REV-012).
+   Violet means an AI checked it, not the owner; green is kept for a key the
+   owner verified. The fingerprints are folded away but still on the page. #}
 {% if key %}
-<div class="keyblock">
+<div class="keyblock{% if key.kind == 'owner' %} owner{% endif %}">
   <h2>{{ key.heading }}</h2>
-  <p>Answer key <code>{{ key.version }}</code>, SHA-256 <code class="wrap">{{ key.sha256 }}</code>.<br>
-  Checked by: <strong>{{ key.label }}</strong> (<code>{{ key.kind }}</code>){% if key.review_sha256 %}; review record SHA-256 <code class="wrap">{{ key.review_sha256 }}</code>{% endif %}.</p>
+  <p>Answer key <code>{{ key.version }}</code>, checked by <strong>{{ key.label }}</strong> (<code>{{ key.kind }}</code>).</p>
+  <details>
+    <summary>Fingerprints (to prove which files were used)</summary>
+    <p>Answer key SHA-256 <code class="wrap">{{ key.sha256 }}</code>{% if key.review_sha256 %}<br>Review record SHA-256 <code class="wrap">{{ key.review_sha256 }}</code>{% endif %}</p>
+  </details>
 </div>
 {% elif key_error %}
 <p class="error">{{ key_error }} Scores are shown as unscored.</p>
 {% else %}
-<p class="keyblock muted">No answer key loaded, so nothing here is scored. Start the interface with <code>ke ui --gold PATH --reviewer ai_session --review REVIEW.md</code> to compare outputs with a private answer key.</p>
+<div class="keyblock none">
+  <h2>No answer key loaded</h2>
+  <p>No answer key loaded, so nothing here is scored. To compare outputs with a private answer key, start the interface with:</p>
+  <p><code class="wrap">ke ui --gold PATH --reviewer ai_session --review REVIEW.md</code></p>
+</div>
 {% endif %}
