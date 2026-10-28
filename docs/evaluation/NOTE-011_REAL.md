@@ -71,3 +71,25 @@ The NOTE-005 extractor ran on all 85 segments through request files, answered by
 
 - Hide or retire the rule-extractor records for a chat once a model extraction has run on it, so pasted custom instructions and drafted letter text stop appearing as requirements.
 - Have the extractor and the digest fill open questions from how the chat ends (an unanswered offer, an unsent letter, a promise to report back).
+
+## Extraction scored against answer key v2 (`ke gold convert` + `ke gold score`)
+
+The answer key fingerprints were checked first, and both were unchanged: v1 `1dbf3d2a…781b64` and v2 `a37caa31…d9f5b` (combined SHA-256 of the 10 files, as in `docs/reviews/OPEN_DECISIONS.md`). `ke gold convert` turned v2 into a gold set: 90 records, with 21 key items left unmapped (12 `fact_about_owner`, 7 `fact`, 1 `task`, 1 unclear decision) and 0 number mismatches. Label: **AI check (not owner-verified)**.
+
+| | Result |
+|---|---|
+| Key chats found | 10 of 10 |
+| Produced records in those chats | 71 |
+| Precision / recall / F1 | **0.056 / 0.044 / 0.050** |
+| Gate (anchors, forbidden records, unsupported decisions) | passed; anchor validity 1.0, 0 forbidden |
+| Rejections | P 1.00, R 0.50 |
+| Requirements | P 0.14, R 0.10 |
+| Decisions | 0 of 12 |
+| Key "idea" items (32) | 0 found. The engine records an assistant suggestion as a `proposal` (24 produced, none expected) |
+
+**Reading it honestly:** the low score is partly real and partly a vocabulary mismatch between the key and the engine.
+
+- The key calls an assistant's suggestion an `idea`. The engine calls it a `proposal` and never emits `idea`. So 32 key items and 24 engine records can never pair, even when they describe the same suggestion.
+- The key has no `action` or `proposal` items at all, so every engine action and proposal counts as a false positive.
+- The real misses are decisions (0 of 12 under this matcher, although the separate note re-score found 12 of 22 by meaning) and requirements (2 of 21).
+- Changing how types map is a change to the evaluation criteria, so it needs Louis's approval. The decision is whether `proposal` should count as a match for the key's `idea` (assistant suggestion), or whether the extractor should emit `idea`.
