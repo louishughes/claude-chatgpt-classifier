@@ -19,6 +19,7 @@ from knowledge_engine.importer import records as _records  # noqa: F401
 from knowledge_engine.infrastructure import jobs as _jobs  # noqa: F401
 from knowledge_engine.infrastructure import workspace as _workspace  # noqa: F401
 from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.links import store as _links  # noqa: F401
 
 engine = context.config.attributes.get("engine")
 if not isinstance(engine, Engine):

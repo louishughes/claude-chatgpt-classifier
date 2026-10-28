@@ -47,6 +47,7 @@ from knowledge_engine.importer.records import (
     MessageRevisionRow,
     RevisionObservationRow,
 )
+from knowledge_engine.links.extract import FoundLink, iter_links
 
 
 class MissingNativeIdError(ValueError):
@@ -73,6 +74,8 @@ class ConversationDelta:
         content_types: Message content type -> count.
         unparsed_parts: Content parts kept only as raw JSON because their
             shape isn't understood yet. Kept, never dropped, but counted.
+        links: ``(revision_id, actor, link)`` for every URL mention in the
+            conversation's current revisions, for the link step (LNK-001).
     """
 
     conversation_id: str
@@ -86,6 +89,7 @@ class ConversationDelta:
     nodes: int = 0
     content_types: Counter[str] = field(default_factory=Counter)
     unparsed_parts: int = 0
+    links: list[tuple[str, str | None, FoundLink]] = field(default_factory=list)
 
 
 def native_conversation_id(native: Mapping[str, Any]) -> str | None:
@@ -200,6 +204,10 @@ def apply_conversation(
                     mapping[node_id]["message"],
                     (p.file_id for p in canonical.asset_pointers if p.file_id),
                 )
+            )
+            delta.links.extend(
+                (revision_key, canonical.role, link)
+                for link in iter_links(canonical.text, mapping[node_id]["message"])
             )
             if session.get(MessageRevisionRow, revision_key) is None:
                 message = mapping[node_id]["message"]
