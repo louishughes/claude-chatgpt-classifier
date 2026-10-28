@@ -24,7 +24,7 @@ import argparse
 import json
 import sys
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from enum import IntEnum
 from pathlib import Path
 from typing import Any, NoReturn
@@ -740,6 +740,45 @@ def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _timeline(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Show decision events, oldest first; with --build, derive new ones first (REC-004/005)."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.reconciliation.supersession import reconcile
+    from knowledge_engine.reconciliation.timeline import build_events, timeline
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "timeline", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            built: dict[str, object] = {}
+            if args.build:
+                replaced = reconcile(session)
+                events = build_events(session)
+                session.commit()
+                built = {
+                    "superseded": len(replaced.superseded),
+                    "supersession_review_required": [
+                        {"later": v.later, "earlier": v.earlier, "failed": list(v.failed)}
+                        for v in replaced.review_required
+                    ],
+                    "events_added": events.added,
+                }
+            entries = timeline(session, [args.record] if args.record else None)
+    finally:
+        engine.dispose()
+    return CommandResult(
+        "timeline",
+        data={**built, "events": [asdict(e) for e in entries]},
+        message=f"{len(entries)} event(s); revoked events stay, marked",
+    )
+
+
 def _reconcile(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Propose repeated claims, record links and conflicts in one go (REC-001..003); no text."""
     from sqlalchemy.orm import Session
@@ -1379,6 +1418,14 @@ def build_parser() -> argparse.ArgumentParser:
     commands.add_parser(
         "reconcile", help="propose repeated claims, record links and conflicts"
     ).set_defaults(handler=_reconcile)
+    timeline_cmd = commands.add_parser("timeline", help="how decisions moved (no text shown)")
+    timeline_cmd.add_argument("--record", help="only events touching this krec_ ID")
+    timeline_cmd.add_argument(
+        "--build",
+        action="store_true",
+        help="first derive proposals, acceptances, conflicts and clear replacements",
+    )
+    timeline_cmd.set_defaults(handler=_timeline)
     duplicates = commands.add_parser(
         "duplicates", help="records that may state the same claim (never merged automatically)"
     )

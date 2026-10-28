@@ -1,0 +1,338 @@
+[
+  {
+    "title": "Synthetic engine musing",
+    "create_time": 1710979200.0,
+    "update_time": 1710979560.0,
+    "mapping": {
+      "c0000060-0000-4000-8000-000000000001-root": {
+        "id": "c0000060-0000-4000-8000-000000000001-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000060-0000-4000-8000-000000000001-sys"
+        ]
+      },
+      "c0000060-0000-4000-8000-000000000001-sys": {
+        "id": "c0000060-0000-4000-8000-000000000001-sys",
+        "message": {
+          "id": "c0000060-0000-4000-8000-000000000001-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710979260.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000060-0000-4000-8000-000000000001-root",
+        "children": [
+          "c0000060-0000-4000-8000-000000000001-u0"
+        ]
+      },
+      "c0000060-0000-4000-8000-000000000001-u0": {
+        "id": "c0000060-0000-4000-8000-000000000001-u0",
+        "message": {
+          "id": "c0000060-0000-4000-8000-000000000001-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710979320.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic note: I've decided to use Unity for the game engine."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000060-0000-4000-8000-000000000001-sys",
+        "children": [
+          "c0000060-0000-4000-8000-000000000001-a0"
+        ]
+      },
+      "c0000060-0000-4000-8000-000000000001-a0": {
+        "id": "c0000060-0000-4000-8000-000000000001-a0",
+        "message": {
+          "id": "c0000060-0000-4000-8000-000000000001-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710979380.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: noted, Unity for the game engine."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000060-0000-4000-8000-000000000001-u0",
+        "children": [
+          "c0000060-0000-4000-8000-000000000001-u1"
+        ]
+      },
+      "c0000060-0000-4000-8000-000000000001-u1": {
+        "id": "c0000060-0000-4000-8000-000000000001-u1",
+        "message": {
+          "id": "c0000060-0000-4000-8000-000000000001-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710979440.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question: what if we switched to Godot for the game engine?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000060-0000-4000-8000-000000000001-a0",
+        "children": [
+          "c0000060-0000-4000-8000-000000000001-a1"
+        ]
+      },
+      "c0000060-0000-4000-8000-000000000001-a1": {
+        "id": "c0000060-0000-4000-8000-000000000001-a1",
+        "message": {
+          "id": "c0000060-0000-4000-8000-000000000001-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710979500.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: Godot is lighter, but it depends on what you need."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000060-0000-4000-8000-000000000001-u1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000060-0000-4000-8000-000000000001-a1",
+    "plugin_ids": null,
+    "conversation_id": "c0000060-0000-4000-8000-000000000001",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000060-0000-4000-8000-000000000001"
+  },
+  {
+    "title": "Synthetic engine switch",
+    "create_time": 1711065600.0,
+    "update_time": 1711065960.0,
+    "mapping": {
+      "c0000060-0000-4000-8000-000000000002-root": {
+        "id": "c0000060-0000-4000-8000-000000000002-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000060-0000-4000-8000-000000000002-sys"
+        ]
+      },
+      "c0000060-0000-4000-8000-000000000002-sys": {
+        "id": "c0000060-0000-4000-8000-000000000002-sys",
+        "message": {
+          "id": "c0000060-0000-4000-8000-000000000002-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1711065660.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000060-0000-4000-8000-000000000002-root",
+        "children": [
+          "c0000060-0000-4000-8000-000000000002-u0"
+        ]
+      },
+      "c0000060-0000-4000-8000-000000000002-u0": {
+        "id": "c0000060-0000-4000-8000-000000000002-u0",
+        "message": {
+          "id": "c0000060-0000-4000-8000-000000000002-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1711065720.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic note: I've decided to use Unity for the game engine."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000060-0000-4000-8000-000000000002-sys",
+        "children": [
+          "c0000060-0000-4000-8000-000000000002-a0"
+        ]
+      },
+      "c0000060-0000-4000-8000-000000000002-a0": {
+        "id": "c0000060-0000-4000-8000-000000000002-a0",
+        "message": {
+          "id": "c0000060-0000-4000-8000-000000000002-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1711065780.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: noted, Unity for the game engine."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000060-0000-4000-8000-000000000002-u0",
+        "children": [
+          "c0000060-0000-4000-8000-000000000002-u1"
+        ]
+      },
+      "c0000060-0000-4000-8000-000000000002-u1": {
+        "id": "c0000060-0000-4000-8000-000000000002-u1",
+        "message": {
+          "id": "c0000060-0000-4000-8000-000000000002-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1711065840.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic note: change of plan, I've decided to use Godot instead of Unity for the game engine."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000060-0000-4000-8000-000000000002-a0",
+        "children": [
+          "c0000060-0000-4000-8000-000000000002-a1"
+        ]
+      },
+      "c0000060-0000-4000-8000-000000000002-a1": {
+        "id": "c0000060-0000-4000-8000-000000000002-a1",
+        "message": {
+          "id": "c0000060-0000-4000-8000-000000000002-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1711065900.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: understood, Godot from now on."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000060-0000-4000-8000-000000000002-u1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000060-0000-4000-8000-000000000002-a1",
+    "plugin_ids": null,
+    "conversation_id": "c0000060-0000-4000-8000-000000000002",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000060-0000-4000-8000-000000000002"
+  }
+]
