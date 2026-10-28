@@ -48,7 +48,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from knowledge_engine.orchestration.stage_keys import stage_key
-from knowledge_engine.providers.base import ModelRequest, quote_untrusted
+from knowledge_engine.providers.base import MessageRef, ModelRequest, quote_untrusted
 from knowledge_engine.taxonomy.registry import Dimension, TaxonomySnapshot
 
 STAGE_ID = "classify.segment.v1"
@@ -95,7 +95,7 @@ def _assignment(name: str, id_field: str, ids: tuple[str, ...]) -> type[BaseMode
         id_field: (_enum(ids), Field(json_schema_extra={"enum": list(ids)})),
         "rank": (Rank, ...),
         "confidence": (float, Field(ge=0.0, le=1.0)),
-        "evidence": (list[str], Field(min_length=1, max_length=MAX_EVIDENCE)),
+        "evidence": (list[MessageRef], Field(min_length=1, max_length=MAX_EVIDENCE)),
     }
     return create_model(name, __config__=ConfigDict(extra="forbid"), **fields)
 
