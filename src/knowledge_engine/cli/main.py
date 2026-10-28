@@ -1040,6 +1040,90 @@ def _access(settings: Settings, args: argparse.Namespace) -> CommandResult:
         engine.dispose()
 
 
+def _digest(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Ask for chat digests through request files a Claude session answers (NOTE-004).
+
+    Run it once to write the request files; a session fills the response
+    files (docs/runbooks/LABELLING_SESSION.md); run it again to collect,
+    check every quote and, with ``--vault``, write the rich notes.
+    """
+    from collections import Counter
+
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.digest.stage import DigestStage
+    from knowledge_engine.documents.rich_note import write_rich_note
+    from knowledge_engine.importer.records import ConversationRow
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.providers.file_batch import FileBatchProvider
+    from knowledge_engine.providers.ledger import ModelStageRunner
+    from knowledge_engine.rendering.transcript import find_conversation, load_conversation
+    from knowledge_engine.settings import EgressDisabledError
+
+    name = "digest run"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            if args.all:
+                ids = list(
+                    session.scalars(
+                        select(ConversationRow.conversation_id).order_by(
+                            ConversationRow.conversation_id
+                        )
+                    )
+                )
+            else:
+                found = [find_conversation(session, ref) for ref in args.conversations]
+                if None in found or not found:
+                    return CommandResult(
+                        name, ExitCode.USAGE, message="no such conversation", error_code="not_found"
+                    )
+                ids = [cid for cid in found if cid is not None]
+            provider = FileBatchProvider(settings.model_batch_root, args.run_id, settings.egress)
+            stage = DigestStage(ModelStageRunner(session, provider, settings.egress))
+            counts: Counter[str] = Counter()
+            try:
+                chats = [load_conversation(session, cid) for cid in ids]
+                outcomes = stage.run_all(chats)
+                session.commit()  # the requests and answers are kept before any note is written
+                for conversation_id, outcome in zip(ids, outcomes, strict=True):
+                    counts[outcome.state] += 1
+                    if outcome.state == "done" and args.vault is not None:
+                        write_rich_note(
+                            session,
+                            conversation_id,
+                            args.vault,
+                            settings.workspace_root / "archive",
+                            digest=outcome.digest,
+                        )
+                        counts["notes"] += 1
+            except EgressDisabledError:
+                return CommandResult(
+                    name,
+                    ExitCode.USAGE,
+                    message="text_llm is off: turn it on in [egress] to write request files",
+                    error_code="egress_off",
+                )
+    finally:
+        engine.dispose()
+    data = {k: counts.get(k, 0) for k in ("done", "pending", "review_required", "notes")}
+    data["chats"] = len(ids)
+    return CommandResult(
+        name,
+        data=data,
+        message=(
+            f"{data['done']} done, {data['pending']} waiting for answers, "
+            f"{data['review_required']} need review, {data['notes']} note(s) written"
+        ),
+    )
+
+
 def _web(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Fetch one web page safely and show where it came from (INT-001)."""
     from knowledge_engine.ingestion.web import WebFetchError, fetch_page, save_snapshot
@@ -1249,6 +1333,127 @@ def _taxonomy_report(settings: Settings, args: argparse.Namespace) -> CommandRes
         data=asdict(report),
         message=f"{summary}; {sum(report.open_proposals.values())} open proposal(s)",
     )
+
+
+def _private_target(settings: Settings, path: Path) -> bool:
+    """A file holding chat text may only go in the workspace or a ``private`` folder."""
+    target = path.resolve()
+    if target.is_relative_to(settings.workspace_root.resolve()):
+        return True
+    return any(part.lower() == "private" for part in target.parent.parts)
+
+
+def _write_private(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def _taxonomy_bootstrap(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """NOTE-006: pack, propose, sheet, review, summary and publish (one handler)."""
+    from dataclasses import asdict
+
+    from pydantic import ValidationError
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.segmentation.inventory import corpus_inventory
+    from knowledge_engine.taxonomy import bootstrap
+    from knowledge_engine.taxonomy.registry import TaxonomyRegistry
+
+    command = f"taxonomy {args.taxonomy_command}"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            command, ExitCode.ERROR, message="no database yet", error_code="no_database"
+        )
+    out: Path | None = getattr(args, "out", None)
+    if out is not None and not _private_target(settings, out):
+        return CommandResult(
+            command,
+            ExitCode.USAGE,
+            message="this file can hold private text: write it in the workspace or private/",
+            error_code="not_private",
+        )
+    kind = args.taxonomy_command
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            if kind == "pack" and out is not None:
+                pack = bootstrap.build_pack(
+                    list(corpus_inventory(session)), size=args.sample, seed=args.seed
+                )
+                _write_private(out, json.dumps(pack, ensure_ascii=False, indent=1))
+                return CommandResult(
+                    command,
+                    data={"sha256": bootstrap.pack_sha256(pack), **pack["corpus"]},
+                    message=f"pack written ({pack['corpus']['sampled']} segments)",
+                )
+            if kind == "propose":
+                pack = json.loads(args.pack.read_text(encoding="utf-8"))
+                try:
+                    plan = bootstrap.Plan.model_validate_json(args.plan.read_text(encoding="utf-8"))
+                    filed = bootstrap.file_plan(session, plan, pack)
+                except (ValidationError, bootstrap.PlanError) as problem:
+                    session.rollback()
+                    return CommandResult(
+                        command, ExitCode.USAGE, message=str(problem)[:2000], error_code="bad_plan"
+                    )
+                session.commit()
+                return CommandResult(
+                    command,
+                    data=asdict(filed),
+                    message=(
+                        f"{len(filed.proposed)} proposed, {filed.waiting_for_parent} waiting for "
+                        "an approved category"
+                    ),
+                )
+            if kind == "sheet" and out is not None:
+                sheet = bootstrap.review_sheet(session)
+                _write_private(out, json.dumps(sheet, ensure_ascii=False, indent=1))
+                return CommandResult(
+                    command, data={"open": len(sheet)}, message=f"{len(sheet)} open proposal(s)"
+                )
+            if kind == "review":
+                try:
+                    review = bootstrap.Review.model_validate_json(
+                        args.review.read_text(encoding="utf-8")
+                    )
+                except ValidationError as problem:
+                    return CommandResult(
+                        command,
+                        ExitCode.USAGE,
+                        message=str(problem)[:2000],
+                        error_code="bad_review",
+                    )
+                applied = bootstrap.apply_review(session, review)
+                session.commit()
+                return CommandResult(
+                    command,
+                    data=asdict(applied),
+                    message=(
+                        f"{len(applied.approved)} approved, {len(applied.rejected)} rejected, "
+                        f"{len(applied.refused)} refused"
+                    ),
+                )
+            if kind == "summary" and out is not None:
+                _write_private(out, bootstrap.summary_markdown(session))
+                return CommandResult(command, data={}, message="summary written")
+            try:
+                snapshot = TaxonomyRegistry(session).publish(
+                    args.version, author=args.author, note=args.note
+                )
+            except ValueError as problem:
+                return CommandResult(
+                    command, ExitCode.USAGE, message=str(problem), error_code="bad_version"
+                )
+            session.commit()
+            return CommandResult(
+                command,
+                data={"version": snapshot.version, "terms": len(snapshot.terms)},
+                message=f"published {snapshot.version} ({len(snapshot.terms)} terms)",
+            )
+    finally:
+        engine.dispose()
 
 
 def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
@@ -1822,6 +2027,84 @@ def _docs_check(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _docs_rubric(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Run the NOTE-011 code checks on chats' rich notes, built in memory (writes nothing)."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.digest.stage import stored_digest
+    from knowledge_engine.documents.rich_note import rich_conversation_note
+    from knowledge_engine.evaluation.note_checks import (
+        NOTE_CHECKS_VERSION,
+        CheckStatus,
+        check_note,
+        summarise,
+    )
+    from knowledge_engine.importer.records import ConversationRow
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.rendering.markdown import render_note
+    from knowledge_engine.rendering.transcript import find_conversation, load_conversation
+
+    name = "docs rubric"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            if args.all:
+                ids = list(
+                    session.scalars(
+                        select(ConversationRow.conversation_id).order_by(
+                            ConversationRow.conversation_id
+                        )
+                    )
+                )
+            else:
+                found = [find_conversation(session, ref) for ref in args.conversations]
+                if None in found or not found:
+                    return CommandResult(
+                        name, ExitCode.USAGE, message="no such conversation", error_code="not_found"
+                    )
+                ids = [cid for cid in found if cid is not None]
+            reports = []
+            for conversation_id in ids:
+                digest = stored_digest(session, load_conversation(session, conversation_id))
+                note = rich_conversation_note(session, conversation_id, digest=digest)
+                reports.append(check_note(session, conversation_id, render_note(note.model)))
+    finally:
+        engine.dispose()
+    failed = [r for r in reports if not r.passed]
+    data = {
+        "version": NOTE_CHECKS_VERSION,
+        "notes": len(reports),
+        "passed": len(reports) - len(failed),
+        "checks": summarise(reports),
+        "problems": [
+            {
+                "conversation_id": r.conversation_id,
+                "check": f.check,
+                "status": f.status.value,
+                "problems": list(f.problems),
+            }
+            for r in reports
+            for f in r.findings
+            if f.status is not CheckStatus.PASS
+        ],
+    }
+    if failed:
+        return CommandResult(
+            name,
+            ExitCode.ERROR,
+            data=data,
+            message=f"{len(failed)} of {len(reports)} note(s) failed a check",
+            error_code="rubric_failed",
+        )
+    return CommandResult(name, data=data, message=f"{len(reports)} note(s) passed every check")
+
+
 def _corrections(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """List human corrections and whether they still stand after re-imports (IMP-006)."""
     from sqlalchemy.orm import Session
@@ -1913,14 +2196,28 @@ def _docs_note(settings: Settings, session: Any, args: argparse.Namespace) -> Co
                 command, ExitCode.USAGE, message="no such conversation", error_code="not_found"
             )
         # v2 is the rich-note layout (NOTE-001); v1 (DOC-003) stays the default for now.
-        writer = write_rich_note if args.template == "v2" else write_conversation_note
-        path = writer(
-            session,
-            conversation_id,
-            args.vault,
-            settings.workspace_root / "archive",
-            taxonomy=snapshot,
-        )
+        if args.template == "v2":
+            from knowledge_engine.digest.stage import stored_digest
+            from knowledge_engine.rendering.transcript import load_conversation
+
+            # A digest already collected (NOTE-004) fills the summary; none is asked for here.
+            digest = stored_digest(session, load_conversation(session, conversation_id))
+            path = write_rich_note(
+                session,
+                conversation_id,
+                args.vault,
+                settings.workspace_root / "archive",
+                taxonomy=snapshot,
+                digest=digest,
+            )
+        else:
+            path = write_conversation_note(
+                session,
+                conversation_id,
+                args.vault,
+                settings.workspace_root / "archive",
+                taxonomy=snapshot,
+            )
         # The file name holds the (private) chat title, so only its ID part is printed.
         # Plain "..." because a Windows console can't print the ellipsis character.
         shown = f"{path.parent.as_posix()}/... ({path.stem.rsplit('(', 1)[-1]}.md"
@@ -3093,6 +3390,18 @@ def build_parser() -> argparse.ArgumentParser:
     backup_restore.add_argument("folder", type=Path, help="the backup folder")
     backup_restore.add_argument("--to", type=Path, required=True, help="an empty folder")
     backup_restore.set_defaults(handler=_backup)
+    digest = commands.add_parser(
+        "digest", help="summarise chats through request files a Claude session answers"
+    )
+    digest_commands = digest.add_subparsers(dest="digest_command", required=True)
+    digest_run = digest_commands.add_parser(
+        "run", help="write digest requests, or collect answers and write notes (run again)"
+    )
+    digest_run.add_argument("conversations", nargs="*", help="conv_ or export conversation IDs")
+    digest_run.add_argument("--all", action="store_true", help="every imported chat")
+    digest_run.add_argument("--run-id", required=True, help="the batch folder name, e.g. gold-40")
+    digest_run.add_argument("--vault", type=Path, help="write each finished chat's rich note here")
+    digest.set_defaults(handler=_digest)
     web = commands.add_parser("web", help="fetch web pages (allowlisted, network_fetch on)")
     web_commands = web.add_subparsers(dest="web_command", required=True)
     web_fetch = web_commands.add_parser("fetch", help="fetch one page into located blocks")
@@ -3120,6 +3429,42 @@ def build_parser() -> argparse.ArgumentParser:
         "report", help="duplicates, parent loops, orphans and review activity (read-only)"
     )
     tax_report.set_defaults(handler=_taxonomy_report)
+    # NOTE-006: bootstrap the first taxonomy (proposer and reviewer are separate sessions).
+    tax_pack = taxonomy_commands.add_parser(
+        "pack", help="write a private sample pack for the proposer session"
+    )
+    tax_pack.add_argument("--out", type=Path, required=True, help="inside a private folder")
+    tax_pack.add_argument("--sample", type=int, default=300, help="segments to sample")
+    tax_pack.add_argument("--seed", default="tax-v1", help="same seed, same sample")
+    tax_pack.set_defaults(handler=_taxonomy_bootstrap)
+    tax_propose = taxonomy_commands.add_parser(
+        "propose", help="file a proposer's plan as proposals (run again after each review)"
+    )
+    tax_propose.add_argument("plan", type=Path, help="the plan JSON")
+    tax_propose.add_argument("--pack", type=Path, required=True, help="the pack it was written for")
+    tax_propose.set_defaults(handler=_taxonomy_bootstrap)
+    tax_sheet = taxonomy_commands.add_parser(
+        "sheet", help="write the open proposals for a reviewer"
+    )
+    tax_sheet.add_argument("--out", type=Path, required=True, help="inside a private folder")
+    tax_sheet.set_defaults(handler=_taxonomy_bootstrap)
+    tax_review = taxonomy_commands.add_parser(
+        "review", help="apply a reviewer's decisions (never the proposer's own)"
+    )
+    tax_review.add_argument("review", type=Path, help="the review JSON")
+    tax_review.set_defaults(handler=_taxonomy_bootstrap)
+    tax_summary = taxonomy_commands.add_parser(
+        "summary", help="write a one-page summary of the vocabulary for the owner"
+    )
+    tax_summary.add_argument("--out", type=Path, required=True, help="inside a private folder")
+    tax_summary.set_defaults(handler=_taxonomy_bootstrap)
+    tax_publish = taxonomy_commands.add_parser(
+        "publish", help="freeze the approved vocabulary as a version (the owner's decision)"
+    )
+    tax_publish.add_argument("version", help="e.g. tax-1")
+    tax_publish.add_argument("--author", required=True, help="who decided to publish")
+    tax_publish.add_argument("--note", help="why")
+    tax_publish.set_defaults(handler=_taxonomy_bootstrap)
 
     search = commands.add_parser("search", help="find messages by words, phrase or exact text")
     search.add_argument("query", help="what to look for")
@@ -3229,6 +3574,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     docs_check.add_argument("--vault", type=Path, required=True, help="the vault folder")
     docs_check.set_defaults(handler=_docs_check)
+    docs_rubric = docs_commands.add_parser(
+        "rubric", help="check chats' rich notes: real citations, cited claims, budget (NOTE-011)"
+    )
+    docs_rubric.add_argument("conversations", nargs="*", help="conv_ or export conversation IDs")
+    docs_rubric.add_argument("--all", action="store_true", help="every imported chat")
+    docs_rubric.set_defaults(handler=_docs_rubric)
 
     related = commands.add_parser("related", help="links between conversations (forks, quotes)")
     related_commands = related.add_subparsers(

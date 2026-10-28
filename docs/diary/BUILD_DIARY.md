@@ -2663,6 +2663,41 @@ Fix attempts: 0.
 
 **Next exact task:** open the queued PRs, then INT-003 (watched folders).
 
+### 14:05 — NOTE-006 (#278): a taxonomy discovered from the real chats, reviewed by a separate Claude
+
+Nothing can be classified until there's a published vocabulary, and the real workspace had none. That's why every chat note so far said "unclassified".
+
+What I built (`taxonomy/bootstrap.py`, runbook `docs/runbooks/TAXONOMY_BOOTSTRAP.md`):
+
+- `ke taxonomy pack`: a fair sample of segments, rare themes first (the NRM-006 sampler), with a short excerpt each and the TF-IDF groups as hints. It writes only to a private folder, and the CLI refuses any other path.
+- The proposer writes a JSON plan, and code checks it before anything is filed. It must match the pack's fingerprint, cite only sampled segments, have no duplicates and stop at two levels. `ke taxonomy propose` files TAX-004 proposals. Subcategories wait until their category is approved.
+- `ke taxonomy sheet` / `review` / `summary` / `publish`. TAX-004 already refuses a reviewer who is also the proposer.
+
+The real run (no paid API; everything private stays in `private/taxonomy/tax-1/`):
+
+- The workspace was backed up first. The pack is 300 segments from 1,743 segments in 1,158 chats.
+- **First problem:** about a third of the excerpts began with the same pasted custom-instructions text, so they all looked alike. The fix leaves out any paragraph repeated across many segments: 59 paragraphs were dropped, and the excerpts now show what each segment is actually about.
+- **Proposer:** this thread proposed 12 categories with 37 subcategories, 9 activities and 6 outputs, each with a definition and the segments it rests on.
+- **Reviewer:** a separate Claude session on a different model, named `claude-session-tax-reviewer-b`, read only the pack and the review sheets. Over 3 rounds it approved 64 terms, relabelled 2 ("Play" became "Casual Fun"; "Quick Everyday Questions" became "Identify and Translate Things") and rejected 3 with reasons: a catch-all "Advice and How-To", a "VR Development Practice" subcategory (VR is better as a tag than a subject) and a duplicate. It also found a real gap, no category for programming outside game engines, so I proposed "Software and Scripting" and it approved it.
+- **Second problem:** in round 1 the reviewer admitted it had only read the first ~150 characters of each excerpt. I asked it to re-check every round-1 approval against the full excerpts. All 26 held.
+- **Third problem:** relabelling exposed a bug. Re-running the plan re-filed "Play", because the approved term was now called "Casual Fun", and subcategories couldn't find a renamed parent. A term approved under a new label now still counts as known, and there is a test for it.
+- The result: 13 categories with 37 subcategories, 8 activities and 6 outputs. The governance report finds no issues and no open proposals. **Not published:** publishing is Louis's decision (D2), made from `private/taxonomy/tax-1/summary.md`.
+
+Checks:
+```
+tests/integration/test_taxonomy_bootstrap.py   5 passed
+```
+Fix attempts: 3 (newline escaping in a patch script, the boilerplate excerpts, the relabel bug).
+
+**Teach-back (`taxonomy/bootstrap.py`):** It turns a sample of my chats into a first list of categories without anyone checking their own work: one Claude proposes the categories with evidence, a different Claude approves or rejects each one with a reason, and code refuses anything that doesn't point at real sampled chats. Subcategories only get filed once their parent category has been approved. Nothing becomes the official vocabulary until I publish it.
+
+Talking points:
+- "One AI proposed the categories, a different AI reviewed them, and I approve the publish. Nobody marks their own homework."
+- "The reviewer admitted it had only skimmed the first pass, so I made it re-check everything against the full text. It held up."
+- "A third of my chats started with the same pasted instructions; the sampler now ignores repeated boilerplate so the categories come from what I actually talked about."
+
+**Next exact task:** Louis publishes tax-1 (or asks for changes), then classify the 40 gold chats under it.
+
 ### 12:20 — INT-003: watched folders
 
 - `importer/watch.py`: `FolderWatcher.tick()` looks at a folder once. Each top-level export folder or ZIP must have the same metadata fingerprint on two looks at least `settle_s` apart (so a half-downloaded ZIP waits), then it is compared with the watch state: same metadata is skipped unread, the same contents (touched, re-downloaded, or a second copy under another name) are recorded without importing, and only new contents go to the importer.
@@ -2699,6 +2734,24 @@ tests/unit/test_digest_contract.py   11 passed
 Fix attempts: 0.
 
 **Next exact task:** NOTE-003 (the digest stage behind the provider switch).
+
+### 13:30 — NOTE-003: the digest stage
+
+- `digest/stage.py`: `DigestStage.run(chat)` sends one request per chat through `ModelStageRunner`, so it gets the cache, the single repair, `review_required` and the egress switch for free. No new retry or cache code.
+- The model sees the chat's active path (the version the user ended on), every message tagged `[m:ID] role:` and escaped as untrusted data, plus one line per fork ("after [m:X]: edit fork, 1 other version(s) not shown"). The other versions are not sent; the note's Branches section shows them from the stored tree.
+- A chat over the size budget is split between exchanges, with one shared exchange between neighbours (the segmenter's rule), never inside a message. Each part is labelled "Part n of N" and the answers are merged in code: purpose and intent from the first part, outcome and status from the last, summary sentences round-robin (at most 4), lists de-duplicated.
+- The stage key covers the exact text, the fork lines, the part label and the code, prompt and schema versions.
+- A repair is a new ask, so with a batch provider it is answered on a later run: the first run says `pending`, the next one finishes. A digest whose summary sentences all fail the quote check is `review_required`, not a note.
+
+**Teach-back (`DigestStage`):** For each chat it builds one request holding the conversation as the user finally left it, plus a note of where the chat forked, and hands it to the same stage runner every model step uses. That runner answers from the cache if it has seen the exact same request, allows one repair for a malformed answer, and refuses to send anything if model access is switched off. When the answer comes back it is checked quote by quote, and long chats are asked in parts and stitched back together without ever cutting a message.
+
+Checks:
+```
+tests/integration/test_digest_stage.py   7 passed (FakeProvider, no network)
+```
+Fix attempts: 1 (my new test expected a repair to finish in the same run; it arrives on the next one, as with any batch answer).
+
+**Next exact task:** NOTE-004 (runbook and synthetic dry run), then NOTE-005.
 
 ### 13:20 — NOTE-001 (#273): the rich-note layout, built from what the engine already stores
 
@@ -2777,6 +2830,24 @@ Fix attempts: 1 (my test's "common phrase" was said once per chat, so it never r
 
 **Next exact task:** merge the open PRs on full green, then wire keywords into the note and start NOTE-011's code checks.
 
+### 13:55 — NOTE-004: digests from a Claude session, end to end
+
+- `ke digest run [IDs | --all] --run-id R [--vault V]`: the first run writes the digest requests into `private/model-batches/R/` and says how many are waiting; a Claude session fills the response files; running it again collects, checks every quote and writes the rich notes. All chats go in one submit, so the requests are packed into as few files as fit, not one file per chat.
+- `rich_note.py` now takes a digest: the summary box, purpose, outcome, status and intent in the knowledge card, insights, tensions and next steps (each with its folded, re-checked evidence), open questions from the digest under the extractor's, and topic candidates. Without a digest the note is exactly as before (the NOTE-001 tests are unchanged and pass).
+- `ke docs chat --template v2` uses a digest that was already collected, with model access off. `stored_digest` reads the stored answers only; it never asks.
+- The runbook (`docs/runbooks/LABELLING_SESSION.md`) has a digest section: write, answer in a fresh session with the deny rules, collect, what to do at a usage limit, and repairs.
+
+**Teach-back (`ke digest run`):** The first time it runs, it writes every chat's digest question into request files and stops, because the answers come from a Claude session on my subscription, not from a paid API. Once the session has written its answers next to them, the same command reads them back, throws out any sentence whose quotes aren't really in the chat, and writes a readable note for each chat that passed. Running it a third time asks nothing new, because every answer is already stored.
+
+Checks:
+```
+tests/integration/test_digest_dry_run.py   3 passed (egress off writes nothing; 3 chats end to end; docs chat reuses the digest)
+tests/integration/test_rich_note.py        10 passed (unchanged)
+```
+Fix attempts: 1 (the first version wrote one request file per chat; now one submit for all).
+
+**Next exact task:** NOTE-005 (model-backed knowledge extractor).
+
 ### 13:30 — A design pass on the dashboard (`ke ui`)
 
 Louis asked for the local dashboard to be easier to use and nicer to look at. It worked, but it was a page of links separated by dots, long grey tables and raw state names like `review_required`, and on a phone the tables pushed the whole page sideways.
@@ -2814,3 +2885,59 @@ Talking points:
 - "The tests guard the exact numbers on the page, so a redesign that broke them got caught straight away."
 
 **Next exact task:** Louis looks at the screenshots and says what to change; possible follow-ups are a light/dark switch and a chart on the segment-labels page.
+
+
+### 13:50 — CI: why main kept going red on Windows + Python 3.12 only
+
+Louis was getting a stream of "Run failed" emails. I read every failing run on main and on the PR branches.
+
+What was actually failing:
+
+- **On main (3 out of 3 red runs: 9b5e807, 94a7cc0, b8046be)** the same unit test, `test_interrupted_batch_is_abandoned_never_succeeded`, failed on `windows-latest, 3.12` only. Every one of those PRs had passed all four jobs before it merged, so this wasn't merging early. It was a flaky test that only shows up sometimes.
+- **On PR branches (OPS-009 at 4e5e54e and 1b80610)** a 64-bit Windows ctypes crash in the peak-memory code. That thread fixed it on its own branch (13fa9a5) before merging, so it's not on main.
+- **Once, on main (b8046be)**, the browser-import test (`test_import_from_the_browser_runs_and_shows_the_report`, issue #288) saw the import job end as "didn't finish". The reason was in the page, but pytest cut the page short with `...` right where the reason was.
+
+The root cause of the main failure: the import ledger says "the latest import is the one with the newest start time". Python 3.12 on Windows reads the clock in steps of about 16 milliseconds (3.13 switched to the precise clock, which is why the 3.13 Windows job never failed). The test starts a batch, "crashes", and starts another one straight after; if both land in the same 16 ms step they get identical start times and "latest" is a coin toss. It's a real bug, not just a test problem: `ke status` and the home page in the web UI use the same ordering.
+
+How I proved it: I couldn't run Windows here, so I wrote a throwaway pytest plugin (kept out of the repo) that makes the clock tick in coarse steps. With a coarse enough tick the test fails every time on Linux; with the fix it passes at both the 16 ms and an exaggerated 2 s tick.
+
+The fix (`importer/ledger.py`): when a batch starts, its start time is "now, or one microsecond after the newest batch, whichever is later". Start times are now strictly increasing, so all three readers agree on which import is latest. No test, threshold or evaluation rule was changed.
+
+For #288 I couldn't reproduce it (25 runs on Linux, all passed), and guessing a fix would be dishonest. Instead `pyproject.toml` now sets `verbosity_assertions = 2`, so a failed assert prints long strings in full while the rest of the output stays quiet. Next time it fails, CI will show the job's actual error. #288 stays open.
+
+**Teach-back (`importer/ledger.py`, `_next_start_time`):** Every import gets a start time, and "the latest import" means the one with the newest time. On some Windows setups the clock only moves every 16 milliseconds, so two quick imports could tie and the app couldn't tell which was newer. Now a new import's time is always at least a microsecond after the previous one, so there's never a tie.
+
+Checks:
+```
+python -m knowledge_engine.devtools.ci   lint, format, types, guard ok; 1353 passed, 22 skipped
+coarse-clock plugin, 2 s tick:  before the fix 1 failed / after 49 passed (ledger + UI tests)
+```
+Fix attempts: 1.
+
+Talking points:
+- "A test that only failed on one OS and one Python version turned out to be a clock-resolution bug: Python 3.12 on Windows only ticks every 16 ms."
+- "I couldn't run Windows, so I faked a coarse clock in a test plugin to reproduce it deterministically before fixing it."
+- "When I couldn't reproduce the second flake, I didn't guess. I made CI print the full error so the next failure explains itself."
+
+### 15:30 — NOTE-011 (code half): checking that a rich note is honest
+
+Before anyone scores whether a note is *good*, a program can check it isn't making things up. `evaluation/note_checks.py` reads the rendered Markdown, the way a reader would, and compares it with the stored chat:
+
+- **citations_real**: every `[m12]` link points at a message of this chat, and the number is the one the transcript shows (`alt` off the active path).
+- **claims_cited**: every summary sentence, the Purpose and Outcome cells, and every item under Decisions, Suggestions, Action items, Open questions, Requirements, Insights, Tensions and Next steps cites a message.
+- **decisions_user_held**: every decision and "ruled out" record is held by the user and quotes the user.
+- **tensions_next_steps**: a next step that repeats something ruled out, or restates a tension, is a warning (word overlap, so it can't be a hard fail).
+- **empty_sections** and **budget**: no evidence box under an empty section; the body under its length budget.
+- `ke docs rubric [chats] [--all]` builds each chat's note in memory (with its stored digest), runs the checks, and prints counts per check and the problems (IDs only, no chat text). It writes nothing.
+
+The first run of the checks on the engine's own note found something: a citation inside the knowledge card's table writes its pipe as `\|`, which my link pattern read as part of the anchor. The note was right (that's how Obsidian tables need it); the pattern was fixed.
+
+**Teach-back (`check_note`):** It takes a finished note and the chat it came from and checks six things a program can judge: every message number points at the right message, every claim has a number, every decision is the user's own words, no next step repeats a rejected idea, empty sections stay empty, and the note isn't too long. It reads the Markdown rather than the renderer's internals, so a renderer bug shows up too. It doesn't judge whether the summary is right; that's the independent reference set on the PC.
+
+Checks:
+```
+tests/integration/test_note_checks.py   7 passed (the real note passes; each break caught by exactly one check)
+```
+Fix attempts: 2 (my FakeProvider digest left out the required intent; the table-cell pipe escape).
+
+**Next exact task:** keywords into the note (NOTE-007 wiring), then NOTE-008.

@@ -939,3 +939,12 @@ digest/contract.py (DigestAnswer extra=forbid, cited items, FIELD_PROVENANCE, re
 
 ## 2026-10-28 14:55 NOTE-007 (#279)
 documents/keywords.py (keyword_candidates: must/should/optional with reasons, TF-IDF 1-3-grams, corpus calibration, typo canonicalisation, alias match, setup-text and general-title exclusions; propose_topics files unmatched digest topics as TAX-004 add proposals once). Tests: tests/unit/test_keyword_candidates.py (8).
+
+## 2026-10-28 13:30 NOTE-003 (#275)
+digest/stage.py (DigestStage via ModelStageRunner: active path + fork lines, untrusted quoting, split_parts without clipping, merge_answers, stage key over text and versions). Tests: tests/integration/test_digest_stage.py (7).
+
+## 2026-10-28 13:55 NOTE-004 (#276)
+`ke digest run` (FileBatchProvider + DigestStage.run_all, --vault writes notes), stored_digest, rich_note digest wiring, docs chat v2 uses a stored digest, runbook section. Tests: tests/integration/test_digest_dry_run.py (3); test_rich_note.py unchanged.
+
+## 2026-10-28 15:30 NOTE-011 code checks (#283)
+evaluation/note_checks.py (check_note: citations_real, claims_cited, decisions_user_held, tensions_next_steps (warn), empty_sections, budget; reads the rendered Markdown), `ke docs rubric [chats] [--all]`. Tests: tests/integration/test_note_checks.py (7).
