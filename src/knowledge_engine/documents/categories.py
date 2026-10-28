@@ -16,6 +16,12 @@ module works out, for each term a segment was labelled with:
   changed it, set it with no classifier answer, or not reviewed. A review
   made under an older vocabulary that no longer fits is "out of date".
 
+``suggested_category`` covers a chat with no settled domain label because
+every answer went to review (NOTE-018): it names the classifier's best
+candidate from those unsettled answers, so a note can say "suggested,
+waiting for review" instead of a bare "unclassified". It is never a label:
+the chat's category stays unset until a review settles it.
+
 ``waiting_candidates`` lists open TAX-004 proposals whose evidence points
 at this chat (its segments or its ID): new terms a reviewer hasn't decided
 on. They are shown as candidates and never as labels.
@@ -36,7 +42,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from knowledge_engine.classification.classifier import DONE
+from knowledge_engine.classification.classifier import DONE, REVIEW_REQUIRED
 from knowledge_engine.classification.store import (
     ClassificationLabelRow,
     ClassificationRow,
@@ -74,6 +80,23 @@ class CategoryShare:
     segments: tuple[int, ...]
     evidence: tuple[str, ...]
     verdicts: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Suggestion:
+    """The classifier's best unsettled domain candidate for a chat.
+
+    Attributes:
+        term_id: The approved term it named.
+        label: ``Category › Subcategory`` (or the category alone).
+        segments: 1-based numbers of the segments that named it as primary.
+        confidence: The highest confidence it was given.
+    """
+
+    term_id: str
+    label: str
+    segments: tuple[int, ...]
+    confidence: float
 
 
 def _label(snapshot: TaxonomySnapshot, term_id: str) -> str:
@@ -200,3 +223,50 @@ def waiting_candidates(session: Session, chat: StoredConversation) -> list[str]:
             if label and label not in labels:
                 labels.append(label)
     return sorted(labels, key=str.casefold)
+
+
+def suggested_category(
+    session: Session, chat: StoredConversation, snapshot: TaxonomySnapshot
+) -> Suggestion | None:
+    """The best primary domain candidate among answers waiting for review.
+
+    Only for a chat with no settled domain label (``category_shares`` is
+    empty): once any segment is settled, that is the chat's category and no
+    suggestion is made. Candidates are weighed like settled labels, by the
+    messages in the segments that named them; ties go to the higher
+    confidence, then the lower ID.
+    """
+    if category_shares(session, chat, snapshot):
+        return None
+    weight: dict[str, int] = defaultdict(int)
+    where: dict[str, list[int]] = defaultdict(list)
+    best: dict[str, float] = defaultdict(float)
+    for number, segment in enumerate(load_segments(session, chat), start=1):
+        row = session.scalar(
+            select(ClassificationRow)
+            .where(
+                ClassificationRow.segment_id == segment.segment_id,
+                ClassificationRow.taxonomy_version == snapshot.version,
+                ClassificationRow.state == REVIEW_REQUIRED,
+            )
+            .order_by(ClassificationRow.updated_at.desc(), ClassificationRow.classification_id)
+        )
+        if row is None:
+            continue
+        for label in session.scalars(
+            select(ClassificationLabelRow).where(
+                ClassificationLabelRow.classification_id == row.classification_id,
+                ClassificationLabelRow.field == Dimension.DOMAIN.value,
+                ClassificationLabelRow.rank == PRIMARY,
+            )
+        ):
+            # A term retired since the answer was given is no candidate.
+            if label.target_id not in snapshot.allowed_ids(Dimension.DOMAIN):
+                continue
+            weight[label.target_id] += len(segment.messages)
+            where[label.target_id].append(number)
+            best[label.target_id] = max(best[label.target_id], label.confidence)
+    if not weight:
+        return None
+    term = min(weight, key=lambda t: (-weight[t], -best[t], t))
+    return Suggestion(term, _label(snapshot, term), tuple(where[term]), best[term])
