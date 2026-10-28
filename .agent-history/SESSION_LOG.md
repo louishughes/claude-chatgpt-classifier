@@ -813,3 +813,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - evaluation/end_to_end.py (check_vault, LinkCheck, NoteShape, golden_key, vault_golden, golden_diff, run_end_to_end, EndToEndReport, to_dict, build_fixture, E2E_FIXTURE, E2E_GOLDEN); fixtures tests/fixtures/e2e/export.zip + vault_golden.json; `ke eval e2e [--update-golden]`, `ke docs check --vault`. No migration.
 - Tests: test_end_to_end.py (5). Full suite 1155 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: EVAL-007.
+
+## 2026-10-28 14:50 EVAL-007 (#111)
+- evaluation/gate.py (Status, Outcome, Check, GateInputs, Result, GateReport, CHECKS, run_gate, classification_report, extraction_report, to_dict, to_markdown); `ke eval gate [--fixtures] [--out] [--commit]`; report docs/evaluation/EVAL-007_GATE.md. Filed #240 (EVAL-012 relationship answer key). No migration.
+- Tests: test_gate.py (4). Full suite 1159 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: EVAL-008.

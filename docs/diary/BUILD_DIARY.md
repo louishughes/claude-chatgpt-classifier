@@ -1957,3 +1957,30 @@ ke eval e2e             # PASS: 13 notes, 35 links and 4 embeds all resolve; mat
 Fix attempts: 2 (a taxonomy alias equal to its own label collides with the label; a root-level note was listed twice by name and path, which counted as ambiguous).
 
 **Next exact task:** EVAL-007.
+
+### 14:50 — EVAL-007: one pass, four labels, then stop
+**EVAL-007** (`evaluation/gate.py`, `ke eval gate`) is the release gate. It runs twelve checks against the proposed release thresholds in TEST_STRATEGY §6, each **exactly once**, then stops. Nothing is re-run to get a better answer. If a check crashes, that check is a FAIL and the rest still run. Each line carries:
+- a label: PASS, FAIL, REVIEW (the hard rule held but some cases wait for a person) or BLOCKED (can't be measured here);
+- the threshold next to the measured number;
+- which data it was measured on (`synthetic` or `real`);
+- the command that runs it alone.
+
+The overall result is the worst label. The gate fails only on a FAIL. REVIEW and BLOCKED are filed, not hidden.
+
+Result (`docs/evaluation/EVAL-007_GATE.md`): 7 PASS, 2 REVIEW, 3 BLOCKED, 0 FAIL.
+- **REVIEW:** the synthetic golden set has no ambiguous segments, so "ambiguous cases flagged, not forced" can't be shown (the gold set isn't mine to change); and two true replacements wait for review (EVAL-005).
+- **BLOCKED:** directional relationship precision has no answer key (filed as EVAL-012, #240); the private golden set is scored on Louis's PC; the paid-provider smoke is parked.
+
+Every PASS is on synthetic fixtures, and the report says so on every line.
+
+**Teach-back (`evaluation/gate.py`):** "It runs every quality check once and writes one table: pass, fail, needs a person, or can't be measured yet, with the target next to each number. It never retries to get a nicer result, and if one check crashes the rest still run and the crash shows as a failure. Anything measured only on fake data is labelled as such, so a green line can't be mistaken for real-world quality."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 161 source files
+pytest -q               # 1159 passed, 7 skipped
+migration drift         # 0
+ke eval gate            # BLOCKED: 3 BLOCKED, 2 REVIEW, 7 PASS (0 FAIL; gate passes)
+```
+Fix attempts: 0.
+
+**Next exact task:** EVAL-008.

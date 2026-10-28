@@ -1189,6 +1189,38 @@ def _eval_e2e(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _eval_gate(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Run every evaluation once and label each PASS/FAIL/REVIEW/BLOCKED (EVAL-007)."""
+    import tempfile
+
+    from knowledge_engine.evaluation.gate import GateInputs, run_gate, to_dict, to_markdown
+
+    if not (args.fixtures / "chatgpt").is_dir():
+        return CommandResult(
+            "eval gate",
+            ExitCode.USAGE,
+            message="fixtures folder not found (run from the repository, or pass --fixtures)",
+            error_code="no_fixtures",
+        )
+    with tempfile.TemporaryDirectory(prefix="ke-gate-") as scratch:
+        report = run_gate(GateInputs(args.fixtures, Path(scratch)))
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(to_markdown(report, commit=args.commit), encoding="utf-8")
+    data = to_dict(report)
+    summary = ", ".join(f"{n} {s}" for s, n in report.counts().items() if n)
+    if not report.passed:
+        failed = [c["check"] for c in data["checks"] if c["status"] == "FAIL"]
+        return CommandResult(
+            "eval gate",
+            ExitCode.ERROR,
+            data=data,
+            message=f"FAIL ({summary}): " + ", ".join(failed),
+            error_code="gate_failed",
+        )
+    return CommandResult("eval gate", data=data, message=f"{report.overall.value}: {summary}")
+
+
 def _docs_check(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Check every link, embed and frontmatter block in a vault, as Obsidian reads them."""
     from knowledge_engine.evaluation.end_to_end import check_vault
@@ -2163,6 +2195,18 @@ def build_parser() -> argparse.ArgumentParser:
         help="write the vault shape as the new golden (review the diff before committing)",
     )
     e2e.set_defaults(handler=_eval_e2e)
+    gate = eval_commands.add_parser(
+        "gate", help="run every evaluation once: PASS, FAIL, REVIEW or BLOCKED for each"
+    )
+    gate.add_argument(
+        "--fixtures",
+        type=Path,
+        default=Path("tests/fixtures"),
+        help="the fixtures folder (default: the repository's)",
+    )
+    gate.add_argument("--out", type=Path, help="write the Markdown report here")
+    gate.add_argument("--commit", help="the commit the report describes (for the record)")
+    gate.set_defaults(handler=_eval_gate)
 
     transcript = commands.add_parser("transcript", help="YouTube video transcripts")
     transcript_commands = transcript.add_subparsers(
