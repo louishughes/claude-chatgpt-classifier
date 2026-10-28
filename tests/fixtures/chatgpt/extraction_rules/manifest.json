@@ -1,0 +1,102 @@
+{
+  "fixture_format_version": 1,
+  "case": "extraction_rules",
+  "synthetic": true,
+  "layout": "official",
+  "proves": "EXT-003/EXT-004: an assistant suggestion followed by a curious question is not accepted; an explicit yes, a no, a conditional ok and the user's own decision are told apart; hard and soft requirements, strong and mild preferences, and reported or quoted views are kept separate from the user's own.",
+  "expected": {
+    "conversations": 3,
+    "decisions": {
+      "c0000030-0000-4000-8000-000000000001": [
+        [
+          "proposal",
+          "absent",
+          "c0000030-0000-4000-8000-000000000001-a0"
+        ]
+      ],
+      "c0000030-0000-4000-8000-000000000002": [
+        [
+          "proposal",
+          "absent",
+          "c0000030-0000-4000-8000-000000000002-a0"
+        ],
+        [
+          "decision",
+          "explicit",
+          "c0000030-0000-4000-8000-000000000002-u1"
+        ],
+        [
+          "proposal",
+          "absent",
+          "c0000030-0000-4000-8000-000000000002-a1"
+        ],
+        [
+          "rejection",
+          "explicit",
+          "c0000030-0000-4000-8000-000000000002-u2"
+        ],
+        [
+          "proposal",
+          "absent",
+          "c0000030-0000-4000-8000-000000000002-a2"
+        ],
+        [
+          "decision",
+          "conditional",
+          "c0000030-0000-4000-8000-000000000002-u3"
+        ],
+        [
+          "decision",
+          "explicit",
+          "c0000030-0000-4000-8000-000000000002-u4"
+        ]
+      ]
+    },
+    "preferences": {
+      "c0000030-0000-4000-8000-000000000003": [
+        [
+          "preference",
+          "soft",
+          "for",
+          null,
+          "c0000030-0000-4000-8000-000000000003-u0"
+        ],
+        [
+          "requirement",
+          "hard",
+          null,
+          null,
+          "c0000030-0000-4000-8000-000000000003-u0"
+        ],
+        [
+          "requirement",
+          "soft",
+          null,
+          null,
+          "c0000030-0000-4000-8000-000000000003-u0"
+        ],
+        [
+          "preference",
+          "soft",
+          "for",
+          "external",
+          "c0000030-0000-4000-8000-000000000003-u0"
+        ],
+        [
+          "preference",
+          "hard",
+          "against",
+          null,
+          "c0000030-0000-4000-8000-000000000003-u1"
+        ],
+        [
+          "preference",
+          "soft",
+          "for",
+          "external",
+          "c0000030-0000-4000-8000-000000000003-u2"
+        ]
+      ]
+    }
+  }
+}

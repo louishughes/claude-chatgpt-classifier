@@ -1300,6 +1300,103 @@ def _classification_cases() -> list[Case]:
     ]
 
 
+def _extraction_cases() -> list[Case]:
+    """EXT-003 / EXT-004: who decided what, and whose preference it is."""
+    curious = _chat(
+        "c0000030-0000-4000-8000-000000000001",
+        "Synthetic curious user",
+        60,
+        [
+            (
+                "Synthetic question: how should I store save files?",
+                "Synthetic answer: I suggest using SQLite for the save files.",
+            ),
+            (
+                "Interesting, how does SQLite handle concurrent writes? Synthetic reply.",
+                "Synthetic answer: it locks the whole file during a write.",
+            ),
+        ],
+    )
+    shed = _chat(
+        "c0000030-0000-4000-8000-000000000002",
+        "Synthetic shed choices",
+        61,
+        [
+            (
+                "Synthetic question: what base for my shed?",
+                "Synthetic answer: I recommend a gravel base for the shed.",
+            ),
+            ("Yes, let's do that. Synthetic reply.", "Synthetic answer: you could paint it green."),
+            ("No, not green. Synthetic reply.", "Synthetic answer: you could add a skylight."),
+            ("Ok, as long as it doesn't leak. Synthetic reply.", "Synthetic answer: noted."),
+            (
+                "Synthetic note: I've decided to use cedar cladding.",
+                "Synthetic answer: cedar weathers well.",
+            ),
+        ],
+    )
+    prefs = _chat(
+        "c0000030-0000-4000-8000-000000000003",
+        "Synthetic preferences",
+        62,
+        [
+            (
+                "Synthetic note: I prefer dark themes in every editor. The build must finish "
+                "in under ten minutes. Ideally the tests run in parallel. My client said they "
+                "want a light theme.",
+                "Synthetic answer: I prefer spaces myself, and you must be busy.",
+            ),
+            (
+                "Synthetic note: I really hate tabs for indentation.",
+                "Synthetic answer: spaces it is.",
+            ),
+            (
+                'Synthetic quote from a forum: "I prefer light themes everywhere."',
+                "Synthetic answer: ok.",
+            ),
+        ],
+    )
+    c, s, p = curious.conversation_id, shed.conversation_id, prefs.conversation_id
+    return [
+        Case(
+            "extraction_rules",
+            "EXT-003/EXT-004: an assistant suggestion followed by a curious question is not "
+            "accepted; an explicit yes, a no, a conditional ok and the user's own decision "
+            "are told apart; hard and soft requirements, strong and mild preferences, and "
+            "reported or quoted views are kept separate from the user's own.",
+            "official",
+            [curious.native(), shed.native(), prefs.native()],
+            expected={
+                "conversations": 3,
+                # (record_type, acceptance, first evidence message) in text order.
+                "decisions": {
+                    c: [["proposal", "absent", f"{c}-a0"]],
+                    s: [
+                        ["proposal", "absent", f"{s}-a0"],
+                        ["decision", "explicit", f"{s}-u1"],
+                        ["proposal", "absent", f"{s}-a1"],
+                        ["rejection", "explicit", f"{s}-u2"],
+                        ["proposal", "absent", f"{s}-a2"],
+                        ["decision", "conditional", f"{s}-u3"],
+                        ["decision", "explicit", f"{s}-u4"],
+                    ],
+                },
+                # (record_type, strength, polarity, attributed_to, message).
+                "preferences": {
+                    p: [
+                        ["preference", "soft", "for", None, f"{p}-u0"],
+                        ["requirement", "hard", None, None, f"{p}-u0"],
+                        ["requirement", "soft", None, None, f"{p}-u0"],
+                        ["preference", "soft", "for", "external", f"{p}-u0"],
+                        ["preference", "hard", "against", None, f"{p}-u1"],
+                        ["preference", "soft", "for", "external", f"{p}-u2"],
+                    ],
+                },
+            },
+        )
+    ]
+
+
 def without_children(native: JsonDict) -> JsonDict:
     """Return a copy of a native conversation with every ``children`` list removed."""
     copy: JsonDict = json.loads(json.dumps(native))
@@ -1321,6 +1418,7 @@ def all_cases() -> list[Case]:
         *_search_cases(),
         *_segment_cases(),
         *_classification_cases(),
+        *_extraction_cases(),
     ]
 
 

@@ -1305,3 +1305,30 @@ migration drift         # 0
 Fix attempts: 0.
 
 **Next exact task:** EXT-003 (decision and rejection extractor) + EXT-004 (preference and requirement extractor).
+
+### 07:40 — EXT-003 + EXT-004: who decided, and whose preference it is
+**What:** the first two extractors, both rule-based, local and free.
+- **Decisions (EXT-003).** An assistant sentence with a suggestion cue becomes a *proposal* held by the assistant. The user's next message is then read in one of four ways:
+  - a rejection ("No, not green");
+  - a conditional yes ("Ok, as long as it doesn't leak");
+  - an explicit yes ("Yes, let's do that");
+  - or **nothing**: a question like "how does SQLite handle concurrent writes?" accepts nothing.
+
+  A decision cites both the user's yes and the proposal it answers. If there were several proposals, or the yes came with a question, it is flagged. The user's own "I've decided to use cedar cladding" or "I've ruled out pine" counts as well, unless it is negated ("I haven't decided...").
+- **Preferences and requirements (EXT-004).** Only user sentences count, and questions are skipped.
+  - Requirements are *hard* ("must", "no more than") or *soft* ("ideally", "would be nice").
+  - Preferences are *for* or *against*, and *strong* ("really", "hate") or *mild*.
+  - A view inside quotation marks, or a reported one ("My client said they want a light theme"), gets `attributed_to="external"` and always goes to review. It is never stored as the user's own.
+- **Contract change.** The record contract is now `ext-001-v2`, with optional `strength`, `polarity` and `attributed_to`. The evidence check flags attributed records. The quotation test now looks at where the cue sits, so a sentence that *contains* a quotation is judged by the cue's position. The old private name is kept as an alias, so the EXT-002 tests are unchanged.
+- **Fixture.** New generator case `extraction_rules`.
+
+**Teach-back (`extraction/decisions.py`):** "When the assistant suggests something, I note it as the assistant's proposal, nothing more. It only becomes the user's decision if the user's very next words accept it, like 'yes, let's do that'. A question or a 'maybe' accepts nothing. Each decision quotes both the yes and the suggestion it said yes to."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 176 source files
+pytest -q               # 926 passed, 6 skipped
+migration drift         # 0
+```
+Fix attempts: 1. In the fixture, a quoted preference started mid-sentence, so the sentence start sat outside the quotes. The check now uses the cue's position (`quoted_at`). Separately, I first wrote the fixture's expected list to include the reported "they want" sentence, which needed its own branch.
+
+**Next exact task:** EXT-005 (actions, questions, artefacts) + EXT-006 (named entities).

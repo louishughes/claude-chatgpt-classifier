@@ -18,7 +18,8 @@ at every piece of evidence and gives one of three verdicts:
     question;
   - the quote sits inside a quotation (a ``>`` line or quotation marks), so
     the speaker may be repeating someone else;
-  - the record is ``inferred``, or its extractor already flagged it.
+  - the record is ``inferred``, reports someone else's view
+    (``attributed_to``), or its extractor already flagged it.
 * ``valid``: everything checks. A valid record may become ``supported``
   (EXT-007); it is never ``confirmed`` without a person.
 
@@ -165,7 +166,7 @@ def check_record(session: Session, record: CandidateRecord) -> EvidenceCheck:
         if ref.actor is not speaker:
             problems.append(EvidenceProblem("actor_mismatch", index))
             continue
-        if _inside_quotation(text, ref):
+        if inside_quotation(text, ref):
             problems.append(EvidenceProblem("inside_quotation", index))
         if speaker is Role.USER:
             quote = text[ref.start : ref.end]
@@ -190,6 +191,8 @@ def _meaning_problems(record: CandidateRecord, user_quotes: list[str]) -> list[E
         found.append(EvidenceProblem("inferred"))
     if record.review_reason:
         found.append(EvidenceProblem("extractor_flagged"))
+    if record.attributed_to:
+        found.append(EvidenceProblem("someone_elses_view"))
     return found
 
 
@@ -197,11 +200,17 @@ def _hedged(quote: str) -> bool:
     return bool(_HEDGES.search(quote)) or quote.rstrip().endswith("?")
 
 
-def _inside_quotation(text: str, ref: EvidenceRef) -> bool:
-    line_start = text.rfind("\n", 0, ref.start) + 1
+def inside_quotation(text: str, ref: EvidenceRef) -> bool:
+    """True if the quote starts in a ``>`` line or inside quotation marks on its line."""
+    return quoted_at(text, ref.start)
+
+
+def quoted_at(text: str, offset: int) -> bool:
+    """True if position ``offset`` is in a ``>`` line or inside quotation marks on its line."""
+    line_start = text.rfind("\n", 0, offset) + 1
     if text[line_start:].lstrip().startswith(">"):
         return True
-    before = text[line_start : ref.start]
+    before = text[line_start:offset]
     for opening, closing in _QUOTE_PAIRS:
         if opening == closing:
             # Straight quotes: inside if an odd number come before on the line.
@@ -210,3 +219,7 @@ def _inside_quotation(text: str, ref: EvidenceRef) -> bool:
         elif before.rfind(opening) > before.rfind(closing):
             return True
     return False
+
+
+# The EXT-002 tests use the earlier private name; kept so they stay unchanged.
+_inside_quotation = inside_quotation
