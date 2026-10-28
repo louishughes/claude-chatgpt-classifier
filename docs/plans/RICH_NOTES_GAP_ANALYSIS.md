@@ -1,6 +1,6 @@
 # Rich conversation notes: what the old attempts did, what we have, and what to build
 
-**Date:** 2026-10-28 (UTC). **Asked by:** Louis (owner). **Written by:** a Claude Code thread on Louis's PC. **Status:** proposal. Nothing here is approved until Louis decides the questions in §9.
+**Date:** 2026-10-28 (UTC). **Asked by:** Louis (owner). **Written by:** a Claude Code thread on Louis's PC. **Status:** approved. On 2026-10-28 at 12:50 UTC Louis replied "Go ahead with the recommendations and verifications": all eight decisions in §9 are taken as recommended.
 
 **Rules followed while writing this:** the old folders on `P:\` were only read. No private chat text is copied into this file: chats are described by shape and size, never quoted. No tests, evaluation criteria or gold set were changed. No model API was called.
 
@@ -281,7 +281,7 @@ digest: generated · reviewed: no
 
 ## 8. Proposed tickets
 
-These are proposals. They become GitHub Issues only after Louis agrees the order (decision D1). IDs use the unused `NOTE-` prefix. Each has a concrete finish line and is small enough for one PR. "Blocked by" lists hard dependencies only. Fix attempts: 3 per ticket, then stop and ask.
+Approved under D1. Each becomes a GitHub Issue (opened by a session with GitHub access). IDs use the unused `NOTE-` prefix. Each has a concrete finish line and is small enough for one PR. "Blocked by" lists hard dependencies only. Fix attempts: 3 per ticket, then stop and ask.
 
 | ID | Ticket | Blocked by | Finish line |
 |---|---|---|---|
@@ -306,9 +306,11 @@ These are proposals. They become GitHub Issues only after Louis agrees the order
 
 ---
 
-## 9. Decisions for Louis
+## 9. Decisions (taken 2026-10-28, as recommended)
 
-| # | Decision | Recommendation |
+Louis approved every recommendation below on 2026-10-28 at 12:50 UTC ("Go ahead with the recommendations and verifications"). The prerequisite in §8 (`[m:id]` evidence tag) was already fixed on main in #266. Quality scores for notes (NOTE-011) must come from a session that did not write them.
+
+| # | Decision | Decided (as recommended) |
 |---|---|---|
 | D1 | **Priority.** Do the NOTE tickets next, ahead of PROD-004 and the rest of the parked product work? | Yes. Rich notes are the product; the plumbing is already ahead of the content. |
 | D2 | **Who approves taxonomy v1.** (a) You approve the publish after a Claude reviewer session has checked every proposal, from one summary page, without labelling anything; or (b) you delegate approval fully to an independent Claude reviewer session. | (a). It is one look at about 10 categories and 30 to 40 subcategories, and the taxonomy shapes everything after it. |
