@@ -1064,6 +1064,64 @@ def _relationship_cases() -> list[Case]:
     ]
 
 
+def _search_cases() -> list[Case]:
+    """RET-001: codes, case, phrases, accents and query-syntax characters."""
+    first = _chat(
+        "c0000009-0000-4000-8000-000000000001",
+        "Synthetic search terms",
+        40,
+        [
+            (
+                "Synthetic: the error code was SYN-CODE-4471 again.",
+                "Synthetic: SYN-CODE-4471 means the synthetic widget overheated.",
+            ),
+            ("Synthetic: is KubeCtl a typo?", "Synthetic: the synthetic blue widget ships today."),
+            (
+                "Synthetic: try the widget synthetic blue order instead.",
+                "Synthetic: the café serves synthétique pastries.",
+            ),
+            (
+                'Synthetic: search for "NOT" AND (brackets) OR stars*',
+                "Synthetic: snake_case_synthetic_name is a variable.",
+            ),
+        ],
+    )
+    other = _chat(
+        "c0000009-0000-4000-8000-000000000002",
+        "Synthetic other",
+        41,
+        [("Synthetic: kubectl runs here.", "Synthetic: noted.")],
+    )
+    first_id, other_id = first.conversation_id, other.conversation_id
+    return [
+        Case(
+            "search_terms",
+            "RET-001: exact codes, case-sensitive exact mode, phrase versus any-order words, "
+            "accent folding, and FTS operators typed as plain words.",
+            "official",
+            [first.native(), other.native()],
+            expected={
+                "conversations": 2,
+                # [query, mode, matching native node IDs, sorted]
+                "queries": [
+                    ["SYN-CODE-4471", "exact", [f"{first_id}-a0", f"{first_id}-u0"]],
+                    ["syn-code-4471", "exact", []],
+                    ["syn-code-4471", "tokens", [f"{first_id}-a0", f"{first_id}-u0"]],
+                    ["synthetic blue widget", "phrase", [f"{first_id}-a1"]],
+                    ["synthetic blue widget", "tokens", [f"{first_id}-a1", f"{first_id}-u2"]],
+                    ["KubeCtl", "exact", [f"{first_id}-u1"]],
+                    ["kubectl", "exact", [f"{other_id}-u0"]],
+                    ["kubectl", "tokens", [f"{first_id}-u1", f"{other_id}-u0"]],
+                    ["cafe synthetique", "tokens", [f"{first_id}-a2"]],
+                    ["NOT AND OR", "tokens", [f"{first_id}-u3"]],
+                    ["snake_case_synthetic_name", "exact", [f"{first_id}-a3"]],
+                    ['" ( * )', "tokens", []],
+                ],
+            },
+        )
+    ]
+
+
 def without_children(native: JsonDict) -> JsonDict:
     """Return a copy of a native conversation with every ``children`` list removed."""
     copy: JsonDict = json.loads(json.dumps(native))
@@ -1082,6 +1140,7 @@ def all_cases() -> list[Case]:
         *_identity_cases(),
         *_legacy_cases(),
         *_relationship_cases(),
+        *_search_cases(),
     ]
 
 

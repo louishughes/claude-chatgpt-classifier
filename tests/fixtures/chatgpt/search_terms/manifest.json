@@ -1,0 +1,96 @@
+{
+  "fixture_format_version": 1,
+  "case": "search_terms",
+  "synthetic": true,
+  "layout": "official",
+  "proves": "RET-001: exact codes, case-sensitive exact mode, phrase versus any-order words, accent folding, and FTS operators typed as plain words.",
+  "expected": {
+    "conversations": 2,
+    "queries": [
+      [
+        "SYN-CODE-4471",
+        "exact",
+        [
+          "c0000009-0000-4000-8000-000000000001-a0",
+          "c0000009-0000-4000-8000-000000000001-u0"
+        ]
+      ],
+      [
+        "syn-code-4471",
+        "exact",
+        []
+      ],
+      [
+        "syn-code-4471",
+        "tokens",
+        [
+          "c0000009-0000-4000-8000-000000000001-a0",
+          "c0000009-0000-4000-8000-000000000001-u0"
+        ]
+      ],
+      [
+        "synthetic blue widget",
+        "phrase",
+        [
+          "c0000009-0000-4000-8000-000000000001-a1"
+        ]
+      ],
+      [
+        "synthetic blue widget",
+        "tokens",
+        [
+          "c0000009-0000-4000-8000-000000000001-a1",
+          "c0000009-0000-4000-8000-000000000001-u2"
+        ]
+      ],
+      [
+        "KubeCtl",
+        "exact",
+        [
+          "c0000009-0000-4000-8000-000000000001-u1"
+        ]
+      ],
+      [
+        "kubectl",
+        "exact",
+        [
+          "c0000009-0000-4000-8000-000000000002-u0"
+        ]
+      ],
+      [
+        "kubectl",
+        "tokens",
+        [
+          "c0000009-0000-4000-8000-000000000001-u1",
+          "c0000009-0000-4000-8000-000000000002-u0"
+        ]
+      ],
+      [
+        "cafe synthetique",
+        "tokens",
+        [
+          "c0000009-0000-4000-8000-000000000001-a2"
+        ]
+      ],
+      [
+        "NOT AND OR",
+        "tokens",
+        [
+          "c0000009-0000-4000-8000-000000000001-u3"
+        ]
+      ],
+      [
+        "snake_case_synthetic_name",
+        "exact",
+        [
+          "c0000009-0000-4000-8000-000000000001-a3"
+        ]
+      ],
+      [
+        "\" ( * )",
+        "tokens",
+        []
+      ]
+    ]
+  }
+}

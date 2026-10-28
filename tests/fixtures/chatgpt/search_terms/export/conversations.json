@@ -1,0 +1,396 @@
+[
+  {
+    "title": "Synthetic search terms",
+    "create_time": 1707523200.0,
+    "update_time": 1707523800.0,
+    "mapping": {
+      "c0000009-0000-4000-8000-000000000001-root": {
+        "id": "c0000009-0000-4000-8000-000000000001-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000009-0000-4000-8000-000000000001-sys"
+        ]
+      },
+      "c0000009-0000-4000-8000-000000000001-sys": {
+        "id": "c0000009-0000-4000-8000-000000000001-sys",
+        "message": {
+          "id": "c0000009-0000-4000-8000-000000000001-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707523260.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000009-0000-4000-8000-000000000001-root",
+        "children": [
+          "c0000009-0000-4000-8000-000000000001-u0"
+        ]
+      },
+      "c0000009-0000-4000-8000-000000000001-u0": {
+        "id": "c0000009-0000-4000-8000-000000000001-u0",
+        "message": {
+          "id": "c0000009-0000-4000-8000-000000000001-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707523320.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: the error code was SYN-CODE-4471 again."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000009-0000-4000-8000-000000000001-sys",
+        "children": [
+          "c0000009-0000-4000-8000-000000000001-a0"
+        ]
+      },
+      "c0000009-0000-4000-8000-000000000001-a0": {
+        "id": "c0000009-0000-4000-8000-000000000001-a0",
+        "message": {
+          "id": "c0000009-0000-4000-8000-000000000001-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707523380.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: SYN-CODE-4471 means the synthetic widget overheated."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000009-0000-4000-8000-000000000001-u0",
+        "children": [
+          "c0000009-0000-4000-8000-000000000001-u1"
+        ]
+      },
+      "c0000009-0000-4000-8000-000000000001-u1": {
+        "id": "c0000009-0000-4000-8000-000000000001-u1",
+        "message": {
+          "id": "c0000009-0000-4000-8000-000000000001-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707523440.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: is KubeCtl a typo?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000009-0000-4000-8000-000000000001-a0",
+        "children": [
+          "c0000009-0000-4000-8000-000000000001-a1"
+        ]
+      },
+      "c0000009-0000-4000-8000-000000000001-a1": {
+        "id": "c0000009-0000-4000-8000-000000000001-a1",
+        "message": {
+          "id": "c0000009-0000-4000-8000-000000000001-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707523500.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: the synthetic blue widget ships today."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000009-0000-4000-8000-000000000001-u1",
+        "children": [
+          "c0000009-0000-4000-8000-000000000001-u2"
+        ]
+      },
+      "c0000009-0000-4000-8000-000000000001-u2": {
+        "id": "c0000009-0000-4000-8000-000000000001-u2",
+        "message": {
+          "id": "c0000009-0000-4000-8000-000000000001-u2",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707523560.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: try the widget synthetic blue order instead."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000009-0000-4000-8000-000000000001-a1",
+        "children": [
+          "c0000009-0000-4000-8000-000000000001-a2"
+        ]
+      },
+      "c0000009-0000-4000-8000-000000000001-a2": {
+        "id": "c0000009-0000-4000-8000-000000000001-a2",
+        "message": {
+          "id": "c0000009-0000-4000-8000-000000000001-a2",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707523620.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: the café serves synthétique pastries."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000009-0000-4000-8000-000000000001-u2",
+        "children": [
+          "c0000009-0000-4000-8000-000000000001-u3"
+        ]
+      },
+      "c0000009-0000-4000-8000-000000000001-u3": {
+        "id": "c0000009-0000-4000-8000-000000000001-u3",
+        "message": {
+          "id": "c0000009-0000-4000-8000-000000000001-u3",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707523680.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: search for \"NOT\" AND (brackets) OR stars*"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000009-0000-4000-8000-000000000001-a2",
+        "children": [
+          "c0000009-0000-4000-8000-000000000001-a3"
+        ]
+      },
+      "c0000009-0000-4000-8000-000000000001-a3": {
+        "id": "c0000009-0000-4000-8000-000000000001-a3",
+        "message": {
+          "id": "c0000009-0000-4000-8000-000000000001-a3",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707523740.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: snake_case_synthetic_name is a variable."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000009-0000-4000-8000-000000000001-u3",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000009-0000-4000-8000-000000000001-a3",
+    "plugin_ids": null,
+    "conversation_id": "c0000009-0000-4000-8000-000000000001",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000009-0000-4000-8000-000000000001"
+  },
+  {
+    "title": "Synthetic other",
+    "create_time": 1707609600.0,
+    "update_time": 1707609840.0,
+    "mapping": {
+      "c0000009-0000-4000-8000-000000000002-root": {
+        "id": "c0000009-0000-4000-8000-000000000002-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000009-0000-4000-8000-000000000002-sys"
+        ]
+      },
+      "c0000009-0000-4000-8000-000000000002-sys": {
+        "id": "c0000009-0000-4000-8000-000000000002-sys",
+        "message": {
+          "id": "c0000009-0000-4000-8000-000000000002-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707609660.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000009-0000-4000-8000-000000000002-root",
+        "children": [
+          "c0000009-0000-4000-8000-000000000002-u0"
+        ]
+      },
+      "c0000009-0000-4000-8000-000000000002-u0": {
+        "id": "c0000009-0000-4000-8000-000000000002-u0",
+        "message": {
+          "id": "c0000009-0000-4000-8000-000000000002-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707609720.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: kubectl runs here."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000009-0000-4000-8000-000000000002-sys",
+        "children": [
+          "c0000009-0000-4000-8000-000000000002-a0"
+        ]
+      },
+      "c0000009-0000-4000-8000-000000000002-a0": {
+        "id": "c0000009-0000-4000-8000-000000000002-a0",
+        "message": {
+          "id": "c0000009-0000-4000-8000-000000000002-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707609780.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: noted."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000009-0000-4000-8000-000000000002-u0",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000009-0000-4000-8000-000000000002-a0",
+    "plugin_ids": null,
+    "conversation_id": "c0000009-0000-4000-8000-000000000002",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000009-0000-4000-8000-000000000002"
+  }
+]

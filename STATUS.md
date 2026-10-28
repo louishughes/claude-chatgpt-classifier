@@ -50,9 +50,10 @@ Live ticket status for the build. The original ticket list is `docs/TICKETS.csv`
 | SOC-001 Social account mention detection | VERIFIED (links/social.py: profile URLs for 13 platforms incl. stable IDs, platform-qualified handles, Fediverse addresses; bare @handle stays ambiguous; emails, decorators, code and non-profile URLs excluded) | SESSION_LOG 2026-10-28 SOC |
 | SOC-002 Social account registry, aliases and review | VERIFIED (social_accounts/account_aliases/account_mentions, migration 0012; one account across URL + handle; ambiguous never auto-links; reimport adds 0 mentions; `ke accounts [--platform] [--ambiguous]`) | SESSION_LOG 2026-10-28 SOC |
 | REL-002 Cross-conversation relationship model and structural detectors | VERIFIED (relationships/store.py + detect.py, migration 0013 with append-only triggers; shared node IDs, copied prefix, chatgpt.com links, verbatim quotes; all candidates; fixtures copied_prefix + similar_unrelated; `ke related list/review/detect`) | SESSION_LOG 2026-10-28 REL-002 |
+| RET-001 SQLite FTS5 lexical index and search | VERIFIED (retrieval/lexical.py: separate rebuildable index file, one row per revision with workspace/conversation/node; tokens, phrase and exact modes; query words always quoted; fixture search_terms, 12 queries; `ke search`) | SESSION_LOG 2026-10-28 RET-001 |
 | EVAL-010 Batch smoke test (50/100) | IN_PROGRESS (synthetic 50/100 pass, `ke eval smoke`, docs/evaluation/EVAL-010_SMOKE.md; real-data half waits for a session on Louis's PC, REV-009) | SESSION_LOG 2026-10-28 EVAL-010 |
 
-**Next unblocked:** Milestone 2 in plan order: RET-001, UI-004. The M1 gate still needs the real-data runs and a Windows test run on Louis's PC (one session).
+**Next unblocked:** Milestone 2 in plan order: UI-004. The M1 gate still needs the real-data runs and a Windows test run on Louis's PC (one session).
 
 **Needs Louis (logged, skipped, not waited on):**
 - Real-data checkpoint: REV-009 (#143) and the real half of EVAL-010 (#39) need a read-only session on your PC: `ke inspect` on a few conversations and `ke eval smoke raw --limit 50` / `--limit 100`. Synthetic runs pass.

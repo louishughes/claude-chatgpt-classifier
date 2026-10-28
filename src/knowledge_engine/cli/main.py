@@ -488,6 +488,55 @@ def _seen_fields(mentions: int, conversations: int, first: Any, last: Any) -> di
     }
 
 
+def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Search message text (RET-001). Brings the search index up to date first."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.infrastructure.workspace import WorkspaceRow
+    from knowledge_engine.retrieval.lexical import (
+        LexicalIndex,
+        SearchMode,
+        search_index_path,
+        sync_index,
+    )
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "search", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session, LexicalIndex(search_index_path(settings)) as index:
+            added = sync_index(session, index)
+            hits = [
+                {
+                    "conversation_id": hit.conversation_id,
+                    "native_node_id": hit.native_node_id,
+                    "revision_id": hit.revision_id,
+                    "role": hit.role,
+                    "snippet": hit.snippet,
+                }
+                for workspace_id in session.scalars(select(WorkspaceRow.workspace_id))
+                for hit in index.search(
+                    args.query,
+                    workspace_id=workspace_id,
+                    mode=SearchMode(args.mode),
+                    limit=args.limit,
+                    conversation_id=args.conversation,
+                )
+            ][: args.limit]
+    finally:
+        engine.dispose()
+    return CommandResult(
+        "search",
+        data={"mode": args.mode, "hits": hits, "newly_indexed": added},
+        message=f"{len(hits)} matching message(s)",
+    )
+
+
 def _related_list(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """List conversation relationships with their evidence and history (REL-002)."""
     from sqlalchemy import or_, select
@@ -861,6 +910,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--ambiguous", action="store_true", help="list bare @handles with no platform instead"
     )
     accounts.set_defaults(handler=_accounts)
+
+    search = commands.add_parser("search", help="find messages by words, phrase or exact text")
+    search.add_argument("query", help="what to look for")
+    search.add_argument(
+        "--mode",
+        choices=["tokens", "phrase", "exact"],
+        default="tokens",
+        help="tokens: all words, any order (default); phrase: words in order; "
+        "exact: character for character, case included",
+    )
+    search.add_argument("--limit", type=int, default=20, help="at most this many hits")
+    search.add_argument("--conversation", help="only this conv_ ID")
+    search.set_defaults(handler=_search)
 
     related = commands.add_parser("related", help="links between conversations (forks, quotes)")
     related_commands = related.add_subparsers(
