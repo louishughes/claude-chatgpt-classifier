@@ -50,6 +50,7 @@ from knowledge_engine.importer.media import MediaDelta, MediaLibrary, record_occ
 from knowledge_engine.importer.report import ImportReport
 from knowledge_engine.infrastructure.db import SessionFactory, create_sqlite_engine, database_path
 from knowledge_engine.infrastructure.migrations import upgrade_to_head
+from knowledge_engine.infrastructure.upgrade import require_current
 from knowledge_engine.infrastructure.workspace import WorkspaceRepo
 from knowledge_engine.ingestion.inventory import tree_signature
 from knowledge_engine.ingestion.registry import default_adapters
@@ -94,6 +95,10 @@ def run_import(
     with import_lock(settings.workspace_root, timeout_s=settings.limits.import_lock_timeout_s):
         engine = create_sqlite_engine(database_path(settings))
         try:
+            # A new workspace gets its schema here. An existing database from
+            # an older version is left alone: `ke db upgrade` backs it up
+            # first (OPS-007).
+            require_current(engine)
             upgrade_to_head(engine)
             factory = SessionFactory(engine)
             archive = BlobStore(

@@ -2224,3 +2224,33 @@ ci                                      5/5 ok, 1201 passed, 7 skipped
 Fix attempts: 0 on the product code. The test needed three passes to separate the engine's own trusted syntax (its wikilinks, its link list) from chat text.
 
 **Next exact task:** the approved EVAL-011 paid run on the PC (once #252 merges), then OPS-007 packaging.
+
+### 09:44 — EVAL-011: the one paid run
+
+Louis approved one paid smoke run at 08:54 UTC ("Do a and b"): synthetic chats only, as small as the ticket allows, hard cost cap, cost recorded here. It ran on his PC at commit 80fc4e0, 09:41–09:44 UTC. The key and the egress switch were environment variables for that one command and were removed afterwards; `ke.toml` was not touched and nothing was committed on the PC.
+
+`ke --json eval semantic --synthetic 50 --provider anthropic --max-cost-usd 0.50`: passed, every check true. 50 chats, 67 segments, 67 model calls, 0 schema failures, 0 repairs, 0 capped, 0 unvalidated outputs. 101,846 input and 13,390 output tokens. **Cost: $0.0169** of the $0.50 cap.
+
+All 67 segments went to review and none to done. Nothing unchecked was stored, so that is the safe outcome. My guess is the three-term smoke vocabulary doesn't fit the generated chats and the model said it was unsure, but the report doesn't itemise review reasons, so I haven't confirmed it. Follow-up: count review reasons by kind in the report. No further paid runs: the approval was for one.
+
+**Next exact task:** OPS-007.
+
+### 09:48 — OPS-007: install, upgrade and roll back like a stranger would
+
+- `infrastructure/upgrade.py`: `ke db upgrade` now takes a full OPS-003 backup **before** migrating, into `<workspace>-backups` next to the workspace (`--backup-to` to choose, `--no-backup` to skip on purpose). If a migration fails, the error names the backup to restore.
+- Imports no longer migrate an existing database quietly. A database older than the code stops the import with `schema_mismatch` and says to run `ke db upgrade`. A database newer than the code (an older version installed over a newer one) is refused too. A brand-new workspace is still created straight away.
+- `devtools/release_check.py` builds the wheel, installs it in a fresh venv, checks `ke --version` against `pyproject.toml` and `CHANGELOG.md`, imports a synthetic export, steps the schema back one migration, upgrades (backup taken), then verifies and restores that backup and checks the restored copy is at the old revision. `.github/workflows/release.yml` runs it nightly, on demand and on `v*` tags, on Linux and Windows. It is a separate workflow because `ci.yml`'s commands are pinned by tests.
+- `CHANGELOG.md` starts at 0.1.0; `pyproject.toml` is now 0.1.0. `docs/runbooks/UPGRADE_AND_ROLLBACK.md` is the install, upgrade and rollback procedure.
+
+**Teach-back (`infrastructure/upgrade.py`):** Before a new version changes my database's layout, it makes a full, checked backup next to my workspace, and if the change fails it tells me which backup to restore. Imports won't change the layout behind my back any more: if the database is older or newer than the program, they stop and tell me what to do. So upgrading is one deliberate command, and a bad release costs me a restore, not my data.
+
+Checks:
+```
+tests/integration/test_upgrade.py   4 passed
+tests/unit/test_release.py          2 passed
+release_check (this container)      6/6 ok
+ci                                  5/5 ok, 1199 passed
+```
+Fix attempts: 1 (`create_sqlite_engine` needs a Path in the release check's step-back script).
+
+**Next exact task:** M6.
