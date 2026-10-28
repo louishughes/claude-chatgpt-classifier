@@ -960,3 +960,11 @@ Fix attempts: 0.
 - "When the owner won't label, the next best thing is a reviewer that writes its answer before it looks at yours."
 - "Twenty of twenty-nine errors were one counting rule. Fix the rule, not the twenty items."
 - "Label your evidence: 'agent-reviewed' and 'owner-approved' are different grades."
+
+### 2026-10-28 00:50 UTC — What steps did the old pipelines actually go through?
+**What:** Louis asked what each phase of his old Codex/Hermes pipelines did, including the first pre-processing pass over all chats. Claude re-read the old docs and scripts (read-only) and added §2a to `docs/reference/previous-attempts-review.md`. It covers the nine v1 pre-processing steps, the May v1 eight stages, the September overhaul's steps and the August v2 nine passes. For each one it gives what it did, inputs and outputs, who ran it, where it broke, and where it fits in today's plan.
+**What stood out:** the old pre-process copied 931 images but linked none of them to a chat, sorted all messages by time (mixing branches together), and dropped "yes"/"no" replies as filler, which are exactly the replies that decide things. All three pipelines declared success when their own checks passed.
+**Challenges:** the PC session couldn't `git push` without a permission prompt while Louis was away, so the text was relayed and a cloud session opened the PR.
+**Talking points:**
+- "Draw the old pipeline before you design the new one. You see where it broke at a glance."
+- "My old pre-process threw away the word 'no'. That's the most important word in a decision."
