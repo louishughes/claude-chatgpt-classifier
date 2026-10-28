@@ -213,10 +213,14 @@ class BatchHandle:
     Attributes:
         batch_ids: The batches the requests went into.
         request_ids: Every request submitted, in order.
+        run_id: The run whose folder holds the batches, for providers that
+            keep runs apart (the file batches); stored on the ledger row so
+            a later run can still collect them (LEG-007).
     """
 
     batch_ids: tuple[str, ...]
     request_ids: tuple[str, ...]
+    run_id: str | None = None
 
 
 class StructuredModelProvider(Protocol):
