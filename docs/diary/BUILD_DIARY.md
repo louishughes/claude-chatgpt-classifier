@@ -2630,3 +2630,35 @@ Talking points:
 - "Evidence is folded away, not deleted: open the box and the quote is there, re-checked against the archive."
 
 **Next exact task:** NOTE-006, the first taxonomy discovered from the real chats.
+
+### 13:50 — CI: why main kept going red on Windows + Python 3.12 only
+
+Louis was getting a stream of "Run failed" emails. I read every failing run on main and on the PR branches.
+
+What was actually failing:
+
+- **On main (3 out of 3 red runs: 9b5e807, 94a7cc0, b8046be)** the same unit test, `test_interrupted_batch_is_abandoned_never_succeeded`, failed on `windows-latest, 3.12` only. Every one of those PRs had passed all four jobs before it merged, so this wasn't merging early. It was a flaky test that only shows up sometimes.
+- **On PR branches (OPS-009 at 4e5e54e and 1b80610)** a 64-bit Windows ctypes crash in the peak-memory code. That thread fixed it on its own branch (13fa9a5) before merging, so it's not on main.
+- **Once, on main (b8046be)**, the browser-import test (`test_import_from_the_browser_runs_and_shows_the_report`, issue #288) saw the import job end as "didn't finish". The reason was in the page, but pytest cut the page short with `...` right where the reason was.
+
+The root cause of the main failure: the import ledger says "the latest import is the one with the newest start time". Python 3.12 on Windows reads the clock in steps of about 16 milliseconds (3.13 switched to the precise clock, which is why the 3.13 Windows job never failed). The test starts a batch, "crashes", and starts another one straight after; if both land in the same 16 ms step they get identical start times and "latest" is a coin toss. It's a real bug, not just a test problem: `ke status` and the home page in the web UI use the same ordering.
+
+How I proved it: I couldn't run Windows here, so I wrote a throwaway pytest plugin (kept out of the repo) that makes the clock tick in coarse steps. With a coarse enough tick the test fails every time on Linux; with the fix it passes at both the 16 ms and an exaggerated 2 s tick.
+
+The fix (`importer/ledger.py`): when a batch starts, its start time is "now, or one microsecond after the newest batch, whichever is later". Start times are now strictly increasing, so all three readers agree on which import is latest. No test, threshold or evaluation rule was changed.
+
+For #288 I couldn't reproduce it (25 runs on Linux, all passed), and guessing a fix would be dishonest. Instead `pyproject.toml` now sets `verbosity_assertions = 2`, so a failed assert prints long strings in full while the rest of the output stays quiet. Next time it fails, CI will show the job's actual error. #288 stays open.
+
+**Teach-back (`importer/ledger.py`, `_next_start_time`):** Every import gets a start time, and "the latest import" means the one with the newest time. On some Windows setups the clock only moves every 16 milliseconds, so two quick imports could tie and the app couldn't tell which was newer. Now a new import's time is always at least a microsecond after the previous one, so there's never a tie.
+
+Checks:
+```
+python -m knowledge_engine.devtools.ci   lint, format, types, guard ok; 1353 passed, 22 skipped
+coarse-clock plugin, 2 s tick:  before the fix 1 failed / after 49 passed (ledger + UI tests)
+```
+Fix attempts: 1.
+
+Talking points:
+- "A test that only failed on one OS and one Python version turned out to be a clock-resolution bug: Python 3.12 on Windows only ticks every 16 ms."
+- "I couldn't run Windows, so I faked a coarse clock in a test plugin to reproduce it deterministically before fixing it."
+- "When I couldn't reproduce the second flake, I didn't guess. I made CI print the full error so the next failure explains itself."
