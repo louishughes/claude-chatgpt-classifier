@@ -1,0 +1,416 @@
+{
+  "schema_version": "gold-v1",
+  "name": "golden-synthetic-v1",
+  "synthetic": true,
+  "taxonomy_version": "tax-gold-1",
+  "terms": [
+    {
+      "term_id": "term_gardening",
+      "dimension": "topic",
+      "label": "Gardening",
+      "aliases": [
+        "seedlings",
+        "raised bed"
+      ]
+    },
+    {
+      "term_id": "term_webdesign",
+      "dimension": "topic",
+      "label": "Web design",
+      "aliases": [
+        "menu page"
+      ]
+    },
+    {
+      "term_id": "term_godot",
+      "dimension": "topic",
+      "label": "Godot"
+    },
+    {
+      "term_id": "term_unity",
+      "dimension": "topic",
+      "label": "Unity"
+    },
+    {
+      "term_id": "term_shed",
+      "dimension": "topic",
+      "label": "Garden shed",
+      "aliases": [
+        "shed",
+        "shed floor",
+        "shed roof"
+      ]
+    },
+    {
+      "term_id": "term_baking",
+      "dimension": "topic",
+      "label": "Baking",
+      "aliases": [
+        "sourdough",
+        "sourdough starter",
+        "sourdough loaf"
+      ]
+    },
+    {
+      "term_id": "term_packaging",
+      "dimension": "topic",
+      "label": "Python packaging",
+      "aliases": [
+        "wheel",
+        "pyproject",
+        "python package"
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "project_id": "proj_bakery",
+      "name": "Bakery site"
+    },
+    {
+      "project_id": "proj_garden",
+      "name": "Garden plan"
+    }
+  ],
+  "conversations": [
+    {
+      "native_conversation_id": "c0000020-0000-4000-8000-000000000001",
+      "fixture_case": "mixed_projects",
+      "annotator": "synthetic-annotator",
+      "segments": [
+        {
+          "first_message": "c0000020-0000-4000-8000-000000000001-u0",
+          "labels": {
+            "topic": {
+              "primary": "term_gardening",
+              "secondary": [
+                "term_webdesign"
+              ]
+            },
+            "projects": {
+              "primary": "proj_garden",
+              "secondary": [
+                "proj_bakery"
+              ]
+            }
+          },
+          "note": "the user decides the garden comes first; the bakery site waits"
+        }
+      ],
+      "forbidden": []
+    },
+    {
+      "native_conversation_id": "c0000020-0000-4000-8000-000000000002",
+      "fixture_case": "mixed_projects",
+      "annotator": "synthetic-annotator",
+      "segments": [
+        {
+          "first_message": "c0000020-0000-4000-8000-000000000002-u0",
+          "labels": {
+            "topic": {
+              "primary": "term_godot",
+              "secondary": [
+                "term_unity"
+              ]
+            }
+          },
+          "note": "Unity is compared, Godot is chosen"
+        }
+      ],
+      "forbidden": []
+    },
+    {
+      "native_conversation_id": "c0000010-0000-4000-8000-000000000001",
+      "fixture_case": "topic_segments",
+      "annotator": "synthetic-annotator",
+      "segments": [
+        {
+          "first_message": "shed-u1",
+          "labels": {
+            "topic": {
+              "primary": "term_shed"
+            }
+          }
+        },
+        {
+          "first_message": "bread-u1",
+          "labels": {
+            "topic": {
+              "primary": "term_baking"
+            }
+          }
+        },
+        {
+          "first_message": "py-u1",
+          "labels": {
+            "topic": {
+              "primary": "term_packaging"
+            }
+          }
+        }
+      ],
+      "forbidden": []
+    },
+    {
+      "native_conversation_id": "c0000010-0000-4000-8000-000000000002",
+      "fixture_case": "topic_segments",
+      "annotator": "synthetic-annotator",
+      "segments": [
+        {
+          "first_message": "c0000010-0000-4000-8000-000000000002-u0",
+          "labels": {
+            "topic": {
+              "primary": "term_shed"
+            }
+          }
+        }
+      ],
+      "forbidden": []
+    },
+    {
+      "native_conversation_id": "c0000030-0000-4000-8000-000000000001",
+      "fixture_case": "extraction_rules",
+      "annotator": "synthetic-annotator",
+      "records": [
+        {
+          "record_type": "proposal",
+          "actor": "assistant",
+          "message_id": "c0000030-0000-4000-8000-000000000001-a0",
+          "acceptance": "absent"
+        },
+        {
+          "record_type": "reference",
+          "actor": "assistant",
+          "message_id": "c0000030-0000-4000-8000-000000000001-a0"
+        }
+      ],
+      "forbidden": [
+        {
+          "record_type": "decision",
+          "actor": "user",
+          "message_id": "c0000030-0000-4000-8000-000000000001-u1",
+          "reason": "a curious question does not accept the suggestion"
+        }
+      ],
+      "records_annotated": true
+    },
+    {
+      "native_conversation_id": "c0000030-0000-4000-8000-000000000002",
+      "fixture_case": "extraction_rules",
+      "annotator": "synthetic-annotator",
+      "records": [
+        {
+          "record_type": "proposal",
+          "actor": "assistant",
+          "message_id": "c0000030-0000-4000-8000-000000000002-a0",
+          "acceptance": "absent"
+        },
+        {
+          "record_type": "decision",
+          "actor": "user",
+          "message_id": "c0000030-0000-4000-8000-000000000002-u1",
+          "acceptance": "explicit"
+        },
+        {
+          "record_type": "proposal",
+          "actor": "assistant",
+          "message_id": "c0000030-0000-4000-8000-000000000002-a1",
+          "acceptance": "absent"
+        },
+        {
+          "record_type": "rejection",
+          "actor": "user",
+          "message_id": "c0000030-0000-4000-8000-000000000002-u2",
+          "acceptance": "explicit"
+        },
+        {
+          "record_type": "proposal",
+          "actor": "assistant",
+          "message_id": "c0000030-0000-4000-8000-000000000002-a2",
+          "acceptance": "absent"
+        },
+        {
+          "record_type": "decision",
+          "actor": "user",
+          "message_id": "c0000030-0000-4000-8000-000000000002-u3",
+          "acceptance": "conditional"
+        },
+        {
+          "record_type": "decision",
+          "actor": "user",
+          "message_id": "c0000030-0000-4000-8000-000000000002-u4",
+          "acceptance": "explicit"
+        }
+      ],
+      "forbidden": [
+        {
+          "record_type": "decision",
+          "actor": "user",
+          "message_id": "c0000030-0000-4000-8000-000000000002-u2",
+          "reason": "a 'no' is a rejection, never a decision"
+        }
+      ],
+      "records_annotated": true
+    },
+    {
+      "native_conversation_id": "c0000030-0000-4000-8000-000000000003",
+      "fixture_case": "extraction_rules",
+      "annotator": "synthetic-annotator",
+      "records": [
+        {
+          "record_type": "preference",
+          "actor": "user",
+          "message_id": "c0000030-0000-4000-8000-000000000003-u0",
+          "acceptance": "explicit",
+          "strength": "soft"
+        },
+        {
+          "record_type": "requirement",
+          "actor": "user",
+          "message_id": "c0000030-0000-4000-8000-000000000003-u0",
+          "acceptance": "explicit",
+          "strength": "hard"
+        },
+        {
+          "record_type": "requirement",
+          "actor": "user",
+          "message_id": "c0000030-0000-4000-8000-000000000003-u0",
+          "acceptance": "explicit",
+          "strength": "soft"
+        },
+        {
+          "record_type": "preference",
+          "actor": "user",
+          "message_id": "c0000030-0000-4000-8000-000000000003-u0",
+          "acceptance": "absent",
+          "attributed_to": "external",
+          "strength": "soft"
+        },
+        {
+          "record_type": "preference",
+          "actor": "user",
+          "message_id": "c0000030-0000-4000-8000-000000000003-u1",
+          "acceptance": "explicit",
+          "strength": "hard"
+        },
+        {
+          "record_type": "preference",
+          "actor": "user",
+          "message_id": "c0000030-0000-4000-8000-000000000003-u2",
+          "acceptance": "absent",
+          "attributed_to": "external",
+          "strength": "soft"
+        }
+      ],
+      "forbidden": [
+        {
+          "record_type": "preference",
+          "actor": "assistant",
+          "message_id": "c0000030-0000-4000-8000-000000000003-a0",
+          "reason": "the assistant's own taste is not the user's preference"
+        }
+      ],
+      "records_annotated": true
+    },
+    {
+      "native_conversation_id": "c0000040-0000-4000-8000-000000000001",
+      "fixture_case": "actions_entities",
+      "annotator": "synthetic-annotator",
+      "records": [
+        {
+          "record_type": "proposal",
+          "actor": "assistant",
+          "message_id": "wk-a0",
+          "acceptance": "absent"
+        },
+        {
+          "record_type": "action",
+          "actor": "assistant",
+          "message_id": "wk-a0",
+          "acceptance": "absent"
+        },
+        {
+          "record_type": "action",
+          "actor": "assistant",
+          "message_id": "wk-a0",
+          "acceptance": "absent"
+        },
+        {
+          "record_type": "action",
+          "actor": "user",
+          "message_id": "wk-u1",
+          "acceptance": "explicit"
+        },
+        {
+          "record_type": "question",
+          "actor": "user",
+          "message_id": "wk-u1"
+        },
+        {
+          "record_type": "artefact",
+          "actor": "assistant",
+          "message_id": "wk-a2"
+        },
+        {
+          "record_type": "artefact",
+          "actor": "assistant",
+          "message_id": "wk-a3"
+        },
+        {
+          "record_type": "question",
+          "actor": "user",
+          "message_id": "wk-u4"
+        }
+      ],
+      "forbidden": [
+        {
+          "record_type": "action",
+          "actor": "user",
+          "message_id": "wk-a0",
+          "reason": "a suggested task is not the user's commitment"
+        }
+      ],
+      "records_annotated": true
+    },
+    {
+      "native_conversation_id": "c0000040-0000-4000-8000-000000000002",
+      "fixture_case": "actions_entities",
+      "annotator": "synthetic-annotator",
+      "records": [
+        {
+          "record_type": "reference",
+          "actor": "user",
+          "message_id": "c0000040-0000-4000-8000-000000000002-u0"
+        },
+        {
+          "record_type": "reference",
+          "actor": "user",
+          "message_id": "c0000040-0000-4000-8000-000000000002-u0"
+        },
+        {
+          "record_type": "reference",
+          "actor": "user",
+          "message_id": "c0000040-0000-4000-8000-000000000002-u0"
+        },
+        {
+          "record_type": "proposal",
+          "actor": "assistant",
+          "message_id": "c0000040-0000-4000-8000-000000000002-a0",
+          "acceptance": "absent"
+        },
+        {
+          "record_type": "reference",
+          "actor": "assistant",
+          "message_id": "c0000040-0000-4000-8000-000000000002-a0"
+        },
+        {
+          "record_type": "reference",
+          "actor": "user",
+          "message_id": "c0000040-0000-4000-8000-000000000002-u1"
+        }
+      ],
+      "forbidden": [],
+      "records_annotated": true
+    }
+  ]
+}

@@ -531,6 +531,63 @@ def _corpus(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _gold_template(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Write a private golden-set template into the workspace (EVAL-001); IDs only."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.evaluation.gold import annotation_template, write_gold
+    from knowledge_engine.importer.records import ConversationRow
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.segmentation.inventory import corpus_inventory
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "gold", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            items = list(corpus_inventory(session))
+            rows = session.execute(
+                select(ConversationRow.conversation_id, ConversationRow.native_conversation_id)
+            )
+            native = {conversation_id: native_id for conversation_id, native_id in rows}
+    finally:
+        engine.dispose()
+    gold = annotation_template(
+        items,
+        native,
+        count=args.count,
+        seed=args.seed,
+        taxonomy_version=args.taxonomy,
+        annotator=args.annotator,
+    )
+    # Always inside the git-ignored workspace: a real golden set is private.
+    try:
+        path = write_gold(gold, settings.workspace_root / "gold" / f"{gold.name}.json")
+    except FileExistsError:
+        return CommandResult(
+            "gold",
+            ExitCode.ERROR,
+            message="a golden set already exists in the workspace; it is never overwritten",
+            error_code="exists",
+        )
+    return CommandResult(
+        "gold",
+        data={"conversations": len(gold.conversations), "file": path.name},
+        message=f"{len(gold.conversations)} conversation(s) chosen; template in the workspace",
+    )
+
+
+def _gold_schema(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """The golden-set JSON Schema (EVAL-001)."""
+    from knowledge_engine.evaluation.gold import gold_schema
+
+    return CommandResult("gold", data=gold_schema(), message="golden set schema (gold-v1)")
+
+
 def _taxonomy_report(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Taxonomy health and review activity (TAX-008); reads only."""
     from dataclasses import asdict
@@ -992,6 +1049,19 @@ def build_parser() -> argparse.ArgumentParser:
     corpus.add_argument("--sample", type=int, default=0, help="how many segments to sample")
     corpus.add_argument("--seed", default="nrm-006", help="same seed, same sample")
     corpus.set_defaults(handler=_corpus)
+    gold = commands.add_parser("gold", help="golden answer keys for evaluation")
+    gold_commands = gold.add_subparsers(dest="gold_command", required=True)
+    template = gold_commands.add_parser(
+        "template", help="start a private golden set (IDs only) in the workspace"
+    )
+    template.add_argument("--count", type=int, default=40, help="conversations (30 to 50)")
+    template.add_argument("--seed", default="golden-v1", help="same seed, same choice")
+    template.add_argument("--taxonomy", required=True, help="taxonomy version to label against")
+    template.add_argument("--annotator", default="reviewer", help="who will annotate")
+    template.set_defaults(handler=_gold_template)
+    gold_commands.add_parser("schema", help="print the golden set JSON Schema").set_defaults(
+        handler=_gold_schema
+    )
     taxonomy = commands.add_parser("taxonomy", help="the shared vocabulary")
     taxonomy_commands = taxonomy.add_subparsers(dest="taxonomy_command", required=True)
     tax_report = taxonomy_commands.add_parser(
