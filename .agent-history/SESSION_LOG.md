@@ -673,3 +673,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - classification/store.py (ClassificationRow, ClassificationLabelRow, ClassificationReviewRow, save, record_review, effective_labels, review_queue, FieldLabels, ReviewInputError); migration 0018_classifications; classification/drift.py (order_experiment, canonical, DriftReport, Unstable).
 - Tests: test_classification_store.py (7). Full suite 887 passed, 6 skipped; ruff, mypy OK; drift 0.
 - Next: EXT-001 + EXT-002.
+
+## 2026-10-28 07:10 EXT-001 + EXT-002 (#69, #70)
+- extraction/records.py (RecordType, Origin, Acceptance, Scope, Trust, TRANSITIONS, COMMITMENTS, Provenance, CandidateRecord, KnowledgeRecord, advance, TrustTransitionError); extraction/evidence.py (check_record, revision_text, Verdict, EvidenceCheck, EvidenceProblem).
+- Tests: test_knowledge_records.py (14), test_evidence_validator.py (7). Full suite 908 passed, 6 skipped; ruff, mypy OK; drift 0.
+- Next: EXT-003 + EXT-004.

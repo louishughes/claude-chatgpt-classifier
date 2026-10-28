@@ -1274,3 +1274,34 @@ migration drift         # 0
 Fix attempts: 0. Only lint fixes were needed: import order in env.py and the docstring's closing punctuation.
 
 **Next exact task:** EXT-001 (typed knowledge record contract) + EXT-002 (evidence validator).
+
+### 07:10 — EXT-001 + EXT-002: what a piece of knowledge is, and checking what it stands on
+**What:** the record contract every extractor must fill in, and the check every record's quotes go through.
+- **Records (EXT-001).** A record has:
+  - a type (decision, rejection, preference, task...);
+  - who holds it, and how it came about (`extracted`, `inferred`, `reviewer`);
+  - how acceptance is known (`explicit`, `conditional`, `inferred`, `absent`);
+  - a scope, its evidence quotes and its provenance;
+  - a trust state.
+
+  Extractors return a `CandidateRecord`, which has **no trust field**, so they can only propose. The stored `KnowledgeRecord` refuses three things:
+  - `supported` without evidence that passed the validator, and `confirmed` without a named reviewer;
+  - confirming an `inferred` record;
+  - trusting a user decision, preference, requirement or task unless the acceptance was explicit or conditional.
+
+  Trust only moves along a fixed table, and rejected is final.
+- **Evidence check (EXT-002).** `check_record` loads each cited message revision.
+  - A **malformed** reference makes the record `invalid`: the revision is missing, the range doesn't fit, the quote fingerprint doesn't match, the speaker is wrong, or a quote is cited twice.
+  - Sound references with a doubtful **meaning** make it `review_required`: only the assistant's words behind a "user decision", acceptance claimed without the user's words, a hedged quote or a question, or a quote that sits inside quotation marks or a `>` line.
+- **Note.** Evidence points at a message *revision* (`rev_`), which already pins the exact text and its first snapshot. That's stricter than the guidance DTO's snapshot plus node pair.
+
+**Teach-back (`extraction/evidence.py`):** "Before a record can be trusted, I open every message it quotes and check the quote is really there, unchanged, and said by the person it claims. A broken reference rejects the record outright. A sound reference with a doubtful meaning, like a 'decision' that's only the assistant's suggestion, goes to a person instead."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 172 source files
+pytest -q               # 908 passed, 6 skipped
+migration drift         # 0
+```
+Fix attempts: 0.
+
+**Next exact task:** EXT-003 (decision and rejection extractor) + EXT-004 (preference and requirement extractor).
