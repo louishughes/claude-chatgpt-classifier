@@ -1124,6 +1124,107 @@ def _digest(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _classify(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Classify chats under one published taxonomy, through request files (step 4).
+
+    The same request-file flow as ``ke digest run``: the first run writes one
+    request per segment for a Claude session on the subscription to answer
+    (docs/runbooks/LABELLING_SESSION.md); the next run collects, validates
+    against the pinned version (CLS-001) and stores the results (CLS-004).
+    The vocabulary is fixed for the whole run: one ``--taxonomy`` version.
+    """
+    from collections import Counter
+
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.classification.classifier import SegmentClassifier
+    from knowledge_engine.classification.store import save
+    from knowledge_engine.importer.records import ConversationRow
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.providers.file_batch import FileBatchProvider
+    from knowledge_engine.providers.ledger import ModelStageRunner
+    from knowledge_engine.rendering.transcript import find_conversation, load_conversation
+    from knowledge_engine.segmentation.overrides import load_segments
+    from knowledge_engine.settings import EgressDisabledError
+    from knowledge_engine.taxonomy.registry import TaxonomyRegistry
+
+    name = "classify run"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    refs = list(args.conversations)
+    if args.ids_file is not None:
+        refs += [
+            line.strip()
+            for line in args.ids_file.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.startswith("#")
+        ]
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            try:
+                snapshot = TaxonomyRegistry(session).snapshot(args.taxonomy)
+            except (KeyError, ValueError):
+                return CommandResult(
+                    name,
+                    ExitCode.USAGE,
+                    message="no such published taxonomy version",
+                    error_code="no_taxonomy",
+                )
+            if args.all:
+                ids = list(
+                    session.scalars(
+                        select(ConversationRow.conversation_id).order_by(
+                            ConversationRow.conversation_id
+                        )
+                    )
+                )
+            else:
+                found = [find_conversation(session, ref) for ref in refs]
+                if not found or None in found:
+                    return CommandResult(
+                        name, ExitCode.USAGE, message="no such conversation", error_code="not_found"
+                    )
+                ids = sorted({cid for cid in found if cid is not None})
+            provider = FileBatchProvider(settings.model_batch_root, args.run_id, settings.egress)
+            runner = ModelStageRunner(session, provider, settings.egress)
+            chats = [load_conversation(session, cid) for cid in ids]
+            items = [(chat, seg) for chat in chats for seg in load_segments(session, chat)]
+            try:
+                results = SegmentClassifier(snapshot, runner=runner).classify(items)
+            except EgressDisabledError:
+                return CommandResult(
+                    name,
+                    ExitCode.USAGE,
+                    message="text_llm is off: turn it on in [egress] to write request files",
+                    error_code="egress_off",
+                )
+            save(session, results, provider_id=provider.identity.provider_id)
+            session.commit()
+    finally:
+        engine.dispose()
+    states = Counter(r.state for r in results)
+    data = {
+        "chats": len(ids),
+        "segments": len(results),
+        "done": states.get("done", 0),
+        "pending": states.get("pending", 0),
+        "review_required": states.get("review_required", 0),
+        "taxonomy": args.taxonomy,
+    }
+    return CommandResult(
+        name,
+        data=data,
+        message=(
+            f"{data['done']} done, {data['pending']} waiting for answers, "
+            f"{data['review_required']} need review ({len(ids)} chats, {len(results)} segments)"
+        ),
+    )
+
+
 def _web(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Fetch one web page safely and show where it came from (INT-001)."""
     from knowledge_engine.ingestion.web import WebFetchError, fetch_page, save_snapshot
@@ -3402,6 +3503,19 @@ def build_parser() -> argparse.ArgumentParser:
     digest_run.add_argument("--run-id", required=True, help="the batch folder name, e.g. gold-40")
     digest_run.add_argument("--vault", type=Path, help="write each finished chat's rich note here")
     digest.set_defaults(handler=_digest)
+    classify = commands.add_parser(
+        "classify", help="label chats under a published taxonomy through request files"
+    )
+    classify_commands = classify.add_subparsers(dest="classify_command", required=True)
+    classify_run = classify_commands.add_parser(
+        "run", help="write classification requests, or collect answers (run again)"
+    )
+    classify_run.add_argument("conversations", nargs="*", help="conv_ or export conversation IDs")
+    classify_run.add_argument("--ids-file", type=Path, help="a file with one chat ID per line")
+    classify_run.add_argument("--all", action="store_true", help="every imported chat")
+    classify_run.add_argument("--taxonomy", required=True, help="the published version, e.g. tax-1")
+    classify_run.add_argument("--run-id", required=True, help="the batch folder name, e.g. gold-40")
+    classify.set_defaults(handler=_classify)
     web = commands.add_parser("web", help="fetch web pages (allowlisted, network_fetch on)")
     web_commands = web.add_subparsers(dest="web_command", required=True)
     web_fetch = web_commands.add_parser("fetch", help="fetch one page into located blocks")
