@@ -23,6 +23,17 @@
   {{ chat.created | when }} · {{ chat.messages }} messages · {{ chat.branch_points }} branch point{{ "" if chat.branch_points == 1 else "s" }} · {{ chat.images }} image link{{ "" if chat.images == 1 else "s" }}
   {% if chat.presence == "not_seen" %} · not in the latest full export (kept){% endif %}
 </p>
+<div class="chat-layout">
+<section class="note-pane" aria-labelledby="note-heading">
+  <h2 id="note-heading">Knowledge note</h2>
+  {% if note %}
+  <p class="muted">Built from stored records{% if note.taxonomy_version %}, labels under {{ note.taxonomy_version }}{% else %}, no taxonomy published yet{% endif %}; digest {{ note.digest }}. Each m-number jumps to the message it cites.</p>
+  <div class="note">{{ note.html | safe }}</div>
+  {% else %}
+  <p class="error" role="alert">The note couldn't be built for this chat ({{ chat.note_error or "no database" }}). The transcript is still shown.</p>
+  {% endif %}
+</section>
+<section class="transcript-pane" id="transcript">
 {% for section in chat.sections if section.kind == "active" %}
 <h2>The conversation</h2>
 <p class="muted">The version ChatGPT shows: the path it last had selected.</p>
@@ -50,5 +61,7 @@
 <p class="muted">Links found between chats. Suggested ones are not confirmed; rejected ones are not shown.</p>
 {{ related(chat.related) }}
 {% endif %}
+</section>
+</div>
 <p class="muted">Chat ID <code>{{ chat.conversation_id }}</code>. Same as <code>ke inspect {{ chat.conversation_id }}</code>.</p>
 {% endblock %}

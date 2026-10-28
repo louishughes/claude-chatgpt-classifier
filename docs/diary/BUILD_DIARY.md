@@ -2937,3 +2937,24 @@ tests/integration/test_note_checks.py   7 passed (the real note passes; each bre
 Fix attempts: 2 (my FakeProvider digest left out the required intent; the table-cell pipe escape).
 
 **Next exact task:** keywords into the note (NOTE-007 wiring), then NOTE-008.
+
+### 16:45 — NOTE-012: the knowledge note beside the chat, and a Notes page
+
+The dashboard's chat page now has two columns on a wide screen: the chat's rich note on the left (it stays in view while you scroll) and the transcript on the right. On a phone they stack. Every `m3` in the note is a link to message 3 on the same page, which is highlighted when you land on it. A new **Notes** page (sidebar, under Chats) lists every chat grouped by category, with its status and how many open questions the digest found.
+
+- `ui/notes.py` builds the note in memory, the same way `ke docs rubric` does: the newest published taxonomy, the stored digest, nothing written.
+- The Markdown-to-HTML step only knows the shapes our own notes use (headings, bullets, callouts, the card table, bold, italics, wikilinks). Every character of text is HTML-escaped first, so chat text can't become markup; the test chat contains a `<script>` tag to prove it.
+- A link to another chat's note goes to that chat's page; any other link is shown as plain words.
+- If a note can't be built, the page says so and still shows the transcript.
+
+A small trap I hit: the page template's sidebar already uses a variable called `groups`, so the first Notes page rendered four empty tables. The categories are now passed as `categories`.
+
+**Teach-back (`note_html`):** It turns one of our rich notes into HTML for the dashboard. It escapes all the text first and only recognises the few shapes our own notes use, so nothing from a chat can sneak in as markup. Citations become links to the message's spot on the same page, so you can check every claim with one click.
+
+Checks:
+```
+tests/integration/test_ui_notes.py   5 passed (summary, card and decisions shown; every m-number opens the message it names; no script tag survives; Notes page grouping; converter shapes)
+```
+Fix attempts: 1 (the `groups` name clash; a whole-transcript link was counted as a citation).
+
+**Next exact task:** merge the open PRs on green, then the NOTE-007 keyword section in the note.

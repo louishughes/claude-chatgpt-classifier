@@ -948,3 +948,6 @@ documents/categories.py (category_shares: domain terms by share of labelled mess
 
 ## 2026-10-28 15:30 NOTE-011 code checks (#283)
 evaluation/note_checks.py (check_note: citations_real, claims_cited, decisions_user_held, tensions_next_steps (warn), empty_sections, budget; reads the rendered Markdown), `ke docs rubric [chats] [--all]`. Tests: tests/integration/test_note_checks.py (7).
+
+## 2026-10-28 16:45 NOTE-012 (#284)
+ui/notes.py (note_view: rich note built in memory with the newest taxonomy and stored digest; note_html: escaped converter for the note's own shapes, citations -> #node anchors; notes_index: chats by category with status and open questions), /notes page, chat page two-column layout, sidebar link. Tests: tests/integration/test_ui_notes.py (5).
