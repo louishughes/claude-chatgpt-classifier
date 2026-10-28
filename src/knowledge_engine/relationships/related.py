@@ -52,6 +52,7 @@ from sqlalchemy.orm import Session
 
 from knowledge_engine.classification.schema import PROJECTS_FIELD
 from knowledge_engine.classification.store import effective_labels
+from knowledge_engine.extraction.preamble import looks_like_preamble
 from knowledge_engine.extraction.records import KnowledgeRecord, Trust
 from knowledge_engine.extraction.store import KnowledgeRecordRow
 from knowledge_engine.graph.nodes import NodeFlag
@@ -188,6 +189,8 @@ def _profiles(
             node = chat.messages.get(native_id)
             if node is None or node.role not in _SPOKEN or NodeFlag.HIDDEN in node.flags:
                 continue
+            if looks_like_preamble(node.role, node.text):
+                continue  # a shared pasted setup prompt must not make chats look alike
             words.append(node.text)
         profile.text = "\n".join(words)[:MAX_CHARS]
         if taxonomy is not None:
