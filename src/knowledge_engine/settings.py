@@ -232,6 +232,8 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("KE_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
     )
     tenants_root: Path | None = None
+    web_allowlist: tuple[str, ...] = ()
+    youtube_access_token: SecretStr | None = None
 
     def account_for(self, source: Path) -> str:
         """Return the account label of the raw root holding ``source``, else ``default``."""
