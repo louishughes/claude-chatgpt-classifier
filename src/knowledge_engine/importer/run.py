@@ -64,8 +64,16 @@ def run_import(
     format_id: str | None,
     settings: Settings,
     full_export: bool = True,
+    limit: int | None = None,
 ) -> ImportReport:
-    """Import one source and return its report. See ``importer.import_source``."""
+    """Import one source and return its report. See ``importer.import_source``.
+
+    ``limit`` imports only the first N conversations, for the batch smoke
+    test (EVAL-010). A limited run is never a full export, so it marks
+    nothing ``not_seen``.
+    """
+    if limit is not None:
+        full_export = False
     before = tree_signature(path)
     adapter = select_adapter(path, default_adapters(), format_id)
     listing = adapter.open(path, max_bytes=settings.limits.max_source_file_bytes)
@@ -94,7 +102,16 @@ def run_import(
                 listing.declared_media,
             )
             return _run(
-                path, account_ns, listing, before, factory, archive, library, settings, full_export
+                path,
+                account_ns,
+                listing,
+                before,
+                factory,
+                archive,
+                library,
+                settings,
+                full_export,
+                limit,
             )
         finally:
             engine.dispose()
@@ -110,6 +127,7 @@ def _run(
     library: MediaLibrary,
     settings: Settings,
     full_export: bool,
+    limit: int | None = None,
 ) -> ImportReport:
     versions = {
         "code": __version__,
@@ -158,6 +176,8 @@ def _run(
     seen: dict[str, str] = {}
     group_size = settings.limits.max_conversations_per_batch
     stream = listing.conversations()
+    if limit is not None:
+        stream = islice(stream, limit)
     for group in _groups(stream, group_size):
         with factory.transaction() as session:
             for item in group:

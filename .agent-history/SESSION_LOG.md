@@ -550,3 +550,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - Known gap: dangling parent IDs aren't stored (edge skipped); reported at import as graph_missing_parent.
 - Tests: test_source_browser.py (19). Full suite 550 passed, 6 skipped.
 - Next: slice E (EVAL-010).
+
+## 2026-10-28 00:11 EVAL-010 (slice E, synthetic half)
+- evaluation/smoke.py run_smoke (import, re-import, render, 7 checks, counts/timings only); run_import(limit=N) (limited run never marks not_seen); CLI `ke eval smoke [ROOT --limit N | --synthetic N --seed S]` writes JSON reports under <workspace>/smoke/.
+- docs/evaluation/EVAL-010_SMOKE.md: synthetic 50/100 results. Real-data half pending (Louis's PC, with REV-009). #39 stays open.
+- Tests: test_smoke.py (4). Full suite 554 passed, 6 skipped.
