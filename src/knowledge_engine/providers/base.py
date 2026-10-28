@@ -20,6 +20,7 @@ Talking points:
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -31,6 +32,27 @@ from pydantic import BaseModel, ValidationError
 from knowledge_engine.settings import Capability
 
 _STAGE_KEY_PREFIX = "stg_"
+
+
+_LINE_START_BRACKET = re.compile(r"(?m)^(\s*)\[")
+
+
+def quote_untrusted(text: str) -> str:
+    """Imported text, ready to go inside a request's ``input_text`` (OPS-006).
+
+    Requests mark each message with a line such as ``[m:ID] user:`` (or
+    ``[3] user:`` for numbered evidence). A message containing a line like
+    that could pose as a different message, or as the user. A backslash
+    before every line-start ``[`` keeps such a line as plain text. Text
+    without one is returned unchanged, so ordinary stage keys don't move.
+
+    Args:
+        text: One message's or passage's text.
+
+    Returns:
+        The same text with line-start brackets escaped.
+    """
+    return _LINE_START_BRACKET.sub(r"\1\\[", text)
 
 
 class ResultState(StrEnum):

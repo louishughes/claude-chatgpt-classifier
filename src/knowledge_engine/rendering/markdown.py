@@ -121,8 +121,9 @@ class DocumentModel:
 def escape_text(text: str) -> str:
     """Neutralise Obsidian and HTML syntax in untrusted text.
 
-    Keeps the words readable while stopping wikilinks, embeds, comments,
-    block references, tags at line start and HTML from taking effect.
+    Keeps the words readable while stopping wikilinks, embeds, Markdown
+    links and images, code (where plugins run queries), comments, block
+    references, tags, line-start syntax and HTML from taking effect (OPS-006).
 
     Args:
         text: Text from an imported source.
@@ -132,7 +133,14 @@ def escape_text(text: str) -> str:
     """
     text = text.replace("\\", "\\\\")
     text = re.sub(r"#(?=[^\s#])", r"\\#", text)  # #tags, anywhere in a line
-    text = text.replace("[[", "\\[\\[").replace("]]", "\\]\\]")
+    # Every bracket, not just [[ ]]: a Markdown link or image would let chat
+    # text point the note at another app (obsidian://...) or make it fetch a
+    # remote picture when opened, which tells that server the note was read.
+    text = text.replace("[", "\\[").replace("]", "\\]")
+    # Every backtick: a code fence or inline code is where plugins such as
+    # Dataview run queries and JavaScript ("dataviewjs", "$= ...").
+    text = text.replace("`", "\\`")
+    text = re.sub(r"(?m)^(\s*)~~~", r"\1\\~~~", text)  # the other fence
     text = text.replace("%%", "\\%\\%")
     text = text.replace("<", "&lt;").replace(">", "&gt;")
     text = re.sub(r"(?m)(\s)\^(?=[A-Za-z0-9-]+\s*$)", r"\1\\^", text)  # block refs

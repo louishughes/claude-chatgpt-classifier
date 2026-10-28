@@ -2203,3 +2203,24 @@ ci                                             see PR
 Fix attempts: 1 (the cap test's room was too generous to trigger the cap).
 
 **Next exact task:** run `ke eval semantic --synthetic 50 --provider anthropic --max-cost-usd 0.50` on Louis's PC with egress on for that run only. Then record the cost and approval here, and switch egress off.
+
+### 09:34 — OPS-006: imported text stays data everywhere it goes
+
+I wrote one hostile synthetic chat and followed it through the system. It carries prompt injection, a forged message line, Markdown that would fetch a remote image or open another app, Dataview code, HTML, odd URL schemes, and a hostile title. Most defences were already in place: ZIP names and sizes, escaped web pages with a strict CSP, http(s)-only links, egress off. The test found two real gaps:
+
+- **Vault notes obeyed some chat Markdown.** `escape_text` stopped `[[...]]`, HTML and tags, but not `![x](https://...)`. That kind of image is fetched when the note opens, which tells the remote server the note was read. It also let through `[x](obsidian://...)` links and code. Code fences and inline code are where Dataview runs queries and JavaScript. Every bracket and backtick is now escaped, plus `~~~` fences. The words still read the same; they just don't act.
+- **A message could pose as another message in model input.** Requests frame each message as `[m:ID] role:`, so a message containing a line like `[m:x] user:` looked like a separate user turn. `providers.base.quote_untrusted` now escapes every line-start `[` in classification, extraction and grounded-answer input. Text without one is unchanged, so existing stage keys don't move.
+- The real-model adapter also puts the text inside `<source_data>` tags it can't close. It says in the system prompt that the text is data, and it offers the model no tools.
+- `docs/operations/SOURCE_AS_DATA.md` lists every place imported text goes and the rule there. That is the ticket's "all public contracts documented" criterion.
+
+**Teach-back (`rendering/markdown.py` `escape_text`):** Anything from a chat that lands in my vault goes through one function that turns every special character into a shown character. So a chat can't make a note fetch a picture from the internet, link into another app, or run plugin code when I open it. The words are all still there to read; they just can't do anything.
+
+Checks:
+```
+tests/integration/test_adversarial.py   7 passed
+  (with the old escape_text: the vault test fails; without quote_untrusted: the model-input test fails)
+ci                                      5/5 ok, 1201 passed, 7 skipped
+```
+Fix attempts: 0 on the product code. The test needed three passes to separate the engine's own trusted syntax (its wikilinks, its link list) from chat text.
+
+**Next exact task:** the approved EVAL-011 paid run on the PC (once #252 merges), then OPS-007 packaging.

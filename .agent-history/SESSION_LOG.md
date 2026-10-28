@@ -864,3 +864,6 @@ First CI run: read-only deletes on Windows (purge), OS byte in the e2e fixture Z
 
 ## 2026-10-28 09:16 EVAL-011 real-provider adapter
 AnthropicProvider (pinned model, worst-case cost cap, thinking off) and `ke eval semantic --provider anthropic`, which refuses without --synthetic, a cap, and egress. 7 stand-in tests. No paid call made.
+
+## 2026-10-28 09:34 OPS-006
+Adversarial end-to-end suite (test_adversarial.py, 7). Fixed escape_text (brackets, backticks, ~~~) and line-start "[" in model input (quote_untrusted). Adapter fences input in <source_data>. Contracts in docs/operations/SOURCE_AS_DATA.md. ci 5/5.
