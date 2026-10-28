@@ -18,6 +18,9 @@ Then the vault is checked the way Obsidian would read it:
   ``[[link#Heading]]`` resolves to a note in the vault, and the anchor or
   heading exists in it; every ``![[embed]]`` is a file in the vault
   (escaped links and links inside code are skipped, as Obsidian skips them);
+* the readability rules (NOTE-010, ``readability.py``): no note over its
+  budget, no evidence box in an empty section, no bookkeeping in the
+  front matter of a note written to the rich-note layout;
 * the LLM-free source notes come first: every chat has its transcript
   note, and every knowledge note links to it (BRW-001).
 
@@ -42,6 +45,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
+from knowledge_engine.evaluation.readability import ReadabilityProblem, check_note
 
 E2E_VERSION = "eval-006-v1"
 
@@ -87,11 +92,17 @@ class LinkCheck:
     broken_embeds: list[tuple[str, str]] = field(default_factory=list)
     bad_frontmatter: list[str] = field(default_factory=list)
     shapes: dict[str, NoteShape] = field(default_factory=dict)
+    # NOTE-010: how many notes were written to the rich-note layout (and so
+    # had their budget and properties checked), and what was wrong.
+    readable: int = 0
+    readability: list[ReadabilityProblem] = field(default_factory=list)
 
     @property
     def clean(self) -> bool:
-        """No broken link, embed or frontmatter."""
-        return not (self.broken_links or self.broken_embeds or self.bad_frontmatter)
+        """No broken link, embed or frontmatter, and no readability problem."""
+        return not (
+            self.broken_links or self.broken_embeds or self.bad_frontmatter or self.readability
+        )
 
 
 def check_vault(vault: Path) -> LinkCheck:
@@ -117,6 +128,7 @@ def check_vault(vault: Path) -> LinkCheck:
     for key, text in texts.items():
         front, body = _body(text)
         kind = "note"
+        properties = None
         if front is not None:
             try:
                 properties = yaml.safe_load(front)
@@ -125,9 +137,16 @@ def check_vault(vault: Path) -> LinkCheck:
                 properties = None
             if isinstance(properties, dict):
                 kind = str(properties.get("ke_type", kind))
+        readable, problems = check_note(
+            key, properties if isinstance(properties, dict) else None, body
+        )
+        report.readable += readable
+        report.readability += problems
         shape = NoteShape(kind, anchors=len(anchors[key]))
         for bang, raw in _LINK.findall(_readable(body)):
-            target = raw.strip()
+            # Inside a table cell the alias pipe is written "\|" (a bare pipe
+            # would end the cell); Obsidian reads it as the pipe, so drop the "\".
+            target = raw.strip().removesuffix("\\")
             if bang:
                 report.embeds += 1
                 shape.embeds += 1

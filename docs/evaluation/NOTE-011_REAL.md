@@ -50,3 +50,24 @@ No paid API was called.
 
 - Run the NOTE-005 extractor on the 40 chats (request files, fresh sessions), re-render and re-score with the same references. The references stay unchanged.
 - File fixes 2 to 5 as tickets with the build thread.
+
+## Re-score after the AI extractor (NOTE-005), same 15 references
+
+The NOTE-005 extractor ran on all 85 segments through request files, answered by 5 fresh Claude Sonnet sessions with every quote checked in code. It stored 94 records. The 40 notes were re-rendered and the code rubric passes 35 of 40 (all 5 failures are size only). A **new** scorer session (Claude Opus), which didn't see the first scoring, compared them with the unchanged references.
+
+| Measure | First score | Re-score |
+|---|---|---|
+| Summary | 1.53 mean (23/30) | 24/30 |
+| Category | 8 exact, 3 top only, 4 unclassified | same (no reclassification yet) |
+| Status matches | 12/15 | 12/15 |
+| **Decisions found** | **5 of 22 (23%)** | **12 of 22 (55%)**; the notes hold 28, 2 wrong |
+| Open questions found | 1 of 9 | 0 of 9 |
+| Key points covered | 58/75 (77%) | 59/75 (79%) |
+| Unsupported claims | 9 in 6 notes | 9 in 6 notes |
+| Noise lines in "from the chat" sections | not counted | 57 (42 are pasted custom instructions, in 10 notes) |
+| Readability | 1.73 mean | 19/30 (1.27 mean; the new records add length and noise) |
+
+**What changed:** decision recall more than doubled. **What didn't:** open questions, noise and stitched summaries. The noise comes from the older rule-extractor records, which are still stored and shown next to the new ones. The fixes are the same as listed above, plus two more:
+
+- Hide or retire the rule-extractor records for a chat once a model extraction has run on it, so pasted custom instructions and drafted letter text stop appearing as requirements.
+- Have the extractor and the digest fill open questions from how the chat ends (an unanswered offer, an unsent letter, a promise to report back).
