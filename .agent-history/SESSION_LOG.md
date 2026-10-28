@@ -643,3 +643,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - taxonomy/registry.py (Dimension, TermStatus, normalise_alias, TaxonomyTermRow, TaxonomyAliasRow, TaxonomyVersionRow, TaxonomyProposalRow, ProjectRow, ProjectAliasRow, TaxonomySnapshot, TaxonomyRegistry.add_term/add_alias/add_project/publish/snapshot/versions), migration 0015.
 - Tests: test_taxonomy_registry.py (8). Full suite 811 passed, 6 skipped. ruff, mypy, git_guard OK; no migration drift.
 - Next: TAX-003/004.
+
+## 2026-10-28 04:25 TAX-003 + TAX-004 (#58, #59)
+- taxonomy/aliases.py (AliasResolver.resolve/find/collisions, MatchStatus, Candidate, Resolution, Mention); taxonomy/review.py (Operation, propose, approve, reject, proposals, ReviewError); TaxonomyProposalRow.decision_note/result_id; migration 0016.
+- Tests: test_alias_resolver.py (7), test_taxonomy_review.py (9). Full suite 827 passed, 6 skipped. ruff, mypy OK; no migration drift.
+- Next: TAX-005/006.

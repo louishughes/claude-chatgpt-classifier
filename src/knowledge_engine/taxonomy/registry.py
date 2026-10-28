@@ -174,6 +174,9 @@ class TaxonomyProposalRow(Base):
     proposer: Mapped[str] = mapped_column(String(100))
     status: Mapped[str] = mapped_column(String(10), default="open")
     reviewer: Mapped[str | None] = mapped_column(String(100), default=None)
+    # Why it was approved or rejected, and the ID an approved ``add`` created.
+    decision_note: Mapped[str | None] = mapped_column(Text, default=None)
+    result_id: Mapped[str | None] = mapped_column(String(40), default=None)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
 
