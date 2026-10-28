@@ -2,16 +2,16 @@
 {% from "macros.html" import where %}
 {% block title %}Link · Knowledge Engine{% endblock %}
 {% block main %}
-<p><a href="/links">← All links</a></p>
+<p class="back"><a href="/links">← All links</a></p>
 <h1 class="wrap">{{ link.host }}</h1>
 <p class="wrap"><a href="{{ link.url }}" rel="noreferrer noopener">{{ link.url }}</a> <span class="muted">(opens the real site)</span></p>
 <h2>Mentioned {{ link.mentions | length }} time{{ "" if link.mentions | length == 1 else "s" }}</h2>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>Where</th><th>As written</th></tr></thead>
   <tbody>
   {% for m in link.mentions %}
   <tr><td>{{ where(m.place) }}</td><td class="wrap"><code>{{ m.written }}</code>{% if m.origin == "citation_metadata" %} <span class="muted">(a cited source)</span>{% endif %}</td></tr>
   {% endfor %}
   </tbody>
-</table>
+</table></div>
 {% endblock %}

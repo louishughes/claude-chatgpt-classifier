@@ -1,74 +1,121 @@
 {% extends "base.html" %}
+{% from "macros.html" import empty, checked_by, meter, stackbar, legend %}
 {% block title %}Evaluation · Knowledge Engine{% endblock %}
 {% block main %}
-<h1>Evaluation</h1>
-<p class="muted">How the engine's outputs measure up. Everything is counted from this workspace; scores compare knowledge records with the answer key using the same matching as the EVAL-004 report. This page only shows; there is nothing to label or decide here. <a href="/evaluation/outputs">Look at each output →</a> · <a href="/evaluation/classifications">Segment labels against the key →</a></p>
+{# Trust states get the same colours everywhere: amber waits for someone,
+   grey is untouched, blue passed the evidence check, green a reviewer
+   confirmed, red was rejected. #}
+{% set trust_class = {"review_required": "seg-look", "candidate": "seg-quiet", "supported": "seg-info", "confirmed": "seg-good", "rejected": "seg-bad"} %}
+<header class="page-head">
+  <p class="eyebrow">Check the AI</p>
+  <h1>Evaluation</h1>
+  <p class="lede">How the engine's outputs measure up. Scores compare knowledge records with the answer key using the same matching as the EVAL-004 report. This page only shows; there is nothing to label or decide here.</p>
+</header>
+<ul class="filters">
+  <li><a href="/evaluation/outputs">Look at each output →</a></li>
+  <li><a href="/evaluation/classifications">Segment labels against the key →</a></li>
+</ul>
 {% if found is none %}
-<p>Nothing imported yet.</p>
+{{ empty("Nothing imported yet.", "Import an export first; scores appear once the extractors have run on it.") }}
 {% else %}
 {% with key = found.key, key_error = found.key_error %}{% include "_keyblock.html" %}{% endwith %}
 
 {% if found.report %}
 {% set r = found.report %}
+{% set all = r.rows[-1] %}
 <h2>Knowledge records against the answer key</h2>
+{{ checked_by(found.key) }}
 <ul class="tiles">
   <li><strong class="{{ 'good' if r.passed else 'look' }}">{{ "PASSED" if r.passed else "FAILED" }}</strong>hard gate</li>
-  <li><strong>{{ r.rows[-1].precision | rate }}</strong>precision</li>
-  <li><strong>{{ r.rows[-1].recall | rate }}</strong>recall</li>
-  <li><strong>{{ r.rows[-1].f1 | rate }}</strong>F1</li>
-  <li><strong>{{ r.anchor_validity | rate }}</strong>quotes still valid</li>
+  <li><strong>{{ all.precision | rate }}</strong>precision: share of outputs the key expected{{ meter(all.precision) }}</li>
+  <li><strong>{{ all.recall | rate }}</strong>recall: share of expected records found{{ meter(all.recall) }}</li>
+  <li><strong>{{ all.f1 | rate }}</strong>F1: the two combined{{ meter(all.f1) }}</li>
+  <li><strong>{{ r.anchor_validity | rate }}</strong>quotes still valid{{ meter(r.anchor_validity) }}</li>
 </ul>
-<p class="muted">The hard gate fails if anything the key forbids, or a user decision without the user's own valid words, reached current truth. Forbidden produced: {{ r.forbidden_produced }} (in current truth: {{ r.forbidden_in_truth }}). Unsupported user decisions in current truth: {{ r.unsupported }}. Key <code>{{ r.gold }}</code> covers {{ r.conversations }} chats, {{ r.annotated }} annotated for records. Records scored: {{ r.produced - r.unscored }} of {{ r.produced }} in those chats. Evaluator <code>{{ r.eval_version }}</code>{% for stage, v in r.versions.items() %}; {{ stage }} <code>{{ v }}</code>{% endfor %}.</p>
-<table>
-  <thead><tr><th>Record type</th><th>Found and expected</th><th>Found, not expected</th><th>Expected, missed</th><th>Precision</th><th>Recall</th><th>F1</th></tr></thead>
+<p class="muted">The hard gate fails if anything the key forbids, or a user decision without the user's own valid words, reached current truth. Forbidden produced: {{ r.forbidden_produced }} (in current truth: {{ r.forbidden_in_truth }}). Unsupported user decisions in current truth: {{ r.unsupported }}.</p>
+
+<h3>By record type</h3>
+<p class="muted">Each bar is one type of record. Green was found and expected; amber was found but the key didn't expect it; red was expected but missed.</p>
+{{ legend([("seg-good", "found and expected"), ("seg-look", "found, not expected"), ("seg-bad", "expected, missed")]) }}
+{% set ns = namespace(max=0) %}
+{% for row in r.rows[:-1] %}{% set ns.max = [ns.max, row.tp + row.fp + row.fn] | max %}{% endfor %}
+<div class="chart">
+{% for row in r.rows[:-1] %}
+{{ stackbar(row.name, [("seg-good", row.tp, "found and expected"), ("seg-look", row.fp, "found, not expected"), ("seg-bad", row.fn, "expected, missed")], ns.max, "/evaluation/outputs?type=" ~ row.name) }}
+{% endfor %}
+</div>
+<div class="table-wrap"><table class="scores">
+  <thead><tr><th>Record type</th><th class="num">Found and expected</th><th class="num">Found, not expected</th><th class="num">Expected, missed</th><th class="num">Precision</th><th class="num">Recall</th><th class="num">F1</th></tr></thead>
   <tbody>
   {% for row in r.rows %}
   <tr{% if loop.last %} class="total"{% endif %}><td>{% if loop.last %}{{ row.name }}{% else %}<a href="/evaluation/outputs?type={{ row.name }}">{{ row.name }}</a>{% endif %}</td><td>{{ row.tp }}</td><td>{{ row.fp }}</td><td>{{ row.fn }}</td><td>{{ row.precision | rate }}</td><td>{{ row.recall | rate }}</td><td>{{ row.f1 | rate }}</td></tr>
   {% endfor %}
   </tbody>
-</table>
+</table></div>
 {% if r.agreement %}
-<table>
-  <thead><tr><th>On matched records, agrees on</th><th>Checked</th><th>Right</th><th>Rate</th></tr></thead>
-  <tbody>{% for name, checked, right, rate in r.agreement %}<tr><td>{{ name }}</td><td>{{ checked }}</td><td>{{ right }}</td><td>{{ rate | rate }}</td></tr>{% endfor %}</tbody>
-</table>
+<h3>Details on matched records</h3>
+<p class="muted">When an output matches the key, does it also agree on who said it, how firmly, and whether it was accepted?</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Agrees on</th><th class="num">Checked</th><th class="num">Right</th><th class="num">Rate</th></tr></thead>
+  <tbody>{% for name, checked, right, rate in r.agreement %}<tr><td>{{ name | replace("_", " ") }}</td><td class="num">{{ checked }}</td><td class="num">{{ right }}</td><td class="num">{{ rate | rate }}</td></tr>{% endfor %}</tbody>
+</table></div>
 {% endif %}
+<details>
+  <summary>Which key and versions produced these scores</summary>
+  <p class="muted">Key <code>{{ r.gold }}</code> covers {{ r.conversations }} chats, {{ r.annotated }} annotated for records. Records scored: {{ r.produced - r.unscored }} of {{ r.produced }} in those chats. Evaluator <code>{{ r.eval_version }}</code>{% for stage, v in r.versions.items() %}; {{ stage }} <code>{{ v }}</code>{% endfor %}.</p>
+</details>
 {% endif %}
 
 <h2>All outputs</h2>
-<p class="muted">Every knowledge record the engine stored, by type and how far it got.</p>
+<p class="muted">Every knowledge record the engine stored, by type and how far it got. Counted from this workspace; not a score.</p>
 {% if found.records %}
-<table>
-  <thead><tr><th>Type</th>{% for t, words in found.trust_order %}<th title="{{ words }}">{{ t }}</th>{% endfor %}<th>Total</th></tr></thead>
-  <tbody>
-  {% for t, counts, total in found.records %}
-  <tr><td><a href="/evaluation/outputs?type={{ t }}">{{ t }}</a></td>{% for n in counts %}<td>{{ n }}</td>{% endfor %}<td>{{ total }}</td></tr>
-  {% endfor %}
-  </tbody>
-</table>
-{% else %}<p>No knowledge records yet.</p>{% endif %}
+<ul class="legend">{% for t, words in found.trust_order %}<li><svg aria-hidden="true"><rect class="{{ trust_class.get(t, 'seg-quiet') }}" width="10" height="10" rx="2"></rect></svg>{{ t | replace("_", " ") }} <span>({{ words }})</span></li>{% endfor %}</ul>
+{% set ns2 = namespace(max=0) %}
+{% for t, counts, total in found.records %}{% set ns2.max = [ns2.max, total] | max %}{% endfor %}
+<div class="chart">
+{% for t, counts, total in found.records %}
+{% set parts = [] %}
+{% for state, words in found.trust_order %}{% set _ = parts.append((trust_class.get(state, "seg-quiet"), counts[loop.index0], state | replace("_", " "))) %}{% endfor %}
+{{ stackbar(t, parts, ns2.max, "/evaluation/outputs?type=" ~ t) }}
+{% endfor %}
+</div>
+<details>
+  <summary>Show as a table</summary>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Type</th>{% for t, words in found.trust_order %}<th class="num" title="{{ words }}">{{ t | replace("_", " ") }}</th>{% endfor %}<th class="num">Total</th></tr></thead>
+    <tbody>
+    {% for t, counts, total in found.records %}
+    <tr><td><a href="/evaluation/outputs?type={{ t }}">{{ t }}</a></td>{% for n in counts %}<td class="num">{{ n }}</td>{% endfor %}<td class="num">{{ total }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</details>
+{% else %}
+{{ empty("No knowledge records yet.", "Run extraction (ke extract) on your imported chats; the records it finds appear here.") }}
+{% endif %}
 
+<h2>Other work the engine has done</h2>
 <div class="columns">
-<section><h3>Classifications</h3>{% if found.classifications %}<ul>{% for s, n in found.classifications %}<li>{{ s }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">None yet.</p>{% endif %}<p class="muted">{{ found.label_reviews }} reviewer label decision(s).</p></section>
-<section><h3>Chat links</h3>{% if found.relationships %}<ul>{% for s, n in found.relationships %}<li>{{ s }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">None yet.</p>{% endif %}</section>
-<section><h3>Vocabulary proposals</h3>{% if found.proposals %}<ul>{% for s, n in found.proposals %}<li>{{ s }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">None yet.</p>{% endif %}</section>
-<section><h3>Model requests</h3>{% if found.model_requests %}<ul>{% for s, n in found.model_requests %}<li>{{ s }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">None yet.</p>{% endif %}</section>
+<section><h3>Classifications</h3>{% if found.classifications %}<ul>{% for s, n in found.classifications %}<li>{{ s | replace("_", " ") }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">None yet.</p>{% endif %}<p class="muted">{{ found.label_reviews }} reviewer label decision(s).</p></section>
+<section><h3>Chat links</h3>{% if found.relationships %}<ul>{% for s, n in found.relationships %}<li>{{ s | replace("_", " ") }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">None yet.</p>{% endif %}</section>
+<section><h3>Vocabulary proposals</h3>{% if found.proposals %}<ul>{% for s, n in found.proposals %}<li>{{ s | replace("_", " ") }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">None yet.</p>{% endif %}</section>
+<section><h3>Model requests</h3>{% if found.model_requests %}<ul>{% for s, n in found.model_requests %}<li>{{ s | replace("_", " ") }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">None yet.</p>{% endif %}</section>
 </div>
 
 {% if found.model_runs %}
 <h2>Model requests</h2>
 <p class="muted">Every request the engine sent to a model provider, counted. Prompts and answers aren't shown here.</p>
-<table>
-  <thead><tr><th>Stage</th><th>Provider</th><th>State</th><th>Requests</th><th>Attempts</th><th>Transient failures</th><th>Characters sent</th></tr></thead>
+<div class="table-wrap"><table class="requests">
+  <thead><tr><th>Stage</th><th>Provider</th><th>State</th><th class="num">Requests</th><th class="num">Attempts</th><th class="num">Transient failures</th><th class="num">Characters sent</th></tr></thead>
   <tbody>{% for m in found.model_runs %}<tr><td><code>{{ m.stage }}</code></td><td>{{ m.provider }}</td><td>{{ m.state }}</td><td>{{ m.requests }}</td><td>{{ m.attempts }}</td><td>{{ m.transient }}</td><td>{{ m.characters }}</td></tr>{% endfor %}</tbody>
-</table>
+</table></div>
 {% endif %}
 
 <h2>Review outcomes</h2>
 <p class="muted">Decisions by named reviewers (usually independent AI review sessions, not you) are kept apart from the automatic evidence check. <a href="/reviews">Every decision and its reason →</a></p>
 <div class="columns">
-<section><h3>Named reviewers moved records to</h3>{% if found.reviewer_outcomes %}<ul>{% for s, n in found.reviewer_outcomes %}<li>{{ s }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">No reviewer decisions yet.</p>{% endif %}</section>
-<section><h3>Automatic evidence check sent records to</h3>{% if found.validator_outcomes %}<ul>{% for s, n in found.validator_outcomes %}<li>{{ s }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">Nothing checked yet.</p>{% endif %}</section>
+<section><h3>Named reviewers moved records to</h3>{% if found.reviewer_outcomes %}<ul>{% for s, n in found.reviewer_outcomes %}<li>{{ s | replace("_", " ") }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">No reviewer decisions yet.</p>{% endif %}</section>
+<section><h3>Automatic evidence check sent records to</h3>{% if found.validator_outcomes %}<ul>{% for s, n in found.validator_outcomes %}<li>{{ s | replace("_", " ") }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">Nothing checked yet.</p>{% endif %}</section>
 </div>
 {% endif %}
 {% endblock %}

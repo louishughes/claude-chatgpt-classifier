@@ -145,6 +145,8 @@ def make_app(settings: Settings, answer_key: evaluation.KeySource | None = None)
             version=__version__,
             workspace=str(settings.workspace_root),
             form_token=ctx.form_token,
+            # The sidebar highlights the section this page belongs to.
+            current_path=path,
             **page.values,
         )
         start_response(page.status, list(_HEADERS))
