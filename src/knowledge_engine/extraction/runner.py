@@ -58,7 +58,7 @@ from knowledge_engine.infrastructure.db import Base
 from knowledge_engine.infrastructure.logs import EventLog, null_log
 from knowledge_engine.orchestration.limits import Deadline
 from knowledge_engine.orchestration.stage_keys import stage_key
-from knowledge_engine.providers.base import ModelRequest, quote_untrusted
+from knowledge_engine.providers.base import MessageRef, ModelRequest, quote_untrusted
 from knowledge_engine.providers.ledger import ModelStageRunner
 from knowledge_engine.segmentation.segmenter import SegmenterSettings, split_parts
 
@@ -282,7 +282,7 @@ class ModelQuote(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    message_id: str = Field(min_length=1)
+    message_id: MessageRef = Field(min_length=1)
     text: str = Field(min_length=1, max_length=1000)
 
 

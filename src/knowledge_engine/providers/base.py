@@ -25,9 +25,9 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Annotated, Any, Protocol
 
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, BeforeValidator, ValidationError
 
 from knowledge_engine.settings import Capability
 
@@ -53,6 +53,30 @@ def quote_untrusted(text: str) -> str:
         The same text with line-start brackets escaped.
     """
     return _LINE_START_BRACKET.sub(r"\1\\[", text)
+
+
+_MESSAGE_TAG = re.compile(r"^\[?\s*m:\s*(?P<id>[^\]\s]+)\s*\]?$")
+
+
+def bare_message_id(value: object) -> object:
+    """A cited message ID without the ``[m:...]`` tag the request showed it in.
+
+    Requests show each message as ``[m:ID] user:``, and models often cite
+    it back in that same form. The ID inside is what the evidence checks
+    compare with, so ``[m:abc]`` and ``m:abc`` become ``abc``; anything
+    else is left exactly as it was. Before this, every such citation
+    counted as "outside the segment" (#255: 53 of the 67 answers in the
+    one paid run).
+    """
+    if isinstance(value, str):
+        found = _MESSAGE_TAG.match(value.strip())
+        if found:
+            return found.group("id")
+    return value
+
+
+# A message ID a model cites; validation strips the [m:...] tag.
+MessageRef = Annotated[str, BeforeValidator(bare_message_id)]
 
 
 class ResultState(StrEnum):
