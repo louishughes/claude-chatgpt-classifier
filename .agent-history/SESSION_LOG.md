@@ -725,3 +725,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - segmenter.split_parts (public, generic); extraction/text.exchanges_of; ModelExtractor per-part requests and merge; classifier model path per-part with disagreement -> review; Predicted.input_messages/chat_chars; reports: truncation_count, by_band / recall_by_band, length_band; synthetic case late_rejection; baselines regenerated (numbers unchanged).
 - Tests: test_long_chats.py (5). Full suite 1016 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: M4.
+
+## 2026-10-28 05:55 UI-005 (#221)
+- ui/review.py (suggestions, reviews); templates suggestions.html, reviews.html; routes /suggestions, /reviews; nav links. Issue #221 created (the plan listed UI-005 but no issue existed).
+- Tests: test_ui_review.py (5). Full suite 1021 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: M4.
