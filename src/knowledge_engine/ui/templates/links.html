@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Links · Knowledge Engine{% endblock %}
+{% block main %}
+<h1>Links</h1>
+<p class="muted">Every web address mentioned in your chats, once each, with every place it was mentioned. Nothing here is fetched.</p>
+<form method="get" action="/links" class="search">
+  <label for="q">Find in the address</label>
+  <input id="q" name="q" type="text" value="{{ q }}">
+  <button type="submit">Search</button>
+</form>
+<p class="muted">{{ total }} address{{ "" if total == 1 else "es" }}{% if q %} containing "{{ q }}"{% endif %}.</p>
+{% if rows %}
+<table>
+  <thead><tr><th>Address</th><th>Mentions</th><th>Chats</th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+  <tr>
+    <td class="wrap"><a href="/links/{{ row.target_id }}">{{ row.url }}</a>{% if row.kind == "youtube_video" %} <span class="status">video</span>{% endif %}</td>
+    <td>{{ row.mentions }}</td>
+    <td>{{ row.conversations }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if pages > 1 %}
+<p>
+  {% if page > 1 %}<a href="/links?q={{ q | urlencode }}&amp;page={{ page - 1 }}">← Previous</a>{% endif %}
+  Page {{ page }} of {{ pages }}
+  {% if page < pages %}<a href="/links?q={{ q | urlencode }}&amp;page={{ page + 1 }}">Next →</a>{% endif %}
+</p>
+{% endif %}
+{% endif %}
+{% endblock %}

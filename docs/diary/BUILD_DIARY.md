@@ -1051,3 +1051,23 @@ pytest -q               # 757 passed, 6 skipped
 Fix attempts: 1 (a typing error from building a hit out of a row slice).
 
 **Next exact task:** UI-004 (links, YouTube and accounts pages, plus a search box).
+
+### 02:30 — UI-004: links, videos, accounts and search in the web UI
+**What:** `ke ui` gets five new pages, linked from the header and the home page:
+- **Search:** one box with three choices (all the words, the words in order, exactly). Each result shows its chat, who wrote it and when, with the match in [brackets], and links to that message.
+- **Links:** every web address once, with mention and chat counts, filterable. Each address has a page listing every mention as written.
+- **Videos:** one row per YouTube video with its transcript status. Each video page lists every mention, with clickable start times such as 1:15.
+- **Accounts:** the registry with first and last seen dates. Bare @names are listed separately and never linked to an account. Each account page shows every way it was written.
+
+Every mention on every page links to the exact message (`/chats/<id>#<anchor>`). The tests follow each of those links and check the anchor exists on the chat page.
+**Safety:** links that leave the app are marked "opens the real site" and carry `rel="noreferrer noopener"`. Message text is escaped, so a message containing `<b>` shows the characters. The pages never fetch anything. The only write is bringing the search index up to date, and that file is a cache.
+**Tidy-up:** the account listing queries moved into `social_store`, so `ke accounts` and the page share one implementation.
+**Teach-back (`ui/registries.py`):** "Each page is a read-only view of a registry the importer already keeps: links, videos, accounts. Every row is one click from the message that mentioned it, because each mention stores its exact message version. The search page uses the same index as `ke search`."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 125 source files
+pytest -q               # 766 passed, 6 skipped
+```
+Fix attempts: 0. Screenshots of the search and video pages checked by eye.
+
+**Next exact task:** start M3. Read the M3 plan and LEG-002..005 (#190–#193) and REV-012 (#187) first.

@@ -23,6 +23,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy import (
     CheckConstraint,
@@ -32,10 +33,13 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    func,
+    select,
 )
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from knowledge_engine.domain.ids import account_mention_id, social_account_id
+from knowledge_engine.importer.records import MessageRevisionRow
 from knowledge_engine.infrastructure.db import Base
 from knowledge_engine.links.extract import CITATION_METADATA, MESSAGE_TEXT
 from knowledge_engine.links.social import AMBIGUOUS, RESOLVED, FoundAccount
@@ -199,3 +203,81 @@ def _account(session: Session, found: FoundAccount, import_id: str, counts: Coun
         session.add(AccountAliasRow(account_id=account_id, alias=alias, kind=kind))
         session.flush()
     return account_id
+
+
+def _seen() -> tuple[Any, ...]:
+    return (
+        func.count(AccountMentionRow.mention_id),
+        func.count(func.distinct(AccountMentionRow.conversation_id)),
+        func.min(MessageRevisionRow.create_time),
+        func.max(MessageRevisionRow.create_time),
+    )
+
+
+def _seen_fields(mentions: int, conversations: int, first: Any, last: Any) -> dict[str, Any]:
+    def day(value: Any) -> str | None:
+        return datetime.fromtimestamp(value, UTC).date().isoformat() if value else None
+
+    return {
+        "mentions": int(mentions),
+        "conversations": int(conversations),
+        "first_seen": day(first),
+        "last_seen": day(last),
+    }
+
+
+def account_summaries(session: Session, *, platform: str | None = None) -> list[dict[str, Any]]:
+    """List registry accounts with mention counts and first/last seen dates.
+
+    Args:
+        session: A read session.
+        platform: Only this platform, optionally (case-insensitive).
+
+    Returns:
+        One dict per account, by platform then handle.
+    """
+    query = (
+        select(SocialAccountRow, *_seen())
+        .join(AccountMentionRow, AccountMentionRow.account_id == SocialAccountRow.account_id)
+        .join(MessageRevisionRow)
+        .group_by(SocialAccountRow.account_id)
+        .order_by(SocialAccountRow.platform, SocialAccountRow.canonical_handle)
+    )
+    if platform:
+        query = query.where(SocialAccountRow.platform == platform.lower())
+    return [
+        {
+            "account_id": account.account_id,
+            "platform": account.platform,
+            "handle": account.canonical_handle,
+            "stable_id": account.stable_platform_id,
+            "profile_url": account.profile_url,
+            "identity_status": account.identity_status,
+            **_seen_fields(m, c, first, last),
+        }
+        for account, m, c, first, last in session.execute(query).all()
+    ]
+
+
+def ambiguous_handles(session: Session) -> list[dict[str, Any]]:
+    """List bare @handles (never linked to an account), most mentioned first."""
+    handle = func.lower(AccountMentionRow.handle)
+    rows = session.execute(
+        select(handle, *_seen())
+        .join(MessageRevisionRow)
+        .where(AccountMentionRow.resolution == AMBIGUOUS)
+        .group_by(handle)
+        .order_by(func.count(AccountMentionRow.mention_id).desc(), handle)
+    ).all()
+    return [{"handle": f"@{h}", **_seen_fields(m, c, first, last)} for h, m, c, first, last in rows]
+
+
+def account_mentions(session: Session, account_id: str) -> list[AccountMentionRow]:
+    """Return every mention of one account, in revision order."""
+    return list(
+        session.scalars(
+            select(AccountMentionRow)
+            .where(AccountMentionRow.account_id == account_id)
+            .order_by(AccountMentionRow.revision_id, AccountMentionRow.start)
+        )
+    )

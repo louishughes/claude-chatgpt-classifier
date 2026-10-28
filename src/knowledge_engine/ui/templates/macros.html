@@ -1,0 +1,3 @@
+{% macro where(place) -%}
+{% if place %}<a href="/chats/{{ place.conversation_id }}#{{ place.anchor }}">{{ place.title }}</a> <span class="muted">· {{ place.role or "unknown" }}{% if place.when %} · {{ place.when | when }}{% endif %}</span>{% else %}<span class="muted">(message not found)</span>{% endif %}
+{%- endmacro %}

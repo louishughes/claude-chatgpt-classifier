@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Videos · Knowledge Engine{% endblock %}
+{% block main %}
+<h1>YouTube videos</h1>
+<p class="muted">One row per video, however its link was written. A transcript is only ever added by you (<code>ke transcript add</code>); nothing is downloaded.</p>
+{% if videos %}
+<table>
+  <thead><tr><th>Video</th><th>Mentions</th><th>Chats</th><th>Transcript</th></tr></thead>
+  <tbody>
+  {% for v in videos %}
+  <tr><td><a href="/videos/{{ v.video_id }}"><code>{{ v.video_id }}</code></a></td><td>{{ v.mentions }}</td><td>{{ v.conversations }}</td><td>{{ v.transcript_status | replace("_", " ") }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>No YouTube links found yet.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% from "macros.html" import where %}
+{% block title %}Search · Knowledge Engine{% endblock %}
+{% block main %}
+<h1>Search messages</h1>
+<form method="get" action="/search" class="search">
+  <label for="q">Words to find in any message</label>
+  <input id="q" name="q" type="text" value="{{ q }}">
+  <button type="submit">Search</button>
+  <fieldset class="modes">
+    <legend class="muted">Match</legend>
+    {% for m in modes %}
+    <label class="check"><input type="radio" name="mode" value="{{ m }}"{% if m == mode %} checked{% endif %}>
+      {% if m == "tokens" %}all the words, any order{% elif m == "phrase" %}the words in this order{% else %}exactly, case included (codes, IDs){% endif %}</label>
+    {% endfor %}
+  </fieldset>
+</form>
+{% if hits is not none %}
+<p class="muted">{{ hits | length }} message{{ "" if hits | length == 1 else "s" }}{% if hits | length >= 100 %} (the best 100){% endif %}.</p>
+{% for item in hits %}
+<article class="message">
+  <p class="who">{{ where(item.place) }}</p>
+  <div class="text">{{ item.hit.snippet }}</div>
+</article>
+{% endfor %}
+{% endif %}
+{% endblock %}
