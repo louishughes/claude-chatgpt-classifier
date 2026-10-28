@@ -40,8 +40,9 @@ from __future__ import annotations
 import hashlib
 import re
 from collections import Counter
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, replace
+from functools import partial
 from typing import Protocol
 
 from knowledge_engine.rendering.transcript import StoredConversation, transcript_sections
@@ -99,8 +100,12 @@ class Segment:
         sequence: Position within the section, from 0.
         messages: Native IDs, in order. Never overlaps another segment.
         revisions: The matching revision IDs.
-        reason: Why it starts here: ``start``, ``gap`` or ``vocabulary``.
+        reason: Why it starts here: ``start``, ``gap``, ``vocabulary`` or
+            ``reviewer_split`` (NRM-005).
         parts: The segment split to the size budget (one part if it fits).
+        derived_from: For a segment a reviewer's split or merge produced, the
+            automatic segments whose messages it covers (lineage); empty
+            when it is exactly an automatic segment.
     """
 
     segment_id: str
@@ -112,6 +117,7 @@ class Segment:
     revisions: tuple[str, ...]
     reason: str
     parts: tuple[SegmentPart, ...]
+    derived_from: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -134,6 +140,7 @@ def segment_section(
     section: str = "active",
     section_index: int = 0,
     settings: SegmenterSettings | None = None,
+    overrides: Mapping[str, str] | None = None,
 ) -> list[Segment]:
     """Split one transcript section into topic segments.
 
@@ -143,6 +150,10 @@ def segment_section(
         section: The section kind.
         section_index: The section's position.
         settings: Thresholds; defaults if omitted.
+        overrides: Reviewer decisions, native message ID -> ``split`` (a
+            segment starts here) or ``merge`` (no segment starts here).
+            Only honoured where an exchange starts; anything else is
+            ignored here and reported by ``segmentation.overrides``.
 
     Returns:
         Segments covering every message exactly once, in order.
@@ -152,6 +163,8 @@ def segment_section(
     if not exchanges:
         return []
     starts = _boundaries(exchanges, config)
+    if overrides:
+        starts = _apply_overrides(starts, exchanges, overrides)
     segments = []
     for sequence, (start, reason) in enumerate(starts):
         end = starts[sequence + 1][0] if sequence + 1 < len(starts) else len(exchanges)
@@ -170,6 +183,39 @@ def segment_section(
             )
         )
     return segments
+
+
+def exchange_starts(
+    messages: Sequence[SegmentMessage], settings: SegmenterSettings | None = None
+) -> list[str]:
+    """Native IDs of the messages that open an exchange, in order.
+
+    These are the only places a segment may start: a reviewer can split
+    there, never between a suggestion and the short reply to it.
+    """
+    return [
+        exchange[0].native_id for exchange in _exchanges(messages, settings or SegmenterSettings())
+    ]
+
+
+def _apply_overrides(
+    starts: list[tuple[int, str]],
+    exchanges: list[list[SegmentMessage]],
+    overrides: Mapping[str, str],
+) -> list[tuple[int, str]]:
+    # Exchange 0 always starts the section, so it can be neither split
+    # nor merged away.
+    where = {exchange[0].native_id: index for index, exchange in enumerate(exchanges)}
+    chosen = dict(starts)
+    for native_id, action in overrides.items():
+        index = where.get(native_id)
+        if not index:
+            continue
+        if action == "split":
+            chosen.setdefault(index, "reviewer_split")
+        elif action == "merge":
+            chosen.pop(index, None)
+    return sorted(chosen.items())
 
 
 def _exchanges(
@@ -327,21 +373,10 @@ def boundary_scores(predicted: Sequence[str], gold: Sequence[str]) -> dict[str, 
     return {"precision": precision, "recall": recall, "f1": f1}
 
 
-def segment_conversation(
-    conversation: StoredConversation, settings: SegmenterSettings | None = None
-) -> list[Segment]:
-    """Segment every transcript section of a stored conversation.
-
-    Args:
-        conversation: From ``load_conversation``.
-        settings: Thresholds; defaults if omitted.
-
-    Returns:
-        The active path's segments first, then each alternate branch's,
-        then any messages outside the tree. Every message exactly once.
-    """
-    segments: list[Segment] = []
-    for index, section in enumerate(transcript_sections(conversation)):
+def section_messages(conversation: StoredConversation) -> list[tuple[str, list[SegmentMessage]]]:
+    """Each transcript section's kind and messages, as the segmenter sees them."""
+    sections = []
+    for section in transcript_sections(conversation):
         messages = [
             SegmentMessage(
                 native_id,
@@ -353,11 +388,48 @@ def segment_conversation(
             for native_id in section.messages
             if native_id in conversation.messages
         ]
-        segments += segment_section(
+        sections.append((section.kind, messages))
+    return sections
+
+
+def segment_conversation(
+    conversation: StoredConversation,
+    settings: SegmenterSettings | None = None,
+    overrides: Mapping[str, str] | None = None,
+) -> list[Segment]:
+    """Segment every transcript section of a stored conversation.
+
+    Args:
+        conversation: From ``load_conversation``.
+        settings: Thresholds; defaults if omitted.
+        overrides: Reviewer splits and merges (NRM-005), native message
+            ID -> action; see ``segmentation.overrides.load_segments``.
+
+    Returns:
+        The active path's segments first, then each alternate branch's,
+        then any messages outside the tree. Every message exactly once.
+        Segments a reviewer changed carry their lineage in ``derived_from``.
+    """
+    segments: list[Segment] = []
+    for index, (kind, messages) in enumerate(section_messages(conversation)):
+        split = partial(
+            segment_section,
             messages,
             conversation_id=conversation.conversation_id,
-            section=section.kind,
+            section=kind,
             section_index=index,
             settings=settings,
         )
+        automatic = split()
+        if not overrides:
+            segments += automatic
+            continue
+        reviewed = split(overrides=overrides)
+        known = {s.segment_id for s in automatic}
+        for segment in reviewed:
+            if segment.segment_id not in known:
+                members = set(segment.messages)
+                lineage = tuple(s.segment_id for s in automatic if members & set(s.messages))
+                segment = replace(segment, derived_from=lineage)
+            segments.append(segment)
     return segments

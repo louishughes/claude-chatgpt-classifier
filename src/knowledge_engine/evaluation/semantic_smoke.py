@@ -78,7 +78,8 @@ from knowledge_engine.providers.ledger import (
     schema_failures,
 )
 from knowledge_engine.rendering.transcript import StoredConversation, load_conversation
-from knowledge_engine.segmentation.segmenter import Segment, segment_conversation
+from knowledge_engine.segmentation.overrides import load_segments
+from knowledge_engine.segmentation.segmenter import Segment
 from knowledge_engine.settings import Capability, EgressPolicy, Limits
 from knowledge_engine.taxonomy.registry import SnapshotTerm, TaxonomySnapshot
 
@@ -178,7 +179,7 @@ def run_semantic_smoke(
     if limit is not None:
         query = query.limit(limit)
     conversations = [load_conversation(session, c) for c in session.scalars(query).all()]
-    items = [(conv, seg) for conv in conversations for seg in segment_conversation(conv)]
+    items = [(conv, seg) for conv in conversations for seg in load_segments(session, conv)]
 
     # Classification through the model path, under the run budget.
     budget = RunBudget(limits, log=log)
@@ -264,7 +265,7 @@ def _extraction_segments(
     return [
         (seg.segment_id, segment_extraction_messages(conv, seg))
         for conv in conversations
-        for seg in segment_conversation(conv)
+        for seg in load_segments(session, conv)
     ]
 
 

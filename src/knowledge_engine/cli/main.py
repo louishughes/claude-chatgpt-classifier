@@ -434,11 +434,19 @@ def _accounts(settings: Settings, args: argparse.Namespace) -> CommandResult:
 
 
 def _segments(settings: Settings, args: argparse.Namespace) -> CommandResult:
-    """Show where a conversation's topic segments start, and their size parts (NRM-004)."""
+    """Show a conversation's topic segments; record a reviewer split or merge (NRM-004/005)."""
     from sqlalchemy.orm import Session
 
     from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
     from knowledge_engine.rendering.transcript import load_conversation
+    from knowledge_engine.segmentation.overrides import (
+        Action,
+        OverrideError,
+        load_segments,
+        orphaned,
+        record_override,
+        revalidation,
+    )
     from knowledge_engine.segmentation.segmenter import (
         SEGMENTER_VERSION,
         segment_conversation,
@@ -462,11 +470,42 @@ def _segments(settings: Settings, args: argparse.Namespace) -> CommandResult:
                     message="no such conversation",
                     error_code="unknown_conversation",
                 )
-            found = segment_conversation(conversation)
+            redo = None
+            chosen = [(a, args_value) for a in Action if (args_value := getattr(args, a.value))]
+            if chosen:
+                if len(chosen) > 1 or not args.reviewer:
+                    return CommandResult(
+                        "segments",
+                        ExitCode.USAGE,
+                        message="give one of --split/--merge/--clear, and --reviewer",
+                        error_code="bad_override",
+                    )
+                before = load_segments(session, conversation)
+                ((action, native),) = chosen
+                try:
+                    record_override(
+                        session,
+                        conversation,
+                        native,
+                        action,
+                        reviewer=args.reviewer,
+                        note=args.note,
+                    )
+                except OverrideError as error:
+                    return CommandResult(
+                        "segments", ExitCode.ERROR, message=str(error), error_code="bad_override"
+                    )
+                redo = revalidation(session, before, load_segments(session, conversation))
+                session.commit()
+            found = load_segments(session, conversation)
+            lost = orphaned(session, conversation)
+            automatic = len(segment_conversation(conversation))
     finally:
         engine.dispose()
     data = {
         "segmenter": SEGMENTER_VERSION,
+        "automatic_segments": automatic,
+        "orphaned_overrides": lost,
         "truncation_count": truncation_count(found),
         "segments": [
             {
@@ -474,6 +513,7 @@ def _segments(settings: Settings, args: argparse.Namespace) -> CommandResult:
                 "section": s.section,
                 "sequence": s.sequence,
                 "reason": s.reason,
+                "derived_from": list(s.derived_from),
                 "first_message": s.messages[0],
                 "messages": len(s.messages),
                 "parts": [
@@ -488,6 +528,13 @@ def _segments(settings: Settings, args: argparse.Namespace) -> CommandResult:
             for s in found
         ],
     }
+    if redo is not None:
+        data["revalidation"] = {
+            "retired": list(redo.retired),
+            "added": list(redo.added),
+            "classifications_to_redo": len(redo.classifications),
+            "extraction_runs_to_redo": len(redo.extraction_runs),
+        }
     return CommandResult("segments", data=data, message=f"{len(found)} segment(s)")
 
 
@@ -690,6 +737,77 @@ def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
         "search",
         data={"mode": args.mode, "hits": hits, "newly_indexed": added},
         message=f"{len(hits)} matching message(s)",
+    )
+
+
+def _duplicates(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Propose, list and review records that may state the same claim (REC-001); no text."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.reconciliation.equivalence import (
+        EquivalenceError,
+        State,
+        equivalence_groups,
+        pairs,
+        propose_equivalences,
+        review,
+    )
+
+    name = f"duplicates {args.duplicates_command}"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            if args.duplicates_command == "detect":
+                found = propose_equivalences(session)
+                session.commit()
+                return CommandResult(
+                    name,
+                    data={"added": list(found.added), "known": len(found.known)},
+                    message=f"{len(found.added)} new pair(s) proposed; nothing merged",
+                )
+            if args.duplicates_command == "review":
+                try:
+                    review(
+                        session,
+                        args.pair,
+                        State(args.decision),
+                        reviewer=args.reviewer,
+                        note=args.note,
+                    )
+                except KeyError:
+                    return CommandResult(
+                        name, ExitCode.ERROR, message="no such pair", error_code="unknown_pair"
+                    )
+                except EquivalenceError as error:
+                    return CommandResult(
+                        name, ExitCode.ERROR, message=str(error), error_code="refused"
+                    )
+                session.commit()
+            states = [State(args.state)] if getattr(args, "state", None) else list(State)
+            listed = [
+                {
+                    "pair_id": row.pair_id,
+                    "records": [row.record_a, row.record_b],
+                    "basis": row.basis,
+                    "score": row.score,
+                    "differences": json.loads(row.differences_json),
+                    "state": row.state,
+                }
+                for row in pairs(session, states)
+            ]
+            groups = [list(group) for group in equivalence_groups(session)]
+    finally:
+        engine.dispose()
+    return CommandResult(
+        name,
+        data={"pairs": listed, "groups": groups},
+        message="Records that may state the same claim (confirmed pairs form groups)",
     )
 
 
@@ -1147,6 +1265,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     segments = commands.add_parser("segments", help="a chat's topic segments (no text shown)")
     segments.add_argument("conversation", help="the conv_ ID")
+    segments.add_argument("--split", metavar="MESSAGE", help="start a segment at this message")
+    segments.add_argument("--merge", metavar="MESSAGE", help="join the segment starting here")
+    segments.add_argument("--clear", metavar="MESSAGE", help="forget the decision at this message")
+    segments.add_argument("--reviewer", help="who decided (required with a decision)")
+    segments.add_argument("--note", help="why")
     segments.set_defaults(handler=_segments)
     corpus = commands.add_parser(
         "corpus", help="segment counts and a seeded sample of segment IDs (no text shown)"
@@ -1216,6 +1339,25 @@ def build_parser() -> argparse.ArgumentParser:
         "detect", help="run the link detectors again (imports already do this)"
     )
     rerun.set_defaults(handler=_related_detect)
+
+    duplicates = commands.add_parser(
+        "duplicates", help="records that may state the same claim (never merged automatically)"
+    )
+    duplicates_commands = duplicates.add_subparsers(
+        dest="duplicates_command", metavar="ACTION", parser_class=_Parser
+    )
+    dup_list = duplicates_commands.add_parser("list", help="list proposed and reviewed pairs")
+    dup_list.add_argument("--state", choices=["proposed", "confirmed", "rejected"])
+    dup_list.set_defaults(handler=_duplicates)
+    duplicates_commands.add_parser("detect", help="propose new pairs").set_defaults(
+        handler=_duplicates
+    )
+    dup_review = duplicates_commands.add_parser("review", help="confirm or reject a pair")
+    dup_review.add_argument("pair", help="the req_ ID")
+    dup_review.add_argument("decision", choices=["confirmed", "rejected"])
+    dup_review.add_argument("--reviewer", required=True, help="who decided")
+    dup_review.add_argument("--note", help="why (required to confirm a near miss)")
+    dup_review.set_defaults(handler=_duplicates)
 
     ui = commands.add_parser("ui", help="open the local web interface (this computer only)")
     ui.add_argument("--port", type=int, default=8765, help="port on 127.0.0.1 (default 8765)")

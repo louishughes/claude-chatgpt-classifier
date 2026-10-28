@@ -730,3 +730,9 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - ui/review.py (suggestions, reviews); templates suggestions.html, reviews.html; routes /suggestions, /reviews; nav links. Issue #221 created (the plan listed UI-005 but no issue existed).
 - Tests: test_ui_review.py (5). Full suite 1021 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: M4.
+
+## 2026-10-28 06:20 NRM-005 (#83) + REC-001 (#84)
+- segmentation/overrides.py (SegmentOverrideRow, Action, record_override, active_overrides, load_segments, orphaned, revalidation); segmenter: overrides param, exchange_starts, section_messages, Segment.derived_from; migration 0021_segment_overrides; inventory and semantic smoke use the overrides; `ke segments --split/--merge/--clear`.
+- reconciliation/equivalence.py (find_candidates, compare, propose_equivalences, review, equivalence_groups, pairs); migration 0022_record_equivalences; `ke duplicates detect/list/review`.
+- Tests: test_segment_overrides.py (8), test_record_equivalence.py (5). Full suite 1034 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: REC-002.
