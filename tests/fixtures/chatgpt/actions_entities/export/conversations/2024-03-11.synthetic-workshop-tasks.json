@@ -1,0 +1,311 @@
+{
+  "conversation_id": "c0000040-0000-4000-8000-000000000001",
+  "title": "Synthetic workshop tasks",
+  "create_time": 1710115200.0,
+  "date": "2024-03-11",
+  "filename": "2024-03-11.synthetic-workshop-tasks.json",
+  "message_count": 10,
+  "user_message_count": 5,
+  "assistant_message_count": 4,
+  "image_references": 2,
+  "conversation": {
+    "title": "Synthetic workshop tasks",
+    "create_time": 1710115200.0,
+    "update_time": 1710115860.0,
+    "mapping": {
+      "c0000040-0000-4000-8000-000000000001-root": {
+        "id": "c0000040-0000-4000-8000-000000000001-root",
+        "message": null,
+        "parent": null
+      },
+      "c0000040-0000-4000-8000-000000000001-sys": {
+        "id": "c0000040-0000-4000-8000-000000000001-sys",
+        "message": {
+          "id": "c0000040-0000-4000-8000-000000000001-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115260.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000040-0000-4000-8000-000000000001-root"
+      },
+      "wk-u0": {
+        "id": "wk-u0",
+        "message": {
+          "id": "wk-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115320.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question: how do I refinish the table? What finish lasts longest?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000040-0000-4000-8000-000000000001-sys"
+      },
+      "wk-a0": {
+        "id": "wk-a0",
+        "message": {
+          "id": "wk-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115380.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: you should sand it first. Make sure to wipe off the dust. Oil lasts longest."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "wk-u0"
+      },
+      "wk-u1": {
+        "id": "wk-u1",
+        "message": {
+          "id": "wk-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115440.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic note: I'll sand it tomorrow. Which grit is best for oak?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "wk-a0"
+      },
+      "wk-a1": {
+        "id": "wk-a1",
+        "message": {
+          "id": "wk-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115500.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: I'm not sure, it depends on the oak."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "wk-u1"
+      },
+      "wk-u2": {
+        "id": "wk-u2",
+        "message": {
+          "id": "wk-u2",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115560.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic request: draw the finished table."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "wk-a1"
+      },
+      "wk-a2": {
+        "id": "wk-a2",
+        "message": {
+          "id": "wk-a2",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115620.0,
+          "update_time": null,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "image_asset_pointer",
+                "asset_pointer": "file-service://file-SYN0001",
+                "size_bytes": 0,
+                "width": 4,
+                "height": 4,
+                "fovea": null,
+                "metadata": null
+              },
+              {
+                "content_type": "image_asset_pointer",
+                "asset_pointer": "file-service://file-SYNGONE",
+                "size_bytes": 0,
+                "width": 4,
+                "height": 4,
+                "fovea": null,
+                "metadata": null
+              },
+              "Synthetic: here are two sketches."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "wk-u2"
+      },
+      "wk-u3": {
+        "id": "wk-u3",
+        "message": {
+          "id": "wk-u3",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115680.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: and a script to list the photos?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "wk-a2"
+      },
+      "wk-a3": {
+        "id": "wk-a3",
+        "message": {
+          "id": "wk-a3",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115740.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer:\n```python\nprint('synthetic')\n```"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "wk-u3"
+      },
+      "wk-u4": {
+        "id": "wk-u4",
+        "message": {
+          "id": "wk-u4",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115800.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: is walnut oil food safe?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "wk-a3"
+      }
+    },
+    "moderation_results": [],
+    "current_node": "wk-u4",
+    "plugin_ids": null,
+    "conversation_id": "c0000040-0000-4000-8000-000000000001",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000040-0000-4000-8000-000000000001"
+  }
+}

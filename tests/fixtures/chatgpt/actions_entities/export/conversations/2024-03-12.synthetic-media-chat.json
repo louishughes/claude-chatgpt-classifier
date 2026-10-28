@@ -1,0 +1,163 @@
+{
+  "conversation_id": "c0000040-0000-4000-8000-000000000002",
+  "title": "Synthetic media chat",
+  "create_time": 1710201600.0,
+  "date": "2024-03-12",
+  "filename": "2024-03-12.synthetic-media-chat.json",
+  "message_count": 5,
+  "user_message_count": 2,
+  "assistant_message_count": 2,
+  "image_references": 0,
+  "conversation": {
+    "title": "Synthetic media chat",
+    "create_time": 1710201600.0,
+    "update_time": 1710201960.0,
+    "mapping": {
+      "c0000040-0000-4000-8000-000000000002-root": {
+        "id": "c0000040-0000-4000-8000-000000000002-root",
+        "message": null,
+        "parent": null
+      },
+      "c0000040-0000-4000-8000-000000000002-sys": {
+        "id": "c0000040-0000-4000-8000-000000000002-sys",
+        "message": {
+          "id": "c0000040-0000-4000-8000-000000000002-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710201660.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000040-0000-4000-8000-000000000002-root"
+      },
+      "c0000040-0000-4000-8000-000000000002-u0": {
+        "id": "c0000040-0000-4000-8000-000000000002-u0",
+        "message": {
+          "id": "c0000040-0000-4000-8000-000000000002-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710201720.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: I keep playing Celeste and reading the book Dune by Frank Herbert."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000040-0000-4000-8000-000000000002-sys"
+      },
+      "c0000040-0000-4000-8000-000000000002-a0": {
+        "id": "c0000040-0000-4000-8000-000000000002-a0",
+        "message": {
+          "id": "c0000040-0000-4000-8000-000000000002-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710201780.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: you could try the game Hollow Knight next."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000040-0000-4000-8000-000000000002-u0"
+      },
+      "c0000040-0000-4000-8000-000000000002-u1": {
+        "id": "c0000040-0000-4000-8000-000000000002-u1",
+        "message": {
+          "id": "c0000040-0000-4000-8000-000000000002-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710201840.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: I'm using Blender for renders, see https://example.com/playing and playing Celeste again."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000040-0000-4000-8000-000000000002-a0"
+      },
+      "c0000040-0000-4000-8000-000000000002-a1": {
+        "id": "c0000040-0000-4000-8000-000000000002-a1",
+        "message": {
+          "id": "c0000040-0000-4000-8000-000000000002-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710201900.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: noted."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000040-0000-4000-8000-000000000002-u1"
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000040-0000-4000-8000-000000000002-a1",
+    "plugin_ids": null,
+    "conversation_id": "c0000040-0000-4000-8000-000000000002",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000040-0000-4000-8000-000000000002"
+  }
+}

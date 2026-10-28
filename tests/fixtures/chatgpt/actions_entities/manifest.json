@@ -1,0 +1,87 @@
+{
+  "fixture_format_version": 1,
+  "case": "actions_entities",
+  "synthetic": true,
+  "layout": "split",
+  "proves": "EXT-005/EXT-006: an assistant's suggested task is not the user's commitment; only unanswered or 'not sure' questions are open; a produced image artefact lists its real occurrences and reports the missing one; named games, books, software and a book's author are found by cue, grouped per entity, never from a URL, and never create a project.",
+  "expected": {
+    "conversations": 2,
+    "actions": [
+      [
+        "action",
+        "assistant",
+        "wk-a0"
+      ],
+      [
+        "action",
+        "assistant",
+        "wk-a0"
+      ],
+      [
+        "action",
+        "user",
+        "wk-u1"
+      ],
+      [
+        "question",
+        "user",
+        "wk-u1"
+      ],
+      [
+        "artefact",
+        "assistant",
+        "wk-a2"
+      ],
+      [
+        "artefact",
+        "assistant",
+        "wk-a3"
+      ],
+      [
+        "question",
+        "user",
+        "wk-u4"
+      ]
+    ],
+    "artefact_occurrences": {
+      "available": 1,
+      "missing": 1
+    },
+    "entities": {
+      "c0000040-0000-4000-8000-000000000002": [
+        [
+          "game",
+          "Celeste",
+          2,
+          {}
+        ],
+        [
+          "book",
+          "Dune",
+          1,
+          {
+            "author": "Frank Herbert"
+          }
+        ],
+        [
+          "person",
+          "Frank Herbert",
+          1,
+          {}
+        ],
+        [
+          "game",
+          "Hollow Knight",
+          1,
+          {}
+        ],
+        [
+          "software",
+          "Blender",
+          1,
+          {}
+        ]
+      ]
+    }
+  }
+}
