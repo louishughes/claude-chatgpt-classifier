@@ -1605,3 +1605,29 @@ Fix attempts: 2, both in the new test's setup:
 - the hypothetical's verdict fails only on "hypothetical", because "switched to" already counts as intent.
 
 **Next exact task:** REC-006 (current-state and as-of projector), then REC-007.
+
+### 07:45 — REC-006 + REC-007: what holds, as of when, and what's connected
+**REC-006.** `project()` gives every decision, rejection, requirement and preference a standing, with the events behind it:
+- **current**;
+- **superseded** (and by what);
+- **conflicted** (an open conflict with another current record; neither wins);
+- **pending** (not checked yet);
+- **unknown** (a date was asked and the record's own time is unknown).
+
+Proposals come out as accepted, rejected or open. There are two clocks: **as_of**, what the chats had said by a date, and **known_at**, what we had recorded by a date. Everything read is append-only, so a past snapshot gives the same answer later, even after a replacement is revoked.
+
+**REC-007.** One list of every stored edge between records: links, decision events (revoked ones left out), same-claim pairs and conflicts.
+- Each edge has its origin (detector or reviewer), review state and the source messages of both ends. An edge without sources is never returned.
+- `walk()` goes breadth-first from a record, with filters for edge kind, depth, direction and closed edges, and labels every record it reaches with its REC-006 standing.
+- New commands: `ke state` and `ke walk`.
+
+**Teach-back (`reconciliation/projection.py`):** "It works out, for each of my decisions, whether it still holds, was replaced, is in an open conflict, or is still waiting for a check, and lists the events that explain that. You can ask about a past date in two ways: what the chats had said by then, and what we had recorded by then. Because nothing it reads is ever edited or deleted, the same question about the past always gets the same answer."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 138 source files
+pytest -q               # 1064 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 0.
+
+**Next exact task:** RET-002 (embeddings provider and index protocol), then RET-003.
