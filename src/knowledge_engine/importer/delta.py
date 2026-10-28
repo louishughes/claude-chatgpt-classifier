@@ -48,6 +48,7 @@ from knowledge_engine.importer.records import (
     RevisionObservationRow,
 )
 from knowledge_engine.links.extract import FoundLink, iter_links
+from knowledge_engine.links.social import FoundAccount, iter_accounts
 
 
 class MissingNativeIdError(ValueError):
@@ -76,6 +77,8 @@ class ConversationDelta:
             shape isn't understood yet. Kept, never dropped, but counted.
         links: ``(revision_id, actor, link)`` for every URL mention in the
             conversation's current revisions, for the link step (LNK-001).
+        accounts: ``(revision_id, actor, account)`` for every social account
+            mention, for the registry (SOC-001/002).
     """
 
     conversation_id: str
@@ -90,6 +93,7 @@ class ConversationDelta:
     content_types: Counter[str] = field(default_factory=Counter)
     unparsed_parts: int = 0
     links: list[tuple[str, str | None, FoundLink]] = field(default_factory=list)
+    accounts: list[tuple[str, str | None, FoundAccount]] = field(default_factory=list)
 
 
 def native_conversation_id(native: Mapping[str, Any]) -> str | None:
@@ -205,9 +209,11 @@ def apply_conversation(
                     (p.file_id for p in canonical.asset_pointers if p.file_id),
                 )
             )
-            delta.links.extend(
-                (revision_key, canonical.role, link)
-                for link in iter_links(canonical.text, mapping[node_id]["message"])
+            found_links = list(iter_links(canonical.text, mapping[node_id]["message"]))
+            delta.links.extend((revision_key, canonical.role, link) for link in found_links)
+            delta.accounts.extend(
+                (revision_key, canonical.role, account)
+                for account in iter_accounts(canonical.text, found_links)
             )
             if session.get(MessageRevisionRow, revision_key) is None:
                 message = mapping[node_id]["message"]

@@ -404,6 +404,90 @@ def _transcript_data(session: Any, transcript_id: str) -> dict[str, Any]:
     }
 
 
+def _accounts(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """List the social account registry (SOC-002): read-only."""
+    from sqlalchemy import func, select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.importer.records import MessageRevisionRow
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.links.social_store import AccountMentionRow, SocialAccountRow
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "accounts", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    seen = (
+        func.count(AccountMentionRow.mention_id),
+        func.count(func.distinct(AccountMentionRow.conversation_id)),
+        func.min(MessageRevisionRow.create_time),
+        func.max(MessageRevisionRow.create_time),
+    )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            if args.ambiguous:
+                rows = session.execute(
+                    select(func.lower(AccountMentionRow.handle), *seen)
+                    .join(MessageRevisionRow)
+                    .where(AccountMentionRow.resolution == "ambiguous")
+                    .group_by(func.lower(AccountMentionRow.handle))
+                    .order_by(func.count(AccountMentionRow.mention_id).desc())
+                ).all()
+                items = [
+                    {"handle": f"@{h}", **_seen_fields(m, c, first, last)}
+                    for h, m, c, first, last in rows
+                ]
+                return CommandResult(
+                    "accounts",
+                    data={"ambiguous": items},
+                    message="Bare @handles (no platform; never linked to an account)",
+                )
+            query = (
+                select(SocialAccountRow, *seen)
+                .join(
+                    AccountMentionRow, AccountMentionRow.account_id == SocialAccountRow.account_id
+                )
+                .join(MessageRevisionRow)
+                .group_by(SocialAccountRow.account_id)
+                .order_by(SocialAccountRow.platform, SocialAccountRow.canonical_handle)
+            )
+            if args.platform:
+                query = query.where(SocialAccountRow.platform == args.platform.lower())
+            accounts_list = [
+                {
+                    "account_id": account.account_id,
+                    "platform": account.platform,
+                    "handle": account.canonical_handle,
+                    "stable_id": account.stable_platform_id,
+                    "profile_url": account.profile_url,
+                    "identity_status": account.identity_status,
+                    **_seen_fields(m, c, first, last),
+                }
+                for account, m, c, first, last in session.execute(query).all()
+            ]
+    finally:
+        engine.dispose()
+    return CommandResult(
+        "accounts", data={"accounts": accounts_list}, message="Social accounts (never contacted)"
+    )
+
+
+def _seen_fields(mentions: int, conversations: int, first: Any, last: Any) -> dict[str, Any]:
+    from datetime import UTC, datetime
+
+    def day(value: Any) -> str | None:
+        return datetime.fromtimestamp(value, UTC).date().isoformat() if value else None
+
+    return {
+        "mentions": int(mentions),
+        "conversations": int(conversations),
+        "first_seen": day(first),
+        "last_seen": day(last),
+    }
+
+
 def _ui(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Run the local web interface until Ctrl+C. Listens on 127.0.0.1 only."""
     import webbrowser
@@ -639,6 +723,13 @@ def build_parser() -> argparse.ArgumentParser:
     status_cmd = transcript_commands.add_parser("status", help="a video's transcript status")
     status_cmd.add_argument("video", help="the 11-character YouTube video ID")
     status_cmd.set_defaults(handler=_transcript_status)
+
+    accounts = commands.add_parser("accounts", help="social accounts mentioned in your chats")
+    accounts.add_argument("--platform", help="only this platform, e.g. github")
+    accounts.add_argument(
+        "--ambiguous", action="store_true", help="list bare @handles with no platform instead"
+    )
+    accounts.set_defaults(handler=_accounts)
 
     ui = commands.add_parser("ui", help="open the local web interface (this computer only)")
     ui.add_argument("--port", type=int, default=8765, help="port on 127.0.0.1 (default 8765)")

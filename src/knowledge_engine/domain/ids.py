@@ -63,6 +63,7 @@ PREFIXES = {
     "transcript_snapshot": "trn",
     "transcript_acquisition": "tacq",
     "social_account": "acct",
+    "account_mention": "amen",
     "relationship": "rel",
 }
 
@@ -416,6 +417,28 @@ def social_account_id(
     else:
         raise ValueError("a social account needs a stable platform ID or a handle")
     return _stable_id("social_account", platform, *key)
+
+
+def account_mention_id(revision: str, start: int, end: int, origin: str) -> str:
+    """ID of one mention of a social account at an exact place (SOC-001).
+
+    Args:
+        revision: The ``rev_`` ID.
+        start: Start offset (inclusive).
+        end: End offset (exclusive).
+        origin: ``message_text`` or ``citation_metadata``.
+
+    Returns:
+        An ``amen_`` ID.
+    """
+    _require_offsets(start, end)
+    return _stable_id(
+        "account_mention",
+        _require_prefixed(revision, "message_revision"),
+        start,
+        end,
+        _require_token(origin, "origin"),
+    )
 
 
 def relationship_id(from_conversation: str, kind: str, to_conversation: str, detector: str) -> str:

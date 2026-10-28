@@ -989,3 +989,23 @@ pytest -q               # 672 passed, 6 skipped
 Fix attempts: 1 (the fixture's short replies first lacked the required "synthetic" marker).
 
 **Next exact task:** SOC-001 + SOC-002 (social account mentions and registry).
+
+### 01:20 — SOC-001 + SOC-002: social accounts mentioned in chats
+**What:** the importer now spots social accounts in every message and keeps a registry of them.
+- A profile URL (X/Twitter, Instagram, TikTok, LinkedIn, YouTube, GitHub, Reddit, Bluesky, Threads, Facebook, Twitch) becomes a resolved mention. Posts, repos, videos and lookalike hosts don't count.
+- A handle with its platform named ("GitHub: @octo", "@octo on Twitter") resolves too, and so does a Fediverse address (`@user@server`).
+- A bare `@name` is stored as **ambiguous** with no account, even when an account with that handle exists. Guessing would invent a real person's identity.
+- Emails, Python decorators and anything in code are not accounts.
+- One account however it was written: the URL and the handle become aliases of the same row, and every mention keeps its exact span.
+- `ke accounts` lists accounts with mention counts, conversation counts and first/last seen; `--ambiguous` lists the bare handles.
+
+Nothing is fetched, followed or contacted. Identity starts at "probable" because the engine only ever has text.
+**Teach-back (`links/social_store.py`):** "Every place a chat mentions an account becomes a mention row pinned to the exact characters. Mentions that clearly name a platform point to one shared account row, and every spelling of it is kept as an alias. A bare @name is kept as a question, never linked, because guessing who someone is is how you invent a person."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 113 source files
+pytest -q               # 699 passed, 6 skipped
+```
+Fix attempts: 1 (a test line was too long for ruff).
+
+**Next exact task:** REL-002.
