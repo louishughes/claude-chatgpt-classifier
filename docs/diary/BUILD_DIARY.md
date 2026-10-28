@@ -3121,6 +3121,20 @@ Fix attempts: 1 (the first test run showed the copied-opening detector also need
 
 **Next exact task:** NOTE-012 dashboard chat view.
 
+### 19:35 — NOTE-026: one citation per message on the topics line
+
+The third score found the same message link up to three times on one bullet, in "Keywords and topics". Each digest topic carried its own citation, and a model usually takes several topics from one message. Now topics that cite the same messages are grouped and share one citation, "raised beds, cedar, drainage [m1]; watering [m3]", in the order the digest gave them. Repeats across sections stay: one item, one citation, is intended.
+
+**Teach-back (`_topics_line` in `rich_note.py`):** It walks the digest's topics in order and groups them by the messages they cite. Each group is written once, its topic names joined by commas and followed by one link per message. So a message is linked once on the line however many topics came from it.
+
+Checks:
+```
+tests/integration/test_note_topic_citations.py   1 passed (fails on the old code: links 1, 1, 3, 1)
+```
+Fix attempts: 0.
+
+**Next exact task:** NOTE-025 (#328), with NOTE-023's extractor half, after Louis answers on the prompt-version test line.
+
 ### 18:20 — NOTE-022: the note prefers the model's records where the model ran
 
 The re-score found 57 noise lines in the "from the chat" sections, and 42 of them were pasted custom instructions. They came from the older rule extractors. Those records stay stored next to the newer model-extractor records (NOTE-005), so both showed up in the note.
