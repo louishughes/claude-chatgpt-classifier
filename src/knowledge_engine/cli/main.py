@@ -2283,6 +2283,27 @@ def _eval_semantic(settings: Settings, args: argparse.Namespace) -> CommandResul
     from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
     from knowledge_engine.infrastructure.logs import event_log
 
+    provider = None
+    if args.provider == "anthropic":
+        # The paid path: synthetic chats only, a cap above zero, egress on.
+        refusal = None
+        if not args.synthetic:
+            refusal = "the paid provider only runs on --synthetic conversations"
+        elif args.max_cost_usd <= 0:
+            refusal = "the paid provider needs --max-cost-usd above zero"
+        elif not settings.egress.text_llm:
+            refusal = "the paid provider needs [egress] text_llm = true in ke.toml"
+        elif settings.limits.max_cost_usd_per_run <= 0:
+            refusal = "the paid provider needs [limits] max_cost_usd_per_run above zero"
+        if refusal:
+            return CommandResult(
+                "eval semantic", ExitCode.USAGE, message=refusal, error_code="refused"
+            )
+        from knowledge_engine.providers.anthropic_api import DEFAULT_MODEL, AnthropicProvider
+
+        # Both caps hold: the one on the command line and the one in settings.
+        cap = min(args.max_cost_usd, settings.limits.max_cost_usd_per_run)
+        provider = AnthropicProvider(cap, model=args.model or DEFAULT_MODEL)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
     base = settings.workspace_root / "smoke"
     label = f"semantic-synthetic-{args.synthetic}" if args.synthetic else f"semantic-{args.limit}"
@@ -2318,6 +2339,8 @@ def _eval_semantic(settings: Settings, args: argparse.Namespace) -> CommandResul
                 limits=limits,
                 faults=Faults(invalid_every=args.invalid_every, silent_every=args.silent_every),
                 log=event_log(scratch),
+                provider=provider,
+                egress=settings.egress,
             )
             session.commit()
     finally:
@@ -2421,6 +2444,19 @@ def build_parser() -> argparse.ArgumentParser:
     semantic.add_argument("--max-calls", type=int, default=10_000, help="model call budget")
     semantic.add_argument("--invalid-every", type=int, default=7, help="every Nth answer is broken")
     semantic.add_argument("--silent-every", type=int, default=13, help="every Nth never answers")
+    semantic.add_argument(
+        "--provider",
+        choices=("fake", "anthropic"),
+        default="fake",
+        help=(
+            "anthropic = the paid API (needs --synthetic, --max-cost-usd, "
+            "[egress] text_llm and [limits] max_cost_usd_per_run)"
+        ),
+    )
+    semantic.add_argument("--model", help="pinned model for --provider anthropic")
+    semantic.add_argument(
+        "--max-cost-usd", type=float, default=0.0, help="hard cost cap for --provider anthropic"
+    )
     semantic.set_defaults(handler=_eval_semantic)
 
     retrieval_bench = eval_commands.add_parser(

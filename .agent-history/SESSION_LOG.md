@@ -861,3 +861,6 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 
 ## 2026-10-28 09:14 OPS-005 CI fixes
 First CI run: read-only deletes on Windows (purge), OS byte in the e2e fixture ZIP, two tests that assumed root or a Unix layout. Fixed in #251; non-root full suite green locally.
+
+## 2026-10-28 09:16 EVAL-011 real-provider adapter
+AnthropicProvider (pinned model, worst-case cost cap, thinking off) and `ke eval semantic --provider anthropic`, which refuses without --synthetic, a cap, and egress. 7 stand-in tests. No paid call made.

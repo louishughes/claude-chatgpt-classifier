@@ -70,6 +70,7 @@ from knowledge_engine.providers.base import (
     FakeProvider,
     ModelRequest,
     ProviderIdentity,
+    StructuredModelProvider,
 )
 from knowledge_engine.providers.ledger import (
     ModelOutputRow,
@@ -155,6 +156,8 @@ def run_semantic_smoke(
     interrupt_after: int | None = None,
     log: EventLog | None = None,
     snapshot: TaxonomySnapshot | None = None,
+    provider: StructuredModelProvider | None = None,
+    egress: EgressPolicy | None = None,
 ) -> dict[str, Any]:
     """Run the semantic stages on the first ``limit`` imported conversations.
 
@@ -168,6 +171,10 @@ def run_semantic_smoke(
             many runs (a step-counting deadline); None picks half.
         log: Structured event log (OPS-001).
         snapshot: The frozen vocabulary; ``smoke_taxonomy()`` by default.
+        provider: A real provider instead of the faulty fake (the owner's
+            one approved paid run). Its ``usage()`` goes in the report.
+        egress: The egress switches; all off by default, which only a
+            local provider passes.
 
     Returns:
         A JSON-ready report of counts, rates and checks. No text.
@@ -183,8 +190,9 @@ def run_semantic_smoke(
 
     # Classification through the model path, under the run budget.
     budget = RunBudget(limits, log=log)
-    provider = keyword_backed_fake(snapshot, items, faults)
-    runner = ModelStageRunner(session, provider, EgressPolicy(), log=log, budget=budget)
+    if provider is None:
+        provider = keyword_backed_fake(snapshot, items, faults)
+    runner = ModelStageRunner(session, provider, egress or EgressPolicy(), log=log, budget=budget)
     classifier = SegmentClassifier(snapshot, runner=runner)
     first = classifier.classify(items)
     second = classifier.classify(items)  # collects the repairs
@@ -256,7 +264,16 @@ def run_semantic_smoke(
         "unvalidated_outputs": unvalidated,
         "checks": checks,
         "passed": all(checks.values()),
+        "provider": _usage(provider),
     }
+
+
+def _usage(provider: StructuredModelProvider) -> dict[str, Any]:
+    usage = getattr(provider, "usage", None)
+    if callable(usage):
+        report: dict[str, Any] = usage()
+        return report
+    return {"provider": provider.identity.provider_id}
 
 
 def _extraction_segments(

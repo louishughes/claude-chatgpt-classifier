@@ -39,7 +39,11 @@ dev = [
     "mypy>=1.13",
     "hypothesis>=6.115",  # property-based tests: random inputs, checked invariants
     "types-PyYAML>=6.0",  # type hints for PyYAML, so mypy can check calls into it
+    "anthropic>=2.3",  # type-checks the paid adapter; tests never call it
 ]
+# The paid model adapter (providers/anthropic_api.py). Only needed for a
+# run the owner has approved; nothing else imports it.
+api = ["anthropic>=2.3"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/knowledge_engine"]
