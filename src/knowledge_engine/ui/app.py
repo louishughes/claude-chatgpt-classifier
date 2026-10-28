@@ -39,7 +39,7 @@ from sqlalchemy.orm import Session
 from knowledge_engine import __version__
 from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
 from knowledge_engine.settings import Settings
-from knowledge_engine.ui import data, registries, review
+from knowledge_engine.ui import data, evaluation, registries, review
 from knowledge_engine.ui.jobs import ImportJobs
 
 StartResponse = Callable[[str, list[tuple[str, str]]], Any]
@@ -86,6 +86,9 @@ class _Context:
     # A random token in every form. A web page elsewhere can make the
     # browser POST here, but can't read this token, so its POST is refused.
     form_token: str
+    # The private answer key the evaluation pages score against (UI-006),
+    # or None. Given on the command line, never stored in the workspace.
+    answer_key: evaluation.KeySource | None = None
 
 
 def is_loopback(host: str) -> bool:
@@ -98,11 +101,12 @@ def is_loopback(host: str) -> bool:
         return False
 
 
-def make_app(settings: Settings) -> WSGIApp:
+def make_app(settings: Settings, answer_key: evaluation.KeySource | None = None) -> WSGIApp:
     """Return the WSGI app for one workspace.
 
     Args:
         settings: The workspace's settings.
+        answer_key: Where the private answer key is, for the evaluation pages.
 
     Returns:
         A WSGI callable.
@@ -115,8 +119,9 @@ def make_app(settings: Settings) -> WSGIApp:
     )
     env.filters["when"] = _when
     env.filters["clock"] = _clock
+    env.filters["rate"] = _rate
     style = (env.loader.get_source(env, "style.css")[0]).encode("utf-8")  # type: ignore[union-attr]
-    ctx = _Context(settings, ImportJobs(settings), secrets.token_urlsafe(24))
+    ctx = _Context(settings, ImportJobs(settings), secrets.token_urlsafe(24), answer_key)
 
     def app(environ: dict[str, Any], start_response: StartResponse) -> Iterable[bytes]:
         if not _host_is_local(environ.get("HTTP_HOST", "")):
@@ -199,6 +204,8 @@ def _route(
         return Page("200 OK", "suggestions.html", {"found": found})
     if path == "/reviews":
         return Page("200 OK", "reviews.html", {"found": _read(settings, review.reviews)})
+    if path.startswith("/evaluation"):
+        return _evaluation(ctx, path, query)
     if path == "/accounts":
         return _accounts(settings)
     if path.startswith("/accounts/"):
@@ -327,6 +334,27 @@ def _links(settings: Settings, query: dict[str, list[str]]) -> Page:
             "pages": max(1, -(-total // _PAGE_SIZE)),
         },
     )
+
+
+def _evaluation(ctx: _Context, path: str, query: dict[str, list[str]]) -> Page:
+    # Three read-only pages (UI-006): the overview, every output with its
+    # verdict, and one output in full. None of them has a form.
+    settings, key = ctx.settings, ctx.answer_key
+    if path == "/evaluation":
+        found = _read(settings, lambda s: evaluation.overview(s, key))
+        return Page("200 OK", "evaluation.html", {"found": found})
+    if path == "/evaluation/outputs":
+        verdict = query.get("verdict", [""])[0]
+        record_type = query.get("type", [""])[0]
+        found = _read(settings, lambda s: evaluation.outputs(s, key, verdict, record_type))
+        return Page("200 OK", "evaluation_outputs.html", {"found": found})
+    record_id = path.removeprefix("/evaluation/outputs/")
+    if record_id != path and _IMPORT_ID_RE.fullmatch(record_id):
+        found = _read(settings, lambda s: evaluation.output(s, key, record_id))
+        if found is not None:
+            return Page("200 OK", "evaluation_output.html", {"found": found})
+        return Page("404 Not Found", "error.html", {"message": "No output with that ID."})
+    return Page("404 Not Found", "error.html", {"message": "There's no page here."})
 
 
 def _accounts(settings: Settings) -> Page:
@@ -465,6 +493,11 @@ def _clock(seconds: int) -> str:
     return f"{hours}:{minutes:02d}:{secs:02d}" if hours else f"{minutes}:{secs:02d}"
 
 
+def _rate(value: float) -> str:
+    # 0.123456 -> "0.123", as the Markdown reports print it.
+    return f"{value:.3f}"
+
+
 def _when(value: datetime | None) -> str:
     return value.strftime("%Y-%m-%d %H:%M") if value else "-"
 
@@ -480,11 +513,17 @@ class _QuietHandler(WSGIRequestHandler):
         return
 
 
-def serve(settings: Settings, host: str = "127.0.0.1", port: int = 8765) -> WSGIServer:
+def serve(
+    settings: Settings,
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    answer_key: evaluation.KeySource | None = None,
+) -> WSGIServer:
     """Create (but don't start) the local server for a workspace.
 
     Args:
         settings: The workspace's settings.
+        answer_key: The private answer key for the evaluation pages, if any.
         host: Must be a loopback address.
         port: TCP port; 0 picks a free one.
 
@@ -497,5 +536,9 @@ def serve(settings: Settings, host: str = "127.0.0.1", port: int = 8765) -> WSGI
     if not is_loopback(host):
         raise NotLocalError("the interface only listens on this computer (127.0.0.1)")
     return make_server(
-        host, port, make_app(settings), server_class=_ThreadingServer, handler_class=_QuietHandler
+        host,
+        port,
+        make_app(settings, answer_key),
+        server_class=_ThreadingServer,
+        handler_class=_QuietHandler,
     )

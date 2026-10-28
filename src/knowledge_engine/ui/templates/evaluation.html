@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Evaluation · Knowledge Engine{% endblock %}
+{% block main %}
+<h1>Evaluation</h1>
+<p class="muted">How the engine's outputs measure up. Everything is counted from this workspace; scores compare knowledge records with the answer key using the same matching as the EVAL-004 report. This page only shows; there is nothing to label or decide here. <a href="/evaluation/outputs">Look at each output →</a></p>
+{% if found is none %}
+<p>Nothing imported yet.</p>
+{% else %}
+{% with key = found.key, key_error = found.key_error %}{% include "_keyblock.html" %}{% endwith %}
+
+{% if found.report %}
+{% set r = found.report %}
+<h2>Knowledge records against the answer key</h2>
+<ul class="tiles">
+  <li><strong class="{{ 'good' if r.passed else 'look' }}">{{ "PASSED" if r.passed else "FAILED" }}</strong>hard gate</li>
+  <li><strong>{{ r.rows[-1].precision | rate }}</strong>precision</li>
+  <li><strong>{{ r.rows[-1].recall | rate }}</strong>recall</li>
+  <li><strong>{{ r.rows[-1].f1 | rate }}</strong>F1</li>
+  <li><strong>{{ r.anchor_validity | rate }}</strong>quotes still valid</li>
+</ul>
+<p class="muted">The hard gate fails if anything the key forbids, or a user decision without the user's own valid words, reached current truth. Forbidden produced: {{ r.forbidden_produced }} (in current truth: {{ r.forbidden_in_truth }}). Unsupported user decisions in current truth: {{ r.unsupported }}. Key <code>{{ r.gold }}</code> covers {{ r.conversations }} chats, {{ r.annotated }} annotated for records. Records scored: {{ r.produced - r.unscored }} of {{ r.produced }} in those chats. Evaluator <code>{{ r.eval_version }}</code>{% for stage, v in r.versions.items() %}; {{ stage }} <code>{{ v }}</code>{% endfor %}.</p>
+<table>
+  <thead><tr><th>Record type</th><th>Found and expected</th><th>Found, not expected</th><th>Expected, missed</th><th>Precision</th><th>Recall</th><th>F1</th></tr></thead>
+  <tbody>
+  {% for row in r.rows %}
+  <tr{% if loop.last %} class="total"{% endif %}><td>{% if loop.last %}{{ row.name }}{% else %}<a href="/evaluation/outputs?type={{ row.name }}">{{ row.name }}</a>{% endif %}</td><td>{{ row.tp }}</td><td>{{ row.fp }}</td><td>{{ row.fn }}</td><td>{{ row.precision | rate }}</td><td>{{ row.recall | rate }}</td><td>{{ row.f1 | rate }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if r.agreement %}
+<table>
+  <thead><tr><th>On matched records, agrees on</th><th>Checked</th><th>Right</th><th>Rate</th></tr></thead>
+  <tbody>{% for name, checked, right, rate in r.agreement %}<tr><td>{{ name }}</td><td>{{ checked }}</td><td>{{ right }}</td><td>{{ rate | rate }}</td></tr>{% endfor %}</tbody>
+</table>
+{% endif %}
+{% endif %}
+
+<h2>All outputs</h2>
+<p class="muted">Every knowledge record the engine stored, by type and how far it got.</p>
+{% if found.records %}
+<table>
+  <thead><tr><th>Type</th>{% for t, words in found.trust_order %}<th title="{{ words }}">{{ t }}</th>{% endfor %}<th>Total</th></tr></thead>
+  <tbody>
+  {% for t, counts, total in found.records %}
+  <tr><td><a href="/evaluation/outputs?type={{ t }}">{{ t }}</a></td>{% for n in counts %}<td>{{ n }}</td>{% endfor %}<td>{{ total }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p>No knowledge records yet.</p>{% endif %}
+
+<div class="columns">
+<section><h3>Classifications</h3>{% if found.classifications %}<ul>{% for s, n in found.classifications %}<li>{{ s }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">None yet.</p>{% endif %}<p class="muted">{{ found.label_reviews }} reviewer label decision(s).</p></section>
+<section><h3>Chat links</h3>{% if found.relationships %}<ul>{% for s, n in found.relationships %}<li>{{ s }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">None yet.</p>{% endif %}</section>
+<section><h3>Vocabulary proposals</h3>{% if found.proposals %}<ul>{% for s, n in found.proposals %}<li>{{ s }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">None yet.</p>{% endif %}</section>
+<section><h3>Model requests</h3>{% if found.model_requests %}<ul>{% for s, n in found.model_requests %}<li>{{ s }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">None yet.</p>{% endif %}</section>
+</div>
+
+<h2>Review outcomes</h2>
+<p class="muted">Decisions by named reviewers (usually independent AI review sessions, not you) are kept apart from the automatic evidence check. <a href="/reviews">Every decision and its reason →</a></p>
+<div class="columns">
+<section><h3>Named reviewers moved records to</h3>{% if found.reviewer_outcomes %}<ul>{% for s, n in found.reviewer_outcomes %}<li>{{ s }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">No reviewer decisions yet.</p>{% endif %}</section>
+<section><h3>Automatic evidence check sent records to</h3>{% if found.validator_outcomes %}<ul>{% for s, n in found.validator_outcomes %}<li>{{ s }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">Nothing checked yet.</p>{% endif %}</section>
+</div>
+{% endif %}
+{% endblock %}

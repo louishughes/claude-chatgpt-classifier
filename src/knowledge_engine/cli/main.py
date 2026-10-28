@@ -2137,10 +2137,24 @@ def _ui(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Run the local web interface until Ctrl+C. Listens on 127.0.0.1 only."""
     import webbrowser
 
+    from knowledge_engine.evaluation.report_labels import ReviewerKind
     from knowledge_engine.ui.app import serve
+    from knowledge_engine.ui.evaluation import KeySource
 
+    # The answer key is private and stays where it is; the evaluation pages
+    # only read it. Who reviewed it must be said out loud (UI-006, LEG-002).
+    key = None
+    if args.gold is not None:
+        if args.reviewer is None:
+            return CommandResult(
+                "ui",
+                ExitCode.ERROR,
+                message="--gold needs --reviewer (who checked the answer key)",
+                error_code="reviewer_required",
+            )
+        key = KeySource(args.gold, ReviewerKind(args.reviewer), args.review)
     try:
-        server = serve(settings, port=args.port)
+        server = serve(settings, port=args.port, answer_key=key)
     except OSError:
         return CommandResult(
             "ui",
@@ -2876,6 +2890,13 @@ def build_parser() -> argparse.ArgumentParser:
     ui = commands.add_parser("ui", help="open the local web interface (this computer only)")
     ui.add_argument("--port", type=int, default=8765, help="port on 127.0.0.1 (default 8765)")
     ui.add_argument("--no-browser", action="store_true", help="don't open a browser window")
+    ui.add_argument("--gold", type=Path, help="private answer key for the Evaluation pages")
+    ui.add_argument(
+        "--reviewer",
+        choices=["owner", "ai_session", "same_model", "none"],
+        help="who reviewed the answer key (needed with --gold)",
+    )
+    ui.add_argument("--review", type=Path, help="the answer key's review record")
     ui.set_defaults(handler=_ui)
 
     api = commands.add_parser("api", help="serve the JSON API (this computer only)")
