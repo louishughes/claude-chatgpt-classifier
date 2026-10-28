@@ -1786,6 +1786,7 @@ def _docs_note(settings: Settings, session: Any, args: argparse.Namespace) -> Co
         write_topic_master,
     )
     from knowledge_engine.documents.render import Mode
+    from knowledge_engine.documents.rich_note import write_rich_note
     from knowledge_engine.rendering.transcript import find_conversation
     from knowledge_engine.taxonomy.registry import TaxonomyRegistry
 
@@ -1825,7 +1826,9 @@ def _docs_note(settings: Settings, session: Any, args: argparse.Namespace) -> Co
             return CommandResult(
                 command, ExitCode.USAGE, message="no such conversation", error_code="not_found"
             )
-        path = write_conversation_note(
+        # v2 is the rich-note layout (NOTE-001); v1 (DOC-003) stays the default for now.
+        writer = write_rich_note if args.template == "v2" else write_conversation_note
+        path = writer(
             session,
             conversation_id,
             args.vault,
@@ -1833,7 +1836,8 @@ def _docs_note(settings: Settings, session: Any, args: argparse.Namespace) -> Co
             taxonomy=snapshot,
         )
         # The file name holds the (private) chat title, so only its ID part is printed.
-        shown = f"{path.parent.as_posix()}/… ({path.stem.rsplit('(', 1)[-1]}.md"
+        # Plain "..." because a Windows console can't print the ellipsis character.
+        shown = f"{path.parent.as_posix()}/... ({path.stem.rsplit('(', 1)[-1]}.md"
         return CommandResult(command, data={"note": shown}, message=f"wrote {shown}")
     else:
         if snapshot is None:
@@ -3110,6 +3114,12 @@ def build_parser() -> argparse.ArgumentParser:
     docs_chat.add_argument("conversation", help="conv_ ID or the export's conversation ID")
     docs_chat.add_argument("--vault", type=Path, required=True, help="the vault folder")
     docs_chat.add_argument("--taxonomy", help="taxonomy version to show labels under")
+    docs_chat.add_argument(
+        "--template",
+        choices=("v1", "v2"),
+        default="v1",
+        help="v1: the DOC-003 note; v2: the rich-note layout (summary and card first)",
+    )
     docs_chat.set_defaults(handler=_docs)
     docs_topic = docs_commands.add_parser(
         "topic", help="write a topic's master note from every chat (by term ID, label or alias)"

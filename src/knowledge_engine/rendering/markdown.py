@@ -97,7 +97,30 @@ class CodeBlock:
     language: str = ""
 
 
-Block = Heading | Paragraph | BulletList | CodeBlock
+@dataclass(frozen=True)
+class Callout:
+    """An Obsidian callout: a titled box, folded shut when ``collapsed``.
+
+    Rich notes (NOTE-001) put evidence quotes in a folded box under each
+    item, so the reader sees the point first and opens the proof on demand.
+
+    Attributes:
+        kind: The callout type (``quote``, ``summary``...): lower-case letters.
+        title: The box title (the engine's own words, never escaped).
+        lines: One line each. Escaped unless ``trusted``; a line break inside
+            a line is folded into a space, because it would end the box.
+        trusted: True only for text the engine wrote itself.
+        collapsed: Start folded (``[!kind]-``) or open (``[!kind]``).
+    """
+
+    kind: str
+    title: str
+    lines: tuple[str, ...]
+    trusted: bool = False
+    collapsed: bool = True
+
+
+Block = Heading | Paragraph | BulletList | CodeBlock | Callout
 
 
 @dataclass(frozen=True)
@@ -299,6 +322,15 @@ def _render_block(block: Block) -> str:
     if isinstance(block, BulletList):
         items = block.items if block.trusted else tuple(escape_text(i) for i in block.items)
         return "\n".join(f"- {item}" for item in items)
+    if isinstance(block, Callout):
+        if not re.fullmatch(r"[a-z]{1,20}", block.kind):
+            raise ValueError("callout kind must be 1-20 lower-case letters")
+        fold = "-" if block.collapsed else ""
+        head = f"> [!{block.kind}]{fold} {' '.join(block.title.split())}".rstrip()
+        lines = [" ".join(line.split()) for line in block.lines]
+        if not block.trusted:
+            lines = [escape_text(line) for line in lines]
+        return "\n".join([head, *(f"> {line}" for line in lines)])
     fence = _fence_for(block.text)
     language = re.sub(r"[^A-Za-z0-9_+-]", "", block.language)
     return f"{fence}{language}\n{block.text}\n{fence}"
