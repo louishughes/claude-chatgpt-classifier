@@ -740,6 +740,68 @@ def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _similar(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Find messages close in meaning (RET-003), with the local embedder; syncs first."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.infrastructure.workspace import WorkspaceRow
+    from knowledge_engine.retrieval.embeddings import LocalHashEmbedder
+    from knowledge_engine.retrieval.semantic import (
+        SemanticIndex,
+        StaleIndexError,
+        semantic_index_path,
+        sync_semantic,
+    )
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "similar", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    embedder = LocalHashEmbedder()
+    engine = create_sqlite_engine(db)
+    try:
+        try:
+            index = SemanticIndex(semantic_index_path(settings), embedder, rebuild=args.rebuild)
+        except StaleIndexError as error:
+            return CommandResult(
+                "similar", ExitCode.ERROR, message=f"{error} (use --rebuild)", error_code="stale"
+            )
+        with Session(engine) as session, index:
+            synced = sync_semantic(session, index, settings.egress)
+            hits = [
+                {
+                    "conversation_id": hit.conversation_id,
+                    "native_node_id": hit.native_node_id,
+                    "revision_id": hit.revision_id,
+                    "role": hit.role,
+                    "score": round(hit.score, 4),
+                }
+                for workspace_id in session.scalars(select(WorkspaceRow.workspace_id))
+                for hit in index.search(
+                    args.query,
+                    workspace_id=workspace_id,
+                    egress=settings.egress,
+                    limit=args.limit,
+                    conversation_ids=[args.conversation] if args.conversation else None,
+                )
+            ]
+    finally:
+        engine.dispose()
+    hits.sort(key=lambda h: (-float(h["score"]), str(h["revision_id"])))  # type: ignore[arg-type]
+    return CommandResult(
+        "similar",
+        data={
+            "embedder": embedder.identity.model,
+            "hits": hits[: args.limit],
+            "newly_embedded": synced.embedded,
+        },
+        message=f"{len(hits[: args.limit])} close message(s) (local embedder: no synonyms)",
+    )
+
+
 def _state(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """What holds now or on a date, with the events behind it (REC-006); no text."""
     from datetime import UTC, datetime
@@ -1481,6 +1543,15 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("--limit", type=int, default=20, help="at most this many hits")
     search.add_argument("--conversation", help="only this conv_ ID")
     search.set_defaults(handler=_search)
+
+    similar = commands.add_parser("similar", help="find messages close in meaning (local)")
+    similar.add_argument("query", help="what to look for")
+    similar.add_argument("--limit", type=int, default=20, help="at most this many hits")
+    similar.add_argument("--conversation", help="only this conv_ ID")
+    similar.add_argument(
+        "--rebuild", action="store_true", help="rebuild an index made by another embedder"
+    )
+    similar.set_defaults(handler=_similar)
 
     related = commands.add_parser("related", help="links between conversations (forks, quotes)")
     related_commands = related.add_subparsers(
