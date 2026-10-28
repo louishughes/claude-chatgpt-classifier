@@ -1007,6 +1007,64 @@ def _eval_retrieval(settings: Settings, args: argparse.Namespace) -> CommandResu
     )
 
 
+def _docs_note(settings: Settings, session: Any, args: argparse.Namespace) -> CommandResult:
+    """Write one chat's knowledge note (DOC-003) or one topic's master note (DOC-005)."""
+    from knowledge_engine.documents.notes import (
+        TopicNotFound,
+        write_conversation_note,
+        write_topic_master,
+    )
+    from knowledge_engine.documents.render import Mode
+    from knowledge_engine.rendering.transcript import find_conversation
+    from knowledge_engine.taxonomy.registry import TaxonomyRegistry
+
+    command = f"docs {args.docs_command}"
+    snapshot = None
+    if args.taxonomy:
+        try:
+            snapshot = TaxonomyRegistry(session).snapshot(args.taxonomy)
+        except KeyError:
+            return CommandResult(
+                command,
+                ExitCode.USAGE,
+                message="no such taxonomy version",
+                error_code="no_taxonomy",
+            )
+    if args.docs_command == "chat":
+        conversation_id = find_conversation(session, args.conversation)
+        if conversation_id is None:
+            return CommandResult(
+                command, ExitCode.USAGE, message="no such conversation", error_code="not_found"
+            )
+        path = write_conversation_note(
+            session,
+            conversation_id,
+            args.vault,
+            settings.workspace_root / "archive",
+            taxonomy=snapshot,
+        )
+        # The file name holds the (private) chat title, so only its ID part is printed.
+        shown = f"{path.parent.as_posix()}/… ({path.stem.rsplit('(', 1)[-1]}.md"
+        return CommandResult(command, data={"note": shown}, message=f"wrote {shown}")
+    else:
+        if snapshot is None:
+            return CommandResult(
+                command,
+                ExitCode.USAGE,
+                message="a topic needs --taxonomy",
+                error_code="no_taxonomy",
+            )
+        try:
+            path = write_topic_master(
+                session, args.topic, snapshot, args.vault, mode=Mode(args.mode)
+            )
+        except TopicNotFound as error:
+            return CommandResult(command, ExitCode.USAGE, message=str(error), error_code="no_topic")
+    return CommandResult(
+        command, data={"note": path.as_posix()}, message=f"wrote {path.as_posix()}"
+    )
+
+
 def _docs(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Build document contents and track dependencies, or list what a change affects (DOC-001)."""
     from sqlalchemy.orm import Session
@@ -1032,6 +1090,8 @@ def _docs(settings: Settings, args: argparse.Namespace) -> CommandResult:
                     data={"note": path.as_posix(), "mode": args.mode},
                     message=f"wrote {path.as_posix()}",
                 )
+            if args.docs_command in ("chat", "topic"):
+                return _docs_note(settings, session, args)
             if args.docs_command == "affected":
                 found = affected_documents(session, args.ids)
                 return CommandResult(
@@ -1872,6 +1932,23 @@ def build_parser() -> argparse.ArgumentParser:
         "--mode", choices=["current", "history", "all"], default="all", help="default: all"
     )
     docs_project.set_defaults(handler=_docs)
+    docs_chat = docs_commands.add_parser(
+        "chat", help="write a chat's knowledge note (labels, quotes, branches, images, links)"
+    )
+    docs_chat.add_argument("conversation", help="conv_ ID or the export's conversation ID")
+    docs_chat.add_argument("--vault", type=Path, required=True, help="the vault folder")
+    docs_chat.add_argument("--taxonomy", help="taxonomy version to show labels under")
+    docs_chat.set_defaults(handler=_docs)
+    docs_topic = docs_commands.add_parser(
+        "topic", help="write a topic's master note from every chat (by term ID, label or alias)"
+    )
+    docs_topic.add_argument("topic", help="term ID, label or alias")
+    docs_topic.add_argument("--vault", type=Path, required=True, help="the vault folder")
+    docs_topic.add_argument("--taxonomy", help="taxonomy version (required)")
+    docs_topic.add_argument(
+        "--mode", choices=["current", "history", "all"], default="all", help="default: all"
+    )
+    docs_topic.set_defaults(handler=_docs)
 
     related = commands.add_parser("related", help="links between conversations (forks, quotes)")
     related_commands = related.add_subparsers(
