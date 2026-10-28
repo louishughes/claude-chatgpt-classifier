@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Segment labels · Evaluation · Knowledge Engine{% endblock %}
+{% block main %}
+<h1>Segment labels against the answer key</h1>
+<p class="muted"><a href="/evaluation">← Evaluation overview</a>. Each segment the answer key labels, beside the labels stored for the segment holding its first message, paired exactly as the EVAL-003 report pairs them. This page only shows; it changes nothing.</p>
+{% if found is none %}
+<p>Nothing imported yet.</p>
+{% else %}
+{% with key = found.key, key_error = found.key_error %}{% include "_keyblock.html" %}{% endwith %}
+{% if found.stored %}<p class="muted">Stored classifications: {% for s, n in found.stored %}{{ s }} {{ n }}{% if not loop.last %} · {% endif %}{% endfor %}.</p>{% endif %}
+{% if found.no_labels %}
+<p>This answer key has no segment labels yet, so classifications can't be scored. A real key gets them once the first vocabulary is published.</p>
+{% endif %}
+{% if found.report %}
+{% set r = found.report %}
+<p class="muted">Taxonomy <code>{{ r.taxonomy_version }}</code>; evaluator <code>{{ r.eval_version }}</code>{% for n, v in r.versions.items() %}; {{ n }} <code>{{ v }}</code>{% endfor %}. Key segments: {{ r.gold_segments }}, not classified: {{ r.unmatched }}. Ambiguous segments sent to review: {{ r.flagged }}, not sent: {{ r.missed }}.</p>
+<table>
+  <thead><tr><th>Field</th><th>Segments</th><th>Precision</th><th>Recall</th><th>Micro F1</th><th>Macro F1</th><th>Primary right</th></tr></thead>
+  <tbody>{% for n, segs, p, rc, f1, mf1, acc in r.fields %}<tr><td>{{ n }}</td><td>{{ segs }}</td><td>{{ p | rate }}</td><td>{{ rc | rate }}</td><td>{{ f1 | rate }}</td><td>{{ mf1 | rate }}</td><td>{{ acc | rate }}</td></tr>{% endfor %}</tbody>
+</table>
+{% for seg in found.segments %}
+<section class="segment">
+  <h3>{% if seg.place %}<a href="/chats/{{ seg.place[0] }}#{{ seg.place[2] }}">{{ seg.place[1] }}</a>{% else %}(segment not in this workspace){% endif %}</h3>
+  <p class="verdict {{ 'matched' if seg.good else 'extra' }}"><strong>{{ seg.verdict }}</strong>{% if seg.ambiguous %} <span class="muted">(the key marks this segment as undecidable)</span>{% endif %}</p>
+  {% if seg.state %}<p class="muted">Stored as {{ seg.state }} by the {{ seg.method }} classifier{% if seg.provider %} through {{ seg.provider }}{% endif %}{% if seg.model %} ({{ seg.model }}){% endif %}{% if seg.problems %}; problems: {{ seg.problems | join(", ") }}{% endif %}.</p>{% endif %}
+  {% if seg.fields %}
+  <table>
+    <thead><tr><th>Field</th><th>Answer key</th><th>Stored labels</th><th></th></tr></thead>
+    <tbody>{% for f in seg.fields %}<tr><td>{{ f.name }}</td><td>{{ f.expected }}</td><td>{{ f.produced }}</td><td class="{{ 'good' if f.same_set else 'look' }}">{% if f.same_set %}same{% elif f.primary_right %}primary right, others differ{% else %}differs{% endif %}</td></tr>{% endfor %}</tbody>
+  </table>
+  {% endif %}
+</section>
+{% endfor %}
+{% endif %}
+{% endif %}
+{% endblock %}

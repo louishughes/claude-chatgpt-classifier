@@ -11,7 +11,10 @@ himself. So this module shows, side by side:
   can never disagree;
 * **one output at a time**: its quotes, what the automatic evidence check
   says today, who changed its trust and why, and how it compares with the
-  answer key, attribute by attribute.
+  answer key, attribute by attribute;
+* **segment labels**: each answer-key segment beside the labels stored for
+  the segment holding it, paired exactly as EVAL-003 pairs them;
+* **model requests**: the ledger by stage, provider and state (counts only).
 
 Every score carries the answer key's name, fingerprint and the label from
 ``report_labels`` saying who checked the key, e.g. "AI check (not
@@ -27,6 +30,7 @@ Talking points:
 
 from __future__ import annotations
 
+import json
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
@@ -36,7 +40,18 @@ from pydantic import ValidationError
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from knowledge_engine.classification.store import ClassificationReviewRow, ClassificationRow
+from knowledge_engine.classification.classifier import PENDING, REVIEW_REQUIRED
+from knowledge_engine.classification.schema import Rank
+from knowledge_engine.classification.store import (
+    ClassificationLabelRow,
+    ClassificationReviewRow,
+    ClassificationRow,
+)
+from knowledge_engine.evaluation.classification_eval import (
+    Predicted,
+    evaluate_classification,
+    match_classification,
+)
 from knowledge_engine.evaluation.extraction_eval import (
     ExtractionReport,
     Matching,
@@ -45,7 +60,7 @@ from knowledge_engine.evaluation.extraction_eval import (
     match_extraction,
     scored_records,
 )
-from knowledge_engine.evaluation.gold import GoldRecord, GoldSet, load_gold
+from knowledge_engine.evaluation.gold import FIELDS, GoldRecord, GoldSet, load_gold
 from knowledge_engine.evaluation.report_labels import AnswerKey, ReviewerKind, key_from_file
 from knowledge_engine.extraction.evidence import check_record, revision_text
 from knowledge_engine.extraction.records import KnowledgeRecord, RecordType, Trust
@@ -182,6 +197,7 @@ def overview(session: Session, source: KeySource | None) -> dict[str, Any]:
         "model_requests": _counts(session, ModelRequestRow.state),
         "reviewer_outcomes": reviewer_outcomes,
         "validator_outcomes": _counts_validator(session),
+        "model_runs": model_runs(session),
         "key": None,
         "key_error": None,
         "report": None,
@@ -493,3 +509,205 @@ def _compare_view(session: Session, scoring: _Scoring, record: KnowledgeRecord) 
         if item.record.record_id == record.record_id
     ]
     return view
+
+
+# ---------------------------------------------------------------------------
+# Classifications (segment labels) against the answer key's segment labels.
+
+
+def _label_names(session: Session, gold: GoldSet) -> dict[str, str]:
+    # ID -> readable name, so the page says "Godot" rather than a random ID.
+    # A synthetic key brings its own vocabulary; a real one uses the
+    # published version it names. No names is fine: the page shows IDs.
+    snapshot = None
+    if gold.terms or gold.projects:
+        snapshot = gold.snapshot()
+    else:
+        from knowledge_engine.taxonomy.registry import TaxonomyRegistry
+
+        try:
+            snapshot = TaxonomyRegistry(session).snapshot(gold.taxonomy_version)
+        except KeyError:
+            return {}
+    names = {t.term_id: t.label for t in snapshot.terms}
+    names |= {p.project_id: p.name for p in snapshot.projects}
+    return names
+
+
+def _stored_predictions(
+    session: Session, gold: GoldSet
+) -> tuple[list[Predicted], dict[str, ClassificationRow]]:
+    # The newest finished classification of every segment of the key's
+    # chats, under the key's own taxonomy version (labels from another
+    # version can't be compared). Nothing is classified here.
+    from knowledge_engine.rendering.transcript import load_conversation
+    from knowledge_engine.segmentation.overrides import load_segments
+
+    natives = sorted({c.native_conversation_id for c in gold.conversations if c.segments})
+    predicted: list[Predicted] = []
+    rows: dict[str, ClassificationRow] = {}
+    for conversation_id in session.scalars(
+        select(ConversationRow.conversation_id).where(
+            ConversationRow.native_conversation_id.in_(natives)
+        )
+    ):
+        conversation = load_conversation(session, conversation_id)
+        chars = sum(len(node.text) for node in conversation.messages.values())
+        for segment in load_segments(session, conversation):
+            row = session.scalar(
+                select(ClassificationRow)
+                .where(
+                    ClassificationRow.segment_id == segment.segment_id,
+                    ClassificationRow.taxonomy_version == gold.taxonomy_version,
+                    ClassificationRow.state != PENDING,
+                )
+                .order_by(ClassificationRow.updated_at.desc(), ClassificationRow.classification_id)
+            )
+            if row is None:
+                continue
+            grouped: dict[str, tuple[str | None, list[str]]] = {}
+            for label in session.scalars(
+                select(ClassificationLabelRow)
+                .where(ClassificationLabelRow.classification_id == row.classification_id)
+                .order_by(ClassificationLabelRow.label_id)
+            ):
+                primary, rest = grouped.get(label.field, (None, []))
+                if label.rank == Rank.PRIMARY.value:
+                    primary = label.target_id
+                else:
+                    rest.append(label.target_id)
+                grouped[label.field] = (primary, rest)
+            rows[segment.segment_id] = row
+            predicted.append(
+                Predicted(
+                    segment_id=segment.segment_id,
+                    native_conversation_id=conversation.native_conversation_id,
+                    messages=segment.messages,
+                    labels={k: (p, tuple(r)) for k, (p, r) in grouped.items()},
+                    review=row.state == REVIEW_REQUIRED,
+                    chat_chars=chars,
+                )
+            )
+    return predicted, rows
+
+
+def _labels_text(primary: str | None, secondary: tuple[str, ...], names: dict[str, str]) -> str:
+    if primary is None and not secondary:
+        return "none"
+    shown = [names.get(primary, primary)] if primary else []
+    shown += [f"{names.get(s, s)} (secondary)" for s in secondary]
+    return ", ".join(shown)
+
+
+def classifications(session: Session, source: KeySource | None) -> dict[str, Any]:
+    """Each answer-key segment beside the stored labels of the segment holding it."""
+    loaded = _load_key(source)
+    values: dict[str, Any] = {
+        "key": None,
+        "key_error": loaded if isinstance(loaded, str) else None,
+        "report": None,
+        "segments": [],
+        "stored": _counts(session, ClassificationRow.state),
+    }
+    if not isinstance(loaded, tuple):
+        return values
+    gold, key = loaded
+    values["key"] = _key_view(key)
+    if not any(c.segments for c in gold.conversations):
+        values["no_labels"] = True  # e.g. the real key before a taxonomy is published
+        return values
+    predicted, rows = _stored_predictions(session, gold)
+    methods = sorted({row.method for row in rows.values()})
+    report = evaluate_classification(
+        gold, predicted, {"classifier": ", ".join(methods) or "none stored"}, key=key
+    )
+    names = _label_names(session, gold)
+    pairs = match_classification(gold, predicted)
+    where = _message_places(session, {(conv, seg.first_message) for conv, seg, _ in pairs})
+    for conv, segment, match in pairs:
+        fields = []
+        for name in FIELDS:
+            want = segment.labels.get(name)
+            want_primary = want.primary if want else None
+            want_secondary = want.secondary if want else ()
+            got_primary, got_secondary = match.labels.get(name, (None, ())) if match else (None, ())
+            if not (want_primary or want_secondary or got_primary or got_secondary):
+                continue
+            fields.append(
+                {
+                    "name": name,
+                    "expected": _labels_text(want_primary, want_secondary, names),
+                    "produced": _labels_text(got_primary, got_secondary, names),
+                    "primary_right": want_primary == got_primary,
+                    "same_set": {want_primary, *want_secondary} - {None}
+                    == {got_primary, *got_secondary} - {None},
+                }
+            )
+        row = rows.get(match.segment_id) if match else None
+        if match is None:
+            verdict = "not classified (or not under this taxonomy version)"
+        elif segment.ambiguous:
+            verdict = (
+                "sent to review, as it should be" if match.review else "should have gone to review"
+            )
+        elif all(f["same_set"] for f in fields):
+            verdict = "matches the answer key"
+        else:
+            verdict = "differs from the answer key"
+        values["segments"].append(
+            {
+                "place": where.get((conv, segment.first_message)),
+                "ambiguous": segment.ambiguous,
+                "fields": fields,
+                "verdict": verdict,
+                "good": verdict in ("matches the answer key", "sent to review, as it should be"),
+                "state": row.state if row else None,
+                "method": row.method if row else None,
+                "provider": row.provider_id if row else None,
+                "model": row.served_model if row else None,
+                "problems": json.loads(row.problems_json) if row else [],
+            }
+        )
+    values["report"] = {
+        "taxonomy_version": report.taxonomy_version,
+        "eval_version": report.eval_version,
+        "versions": report.versions,
+        "gold_segments": report.gold_segments,
+        "unmatched": report.unmatched_segments,
+        "flagged": report.ambiguous_flagged,
+        "missed": report.ambiguous_missed,
+        "fields": [
+            (n, s.segments, s.precision, s.recall, s.micro_f1, s.macro_f1, s.primary_accuracy)
+            for n, s in report.fields.items()
+        ],
+    }
+    return values
+
+
+def model_runs(session: Session) -> list[dict[str, Any]]:
+    """The model-request ledger by stage and provider: no prompts, no answers."""
+    found = session.execute(
+        select(
+            ModelRequestRow.stage_id,
+            ModelRequestRow.provider_id,
+            ModelRequestRow.state,
+            func.count(),
+            func.sum(ModelRequestRow.attempts),
+            func.sum(ModelRequestRow.transient_failures),
+            func.sum(ModelRequestRow.characters),
+        )
+        .group_by(ModelRequestRow.stage_id, ModelRequestRow.provider_id, ModelRequestRow.state)
+        .order_by(ModelRequestRow.stage_id, ModelRequestRow.provider_id, ModelRequestRow.state)
+    )
+    return [
+        {
+            "stage": stage,
+            "provider": provider,
+            "state": state,
+            "requests": int(n),
+            "attempts": int(attempts or 0),
+            "transient": int(transient or 0),
+            "characters": int(chars or 0),
+        }
+        for stage, provider, state, n, attempts, transient, chars in found
+    ]
