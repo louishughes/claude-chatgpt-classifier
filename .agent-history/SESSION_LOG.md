@@ -663,3 +663,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - taxonomy/governance.py (Issue, GovernanceReport, governance_report), `ke taxonomy report`; classification/schema.py (output_model, instructions, segment_input, classification_request, assignments, answer_problems, Rank, SegmentMessageText).
 - Tests: test_taxonomy_governance.py (5), test_classifier_schema.py (12). Full suite 863 passed, 6 skipped; ruff, mypy OK; drift 0.
 - Next: CLS-002 + CLS-003.
+
+## 2026-10-28 06:15 CLS-002 + CLS-003 (#65, #66)
+- classification/scoring.py (Weights, Signals, KeywordScorer, corpus_frequencies, rank, Ranking, as_answer); classification/classifier.py (SegmentClassifier, SegmentClassification, segment_messages); synthetic fixture case mixed_projects.
+- Tests: test_segment_classifier.py (7). Full suite 880 passed, 6 skipped; ruff, mypy OK; drift 0.
+- Next: CLS-004 + CLS-005.
