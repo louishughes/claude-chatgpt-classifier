@@ -2785,6 +2785,27 @@ Talking points:
 
 **Next exact task:** NOTE-006, the first taxonomy discovered from the real chats.
 
+### 14:10 — NOTE-005: a model reads for decisions, suggestions, actions and questions
+
+The rule extractors only catch fixed phrasings, and on the real chats they found 16 actions and no questions. This adds a model-backed extractor through the existing `ModelExtractor` (stage runner, cache, one repair, egress switch), with the EXT-001 contract and its acceptance rules unchanged.
+
+- `extraction/model_knowledge.py`: `knowledge_extractor(runner)` asks for four types only: decision (or rejection), proposal, action, question.
+- Three checks run in code on whatever the model returns:
+  1. A user decision, rejection, action, preference or requirement must quote the user. If only the assistant was quoted, it goes back to being the assistant's proposal, flagged for review.
+  2. Several proposals from one actor quoting only the same message (a bulleted list of options) become one proposal: "Options suggested: A; B; C".
+  3. A long user message that opens like a pasted setup prompt ("You are...", "Act as...", "From now on...", at least 200 characters) can't be the source of a commitment. "You are right." is not a setup prompt.
+- Records then go through the EXT-007 gate and the EXT-002 evidence check like any other.
+
+**Teach-back (`check_candidates`):** After the model reads a chunk of chat and lists what it thinks was decided, suggested, promised or asked, this function checks who actually said it. A "decision" backed only by the assistant's words is turned back into the assistant's suggestion, a bulleted list of options becomes one suggestion, and anything resting only on a pasted "You are a..." prompt is dropped. So the model can't make me the owner of something the assistant said.
+
+Checks:
+```
+tests/integration/test_model_knowledge.py   6 passed (FakeProvider, no network)
+```
+Fix attempts: 1 (my new gate test quoted an assistant message from another part of a split segment).
+
+**Next exact task:** NOTE-007 (keyword and topic candidates).
+
 ### 13:55 — NOTE-004: digests from a Claude session, end to end
 
 - `ke digest run [IDs | --all] --run-id R [--vault V]`: the first run writes the digest requests into `private/model-batches/R/` and says how many are waiting; a Claude session fills the response files; running it again collects, checks every quote and writes the rich notes. All chats go in one submit, so the requests are packed into as few files as fit, not one file per chat.
