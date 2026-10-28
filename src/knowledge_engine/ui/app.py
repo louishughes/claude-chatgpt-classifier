@@ -39,7 +39,7 @@ from sqlalchemy.orm import Session
 from knowledge_engine import __version__
 from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
 from knowledge_engine.settings import Settings
-from knowledge_engine.ui import data, registries
+from knowledge_engine.ui import data, registries, review
 from knowledge_engine.ui.jobs import ImportJobs
 
 StartResponse = Callable[[str, list[tuple[str, str]]], Any]
@@ -192,6 +192,13 @@ def _route(
         video_id = path.removeprefix("/videos/")
         if _VIDEO_RE.fullmatch(video_id):
             return _one(settings, "video.html", "video", registries.video_page, video_id)
+    if path == "/suggestions":
+        trust = query.get("trust", [""])[0]
+        record_type = query.get("type", [""])[0]
+        found = _read(settings, lambda s: review.suggestions(s, trust, record_type))
+        return Page("200 OK", "suggestions.html", {"found": found})
+    if path == "/reviews":
+        return Page("200 OK", "reviews.html", {"found": _read(settings, review.reviews)})
     if path == "/accounts":
         return _accounts(settings)
     if path.startswith("/accounts/"):

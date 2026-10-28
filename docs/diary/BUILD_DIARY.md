@@ -1500,3 +1500,20 @@ migration drift         # 0
 Fix attempts: 0. The fixture's "No." first lacked the word "Synthetic", which the fixture suite requires, so it became "No. Synthetic.".
 
 **Next exact task:** M4, starting with its first unblocked ticket.
+
+### 05:55 — UI-005: see what the AI suggested and what reviewers decided
+**What:** two new read-only pages in `ke ui`, linked from the top bar.
+- **Suggestions** lists every knowledge record the extractors proposed, with a count per trust state (waiting for a reviewer, proposed, evidence checked, confirmed, rejected), filters for trust and type, and each quote one click from its message. The page says plainly that a suggestion is not a decision.
+- **Reviews** lists every named reviewer's decision and the reason they gave: on knowledge records, vocabulary proposals (plus how many are still open), topic-label corrections and conversation links. The automatic evidence validator is counted in its own section and never appears as a reviewer, and nothing is labelled as the owner's approval.
+- Both pages accept GET only and work on an empty workspace. Reasons are HTML-escaped.
+
+**Teach-back (`ui/review.py`):** "The suggestions page reads every knowledge record, counts them by how far they've got, and links each quote back to the exact message. The reviews page reads the append-only decision logs and shows who decided what and why, keeping the automatic quote checker in a separate box so a machine check never looks like a person's decision. Both only read the database; there's no button that changes anything."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 124 source files
+pytest -q               # 1021 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 1. `dict()` over a SQLAlchemy result treats it as a mapping, so the trust counts are built from pairs.
+
+**Next exact task:** M4, starting with its first unblocked ticket (DEPENDENCY_MAP §4).
