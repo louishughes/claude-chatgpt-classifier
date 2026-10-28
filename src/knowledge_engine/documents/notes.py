@@ -348,6 +348,16 @@ def conversation_note(
     return ConversationNote(DocumentModel(title, properties, tuple(blocks)), tuple(refs))
 
 
+def knowledge_path(conversation_id: str, title: str | None) -> PurePosixPath:
+    """Where a chat's knowledge note lives (``Knowledge/…``).
+
+    Same title and ID part as the transcript, so the two notes sort side by side.
+    """
+    suffix = conversation_id.replace("_", "-", 1)[:13]
+    name = safe_filename(f"{title or 'Untitled conversation'} knowledge", suffix)
+    return safe_relative_path(KNOWLEDGE_DIR, name)
+
+
 def write_conversation_note(
     session: Session,
     conversation_id: str,
@@ -359,10 +369,9 @@ def write_conversation_note(
     """Write a chat's knowledge note into ``vault_root/Knowledge``, with its images."""
     note = conversation_note(session, conversation_id, taxonomy=taxonomy)
     export_attachments(note.media, vault_root, blob_sources(session, store_root))
-    # Same title and ID part as the transcript, so the two notes sort side by side.
-    title = session.get_one(ConversationRow, conversation_id).title or "Untitled conversation"
-    suffix = conversation_id.replace("_", "-", 1)[:13]
-    relative = safe_relative_path(KNOWLEDGE_DIR, safe_filename(f"{title} knowledge", suffix))
+    relative = knowledge_path(
+        conversation_id, session.get_one(ConversationRow, conversation_id).title
+    )
     write_note(vault_root, relative, render_note(note.model))
     return relative
 
@@ -480,6 +489,13 @@ def topic_master(
     return DocumentModel(f"Topic {term.label}", properties, tuple(blocks))
 
 
+def topic_path(snapshot: TaxonomySnapshot, term_id: str, mode: Mode = Mode.ALL) -> PurePosixPath:
+    """Where a topic master lives (``Topics/…``), named by label and term ID."""
+    suffix = term_id.replace("_", "-")[:13]
+    name = safe_filename(f"{snapshot.term(term_id).label} {mode.value}", suffix)
+    return safe_relative_path(TOPICS_DIR, name)
+
+
 def write_topic_master(
     session: Session,
     name: str,
@@ -490,12 +506,6 @@ def write_topic_master(
 ) -> PurePosixPath:
     """Write a topic master into ``vault_root/Topics`` (named by the term ID)."""
     note = topic_master(session, name, snapshot, mode=mode)
-    term_id = str(note.properties["term_id"])
-    relative = safe_relative_path(
-        TOPICS_DIR,
-        safe_filename(
-            f"{snapshot.term(term_id).label} {mode.value}", term_id.replace("_", "-")[:13]
-        ),
-    )
+    relative = topic_path(snapshot, str(note.properties["term_id"]), mode)
     write_note(vault_root, relative, render_note(note))
     return relative

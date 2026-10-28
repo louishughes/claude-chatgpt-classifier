@@ -1030,6 +1030,24 @@ def _docs_note(settings: Settings, session: Any, args: argparse.Namespace) -> Co
                 message="no such taxonomy version",
                 error_code="no_taxonomy",
             )
+    if args.docs_command == "vault":
+        from knowledge_engine.documents.vault import sync_vault
+
+        report = sync_vault(
+            session, args.vault, settings.workspace_root / "archive", taxonomy=snapshot
+        )
+        counts = report.counts()
+        # Counts only: note paths hold private chat titles.
+        return CommandResult(
+            command,
+            data=counts,
+            message=(
+                f"{counts['created']} created, {counts['written']} updated, "
+                f"{counts['unchanged']} unchanged, {counts['conflicts']} kept (edited by hand), "
+                f"{counts['occupied']} skipped (not the engine's), {counts['broken_embeds']} "
+                "broken image link(s)"
+            ),
+        )
     if args.docs_command == "chat":
         conversation_id = find_conversation(session, args.conversation)
         if conversation_id is None:
@@ -1090,7 +1108,7 @@ def _docs(settings: Settings, args: argparse.Namespace) -> CommandResult:
                     data={"note": path.as_posix(), "mode": args.mode},
                     message=f"wrote {path.as_posix()}",
                 )
-            if args.docs_command in ("chat", "topic"):
+            if args.docs_command in ("chat", "topic", "vault"):
                 return _docs_note(settings, session, args)
             if args.docs_command == "affected":
                 found = affected_documents(session, args.ids)
@@ -1949,6 +1967,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--mode", choices=["current", "history", "all"], default="all", help="default: all"
     )
     docs_topic.set_defaults(handler=_docs)
+    docs_vault = docs_commands.add_parser(
+        "vault",
+        help="write or update every managed note and image in a vault (keeps your edits)",
+    )
+    docs_vault.add_argument("--vault", type=Path, required=True, help="the vault folder")
+    docs_vault.add_argument("--taxonomy", help="taxonomy version for labels and topic notes")
+    docs_vault.set_defaults(handler=_docs)
 
     related = commands.add_parser("related", help="links between conversations (forks, quotes)")
     related_commands = related.add_subparsers(

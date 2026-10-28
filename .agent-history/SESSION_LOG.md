@@ -783,3 +783,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - documents/notes.py (conversation_note, ConversationNote, write_conversation_note, Related, related_conversations, TopicNotFound, resolve_topic, TopicSegment, topic_segments, topic_master, write_topic_master); documents/render.py gains evidence_of, evidence_blocks and `knowledge_note(quotes=...)`; `ke docs chat|topic`. No migration.
 - Tests: test_conversation_notes.py (6). Full suite 1121 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: DOC-006.
+
+## 2026-10-28 11:10 DOC-006 (#102)
+- documents/vault.py (MARKER, MANIFEST, PlannedNote, plan_vault, split_manual, SyncReport, sync_vault); path helpers transcript_path, knowledge_path, project_path, topic_path; `ke docs vault`. No migration.
+- Tests: test_vault_sync.py (5). Full suite 1126 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: IMP-006.
