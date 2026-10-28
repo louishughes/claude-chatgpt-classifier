@@ -773,3 +773,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - evaluation/retrieval_bench.py (CHATS, QUERIES, THRESHOLDS, BenchReport, MethodScore, run_benchmark, check, to_markdown, write_export); `ke eval retrieval [--out]`; docs/evaluation/RET-008_BENCHMARK.md generated.
 - Tests: test_retrieval_bench.py (3). Full suite 1106 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: DOC-001.
+
+## 2026-10-28 10:10 DOC-001 (#98) + DOC-004 (#100)
+- documents/model.py (DocumentKind, document_id, DocItem, DocSection, KnowledgeDocument, Snapshot, snapshot, subjects_of, chats_of, build_document, build_all); documents/dependencies.py (DocumentBuildRow, DocumentDependencyRow, APPEND_ONLY_TRIGGERS, register, latest_builds, Affected, affected_documents); migration 0026_document_builds; documents/render.py (Mode, record_anchor, SourceLink, transcript_stem, source_links, knowledge_note, project_master, write_project_master); `ke docs build|affected|project`.
+- Tests: test_documents.py (5), test_project_master.py (4). Full suite 1115 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: DOC-003.
