@@ -2293,13 +2293,17 @@ def _eval_semantic(settings: Settings, args: argparse.Namespace) -> CommandResul
             refusal = "the paid provider needs --max-cost-usd above zero"
         elif not settings.egress.text_llm:
             refusal = "the paid provider needs [egress] text_llm = true in ke.toml"
+        elif settings.limits.max_cost_usd_per_run <= 0:
+            refusal = "the paid provider needs [limits] max_cost_usd_per_run above zero"
         if refusal:
             return CommandResult(
                 "eval semantic", ExitCode.USAGE, message=refusal, error_code="refused"
             )
         from knowledge_engine.providers.anthropic_api import DEFAULT_MODEL, AnthropicProvider
 
-        provider = AnthropicProvider(args.max_cost_usd, model=args.model or DEFAULT_MODEL)
+        # Both caps hold: the one on the command line and the one in settings.
+        cap = min(args.max_cost_usd, settings.limits.max_cost_usd_per_run)
+        provider = AnthropicProvider(cap, model=args.model or DEFAULT_MODEL)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
     base = settings.workspace_root / "smoke"
     label = f"semantic-synthetic-{args.synthetic}" if args.synthetic else f"semantic-{args.limit}"
@@ -2444,7 +2448,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--provider",
         choices=("fake", "anthropic"),
         default="fake",
-        help="anthropic = the paid API (needs --synthetic, --max-cost-usd and [egress] text_llm)",
+        help=(
+            "anthropic = the paid API (needs --synthetic, --max-cost-usd, "
+            "[egress] text_llm and [limits] max_cost_usd_per_run)"
+        ),
     )
     semantic.add_argument("--model", help="pinned model for --provider anthropic")
     semantic.add_argument(

@@ -32,17 +32,18 @@ The measured schema failure rate (about 0.14) matches the injected one-in-seven 
 
 Louis approved **one** paid smoke run on 2026-10-28, as a single exception to the no-paid-API rule: synthetic chats only, as small as the ticket allows, with a hard cost cap. The adapter is `src/knowledge_engine/providers/anthropic_api.py`.
 
-It is fenced three ways, and the command refuses (`refused`, exit 2) unless all three are set:
+It is fenced three ways, and the command refuses (`refused`, exit 2) unless all of them are set:
 
 1. `--synthetic N`: generated chats only, never imported ones.
-2. `--max-cost-usd X` above zero. Before each request the adapter works out the most it could cost (all its input, the schema, and the full output allowance at list price). If that would go over what is left, the request is **not sent**. It stays pending and is counted as `capped_requests`.
+2. A cap above zero in two places: `--max-cost-usd X` on the command line and `[limits] max_cost_usd_per_run` in `ke.toml`. The lower of the two is used. Before each request the adapter works out the most it could cost (all its input, the schema, and the full output allowance at list price). If that would go over what is left, the request is **not sent**. It stays pending and is counted as `capped_requests`.
 3. `[egress] text_llm = true` in `ke.toml`. With it off, the model path refuses the provider before anything is sent.
 
 The model is pinned (`claude-haiku-5-5` by default, the model the OD-05 spike used), with thinking off and low effort. Its answers go through the same schema check, single repair and review routing as the fake's.
 
 ```
 pip install -e ".[api]"                        # the Anthropic SDK, only needed for this
-# ke.toml: [egress] text_llm = true            (turn it off again afterwards)
+# ke.toml: [egress] text_llm = true and [limits] max_cost_usd_per_run = 0.50
+#          (turn egress off again afterwards)
 # ANTHROPIC_API_KEY in the environment, never in a file in the repo
 ke eval semantic --synthetic 50 --provider anthropic --max-cost-usd 0.50
 ```

@@ -164,3 +164,7 @@ def test_the_cli_refuses_the_paid_provider_unless_every_fence_is_set(
     ):
         assert main(["--json", "eval", "semantic", *argv]) == 2
         assert json.loads(capsys.readouterr().out)["error"]["code"] == "refused"
+    monkeypatch.setenv("KE_EGRESS__TEXT_LLM", "true")  # egress on, but no cap in settings
+    argv = ["--provider", "anthropic", "--synthetic", "3", "--max-cost-usd", "0.5"]
+    assert main(["--json", "eval", "semantic", *argv]) == 2
+    assert "max_cost_usd_per_run" in json.loads(capsys.readouterr().out)["message"]
