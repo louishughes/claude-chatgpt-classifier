@@ -30,6 +30,9 @@ ke api                          # http://127.0.0.1:8766/api/v1/docs (Ctrl+C to s
 | `source_not_found` | 400 | `POST /imports`: the file or folder doesn't exist. The path is never repeated. |
 | `source_in_workspace` | 400 | `POST /imports`: the path is inside the workspace, not an export. |
 | `invalid_account` | 400 | `POST /imports`: account labels use letters, numbers, `-` and `_` only. |
+| `invalid_proposal` | 400 | `POST /taxonomy/proposals`: a required field is missing or the dimension is unknown. |
+| `reviewer_not_allowed` | 403 | A review decision from the proposer of that proposal, or under the built-in `validator` name. |
+| `invalid_transition` | 409 | A decision the review workflow doesn't allow: deciding twice, supporting a confirmed record, a reject without a reason, an alias clash, a suggestion becoming the user's decision without acceptance. Nothing is changed. |
 | `no_database` | 503 | Nothing has been imported into this workspace yet. |
 | `schema_mismatch` | 503 | The database is older than the code (run `ke db upgrade`) or from a newer version (OPS-007). |
 | `internal_error` | 500 | An unexpected failure. Nothing about it is returned. |
@@ -58,7 +61,24 @@ ke api                          # http://127.0.0.1:8766/api/v1/docs (Ctrl+C to s
 
 **Cross-site requests.** Anything but GET must have an `application/json` body, and if it has an `Origin` header that must be this computer. A web page on another site can make the browser send a form or plain text to 127.0.0.1, but not JSON (that needs a CORS preflight, which this API never grants).
 
-Taxonomy, review, search, answer and document endpoints follow in API-003..005.
+## Taxonomy, review and knowledge (API-003)
+
+The review rules are the command line's (TAX-004, EXT-007); the API only passes a person's decision to them. A refused decision rolls back completely. The `reviewer` and `proposer` are names the caller gives: there are no accounts until PROD-002, so this is the same trust as `ke ... --reviewer`.
+
+| Method and path | Answers |
+|---|---|
+| `GET /api/v1/taxonomy` | Live terms (all statuses) and projects, and the published version names. A proposed `add` isn't a term until approved. |
+| `GET /api/v1/taxonomy/versions/{version}` | One published, frozen snapshot with its fingerprint: what classifiers of that version saw. |
+| `GET /api/v1/taxonomy/governance` | The TAX-008 health report: duplicates, parent and merge problems, waiting proposals, reviewer activity. |
+| `GET /api/v1/taxonomy/proposals?status=open` | Proposals (`open`, `approved`, `rejected` or `all`), oldest first, with payload, evidence IDs and the decision. |
+| `POST /api/v1/taxonomy/proposals` | `{"operation": "add" / "rename" / "alias" / "merge" / "retire" / "reparent", "payload": {...}, "proposer": "name", "evidence": {...}}`. **201** with the open proposal. Nothing changes yet. |
+| `POST /api/v1/taxonomy/proposals/{id}/review` | `{"decision": "approve" / "reject", "reviewer": "name", "note": "why", "label": "for an add only"}`. The reviewer must not be the proposer (case and spaces ignored); a reject needs a note; renaming or merging a project needs a note. Approving changes the live vocabulary; `publish` makes it visible to classifiers. |
+| `GET /api/v1/knowledge?scope_id=&type=` | Current knowledge: `supported` and `confirmed` records only. `type` can repeat (`decision`, `preference`, `requirement`, `action`...). |
+| `GET /api/v1/review` | What waits for a person: `review_required` records and open taxonomy proposals. |
+| `GET /api/v1/knowledge/{record_id}` | One record at any trust, with its evidence anchors (message revision, character span, quote hash, who said it) and every trust change: from, to, who, note, problems, when. |
+| `POST /api/v1/knowledge/{record_id}/review` | `{"decision": "support" / "confirm" / "reject", "reviewer": "name", "note": "why"}`. `support` applies to `review_required`; `confirm` and `reject` to `review_required` or `supported`. A candidate must go through the evidence gate first. Confirmed and rejected records are final here. |
+
+Search, answer and document endpoints follow in API-004 and API-005.
 
 ## Swapping parts in tests
 

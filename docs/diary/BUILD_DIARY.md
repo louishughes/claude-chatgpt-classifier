@@ -2298,3 +2298,23 @@ ci                                      5/5 ok, 1224 passed, 7 skipped
 Fix attempts: 0.
 
 **Next exact task:** API-003 (taxonomy, review and knowledge endpoints).
+
+### 10:17 — API-003: taxonomy, review and knowledge over the API
+
+- `api/knowledge.py` puts the existing review workflows behind HTTP and adds no rules of its own except one (below). Taxonomy: the live vocabulary, published frozen versions, the governance report, proposals by status, `POST` a proposal, `POST` a review. Knowledge: current knowledge (supported and confirmed only), the review queue (records plus open proposals), one record with its evidence anchors and trust history, and `POST` a decision.
+- Refusals: `reviewer_not_allowed` (403) for the proposer reviewing their own proposal or the `validator` name; `invalid_transition` (409) for anything the workflow refuses. Each request is one transaction, so a refused approval (an alias clash, say) leaves nothing half-applied. The test checks the vocabulary and the record's history are unchanged afterwards.
+- The one new rule: `decide` quietly returns a record unchanged when a decision doesn't apply (support on a confirmed record). The API refuses that with 409 instead, so a program never mistakes "nothing happened" for "done". `decide` itself is unchanged.
+- Pydantic's error for a broken record rule can include the record's input, so the API returns only the rule's own words ("a user decision needs explicit or conditional acceptance").
+- There are no accounts until PROD-002: the reviewer is a name the caller gives, the same trust as `ke ... --reviewer`. Recorded in `docs/api/API.md`.
+
+**Teach-back (`api/knowledge.py`):** These endpoints let a program see what's waiting for review and send a person's decision, but every decision still goes through the same rules as the command line. Nobody can approve their own proposal, nothing can be decided twice, and an assistant's suggestion can't be turned into my decision without my acceptance. If a decision is refused, nothing about the record or the vocabulary changes.
+
+Checks:
+```
+tests/integration/test_api_knowledge.py   8 passed
+tests/integration/test_api*.py            25 passed
+ci                                        5/5 ok, 1232 passed, 7 skipped
+```
+Fix attempts: 1 (supporting a confirmed record was a silent no-op; now refused).
+
+**Next exact task:** API-004 (search, answers and decision history).
