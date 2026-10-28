@@ -896,3 +896,20 @@ pytest -q               # 605 passed, 6 skipped
 Fix attempts: 1 (the parser turned non-breaking spaces into ordinary spaces; the random round trip caught it, and text is now kept exactly).
 
 **Next exact task:** LNK-001 (URL occurrences and link registry). The M1 gate run (Windows tests, real data, `ke ui` on Windows) is running on Louis's PC.
+
+### 00:42 — LNK-001: every link in your chats, with where it was said
+**What:** every web link in every message is now recorded during import. Each destination is stored once. Each mention records which message it's in, who wrote it, and exactly which characters it covers. Links in the "sources" an AI answer cites are recorded too. A link written three times becomes one destination with three mentions. Importing the same export again adds nothing. If a message was edited, the new version gets its own mentions and the old ones stay as evidence. Links are never opened. 18 new tests, 623 in total.
+**The fiddly part:** a URL inside a sentence has to be cut out exactly: "(see https://x.org/a)." mustn't include the bracket or the full stop, but Wikipedia's "Python_(language)" must keep its bracket. Markdown `[text](url)` and `<url>` are handled too. A random test puts URLs inside random text and checks that each one is cut out exactly. It caught that URLs can legitimately end with "_".
+**Decisions:** the destination ignores the "#section" part and upper/lower case in the domain name, but keeps the "?query" exactly, because changing it can mean a different page. Bare "example.com" without "https://" isn't guessed at.
+**Teach-back (`links/extract.py`):** "During import, every web link in a message is found and cut out exactly, without the sentence's punctuation, and pinned to its character positions. Links that mean the same page are grouped under one destination, so a link mentioned 12 times is one destination with 12 mentions. Nothing is ever downloaded; a link is just text."
+**Talking points:**
+- "Links are a registry: one destination, many mentions, each with its exact source."
+- "Random testing found an edge case I'd have missed: URLs that end in an underscore."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 100 source files
+pytest -q               # 623 passed, 6 skipped
+```
+Fix attempts: 1 (the trailing-underscore case above).
+
+**Next exact task:** YTB-001 + YTB-002 (YouTube video identity, transcript status and user-supplied transcripts).

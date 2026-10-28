@@ -48,6 +48,8 @@ class ImportReport:
             counts, plus a fidelity summary.
         candidate_matches: Candidate reason -> count: conversations whose
             identity is ``review_required`` (never merged automatically).
+        links: LNK-001's counts: ``new_targets``, ``new_occurrences`` and
+            ``seen_occurrences`` (every URL mention in current revisions).
     """
 
     import_id: str
@@ -68,6 +70,7 @@ class ImportReport:
     asset_occurrences: Mapping[str, int] = field(default_factory=dict)
     duplicate_assets: int = 0
     integrity: Mapping[str, Any] = field(default_factory=dict)
+    links: Mapping[str, int] = field(default_factory=dict)
     extra: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -89,6 +92,7 @@ class ImportReport:
             "media": dict(sorted(self.media.items())),
             "asset_occurrences": dict(sorted(self.asset_occurrences.items())),
             "integrity": dict(self.integrity),
+            "links": dict(sorted(self.links.items())),
             "summary": self.summary(),
         }
 

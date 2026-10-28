@@ -579,3 +579,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - Tests: test_offsets.py (7), test_transcripts.py (9). Full suite 605 passed, 6 skipped. ruff, mypy, git_guard OK.
 - M1 gate (Windows tests, REV-009 real data, ke ui on Windows) handed to the PC session at 00:34; results pending.
 - Next: LNK-001.
+
+## 2026-10-28 00:42 LNK-001 (slice L1)
+- links/extract.py (find_in_text with _trim rules, find_in_metadata for citations/content_references, canonical_url, context), links/store.py (LinkTargetRow, LinkOccurrenceRow, record_links), migration 0009_links. ConversationDelta.links; run_import records links in the same transaction; ImportReport.links.
+- Tests: test_link_extract.py (15 incl. Hypothesis), test_link_registry.py (3). Full suite 623 passed, 6 skipped. ruff, mypy, git_guard OK; autogen shows no drift.
+- Next: YTB-001/002.
