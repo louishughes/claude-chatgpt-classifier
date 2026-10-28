@@ -929,3 +929,16 @@ pytest -q               # 649 passed, 6 skipped
 Fix attempts: 0.
 
 **Next exact task:** YTB-002 (transcript status, policy gate and user-supplied transcripts).
+
+## 2026-10-28
+
+### 00:50 — The answer key gets checked, by an agent, because Louis opted out
+**What:** Louis said he wants no involvement in tagging and asked for the answer-key review to be done for him. That collides head-on with the biggest lesson from the earlier attempts: an AI marking an AI's homework. So the review was run with the most independence the setup allows. A Remote Control session on his PC read each of the 10 chats from `raw/` and wrote its *own* reference first, then opened the key for that chat and compared. The verdicts live beside the key in the private, git-ignored folder; the key itself is untouched and its hash is recorded before and after.
+**Result:** 113 things checked (18 segments, 95 items). 82 ok, 29 fix, 2 drop, 28 add. Twenty of the 29 fixes were one bug: two chats numbered messages without counting code-type messages, so every later citation was off by one or two. Segment boundaries matched the independent read within one message everywhere. No assistant suggestion was marked accepted without a user message behind it. The key had no quotes, so quotes couldn't be checked word for word.
+**Most common misses:** things the assistant said recorded as the owner's facts or ideas; short user instructions and rejections ("try again", "rate each one") not captured; artefacts inside code messages and links skipped.
+**Decision:** the record says "agent-reviewed, not owner-approved", and every accuracy number scored against this key carries that label. Follow-ups go to new tickets: a versioned key v2 with the fixes applied, and a numbering rule plus verbatim quotes in the annotation guide.
+**Challenges:** the folder-consent card needs a human click and Louis was away, so Remote Control (already approved for this device) did the job instead. Nothing left the PC.
+**Talking points:**
+- "When the owner won't label, the next best thing is a reviewer that writes its answer before it looks at yours."
+- "Twenty of twenty-nine errors were one counting rule. Fix the rule, not the twenty items."
+- "Label your evidence: 'agent-reviewed' and 'owner-approved' are different grades."
