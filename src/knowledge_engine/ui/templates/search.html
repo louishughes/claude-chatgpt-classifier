@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros.html" import where %}
+{% from "macros.html" import where, related %}
 {% block title %}Search · Knowledge Engine{% endblock %}
 {% block main %}
 <h1>Search messages</h1>
@@ -21,6 +21,7 @@
 <article class="message">
   <p class="who">{{ where(item.place) }}</p>
   <div class="text">{{ item.hit.snippet }}</div>
+  {{ related(item.related) }}
 </article>
 {% endfor %}
 {% endif %}

@@ -326,7 +326,56 @@ def conversation_page(session: Session, conversation_id: str) -> dict[str, Any] 
         "branch_points": len(graph.branch_points),
         "images": sum(len(uses) for uses in conversation.media.values()),
         "sections": sections,
+        "related": related_view(session, [conversation.conversation_id]).get(
+            conversation.conversation_id, []
+        ),
     }
+
+
+_KIND_WORDS = {
+    "continues": "continues",
+    "forked_from": "was forked from",
+    "quotes": "quotes",
+    "references": "links to",
+    "related_to": "is related to",
+    "same_project": "is in the same project as",
+}
+
+
+def related_view(session: Session, conversation_ids: list[str]) -> dict[str, list[dict[str, Any]]]:
+    """Chat -> its visible links, phrased for a page (rejected links are left out).
+
+    Each entry reads in the link's stored direction: "This chat continues X"
+    or "X continues this chat".
+    """
+    from knowledge_engine.relationships.view import related_by_conversation
+
+    grouped = related_by_conversation(session, conversation_ids)
+    others = {link.other(c) for c, links in grouped.items() for link in links}
+    titles = dict(
+        session.execute(
+            select(ConversationRow.conversation_id, ConversationRow.title).where(
+                ConversationRow.conversation_id.in_(sorted(others))
+            )
+        )
+        .tuples()
+        .all()
+    )
+    view: dict[str, list[dict[str, Any]]] = {}
+    for conversation_id, links in grouped.items():
+        view[conversation_id] = [
+            {
+                "relationship_id": link.relationship_id,
+                "other": link.other(conversation_id),
+                "other_title": titles.get(link.other(conversation_id)) or "Untitled conversation",
+                "outgoing": link.from_conversation_id == conversation_id,
+                "words": _KIND_WORDS.get(link.kind, link.kind),
+                "state": link.review_state,
+                "because": list(link.because),
+            }
+            for link in links
+        ]
+    return view
 
 
 def media_file(session: Session, store_root: Path, blob_sha256: str) -> tuple[bytes, str] | None:

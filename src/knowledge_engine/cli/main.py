@@ -809,6 +809,7 @@ def _find(settings: Settings, args: argparse.Namespace) -> CommandResult:
 
     from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
     from knowledge_engine.infrastructure.workspace import WorkspaceRow
+    from knowledge_engine.relationships.view import related_by_conversation
     from knowledge_engine.retrieval.embeddings import LocalHashEmbedder
     from knowledge_engine.retrieval.hybrid import HybridRetriever
     from knowledge_engine.retrieval.lexical import LexicalIndex, search_index_path, sync_index
@@ -827,6 +828,7 @@ def _find(settings: Settings, args: argparse.Namespace) -> CommandResult:
         )
     question = plan(args.question)
     engine = create_sqlite_engine(db)
+    related: dict[str, list[dict[str, object]]] = {}
     records: list[dict[str, object]] = []
     hits: list[dict[str, object]] = []
     fallback = False
@@ -887,6 +889,16 @@ def _find(settings: Settings, args: argparse.Namespace) -> CommandResult:
                     }
                     for h in result.hits
                 ]
+            # Links between the chats found (REL-004): IDs, kind, direction, reasons.
+            shown = records[: args.limit] + hits[: args.limit]
+            related = {
+                conversation: [link.as_dict(conversation) for link in links]
+                for conversation, links in sorted(
+                    related_by_conversation(
+                        session, {str(h["conversation_id"]) for h in shown if h["conversation_id"]}
+                    ).items()
+                )
+            }
     finally:
         engine.dispose()
     found = len(records) + len(hits)
@@ -899,6 +911,7 @@ def _find(settings: Settings, args: argparse.Namespace) -> CommandResult:
             "fallback": fallback,
             "records": records[: args.limit],
             "hits": hits[: args.limit],
+            "related": related,
         },
         message=f"{question.route.value} route{' (fell back to hybrid)' if fallback else ''}: "
         f"{found} result(s)",
@@ -1556,6 +1569,51 @@ def _related_detect(settings: Settings, args: argparse.Namespace) -> CommandResu
     )
 
 
+def _related_suggest(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Propose related_to and same_project candidates from subjects and meaning (REL-003)."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.infrastructure.workspace import WorkspaceRow
+    from knowledge_engine.relationships.related import suggest_related
+    from knowledge_engine.taxonomy.registry import TaxonomyRegistry
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "related suggest", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    counts: dict[str, int] = {}
+    try:
+        with Session(engine) as session, session.begin():
+            snapshot = None
+            if args.taxonomy:
+                try:
+                    snapshot = TaxonomyRegistry(session).snapshot(args.taxonomy)
+                except KeyError:
+                    return CommandResult(
+                        "related suggest",
+                        ExitCode.USAGE,
+                        message="no such taxonomy version",
+                        error_code="no_taxonomy",
+                    )
+            for workspace_id in session.scalars(select(WorkspaceRow.workspace_id)):
+                found = suggest_related(
+                    session, workspace_id=workspace_id, taxonomy=snapshot, egress=settings.egress
+                )
+                for key, value in found.items():
+                    counts[key] = counts.get(key, 0) + value
+    finally:
+        engine.dispose()
+    return CommandResult(
+        "related suggest",
+        data={"new": dict(sorted(counts.items()))},
+        message=f"{sum(counts.values())} new suggestion(s); review them with ke related list",
+    )
+
+
 def _ui(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Run the local web interface until Ctrl+C. Listens on 127.0.0.1 only."""
     import webbrowser
@@ -2044,6 +2102,11 @@ def build_parser() -> argparse.ArgumentParser:
         "detect", help="run the link detectors again (imports already do this)"
     )
     rerun.set_defaults(handler=_related_detect)
+    suggest = related_commands.add_parser(
+        "suggest", help="suggest related chats from shared projects, topics and wording"
+    )
+    suggest.add_argument("--taxonomy", help="taxonomy version whose labels count")
+    suggest.set_defaults(handler=_related_suggest)
 
     commands.add_parser(
         "reconcile", help="propose repeated claims, record links and conflicts"

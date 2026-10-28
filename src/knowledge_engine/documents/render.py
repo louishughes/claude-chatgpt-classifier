@@ -33,6 +33,7 @@ Talking points:
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
@@ -52,6 +53,7 @@ from knowledge_engine.extraction.store import KnowledgeRecordRow
 from knowledge_engine.importer.records import ConversationRow, MessageNodeRow, MessageRevisionRow
 from knowledge_engine.reconciliation.graph import edges
 from knowledge_engine.reconciliation.timeline import TimelineEntry, timeline
+from knowledge_engine.relationships.view import RelatedLink, related_links
 from knowledge_engine.rendering.markdown import (
     Block,
     BulletList,
@@ -135,6 +137,51 @@ def source_links(session: Session, revision_ids: list[str]) -> dict[str, SourceL
                 conversation, transcript_stem(conversation, title), message_anchor(node_key)
             )
     return found
+
+
+MAX_CITED = 4  # evidence links per relationship line; the rest are counted
+
+
+def relationship_lines(
+    session: Session, links: Sequence[RelatedLink], *, here: str | None = None
+) -> list[str]:
+    """One bullet per link: both chats, kind, state, reasons and cited messages.
+
+    Read in the stored direction: "[[B]] **continues** [[A]]". Seen from
+    ``here`` (a chat's own note), that chat is called "this chat".
+    """
+    ends = {c for link in links for c in (link.from_conversation_id, link.to_conversation_id)}
+    titles = {
+        c: t
+        for c, t in session.execute(
+            select(ConversationRow.conversation_id, ConversationRow.title).where(
+                ConversationRow.conversation_id.in_(sorted(ends))
+            )
+        )
+    }
+    cited = source_links(session, [r for link in links for r in link.revisions])
+
+    def name(conversation_id: str) -> str:
+        if conversation_id == here:
+            return "this chat"
+        return f"[[{transcript_stem(conversation_id, titles.get(conversation_id))}]]"
+
+    lines = []
+    for link in links:
+        line = (
+            f"{name(link.from_conversation_id)} **{link.kind}** "
+            f"{name(link.to_conversation_id)} ({link.evidence_class}, confidence "
+            f"{link.confidence:.2f}, {link.review_state}, `{link.relationship_id}`)"
+        )
+        if link.because:
+            line += " because " + "; ".join(escape_text(b) for b in link.because)
+        sources = [cited[r].wikilink for r in link.revisions if r in cited]
+        if sources:
+            more = len(sources) - MAX_CITED
+            line += ". Evidence: " + ", ".join(sources[:MAX_CITED])
+            line += f" and {more} more" if more > 0 else ""
+        lines.append(line)
+    return lines
 
 
 _STATUS_WORDS = {
@@ -312,6 +359,10 @@ def project_master(session: Session, project_id: str, *, mode: Mode = Mode.ALL) 
         blocks.append(
             BulletList(tuple(f"[[{note}]] (`{conv}`)" for conv, note in chats), trusted=True)
         )
+        related = relationship_lines(session, related_links(session, [c for c, _ in chats]))
+        if related:
+            blocks.append(Heading("Related conversations", 2))
+            blocks.append(BulletList(tuple(related), trusted=True))
     return DocumentModel(note.title, note.properties, tuple(blocks))
 
 

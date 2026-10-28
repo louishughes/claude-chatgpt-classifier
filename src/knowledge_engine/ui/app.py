@@ -369,7 +369,15 @@ def _search(settings: Settings, query: dict[str, list[str]]) -> Page:
                 )
             ][:_PAGE_SIZE]
         where = registries.places(session, (hit.revision_id for hit in hits))
-        return [{"hit": hit, "place": where.get(hit.revision_id)} for hit in hits]
+        related = data.related_view(session, sorted({hit.conversation_id for hit in hits}))
+        return [
+            {
+                "hit": hit,
+                "place": where.get(hit.revision_id),
+                "related": related.get(hit.conversation_id, []),
+            }
+            for hit in hits
+        ]
 
     values["hits"] = _read(settings, run) or []
     return Page("200 OK", "search.html", values)
