@@ -3079,3 +3079,20 @@ Talking points:
 - "Before changing the answer key, the session proved the old one was untouched by its hash, and afterwards proved it again."
 - "Every answer in the key is checked by code against the real message: the quote, the speaker and the number."
 - "A checker that's never been shown to fail isn't proven, so we planted three mistakes and watched it catch them."
+
+### 16:30 UTC — EVAL-012 on real chats: 0.80, and why
+
+A separate session on Louis's PC wrote the real link answer key, and it never saw the engine's links. It covers 30 of his chats: 25 picked because they contain real links, plus 5 with no obvious link as controls. In them it found 49 true links, each backed by two quotes that code checked against the archive. It hashed the key before scoring and confirmed afterwards that nothing had changed.
+
+The engine scored **0.80 precision** against a 0.90 bar, so it fails. That's the first real number for this line of the release check, which had said BLOCKED since EVAL-007. The failure has a single cause. All 5 wrong answers were forks: the detector linked every pair of chats sharing copied message IDs. So two forks of the same chat were linked to each other as "forked from", and so was a fork of a fork and its grandparent.
+
+The fix: each chat gets one parent, the older chat it shares the most copied messages with, the earliest on a tie. A sibling only holds the parent's messages, so the parent wins the tie by being older. A grandparent holds fewer of them than the parent does. A new test builds exactly that family (a parent, two forks and a fork of a fork). It failed before the fix with 6 links and passes after with the right 3.
+
+The definition was Louis's call, so I asked him on a decision card whether siblings should count as forks, and recommended "direct parent only".
+
+**Teach-back (`_shared_nodes`):** When ChatGPT forks a chat, the new chat keeps copies of the old messages with the same IDs, so two chats sharing IDs are related by a fork. Two forks of the same chat also share those IDs, so for each chat the code now picks just one parent: the older chat it shares the most copied messages with. That way a sibling or a grandparent is never named as the parent.
+
+Talking points:
+- "The first honest score was a fail, and the failure pointed at one bug."
+- "A test that fails before the fix and passes after is the proof the fix does what I say."
+- "Whether a sibling counts as a fork is a definition, so the owner decides it, not the code."
