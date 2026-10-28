@@ -29,12 +29,12 @@ Talking points:
 
 from __future__ import annotations
 
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
 from knowledge_engine.domain.enums import Role
 from knowledge_engine.domain.models import EvidenceRef
+from knowledge_engine.extraction.preamble import looks_like_preamble
 from knowledge_engine.extraction.records import (
     COMMITMENTS,
     Acceptance,
@@ -73,25 +73,12 @@ set acceptance). Text the user pasted to set the assistant up (custom \
 instructions, "You are...", "Act as...") is not a decision. Set unsure to \
 true when in doubt. Return an empty list rather than guess."""
 
-# Opening words of a pasted setup prompt (custom instructions, role-play).
-_PREAMBLE = re.compile(
-    r"^\s*(?:#+\s*)?(?:you are\b|you're\b|act as\b|pretend\b|from now on\b|"
-    r"system\s*:|role\s*:|instructions?\s*:|custom instructions\b|"
-    r"i want you to act\b|your role\b)",
-    re.IGNORECASE,
-)
-# A setup prompt is long; "you are right" in a short reply is not one.
-PREAMBLE_MIN_CHARS = 200
 _HELD_BY_USER = COMMITMENTS | {RecordType.REJECTION}
 
 
 def is_preamble(message: ExtractionMessage) -> bool:
     """A user message that reads as a pasted setup prompt, not a turn of the chat."""
-    return (
-        message.role is Role.USER
-        and len(message.text) >= PREAMBLE_MIN_CHARS
-        and _PREAMBLE.match(message.text) is not None
-    )
+    return looks_like_preamble(message.role.value, message.text)
 
 
 @dataclass
