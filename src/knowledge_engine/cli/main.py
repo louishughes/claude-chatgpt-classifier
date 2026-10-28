@@ -1131,6 +1131,100 @@ def _eval_temporal(settings: Settings, args: argparse.Namespace) -> CommandResul
     )
 
 
+def _eval_e2e(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Run ZIP to vault end to end, check every link and compare the golden (EVAL-006)."""
+    import json
+    import tempfile
+
+    from knowledge_engine.evaluation.end_to_end import (
+        E2E_QUERY,
+        golden_diff,
+        run_end_to_end,
+        to_dict,
+        vault_golden,
+    )
+
+    if not args.fixture.is_file():
+        return CommandResult(
+            "eval e2e",
+            ExitCode.USAGE,
+            message="fixture ZIP not found (run from the repository, or pass --fixture)",
+            error_code="no_fixtures",
+        )
+    with tempfile.TemporaryDirectory(prefix="ke-e2e-") as scratch:
+        report = run_end_to_end(args.fixture, Path(scratch), query=E2E_QUERY)
+    golden = vault_golden(report.check)
+    if args.update_golden:
+        args.golden.parent.mkdir(parents=True, exist_ok=True)
+        args.golden.write_text(json.dumps(golden, indent=1) + "\n", encoding="utf-8")
+    diffs = (
+        golden_diff(golden, json.loads(args.golden.read_text(encoding="utf-8")))
+        if args.golden.is_file()
+        else ["no golden file"]
+    )
+    data = {**to_dict(report), "golden_differences": diffs}
+    problems = diffs[:3]
+    broken = len(report.check.broken_links) + len(report.check.broken_embeds)
+    if broken or report.check.bad_frontmatter:
+        problems.append(
+            f"{broken} broken link(s), {len(report.check.bad_frontmatter)} bad header(s)"
+        )
+    if not report.sources_first:
+        problems.append("a chat is missing its source note or link")
+    if not report.search_hit_in_vault:
+        problems.append("search did not land on a note")
+    if problems:
+        return CommandResult(
+            "eval e2e",
+            ExitCode.ERROR,
+            data=data,
+            message="FAIL: " + "; ".join(problems),
+            error_code="regression",
+        )
+    return CommandResult(
+        "eval e2e",
+        data=data,
+        message=f"PASS: {report.check.notes} notes, {report.check.links} links and "
+        f"{report.check.embeds} embeds all resolve; matches the golden",
+    )
+
+
+def _docs_check(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Check every link, embed and frontmatter block in a vault, as Obsidian reads them."""
+    from knowledge_engine.evaluation.end_to_end import check_vault
+
+    if not args.vault.is_dir():
+        return CommandResult(
+            "docs check",
+            ExitCode.USAGE,
+            message="vault folder not found",
+            error_code="no_vault",
+        )
+    check = check_vault(args.vault)
+    data = {
+        "notes": check.notes,
+        "links": check.links,
+        "embeds": check.embeds,
+        "broken_links": [list(b) for b in check.broken_links],
+        "broken_embeds": [list(b) for b in check.broken_embeds],
+        "bad_frontmatter": check.bad_frontmatter,
+    }
+    if not check.clean:
+        broken = len(check.broken_links) + len(check.broken_embeds) + len(check.bad_frontmatter)
+        return CommandResult(
+            "docs check",
+            ExitCode.ERROR,
+            data=data,
+            message=f"{broken} problem(s) in {check.notes} notes",
+            error_code="broken_links",
+        )
+    return CommandResult(
+        "docs check",
+        data=data,
+        message=f"{check.notes} notes: {check.links} links and {check.embeds} embeds all resolve",
+    )
+
+
 def _corrections(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """List human corrections and whether they still stand after re-imports (IMP-006)."""
     from sqlalchemy.orm import Session
@@ -2048,6 +2142,27 @@ def build_parser() -> argparse.ArgumentParser:
     )
     temporal.add_argument("--out", type=Path, help="write the Markdown report here")
     temporal.set_defaults(handler=_eval_temporal)
+    e2e = eval_commands.add_parser(
+        "e2e", help="run a ZIP all the way to a vault and check every link in it"
+    )
+    e2e.add_argument(
+        "--fixture",
+        type=Path,
+        default=Path("tests/fixtures/e2e/export.zip"),
+        help="the export ZIP (default: the repository's synthetic one)",
+    )
+    e2e.add_argument(
+        "--golden",
+        type=Path,
+        default=Path("tests/fixtures/e2e/vault_golden.json"),
+        help="the expected vault shape to compare with",
+    )
+    e2e.add_argument(
+        "--update-golden",
+        action="store_true",
+        help="write the vault shape as the new golden (review the diff before committing)",
+    )
+    e2e.set_defaults(handler=_eval_e2e)
 
     transcript = commands.add_parser("transcript", help="YouTube video transcripts")
     transcript_commands = transcript.add_subparsers(
@@ -2218,6 +2333,11 @@ def build_parser() -> argparse.ArgumentParser:
     docs_vault.add_argument("--vault", type=Path, required=True, help="the vault folder")
     docs_vault.add_argument("--taxonomy", help="taxonomy version for labels and topic notes")
     docs_vault.set_defaults(handler=_docs)
+    docs_check = docs_commands.add_parser(
+        "check", help="check every link, embed and note header in a vault (changes nothing)"
+    )
+    docs_check.add_argument("--vault", type=Path, required=True, help="the vault folder")
+    docs_check.set_defaults(handler=_docs_check)
 
     related = commands.add_parser("related", help="links between conversations (forks, quotes)")
     related_commands = related.add_subparsers(
