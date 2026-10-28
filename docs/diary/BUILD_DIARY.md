@@ -1444,3 +1444,20 @@ migration drift         # 0
 Fix attempts: 1. The fake provider counts as sending data, so the smoke run failed with egress off. The smoke run now uses a local fake that truthfully declares it sends nothing.
 
 **Next exact task:** the LEG-002..005 and REV-012 fold-ins, then M4.
+
+### 11:30 — LEG-002 + REV-012: every score says what it was scored against
+**What:** older attempts printed AI-made verdicts under owner-sounding headings. Every accuracy report now opens with the answer key's version, its SHA-256 and a reviewer label.
+- `evaluation/report_labels.py` defines `ReviewerKind` (owner, ai_session, same_model, none) and `AnswerKey`. Only `owner` gets the heading "Owner verdict"; everything else is headed "AI check (not owner-verified)".
+- A key missing its version, hash or label refuses to render. A reviewed key must carry its review file's hash. A report with no key prints "unscored".
+- The independent review of the synthetic gold set is now committed as `docs/reviews/GOLD_SYNTHETIC_V1_REVIEW.md` (synthetic content only), so the baselines can cite its hash. Both baselines were regenerated with the key block, and their numbers are unchanged.
+
+**Teach-back (`evaluation/report_labels.py`):** "Every accuracy report starts by saying which answer key it used, that key's fingerprint, and who reviewed the key. Only my own review can produce the words 'Owner verdict'; an AI review is always labelled as an AI check. If any of those facts is missing the report refuses to print, and with no key at all it just says 'unscored'."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 122 source files
+pytest -q               # 982 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 0.
+
+**Next exact task:** LEG-003 (provider failure cases) + LEG-004 (quote matching on real text).

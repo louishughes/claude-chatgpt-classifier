@@ -710,3 +710,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - Tests: test_limits_and_semantic_smoke.py (7). Full suite 972 passed, 7 skipped; ruff, mypy OK; drift 0.
 - EVAL-011 real-provider run not done (needs owner opt-in); issue stays open.
 - Next: LEG-002..005, REV-012.
+
+## 2026-10-28 11:30 LEG-002 + REV-012 (#190, #187)
+- evaluation/report_labels.py (ReviewerKind, AnswerKey, key_from_gold, key_from_file); reports take `key=`; baselines regenerated with key block; docs/reviews/GOLD_SYNTHETIC_V1_REVIEW.md; ANNOTATION_GUIDE "Report labels".
+- Tests: tests/unit/test_report_labels.py (10). Full suite 982 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: LEG-003 + LEG-004.
