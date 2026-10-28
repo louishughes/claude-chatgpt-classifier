@@ -982,3 +982,6 @@ documents/rich_note.py _topics_line: digest topics grouped by the messages they 
 
 ## 2026-10-28 21:20 EVAL-010c (#334)
 evaluation/link_counts.py link_counts + `ke eval links --limit N`: counts-only report of link occurrences/targets, YouTube mentions/videos, social mentions/accounts/ambiguous @names for the first N chats by native ID; read-only, no model calls, no URL/handle/text. Docs: EVAL-010_SMOKE.md section. Tests: tests/integration/test_eval_links.py (1).
+
+## 2026-10-28 19:50 REL-005 (#340)
+relationships/words.py distinctive_similarity (TF-IDF over content words + title x3, IDF across the workspace, top 100 terms per chat, inverted index) and relationships/related.py: new related_to reasons "both chats cite the same link" (link_targets cited by <= MAX_SPREAD chats, chatgpt.com excluded) and "their distinctive words overlap" (>= 0.3; two reasons' weight at >= 0.5); embedding cosine alone no longer proposes a link; related_to kept only within the top RELATED_PER_CHAT=3 of both chats. Evidence: link_targets, link_occurrences, distinctive_words, cited revisions; no URL or words. Tests: tests/integration/test_related_links_words.py (3); REL-003/004 tests unchanged and passing.

@@ -7,26 +7,42 @@ thing*. It proposes two kinds of candidate, never anything stronger:
 * ``same_project``: both chats have a segment labelled with the same
   approved project (a reviewer's label or the classifier's);
 * ``related_to``: the chats share a distinctive approved topic, a
-  distinctive named entity (a game, book, piece of software...), or their
+  distinctive named entity (a game, book, piece of software...), a
+  distinctive link (both cite the same web page or video, REL-005), their
+  distinctive words overlap (TF-IDF over the workspace, REL-005), or their
   words are close in meaning (local embedding similarity).
 
+Labels and entities need paid classifier and extraction runs; links and
+distinctive words need nothing but the import, so an archive that has never
+been sent to a model still gets suggestions (EVAL-012 found none without).
+
 Every candidate carries its reasons in plain words (``because``) plus the
-IDs behind them: the labelled segments, the records naming the entity and
-the message revisions they cite. It carries no private text.
+IDs behind them: the labelled segments, the records naming the entity, the
+shared link targets and the message revisions they cite. It carries no
+private text: not the words, not the URL.
 
 Rules that keep this honest:
 
 * **Similarity never proves a fork.** Only ``related_to`` and
   ``same_project`` are ever proposed here; ``continues`` and
   ``forked_from`` need REL-002's exact evidence or a person (ADR-0005).
+* **Resemblance alone is not a reason** (REL-005). The embedding cosine
+  only adds weight to a pair that already shares something: a label, an
+  entity, a link or distinctive words. The local hashed embedding counts
+  every word, so on real chats almost any two long ones pass the cosine
+  floor; on its own it would fill the queue with noise.
 * **Everything is a candidate.** Nothing is accepted automatically, and a
   pair a person already reviewed (accepted, rejected...) is never touched.
-* **Common ground isn't evidence.** A topic or entity found in more than
-  ``MAX_SPREAD`` chats says little about any two of them, so it is not used.
+* **Common ground isn't evidence.** A topic, entity or link found in more
+  than ``MAX_SPREAD`` chats says little about any two of them, so it is not
+  used. Links to other ChatGPT chats are REL-002's ``references``, not here.
 * **Pairs already linked by exact evidence are skipped**: a fork or a
   quote says more than "related".
 * **Bounded.** Each chat keeps at most ``PER_CHAT`` partners per kind,
   the strongest first, so one busy project can't flood the review queue.
+  A ``related_to`` pair must be among the ``RELATED_PER_CHAT`` strongest of
+  *both* chats (REL-005): on the real archive, "either chat" let every chat
+  pull in five weak partners, and EVAL-012 scored 8 of 12 of them wrong.
 
 Comparing every pair of chats is quadratic; that is fine for a personal
 archive of a few thousand chats, and is why this runs on request
@@ -57,12 +73,14 @@ from knowledge_engine.extraction.records import KnowledgeRecord, Trust
 from knowledge_engine.extraction.store import KnowledgeRecordRow
 from knowledge_engine.graph.nodes import NodeFlag
 from knowledge_engine.importer.records import ConversationRow, MessageNodeRow, MessageRevisionRow
+from knowledge_engine.links.store import LinkOccurrenceRow, LinkTargetRow
 from knowledge_engine.relationships.store import (
     ConversationRelationshipRow,
     EvidenceClass,
     RelationKind,
     propose,
 )
+from knowledge_engine.relationships.words import distinctive_similarity
 from knowledge_engine.rendering.transcript import load_conversation
 from knowledge_engine.retrieval.embeddings import Embedder, LocalHashEmbedder, cosine, embed
 from knowledge_engine.segmentation.overrides import load_segments
@@ -73,14 +91,22 @@ RELATED_DETECTOR = "related-v1"
 SAME_PROJECT_DETECTOR = "same-project-v1"
 
 MIN_SIMILARITY = 0.55  # cosine; the local embedder puts rewordings well above this
+# Distinctive-word cosine (REL-005). One reason at the first level, two at
+# the second; chosen conservatively and revisitable once real scores exist.
+MIN_DISTINCTIVE = 0.3
+STRONG_DISTINCTIVE = 0.5
 MIN_CONFIDENCE = 0.3  # one distinctive shared topic or entity is just enough
 MAX_CONFIDENCE = 0.85  # resemblance is never certainty
 MAX_SPREAD = 10
 PER_CHAT = 5
+RELATED_PER_CHAT = 3  # and on both ends, not either
 MAX_CHARS = 20_000  # words per chat fed to the embedder
 _SPOKEN = frozenset({"user", "assistant"})
 # Detectors whose links already say more than "related" (REL-002).
 _EXACT = frozenset({"native-node-v1", "prefix-v1", "chatgpt-url-v1", "quote-v1"})
+# Links between ChatGPT chats are REL-002's ``references``.
+_CHATGPT_HOSTS = frozenset({"chatgpt.com", "www.chatgpt.com", "chat.openai.com"})
+_LINK = "link:"  # keeps link targets apart from topics and entities in ``_spread``
 
 
 @dataclass
@@ -95,6 +121,9 @@ class _Profile:
     topics: dict[str, tuple[set[str], set[str]]] = field(default_factory=dict)
     # Entity key -> (record IDs, evidence revisions).
     entities: dict[str, tuple[set[str], set[str]]] = field(default_factory=dict)
+    # "link:" + target ID -> (occurrence IDs, revisions holding them).
+    links: dict[str, tuple[set[str], set[str]]] = field(default_factory=dict)
+    title: str = ""
     text: str = ""
     vector: list[float] = field(default_factory=list)
 
@@ -142,14 +171,18 @@ def suggest_related(
     for profile, vector in zip(profiles, vectors, strict=True):
         profile.vector = vector
     _attach_entities(session, {p.conversation_id: p for p in profiles})
+    _attach_links(session, {p.conversation_id: p for p in profiles})
+    distinctive = distinctive_similarity(
+        [(p.title, p.text) for p in profiles], floor=MIN_DISTINCTIVE
+    )
     linked = _exactly_linked(session, [p.conversation_id for p in profiles])
     spread = _spread(profiles)
     candidates: list[_Candidate] = []
-    for a, b in combinations(profiles, 2):
+    for (i, a), (j, b) in combinations(enumerate(profiles), 2):
         if frozenset((a.conversation_id, b.conversation_id)) in linked:
             continue
         similarity = cosine(a.vector, b.vector)
-        candidates += _judge(a, b, similarity, spread)
+        candidates += _judge(a, b, similarity, spread, distinctive.get((i, j), 0.0))
     counts: Counter[str] = Counter()
     for candidate in _strongest(candidates):
         detector = (
@@ -183,7 +216,7 @@ def _profiles(
     profiles = []
     for conversation_id in ids:
         chat = load_conversation(session, conversation_id)
-        profile = _Profile(conversation_id, chat.create_time)
+        profile = _Profile(conversation_id, chat.create_time, title=chat.title or "")
         words = []
         for native_id in chat.graph.active_messages:
             node = chat.messages.get(native_id)
@@ -264,6 +297,27 @@ def _attach_entities(session: Session, profiles: dict[str, _Profile]) -> None:
             cited.add(revision)
 
 
+def _attach_links(session: Session, profiles: dict[str, _Profile]) -> None:
+    """Add each web page or video a chat cites (any branch, text or citation)."""
+    rows = session.execute(
+        select(
+            LinkOccurrenceRow.conversation_id,
+            LinkOccurrenceRow.target_id,
+            LinkOccurrenceRow.occurrence_id,
+            LinkOccurrenceRow.revision_id,
+        )
+        .join(LinkTargetRow, LinkTargetRow.target_id == LinkOccurrenceRow.target_id)
+        .where(LinkTargetRow.host.not_in(sorted(_CHATGPT_HOSTS)))
+    ).tuples()
+    for conversation_id, target_id, occurrence_id, revision_id in rows:
+        profile = profiles.get(conversation_id)
+        if profile is None:
+            continue
+        occurrences, revisions = profile.links.setdefault(_LINK + target_id, (set(), set()))
+        occurrences.add(occurrence_id)
+        revisions.add(revision_id)
+
+
 def _conversations_of(session: Session, revision_ids: Iterable[str]) -> dict[str, str]:
     wanted = sorted(set(revision_ids))
     found: dict[str, str] = {}
@@ -301,11 +355,13 @@ def _spread(profiles: list[_Profile]) -> Counter[str]:
     """How many chats carry each topic and entity."""
     spread: Counter[str] = Counter()
     for profile in profiles:
-        spread.update(set(profile.topics) | set(profile.entities))
+        spread.update(set(profile.topics) | set(profile.entities) | set(profile.links))
     return spread
 
 
-def _judge(a: _Profile, b: _Profile, similarity: float, spread: Counter[str]) -> list[_Candidate]:
+def _judge(
+    a: _Profile, b: _Profile, similarity: float, spread: Counter[str], distinctive: float = 0.0
+) -> list[_Candidate]:
     newer, older = _newer_older(a, b)
     found = []
     projects = sorted(set(a.projects) & set(b.projects))
@@ -329,25 +385,43 @@ def _judge(a: _Profile, b: _Profile, similarity: float, spread: Counter[str]) ->
         )
     topics = sorted(t for t in set(a.topics) & set(b.topics) if spread[t] <= MAX_SPREAD)
     entities = sorted(e for e in set(a.entities) & set(b.entities) if spread[e] <= MAX_SPREAD)
+    links = sorted(k for k in set(a.links) & set(b.links) if spread[k] <= MAX_SPREAD)
     because = [f"both chats are labelled with topic {t}" for t in topics]
     because += [f"both chats name the same {_entity_word(e)}" for e in entities]
+    if links:
+        because.append(
+            "both chats cite the same link"
+            if len(links) == 1
+            else f"both chats cite the same {len(links)} links"
+        )
+    if distinctive >= MIN_DISTINCTIVE:
+        because.append(f"their distinctive words overlap (score {distinctive:.2f})")
     misses = 1.0
     misses *= 0.7 ** min(len(topics), 2)
     misses *= 0.7 ** min(len(entities), 2)
+    misses *= 0.7 ** min(len(links), 2)
+    if distinctive >= MIN_DISTINCTIVE:
+        misses *= 0.49 if distinctive >= STRONG_DISTINCTIVE else 0.7
+    grounded = bool(because)  # something shared, not just a resemblance
     if similarity >= MIN_SIMILARITY:
         because.append(f"their words are similar (cosine {similarity:.2f})")
         misses *= 1.0 - 0.6 * similarity
     confidence = min(MAX_CONFIDENCE, round(1.0 - misses, 3))
-    if because and confidence >= MIN_CONFIDENCE:
+    if grounded and confidence >= MIN_CONFIDENCE:
         records = sorted({r for e in entities for r in a.entities[e][0] | b.entities[e][0]})
         evidence: dict[str, object] = {
             "because": because,
             "term_ids": topics,
             "entity_keys": entities,
             "records": records,
+            "link_targets": [k.removeprefix(_LINK) for k in links],
+            "link_occurrences": sorted({o for k in links for o in a.links[k][0] | b.links[k][0]}),
             "similarity": round(similarity, 3),
+            "distinctive_words": distinctive,
             "revisions": _cited(
-                (newer.topics, older.topics, topics), (newer.entities, older.entities, entities)
+                (newer.topics, older.topics, topics),
+                (newer.entities, older.entities, entities),
+                (newer.links, older.links, links),
             ),
         }
         found.append(
@@ -391,7 +465,7 @@ def _newer_older(a: _Profile, b: _Profile) -> tuple[_Profile, _Profile]:
 
 
 def _strongest(candidates: list[_Candidate]) -> list[_Candidate]:
-    """Keep a pair only if it is among the ``PER_CHAT`` strongest of either chat."""
+    """Keep a pair only if it is among the strongest of either chat (both, for related_to)."""
     ranked = sorted(
         candidates,
         key=lambda c: (-c.confidence, -float(c.evidence["similarity"]), c.newer, c.older),  # type: ignore[arg-type]
@@ -400,7 +474,11 @@ def _strongest(candidates: list[_Candidate]) -> list[_Candidate]:
     kept = []
     for candidate in ranked:
         ends = [(candidate.newer, candidate.kind), (candidate.older, candidate.kind)]
-        if any(taken[end] < PER_CHAT for end in ends):
+        if candidate.kind is RelationKind.RELATED_TO:
+            room = all(taken[end] < RELATED_PER_CHAT for end in ends)
+        else:
+            room = any(taken[end] < PER_CHAT for end in ends)
+        if room:
             kept.append(candidate)
             for end in ends:
                 taken[end] += 1

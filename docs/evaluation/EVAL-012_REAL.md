@@ -9,6 +9,25 @@ Numbers only. The key and the full report stay on the owner's PC (`private/answe
 - Evidence check (`check_evidence`, workspace of 1158 chats): 0 problems.
 - First scored at commit b47b6a1, before the fork-parent fix, then re-scored at cb24bf3, after it (same key, same hash before and after).
 
+## Related-chat suggestions (REL-005, e6a77f6): PASS
+
+Scored on a fresh import of the same export, after `ke related detect` and `ke related suggest` (wording and links only, no taxonomy). Same key and hash.
+
+- Precision: **0.960** (threshold 0.90): **PASS**
+- Recall, for information: 0.490 (24 of 49 key links)
+- Proposals: 257 distinct, 25 scored
+
+| Kind | correct | wrong_direction | wrong_kind | false_link |
+|---|---|---|---|---|
+| forked_from | 9 | 0 | 1 | 0 |
+| quotes | 2 | 0 | 0 | 0 |
+| references | 9 | 0 | 0 | 0 |
+| related_to | 4 | 0 | 0 | 0 |
+
+Baseline with the REL-003 rules on the same workspace (suggest had never been run before): 4,991 related suggestions, precision **0.727 (FAIL)**, recall 0.490. related_to was 4 correct and 8 false. REL-005 keeps the same 4 correct links, drops all 8 false ones, and makes 143 suggestions instead of 4,991.
+
+Still missed: 15 `related_to` and all 9 `same_project`. `same_project` needs approved project labels, which come from a classifier run (paid) or a reviewer.
+
 ## After the fork-parent fix (cb24bf3): PASS
 
 Re-scored on a fresh import of the same export (1158 chats), because the detectors never delete link rows they proposed earlier.

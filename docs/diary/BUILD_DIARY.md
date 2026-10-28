@@ -3121,6 +3121,29 @@ Fix attempts: 1 (the first test run showed the copied-opening detector also need
 
 **Next exact task:** NOTE-012 dashboard chat view.
 
+### 19:50 — REL-005: related chats without paid labels
+
+The real relationship score passed on precision (0.952) but found only 20 of the key's 49 links, and none were `related_to` or `same_project`. The "related" suggester leaned on three signals. Two of them, approved topic labels and named entities, only exist after paid classifier and extraction runs, and the real archive has had neither. The third, the local hashed embedding, counts every word: on a synthetic check it put two chats on different subjects at 0.35 and two on the same subject at 0.42. Fed whole chats, it passes the 0.55 floor for almost any pair. In the new test it linked every one of twelve unrelated chats to the others.
+
+So there are two new free signals and one rule:
+- two chats citing the same web page or video, when ten or fewer chats cite it;
+- two chats sharing *distinctive* words, TF-IDF over the workspace, so a word every chat uses counts for nothing;
+- the embedding cosine on its own is no longer a reason. It only adds weight to a pair that already shares something. That's the spec's line: "semantic embeddings never replace evidence".
+- a `related_to` pair must be in the top three of *both* chats, not the top five of either one.
+
+Before this, the PC ran the old `ke related suggest` on the real archive for a baseline (first fixing a crash: the command never loaded the import ledger's table, #341). It made 4,991 suggestions. Precision fell from 0.952 to 0.727, and recall rose from 0.408 to 0.490. Inside the key, 4 related links were right and 8 were wrong. The floors above were set before that result and were not tuned on the key.
+
+**Teach-back (`distinctive_similarity` in `relationships/words.py`):** Each chat becomes a list of its most telling words, its title words counted three times, with each word weighted down the more chats in the archive use it. Two chats score high when their telling words overlap, so "telescope eyepiece collimation" links two chats and "can you help me with this" links nothing. Only the score leaves the function, never the words.
+
+Checks:
+```
+tests/integration/test_related_links_words.py   3 passed (shared link; common link ignored; distinctive words; common words only -> no link; no URL or word in the evidence; a busy chat keeps only its 3 strongest related partners)
+REL-003/004 and relationship tests              47 passed, unchanged
+```
+Fix attempts: 2 (both in the new test: a SQLAlchemy result needed `.all()`, and two "plain" chats shared an uncommon title, which rightly counted).
+
+**Next exact task:** on the PC, re-import the EVAL-012 workspace, run `ke related detect` and `ke related suggest`, and re-score with `ke eval relationships` against the unchanged key. Precision must stay at or above 0.90.
+
 ### 21:20 — EVAL-010c: link, video and account counts for Gate G2
 
 Closing the milestone maps showed one gate with no evidence at all. G2 asks for link, YouTube and social counts on 100 real chats, and nothing produced them: all nine M2 tickets were closed, but the check itself was never built. `ke eval links --limit 100` now counts what the registries already hold for a batch of chats. It reads only, makes no calls, and prints numbers and kinds, never a URL or a handle, so the PC can paste its output.
