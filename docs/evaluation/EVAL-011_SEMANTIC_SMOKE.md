@@ -26,4 +26,25 @@ The measured schema failure rate (about 0.14) matches the injected one-in-seven 
 - It shows the plumbing holds at 50 and 100 conversations. Every failure ends recorded: repaired, `review_required` with an error code, or `capped` and logged. Nothing invalid is stored, and a resumed run repeats no finished stage key.
 - Stability is 1.000 because the fake model is deterministic and the second run is answered from the cache. Real label stability needs a real model.
 - The generated conversations contain no decision or task cues, so extraction finds 0 records here. Extraction quality is measured by EVAL-004.
-- **Not done: the pinned real-provider run under a cost cap.** It needs the owner to opt in (egress on, a key, a spending cap). The project rules forbid paid calls without that. Ticket EVAL-011 stays open for this half.
+- **Not done yet: the pinned real-provider run under a cost cap.** Louis approved one such run on 2026-10-28 (see below). Ticket EVAL-011 stays open until it has run and its cost is in the diary.
+
+## The real-provider run (one approved run)
+
+Louis approved **one** paid smoke run on 2026-10-28, as a single exception to the no-paid-API rule: synthetic chats only, as small as the ticket allows, with a hard cost cap. The adapter is `src/knowledge_engine/providers/anthropic_api.py`.
+
+It is fenced three ways, and the command refuses (`refused`, exit 2) unless all three are set:
+
+1. `--synthetic N`: generated chats only, never imported ones.
+2. `--max-cost-usd X` above zero. Before each request the adapter works out the most it could cost (all its input, the schema, and the full output allowance at list price). If that would go over what is left, the request is **not sent**. It stays pending and is counted as `capped_requests`.
+3. `[egress] text_llm = true` in `ke.toml`. With it off, the model path refuses the provider before anything is sent.
+
+The model is pinned (`claude-haiku-5-5` by default, the model the OD-05 spike used), with thinking off and low effort. Its answers go through the same schema check, single repair and review routing as the fake's.
+
+```
+pip install -e ".[api]"                        # the Anthropic SDK, only needed for this
+# ke.toml: [egress] text_llm = true            (turn it off again afterwards)
+# ANTHROPIC_API_KEY in the environment, never in a file in the repo
+ke eval semantic --synthetic 50 --provider anthropic --max-cost-usd 0.50
+```
+
+The report's `provider` block gives calls, tokens, dollars spent, the cap, and how many requests the cap held back. It never includes any text.

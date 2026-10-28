@@ -2182,3 +2182,24 @@ The first GitHub Actions run of #251 failed on all four jobs. Locally every test
 
 Checks: the full suite as a non-root user, 1186 passed, 7 skipped. Purge, backup, end-to-end and CLI tests pass as root. Windows is proved by CI.
 Fix attempts: 1.
+
+### 09:16 — EVAL-011: a real-model adapter with a hard cost cap
+
+Louis approved one paid smoke run (2026-10-28 08:54 UTC, "Do a and b"). This PR builds the adapter for it. Nothing paid has run yet.
+
+- `providers/anthropic_api.py`: `AnthropicProvider` sends each request to a pinned model (`claude-haiku-5-5` by default, the OD-05 spike's model) and asks for JSON that fits the request's schema. Before each request it works out the worst case: all the input and the schema at about 2 characters per token, plus the full output allowance, at list price. If that would go over what is left of `max_cost_usd`, the request is not sent and is counted as capped. After each answer, the real cost from the reported token counts is added. Thinking is off: choosing labels from a fixed list doesn't need it, and it would use up the same `max_tokens`.
+- Answers go through `result_from_response` like every provider's. A refusal is `invalid` and isn't retried. A cut-off answer is `invalid`. Rate limits and connection errors are `transient`, and the worst case is counted as spent.
+- `ke eval semantic --provider anthropic --max-cost-usd X` refuses unless `--synthetic` is given, the cap is above zero, and `[egress] text_llm` is on. The report gains a `provider` block: calls, tokens, dollars, the cap, and capped requests.
+- `pyproject.toml`: a new `api` extra (the SDK). The dev extra includes it so the tests type-check.
+
+**Teach-back (`providers/anthropic_api.py`):** This is the only piece that can spend money, so before each question it works out the most that question could cost, and doesn't send it if that would break the cap. It also can't send anything unless I've switched outbound model calls on, and the command only lets it run on made-up chats. Its answers get exactly the same checks as the fake model's, so a bad answer ends up as a review item, not stored data.
+
+Checks:
+```
+tests/integration/test_anthropic_provider.py   7 passed (stand-in client, no network)
+ci                                             see PR
+```
+- First draft: my stand-in's answer didn't fit the classification schema, so every segment used its one repair (2 calls per segment). The test now answers with a valid "unsure" reply and checks there is exactly 1 call per segment.
+Fix attempts: 1 (the cap test's room was too generous to trigger the cap).
+
+**Next exact task:** run `ke eval semantic --synthetic 50 --provider anthropic --max-cost-usd 0.50` on Louis's PC with egress on for that run only. Then record the cost and approval here, and switch egress off.
