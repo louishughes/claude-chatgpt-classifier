@@ -469,6 +469,7 @@ def build_fixture(base: Path, out: Path) -> bytes:
             info = zipfile.ZipInfo(name, date_time=_ZIP_TIME)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
+            info.create_system = 3  # same bytes on Windows and Unix (see synthetic.py)
             target.writestr(info, data)
     data = buffer.getvalue()
     out.parent.mkdir(parents=True, exist_ok=True)

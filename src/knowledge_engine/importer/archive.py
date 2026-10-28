@@ -304,6 +304,18 @@ class BlobStore:
             raise BlobCorruptError(f"blob {sha256[:12]} does not match its hash")
 
 
+def remove_stored(path: Path) -> None:
+    """Delete a stored copy on purpose (a purge, or a purged file stored again).
+
+    Windows refuses to delete a read-only file, so the write bit goes back first.
+    """
+    try:
+        path.chmod(stat.S_IREAD | stat.S_IWRITE)
+    except FileNotFoundError:
+        return
+    path.unlink(missing_ok=True)
+
+
 def _make_read_only(path: Path) -> None:
     # A stored blob is evidence. Read-only permissions won't stop a
     # determined user, but they stop accidental edits by tools and scripts.

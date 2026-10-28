@@ -3,7 +3,7 @@
 import json
 import os
 import subprocess
-import sys
+import sysconfig
 from pathlib import Path
 from typing import Any
 
@@ -179,7 +179,8 @@ def test_exit_codes_are_stable() -> None:
 
 
 def test_installed_ke_command_runs(tmp_path: Path) -> None:
-    ke = Path(sys.executable).parent / ("ke.exe" if os.name == "nt" else "ke")
+    # Windows puts console scripts in Scripts\, not next to python.exe.
+    ke = Path(sysconfig.get_path("scripts")) / ("ke.exe" if os.name == "nt" else "ke")
     result = subprocess.run(
         [str(ke), "--json", "status"], capture_output=True, text=True, cwd=tmp_path, check=False
     )

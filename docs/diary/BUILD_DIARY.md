@@ -2171,3 +2171,14 @@ ci --nightly (gate, variance, e2e)       # 3/3 ok
 Fix attempts: 0.
 
 **Next exact task:** the real-provider adapter for the one approved EVAL-011 run, then OPS-006.
+
+### 09:14 — OPS-005: first CI run found Windows and non-root problems
+
+The first GitHub Actions run of #251 failed on all four jobs. Locally every test passed because this container runs as root, and none of the earlier runs were on Windows.
+
+- **Purge on Windows (product bug).** Windows won't delete a read-only file, and stored evidence is read-only. Purge, and the importer's removal of a purged file stored again, now go through `archive.remove_stored`, which puts the write bit back first.
+- **Fixture ZIP bytes (product bug).** The EVAL-006 fixture builder didn't pin the ZIP's "made on" byte, so Windows built different bytes. It is now pinned, as `synthetic.py` already did.
+- **Two tests that only ran in one setup.** The backup tamper test wrote to a read-only file. It now makes it writable first, as a tamperer would; its assertions are unchanged. The installed-`ke` test looked next to `python.exe`, but Windows puts scripts in `Scripts\\`; it now asks `sysconfig`. Neither assertion changed.
+
+Checks: the full suite as a non-root user, 1186 passed, 7 skipped. Purge, backup, end-to-end and CLI tests pass as root. Windows is proved by CI.
+Fix attempts: 1.
