@@ -2563,3 +2563,22 @@ tests/integration/test_video_transcripts.py  6 passed (unchanged)
 Fix attempts: 0.
 
 **Next exact task:** open the queued PRs, then INT-003 (watched folders).
+
+### 13:05 — NOTE-002: the conversation digest contract
+
+Louis approved the rich-notes plan (`docs/plans/RICH_NOTES_GAP_ANALYSIS.md`), so the NOTE tickets come next. This one is the shape of the *digest*: what a model writes about a whole chat so the note reads well.
+
+- `digest/contract.py`: `DigestAnswer` is what the model must return: 1 to 4 summary sentences, purpose, outcome, status (open, settled, abandoned), intent, topics, insights, tensions, open questions and next steps. `extra="forbid"` everywhere, and every item needs at least one short quote (300 characters at most) naming its message.
+- `resolve_digest` looks each quote up in the real message (the same matching as the extractor, LEG-004) and turns it into exact, fingerprinted evidence. If any quote of an item is wrong (a message that isn't in the chat, or words that aren't in that message), the whole item is dropped and a flag says why. A status or intent that can't be backed becomes "unknown" rather than a guess. A digest with no surviving summary sentence is not usable and goes to review.
+- Whether a section is "From the chat" or "Generated" is fixed in `FIELD_PROVENANCE`, not chosen by the model. Only open questions count as from the chat; everything else is the model's own wording, so the note labels it generated (decision D3).
+- It is a separate thing from knowledge records (decision D5), so a generated insight can never pass for a confirmed decision.
+
+**Teach-back (`resolve_digest`):** The model hands back a summary and the other sections, and each sentence has to point at the messages it came from with a few exact words. This function checks those words really are in those messages and swaps them for precise positions and a fingerprint. Any sentence with even one bad citation is thrown out and noted, so what reaches the note is fully backed by the chat.
+
+Checks:
+```
+tests/unit/test_digest_contract.py   11 passed
+```
+Fix attempts: 0.
+
+**Next exact task:** NOTE-003 (the digest stage behind the provider switch).
