@@ -523,21 +523,26 @@ def rich_conversation_note(
 
     category = labels.category or "unclassified"
     where = category if labels.subcategory is None else f"{category} › {labels.subcategory}"
-    names = sorted(
-        {" ".join(i.record.entity.name.split()) for i in sorted_.references if i.record.entity}
-    )
+    # A "name" made only of digits and punctuation ("48" from "playing 48
+    # levels") is a number the entity cue caught, not a tool or a title.
+    spelled = {
+        " ".join(i.record.entity.name.split()) for i in sorted_.references if i.record.entity
+    }
+    names = sorted(n for n in spelled if any(ch.isalpha() for ch in n))
     made = _artefact_names(session, sorted_.artefacts)
 
     def card_cell(item: DigestItem | None, missing: str) -> str:
         return _cell(_digest_line(item, citer)) if item else missing
 
-    pending = "not written yet" if digest is None else "not stated"
-    card = [
-        "| | |",
-        "|---|---|",
-        f"| **Purpose** | {card_cell(digest.purpose if digest else None, pending)} |",
-        f"| **Outcome** | {card_cell(digest.outcome if digest else None, pending)} |",
-    ]
+    card = ["| | |", "|---|---|"]
+    if digest is None:
+        card += ["| **Purpose** | not written yet |", "| **Outcome** | not written yet |"]
+    else:
+        # A digest that found no purpose or outcome leaves the row out: an
+        # empty "not stated" row reads as a claim about the chat (NOTE-024).
+        for title, item in (("Purpose", digest.purpose), ("Outcome", digest.outcome)):
+            if item is not None:
+                card.append(f"| **{title}** | {card_cell(item, '')} |")
     if digest is not None:
         status = digest.status.value if digest.status else "unknown"
         intent = digest.intent.value if digest.intent else "unknown"
