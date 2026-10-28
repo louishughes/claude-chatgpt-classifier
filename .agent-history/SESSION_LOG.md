@@ -823,3 +823,9 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - evaluation/variance.py (SEEDS, SOURCES, ReviewItem, RunView, VarianceReport, shuffled_export, pinned_fake, run_order, differences, run_variance, to_dict); gate line `variance.order_and_repeats`; `ke eval variance [--fixtures]`; docs/evaluation/EVAL-007_GATE.md regenerated (8 PASS, 2 REVIEW, 3 BLOCKED, 0 FAIL). No migration.
 - Tests: test_variance.py (4). Full suite 1163 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: check UI-005 issue #175, then M5.
+
+## 2026-10-28 15:45 EVAL-013 (#244) + merged gold-real-v1-review (#243)
+- Opened and merged #243 for the PC session: docs/reviews/GOLD_REAL_V1_REVIEW.md + diary entry (merged main into the branch, both diary histories kept; no gold content).
+- evaluation/workspace_score.py (WorkspaceScore, score_extraction); `ke gold score --gold --reviewer [--review] [--out] [--no-rules]`; gate line quality.real_golden_set now names EVAL-013 and the command; gate report regenerated. No migration.
+- Tests: test_gold_score.py (2). Full suite 1165 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: UI-005 issue check, then M5.

@@ -454,11 +454,14 @@ CHECKS: tuple[Check, ...] = (
     ),
     Check(
         "quality.real_golden_set",
-        "EVAL-001",
-        "the thresholds above, on the private golden set",
+        "EVAL-013",
+        "the extraction thresholds above, on the private golden set",
         "real",
-        "ke gold (on the owner's PC)",
-        _blocked("the private golden set is built and scored on the owner's PC; numbers only"),
+        "ke gold score --gold <key> --reviewer ai_session (on the owner's PC)",
+        _blocked(
+            "the private key golden-v1 (extraction only, AI-reviewed) is on the owner's PC; "
+            "scored there, numbers only"
+        ),
     ),
     Check(
         "provider.real_smoke",
