@@ -32,6 +32,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from knowledge_engine.digest.stage import stored_digest
+from knowledge_engine.documents.categories import suggested_category
 from knowledge_engine.documents.notes import knowledge_path
 from knowledge_engine.documents.render import transcript_stem
 from knowledge_engine.documents.rich_note import body_of, chat_labels, rich_conversation_note
@@ -208,7 +209,8 @@ def notes_index(session: Session, *, offset: int, limit: int) -> dict[str, Any]:
     """One page of chats, grouped by category, with status and open questions.
 
     Categories come from the newest published taxonomy; with none published
-    every chat is "unclassified". Status and open questions come from the
+    every chat is "unclassified". An unclassified chat whose answers wait
+    for review shows the classifier's suggestion (NOTE-018). Status and open questions come from the
     chat's stored digest, or say it hasn't been written.
     """
     taxonomy = newest_taxonomy(session)
@@ -225,11 +227,19 @@ def notes_index(session: Session, *, offset: int, limit: int) -> dict[str, Any]:
         labels = chat_labels(session, chat, taxonomy)
         digest = stored_digest(session, chat)
         category = labels.category or "unclassified"
+        # NOTE-018: an unsettled chat stays under "unclassified", with the
+        # classifier's best candidate shown beside it, never as its group.
+        suggestion = (
+            suggested_category(session, chat, taxonomy)
+            if taxonomy is not None and labels.category is None
+            else None
+        )
         groups.setdefault(category, []).append(
             {
                 "conversation_id": conversation_id,
                 "title": title or "Untitled conversation",
                 "subcategory": labels.subcategory,
+                "suggested": suggestion.label if suggestion else None,
                 "status": (digest.status.value if digest and digest.status else None),
                 "digest": digest is not None,
                 "open_questions": len(digest.open_questions) if digest else None,

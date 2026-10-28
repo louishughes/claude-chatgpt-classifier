@@ -2975,12 +2975,14 @@ Now, when a chat has no settled category, the note shows the classifier's best c
 
 Checks:
 ```
-tests/integration/test_note_suggested_review.py   3 passed (all-review chat: suggestion shown, label unset; reviewer files settle it, named reviewer, no repeat requests; unsure reviewer records nothing)
+tests/integration/test_note_suggested_review.py   4 passed (all-review chat: suggestion shown, label unset; reviewer files settle it, named reviewer, no repeat requests; unsure reviewer records nothing; the Notes page shows the suggestion under "unclassified")
 tests/integration/test_note_categories.py         unchanged, pass
 ```
 Fix attempts: 0.
 
-**Next exact task:** the Notes page shows the suggestion too, once NOTE-012 (#302) is merged.
+The Notes page (NOTE-012) shows the suggestion too, beside the chat under "unclassified", never as its group.
+
+**Next exact task:** on the PC, `ke classify review --taxonomy tax-1 --run-id review-1` for the 18 review_required segments, answered by a separate session.
 
 ### 16:45 — NOTE-012: the knowledge note beside the chat, and a Notes page
 

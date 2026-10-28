@@ -9,6 +9,7 @@ says it is unsure, so both go to review and nothing is settled. Then
 
 from __future__ import annotations
 
+import io
 import json
 import re
 from collections.abc import Callable
@@ -33,6 +34,7 @@ from knowledge_engine.rendering.transcript import load_conversation
 from knowledge_engine.segmentation.overrides import load_segments
 from knowledge_engine.settings import EgressPolicy, load_settings
 from knowledge_engine.taxonomy.registry import Dimension, TaxonomyRegistry, TermStatus
+from knowledge_engine.ui.app import make_app
 
 T0 = 1704067200.0
 HOUR = 3600.0
@@ -224,3 +226,25 @@ def test_an_unsure_reviewer_records_nothing(
     assert (second["reviewed"], second["unsure"], second["queued"]) == (0, 2, 2)
     text, category = _note(world["cid"])
     assert category is None and "suggested: Home and garden › Raised beds" in text
+
+
+def test_notes_page_shows_the_suggestion_under_unclassified(world: dict[str, str]) -> None:
+    captured: dict[str, str] = {}
+
+    def start_response(status: str, headers: list[tuple[str, str]]) -> None:
+        captured["status"] = status
+
+    environ = {
+        "REQUEST_METHOD": "GET",
+        "PATH_INFO": "/notes",
+        "QUERY_STRING": "",
+        "HTTP_HOST": "127.0.0.1:8765",
+        "CONTENT_LENGTH": "0",
+        "wsgi.input": io.BytesIO(b""),
+    }
+    page = b"".join(make_app(load_settings())(environ, start_response)).decode("utf-8")
+
+    assert captured["status"].startswith("200")
+    assert "<h2>unclassified" in page
+    row = page.split(f'href="/chats/{world["cid"]}"', 1)[1].split("</tr>", 1)[0]
+    assert "suggested: Home and garden › Raised beds (waiting for review)" in row
