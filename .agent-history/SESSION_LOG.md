@@ -688,3 +688,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - extraction/actions.py (extract_actions, load_occurrences, Occurrence); extraction/entities.py (extract_entities); records.py v3 (EntityType, Entity, asset_occurrences, missing_occurrences); evidence.py occurrence checks; synthetic case actions_entities.
 - Tests: test_action_entity_extractors.py (4). Full suite 939 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: EXT-007 + EXT-008.
+
+## 2026-10-28 08:45 EXT-007 + EXT-008 (#75, #76)
+- extraction/store.py (KnowledgeRecordRow, KnowledgeRecordEventRow, add_candidates, gate, decide, current_truth, review_queue, history, Decision, GateError); extraction/runner.py (ExtractionRunRow, run, run_key, RuleExtractor, ModelExtractor, ModelAnswer, PendingAnswer, RunReport); migration 0019_knowledge_records.
+- Tests: test_extraction_gate_runner.py (6). Full suite 945 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: EVAL-001 + EVAL-003.

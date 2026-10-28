@@ -13,6 +13,8 @@ from sqlalchemy import Engine
 # Import every module that defines tables, so autogenerate and the drift test
 # see the full schema.
 from knowledge_engine.classification import store as _classifications  # noqa: F401
+from knowledge_engine.extraction import runner as _extraction_runs  # noqa: F401
+from knowledge_engine.extraction import store as _knowledge_records  # noqa: F401
 from knowledge_engine.importer import identity as _identity  # noqa: F401
 from knowledge_engine.importer import ledger as _ledger  # noqa: F401
 from knowledge_engine.importer import media as _media  # noqa: F401
