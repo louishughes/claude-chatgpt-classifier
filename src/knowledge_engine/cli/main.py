@@ -1055,6 +1055,82 @@ def _eval_retrieval(settings: Settings, args: argparse.Namespace) -> CommandResu
     )
 
 
+def _eval_fidelity(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Check every fixture export's nodes all land, in scratch workspaces (EVAL-002)."""
+    import tempfile
+
+    from knowledge_engine.evaluation.import_fidelity import (
+        evaluate_fixtures,
+        to_dict,
+        to_markdown,
+    )
+
+    if not args.fixtures.is_dir():
+        return CommandResult(
+            "eval fidelity",
+            ExitCode.USAGE,
+            message="fixtures folder not found (run from the repository, or pass --fixtures)",
+            error_code="no_fixtures",
+        )
+    with tempfile.TemporaryDirectory(prefix="ke-fidelity-") as scratch:
+        report = evaluate_fixtures(args.fixtures, Path(scratch))
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(to_markdown(report), encoding="utf-8")
+    data = to_dict(report)
+    if not report.passed:
+        silent = [e.name for e in report.exports if e.verdict == "silent_drop"]
+        return CommandResult(
+            "eval fidelity",
+            ExitCode.ERROR,
+            data=data,
+            message="nodes lost without a warning in: " + ", ".join(silent),
+            error_code="silent_drop",
+        )
+    return CommandResult(
+        "eval fidelity",
+        data=data,
+        message=f"PASS: {len(report.exports)} export(s), no node lost without a warning",
+    )
+
+
+def _eval_temporal(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Run the temporal/current-state benchmark (EVAL-005) in a scratch folder."""
+    import tempfile
+
+    from knowledge_engine.evaluation.temporal_bench import run_benchmark, to_dict, to_markdown
+
+    fixture = args.fixtures / "engine_switch" / "export"
+    if not fixture.is_dir():
+        return CommandResult(
+            "eval temporal",
+            ExitCode.USAGE,
+            message="fixtures folder not found (run from the repository, or pass --fixtures)",
+            error_code="no_fixtures",
+        )
+    with tempfile.TemporaryDirectory(prefix="ke-temporal-") as scratch:
+        report = run_benchmark(fixture, Path(scratch))
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(to_markdown(report), encoding="utf-8")
+    data = to_dict(report)
+    if not report.passed:
+        return CommandResult(
+            "eval temporal",
+            ExitCode.ERROR,
+            data=data,
+            message="false supersession or lost history: "
+            + (", ".join(report.false_supersessions) or "pipeline"),
+            error_code="regression",
+        )
+    return CommandResult(
+        "eval temporal",
+        data=data,
+        message=f"PASS: {data['right']} of {data['pairs']} pairs as expected, "
+        "0 false supersessions, history kept",
+    )
+
+
 def _corrections(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """List human corrections and whether they still stand after re-imports (IMP-006)."""
     from sqlalchemy.orm import Session
@@ -1950,6 +2026,28 @@ def build_parser() -> argparse.ArgumentParser:
     )
     retrieval_bench.add_argument("--out", type=Path, help="write the Markdown report here")
     retrieval_bench.set_defaults(handler=_eval_retrieval)
+    fidelity = eval_commands.add_parser(
+        "fidelity", help="import every fixture and check no node is lost without a warning"
+    )
+    fidelity.add_argument(
+        "--fixtures",
+        type=Path,
+        default=Path("tests/fixtures/chatgpt"),
+        help="folder of fixture cases (default: the repository's synthetic fixtures)",
+    )
+    fidelity.add_argument("--out", type=Path, help="write the Markdown report here")
+    fidelity.set_defaults(handler=_eval_fidelity)
+    temporal = eval_commands.add_parser(
+        "temporal", help="check later statements never wrongly replace earlier decisions"
+    )
+    temporal.add_argument(
+        "--fixtures",
+        type=Path,
+        default=Path("tests/fixtures/chatgpt"),
+        help="folder of fixture cases (default: the repository's synthetic fixtures)",
+    )
+    temporal.add_argument("--out", type=Path, help="write the Markdown report here")
+    temporal.set_defaults(handler=_eval_temporal)
 
     transcript = commands.add_parser("transcript", help="YouTube video transcripts")
     transcript_commands = transcript.add_subparsers(

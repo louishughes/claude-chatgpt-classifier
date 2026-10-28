@@ -803,3 +803,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - documents/registries.py (STATUS_WORDS, watch_url, video_path, video_mentions, video_note, CueHit, find_cues, registry_path, account_path, account_registry_note, account_note); vault plans video, registry and account notes; `ke transcript find`. No migration.
 - Tests: test_registry_notes.py (5). Full suite 1139 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: EVAL-002.
+
+## 2026-10-28 13:30 EVAL-002 (#108) + EVAL-005 (#109)
+- evaluation/import_fidelity.py (census, ExportFidelity, FidelityReport, evaluate_export, evaluate_fixtures, verdict, to_dict, to_markdown); evaluation/temporal_bench.py (CASES, run_pairs, run_pipeline, TemporalReport, run_benchmark, to_dict, to_markdown); reconciliation/supersession.py v2 target test; `ke eval fidelity`, `ke eval temporal`; reports docs/evaluation/EVAL-002_FIDELITY.md, EVAL-005_TEMPORAL.md. Filed #237 (stray conversations file read by no adapter).
+- Tests: test_import_fidelity.py (8), test_temporal_bench.py (3). Full suite 1150 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: EVAL-006.

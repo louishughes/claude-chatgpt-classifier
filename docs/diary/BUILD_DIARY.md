@@ -1893,3 +1893,40 @@ migration drift         # 0
 Fix attempts: 1 (my test assumed cue ordinals start at 1; they start at 0, as YTB-002 stores them).
 
 **Next exact task:** EVAL-002.
+
+### 13:30 — EVAL-002 + EVAL-005: nothing lost quietly, and "later" never quietly means "instead"
+**EVAL-002** (`evaluation/import_fidelity.py`, `ke eval fidelity`) gives the import a third opinion. It walks every JSON file of an export itself, inside folders and ZIPs, and lists each conversation's node IDs. It then imports the export into a scratch workspace and checks node by node. Each export gets a verdict:
+- `ok`;
+- `warned`: everything is stored but the report flags something, or nodes are missing and the report says so;
+- `silent_drop`: a node is missing and nothing admits it. This fails the run.
+
+It also reports branch retention, missing images and the unknown payload audit. Across all 24 fixtures, 380 of 380 nodes were stored and 13 of 13 off-path nodes were kept: 18 ok, 6 warned, 0 silent drops. Report: `docs/evaluation/EVAL-002_FIDELITY.md`.
+
+Failing-case reproduction: a second JSON file of conversations sitting next to `conversations.json` is never read by the official adapter, and nothing says so. EVAL-002 calls it a `silent_drop`. I filed this as #237 rather than widening this PR.
+
+**EVAL-005** (`evaluation/temporal_bench.py`, `ke eval temporal`) has two parts.
+- **Curated pairs.** 31 earlier/later pairs go through REC-005's own `evaluate`. They cover true replacements, eight hypotheticals, scope change, contradiction without "instead", weak acceptance, unknown or reversed order, adjacent subjects and unrelated pairs.
+- **Pipeline.** The `engine_switch` fixture runs end to end. The replaced decision shows as superseded now and is explained by its event. It is still current as of just before the switch, and current again after the replacement is withdrawn.
+
+The first run found two problems:
+1. **A benchmark artifact.** A shared "Synthetic:" prefix counted as a shared subject, so the pair texts now carry no marker word.
+2. **A real false supersession.** "We'll use Blender instead of Maya for the shed game models" replaced the decision to use Unity for the shed game, because it shared the project, the word "game" and a firm "instead".
+
+The fix is REC-005 v2's eighth test, **target**. A replacement must name what it replaces (the head of the phrase after "instead of", "rather than", "no longer using", "replace"...), and the earlier record must mention it.
+- If it names something else, the pair is `unrelated`.
+- If it names nothing ("switching to Godot", "scrap that"), an otherwise clean pair goes to review instead of being recorded.
+
+The cost is two true replacements in the benchmark that now wait for review. The benchmark reports them openly. Result: 0 false supersessions, and all existing reconciliation tests unchanged and passing.
+
+**Teach-back (`evaluation/temporal_bench.py`):** "It feeds the reconciler pairs of decisions built to trick it: 'what if' questions, other projects, other parts of the same project, wobbly acceptances. The rule is that nothing may be recorded as replaced unless it really was, and that already-replaced decisions stay visible when you ask what was true at the time. When a newer statement doesn't say what it replaces, it goes to review instead of being guessed."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 159 source files
+pytest -q               # 1150 passed, 7 skipped
+migration drift         # 0
+ke eval fidelity        # PASS: 24 exports, 18 ok, 6 warned, 0 silent_drop
+ke eval temporal        # PASS: 29 of 31 as expected, 0 false supersessions, history kept
+```
+Fix attempts: 2 (target = first word after the marker misread "replace the shed game's pixel font"; then the phrase head, with articles skipped).
+
+**Next exact task:** EVAL-006.
