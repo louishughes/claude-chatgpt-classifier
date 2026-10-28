@@ -186,6 +186,8 @@ class Settings(BaseSettings):
             workspace (OD-02).
         egress: Outbound capability switches, all off by default.
         limits: Size limits and run budgets.
+        model_batch_root: Where model request and response files go
+            (ADR-0009). Git-ignored: they hold private conversation text.
         anthropic_api_key: Read from ``KE_ANTHROPIC_API_KEY`` or
             ``ANTHROPIC_API_KEY``. Masked whenever printed.
     """
@@ -202,6 +204,7 @@ class Settings(BaseSettings):
     media_storage_mode: Literal["reference", "copy"] = "reference"
     egress: EgressPolicy = EgressPolicy()
     limits: Limits = Limits()
+    model_batch_root: Path = Path("private/model-batches")
     anthropic_api_key: SecretStr | None = Field(
         default=None,
         validation_alias=AliasChoices("KE_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
