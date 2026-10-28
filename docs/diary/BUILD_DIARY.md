@@ -3322,3 +3322,29 @@ Talking points:
 - "Changing a prompt changes its version, so old cached answers can't sneak back in."
 
 **Next exact task:** NOTE-017 (one ordered digest for multi-part chats).
+
+### 16:20 — NOTE-017: a long chat's digest reads in order, as one chat
+
+**What:** A chat too long for one request is digested in parts. In the first real score, 4 of 15 notes came from long chats, and 6 of the 9 unsupported claims were in those 4. The merged summary jumped around ("part 3's opening, then part 1's"), and sentences still said "In this part, the user…". Two causes, both mine:
+
+- `merge_answers` picked summary sentences round-robin (each part's first, then each part's second) and **kept them in that order**. Picking round-robin is right, because every part gets represented in the four sentences allowed. Now the picked sentences are **put back in chat order** before they're used.
+- The prompt itself said "if the chat is partial, describe only that part", which invited "this part" wording. It now says to describe the part as sentences about the chat, in order (prompt `digest-v3`, so older digests are asked for again). Whatever wording still slips through is rewritten in code: "In this part, the user picks cedar" becomes "The user picks cedar", and "this part" becomes "the chat".
+
+The NOTE-011 code rubric gets a seventh check, **part_wording**, as the ticket asked. It fails a note whose generated lines (summary, card cells, insights, tensions, next steps, topics) still say "this part" or "part 2 of 3". Quotes and records are the chat's own words, so they aren't checked.
+
+**Decision:** I made the merge deterministic rather than sending a second "merge these parts" request to a Claude session. The ticket allowed either. Code is free, repeatable and testable, and the problem was ordering and wording, not missing understanding.
+
+**Teach-back (`merge_answers`):** A long chat is digested in pieces, and this function joins the pieces' answers into one. It chooses summary sentences fairly from every piece, then puts them back in the order the chat happened, and rewrites leftovers like "in this part" so the summary talks about the whole chat. The start of the chat gives the purpose and the end gives the outcome and status.
+
+Checks:
+```
+tests/integration/test_digest_parts.py   2 passed (a 3+ part chat: summary in chat order, no part wording, note passes; "this part" fails only part_wording)
+note checks, digest stage, ending, dry run, contract   33 passed, unchanged
+```
+Fix attempts: 1 (my test's regex was case-sensitive after the rewrite capitalised "Step").
+
+Talking points:
+- "Choosing fairly and showing in order are two different steps. I'd merged them into one, and the summary read backwards."
+- "The prompt was causing the bug: it told the model to talk about 'this part'."
+
+**Next exact task:** NOTE-016 (drop boilerplate and assistant-drafted text before extraction).
