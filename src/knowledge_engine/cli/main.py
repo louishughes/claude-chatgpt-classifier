@@ -790,6 +790,74 @@ def _file_read(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _access(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Accounts, API tokens and workspace roles (PROD-002)."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.access import accounts as acc
+    from knowledge_engine.access.policy import AccountKind, Role
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.infrastructure.migrations import upgrade_to_head
+    from knowledge_engine.infrastructure.upgrade import SchemaMismatchError, require_current
+
+    name = f"access {args.access_command}"
+    engine = create_sqlite_engine(database_path(settings))
+    try:
+        try:
+            require_current(engine)
+        except SchemaMismatchError as error:
+            return CommandResult(name, ExitCode.ERROR, message=str(error), error_code="schema")
+        upgrade_to_head(engine)  # a brand-new workspace; a current one is left as is
+        with Session(engine) as session:
+            command = args.access_command
+            data: dict[str, Any]
+            if command == "list":
+                rows = acc.members(session)
+                return CommandResult(
+                    name, data={"accounts": rows}, message=f"{len(rows)} account(s)"
+                )
+            if command == "log":
+                events = acc.authz_log(session, args.limit)
+                return CommandResult(
+                    name, data={"events": events}, message=f"{len(events)} event(s)"
+                )
+            try:
+                if command == "add":
+                    kind = AccountKind.SERVICE if args.service else AccountKind.PERSON
+                    acc.add_account(session, args.name, kind)
+                    data, message = (
+                        {"name": args.name, "kind": kind.value},
+                        (
+                            f"added {kind.value} account {args.name}; API checking is now on "
+                            f"(give it a role: ke access grant {args.name} <role>)"
+                        ),
+                    )
+                elif command == "token":
+                    token = acc.issue_token(session, args.name)
+                    data = {"name": args.name, "token": token}
+                    message = f"API token for {args.name} (shown once, keep it secret)"
+                elif command == "revoke":
+                    count = acc.revoke_tokens(session, args.name)
+                    data, message = {"revoked": count}, f"revoked {count} token(s)"
+                elif command == "disable":
+                    acc.disable_account(session, args.name)
+                    data, message = {"name": args.name}, f"{args.name} can no longer log in"
+                elif command == "grant":
+                    acc.grant(session, args.name, args.workspace, Role(args.role), by="cli")
+                    data = {"name": args.name, "role": args.role, "workspace": args.workspace}
+                    message = f"{args.name} is now {args.role} in {args.workspace}"
+                else:  # remove
+                    removed = acc.remove_member(session, args.name, args.workspace, by="cli")
+                    data = {"removed": removed}
+                    message = f"{args.name} removed" if removed else f"{args.name} wasn't a member"
+            except acc.AccessError as error:
+                return CommandResult(name, ExitCode.USAGE, message=str(error), error_code="refused")
+            session.commit()
+            return CommandResult(name, data=data, message=message)
+    finally:
+        engine.dispose()
+
+
 def _purge(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Plan, run or list purges of whole conversations (OPS-004)."""
     from knowledge_engine.retention.purge import PurgeError, plan_purge, purge_log, run_purge
@@ -2657,6 +2725,33 @@ def build_parser() -> argparse.ArgumentParser:
     gold_commands.add_parser("schema", help="print the golden set JSON Schema").set_defaults(
         handler=_gold_schema
     )
+    access = commands.add_parser("access", help="accounts, API tokens and workspace roles")
+    access_commands = access.add_subparsers(dest="access_command", required=True)
+    access_add = access_commands.add_parser("add", help="add an account (turns API checks on)")
+    access_add.add_argument("name")
+    access_add.add_argument(
+        "--service", action="store_true", help="a program, not a person (viewer/editor only)"
+    )
+    for sub, text in (
+        ("token", "make a new API token (shown once)"),
+        ("revoke", "revoke all of an account's tokens"),
+        ("disable", "stop an account logging in"),
+    ):
+        access_commands.add_parser(sub, help=text).add_argument("name")
+    access_grant = access_commands.add_parser("grant", help="give an account a role")
+    access_grant.add_argument("name")
+    access_grant.add_argument("role", choices=["viewer", "editor", "reviewer", "owner"])
+    access_remove = access_commands.add_parser("remove", help="take an account out of a workspace")
+    access_remove.add_argument("name")
+    for scoped in (access_grant, access_remove):
+        scoped.add_argument(
+            "--workspace", default="default", help="workspace name (default: default)"
+        )
+    access_commands.add_parser("list", help="accounts and their roles (no tokens)")
+    access_log = access_commands.add_parser("log", help="the authorisation log, newest first")
+    access_log.add_argument("--limit", type=int, default=50)
+    access.set_defaults(handler=_access)
+
     purge = commands.add_parser(
         "purge", help="delete whole conversations and everything made from them"
     )
