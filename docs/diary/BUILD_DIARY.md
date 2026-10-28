@@ -3130,8 +3130,9 @@ The third score found the same message link up to three times on one bullet, in 
 Checks:
 ```
 tests/integration/test_note_topic_citations.py   1 passed (fails on the old code: links 1, 1, 3, 1)
+full local CI: types, guard, tests ok (1497 passed); lint and format failed on one long line in the new test, fixed with ruff format
 ```
-Fix attempts: 0.
+Fix attempts: 1 (formatting).
 
 **Next exact task:** NOTE-025 (#328), with NOTE-023's extractor half, after Louis answers on the prompt-version test line.
 
