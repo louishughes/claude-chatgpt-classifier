@@ -2652,6 +2652,8 @@ Challenges:
 
 Before and after screenshots, all from synthetic test fixtures: `docs/diary/img/ui-design-2026-10-28/`.
 
+**Teach-back (`stackbar` in `ui/templates/macros.html`):** It draws one horizontal bar made of coloured pieces, such as found and expected, found but not expected, and missed. Every bar on a chart shares one scale, the biggest total, so you can compare their lengths fairly. It's plain SVG with percentage widths and a hover title, because the page isn't allowed to run scripts.
+
 Checks:
 ```
 pytest tests/   1340 passed, 22 skipped (no test changed)
