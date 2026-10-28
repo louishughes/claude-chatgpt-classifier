@@ -618,3 +618,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - Fixture search_terms (12 expected queries). Tests: test_lexical_search.py (16), test_search_query.py (2, Hypothesis).
 - Full suite 757 passed, 6 skipped. ruff, mypy, git_guard OK. No archive migration (index is a separate file).
 - Next: UI-004.
+
+## 2026-10-28 02:30 UI-004 (#174)
+- ui/registries.py (places, list_links, link_page, list_videos, video_page, account_page), app routes /search /links /videos /accounts (+ detail pages), templates macros/links/link/videos/video/accounts/account/search, nav + home search box, `clock` filter. social_store.account_summaries/ambiguous_handles/account_mentions (CLI `ke accounts` now uses them).
+- Tests: test_ui_registries.py (9; follows every mention link to its anchor). Full suite 766 passed, 6 skipped. ruff, mypy, git_guard OK.
+- Next: M3.

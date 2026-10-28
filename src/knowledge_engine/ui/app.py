@@ -39,7 +39,7 @@ from sqlalchemy.orm import Session
 from knowledge_engine import __version__
 from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
 from knowledge_engine.settings import Settings
-from knowledge_engine.ui import data
+from knowledge_engine.ui import data, registries
 from knowledge_engine.ui.jobs import ImportJobs
 
 StartResponse = Callable[[str, list[tuple[str, str]]], Any]
@@ -49,6 +49,8 @@ _IMPORT_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _ACCOUNT_RE = re.compile(r"^[A-Za-z0-9_-]{1,63}$")
 _MAX_FORM_BYTES = 64 * 1024
 _SHA_RE = re.compile(r"^[0-9a-f]{64}$")
+_VIDEO_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
+_SEARCH_MODES = ("tokens", "phrase", "exact")
 _PAGE_SIZE = 100
 _HEADERS = [
     ("Content-Type", "text/html; charset=utf-8"),
@@ -112,6 +114,7 @@ def make_app(settings: Settings) -> WSGIApp:
         lstrip_blocks=True,
     )
     env.filters["when"] = _when
+    env.filters["clock"] = _clock
     style = (env.loader.get_source(env, "style.css")[0]).encode("utf-8")  # type: ignore[union-attr]
     ctx = _Context(settings, ImportJobs(settings), secrets.token_urlsafe(24))
 
@@ -174,6 +177,27 @@ def _route(
         conversation_id = path.removeprefix("/chats/")
         if _IMPORT_ID_RE.fullmatch(conversation_id):
             return _chat(settings, conversation_id)
+    if path == "/search":
+        return _search(settings, query)
+    if path == "/links":
+        return _links(settings, query)
+    if path.startswith("/links/"):
+        target_id = path.removeprefix("/links/")
+        if _IMPORT_ID_RE.fullmatch(target_id):
+            return _one(settings, "link.html", "link", registries.link_page, target_id)
+    if path == "/videos":
+        videos = _read(settings, registries.list_videos) or []
+        return Page("200 OK", "videos.html", {"videos": videos})
+    if path.startswith("/videos/"):
+        video_id = path.removeprefix("/videos/")
+        if _VIDEO_RE.fullmatch(video_id):
+            return _one(settings, "video.html", "video", registries.video_page, video_id)
+    if path == "/accounts":
+        return _accounts(settings)
+    if path.startswith("/accounts/"):
+        account_id = path.removeprefix("/accounts/")
+        if _IMPORT_ID_RE.fullmatch(account_id):
+            return _one(settings, "account.html", "account", registries.account_page, account_id)
     if path.startswith("/imports/"):
         import_id = path.removeprefix("/imports/")
         if _IMPORT_ID_RE.fullmatch(import_id):
@@ -257,6 +281,93 @@ def _chat(settings: Settings, conversation_id: str) -> Page:
     return Page("200 OK", "chat.html", {"chat": chat})
 
 
+def _one(
+    settings: Settings,
+    template: str,
+    name: str,
+    load: Callable[[Session, str], dict[str, Any] | None],
+    key: str,
+) -> Page:
+    found = _read(settings, lambda s: load(s, key))
+    if found is None:
+        return Page("404 Not Found", "error.html", {"message": f"No {name} with that ID."})
+    return Page("200 OK", template, {name: found})
+
+
+def _page_number(query: dict[str, list[str]]) -> int:
+    try:
+        return max(1, int(query.get("page", ["1"])[0]))
+    except ValueError:
+        return 1
+
+
+def _links(settings: Settings, query: dict[str, list[str]]) -> Page:
+    words = query.get("q", [""])[0][:200]
+    page_number = _page_number(query)
+    offset = (page_number - 1) * _PAGE_SIZE
+    found = _read(
+        settings, lambda s: registries.list_links(s, words, offset=offset, limit=_PAGE_SIZE)
+    )
+    rows, total = found if found is not None else ([], 0)
+    return Page(
+        "200 OK",
+        "links.html",
+        {
+            "rows": rows,
+            "total": total,
+            "q": words,
+            "page": page_number,
+            "pages": max(1, -(-total // _PAGE_SIZE)),
+        },
+    )
+
+
+def _accounts(settings: Settings) -> Page:
+    from knowledge_engine.links.social_store import account_summaries, ambiguous_handles
+
+    found = _read(settings, lambda s: (account_summaries(s), ambiguous_handles(s)))
+    accounts, ambiguous = found if found is not None else ([], [])
+    return Page("200 OK", "accounts.html", {"accounts": accounts, "ambiguous": ambiguous})
+
+
+def _search(settings: Settings, query: dict[str, list[str]]) -> Page:
+    from knowledge_engine.infrastructure.workspace import WorkspaceRow
+    from knowledge_engine.retrieval.lexical import (
+        LexicalIndex,
+        SearchMode,
+        search_index_path,
+        sync_index,
+    )
+
+    words = query.get("q", [""])[0][:500]
+    mode = query.get("mode", ["tokens"])[0]
+    if mode not in _SEARCH_MODES:
+        mode = "tokens"
+    values: dict[str, Any] = {"q": words, "mode": mode, "modes": _SEARCH_MODES, "hits": None}
+    if not words.strip():
+        return Page("200 OK", "search.html", values)
+
+    def run(session: Session) -> list[dict[str, Any]]:
+        from sqlalchemy import select
+
+        # The search file is a rebuildable cache; bringing it up to date is
+        # the only write a page makes, and never to the archive itself.
+        with LexicalIndex(search_index_path(settings)) as index:
+            sync_index(session, index)
+            hits = [
+                hit
+                for workspace_id in session.scalars(select(WorkspaceRow.workspace_id))
+                for hit in index.search(
+                    words, workspace_id=workspace_id, mode=SearchMode(mode), limit=_PAGE_SIZE
+                )
+            ][:_PAGE_SIZE]
+        where = registries.places(session, (hit.revision_id for hit in hits))
+        return [{"hit": hit, "place": where.get(hit.revision_id)} for hit in hits]
+
+    values["hits"] = _read(settings, run) or []
+    return Page("200 OK", "search.html", values)
+
+
 def _media(settings: Settings, sha: str, start_response: StartResponse) -> Iterable[bytes]:
     found = None
     if _SHA_RE.fullmatch(sha):
@@ -330,6 +441,13 @@ def _host_is_local(host_header: str) -> bool:
     except ValueError:
         return False
     return host is not None and is_loopback(host)
+
+
+def _clock(seconds: int) -> str:
+    # 75 -> "1:15", 3725 -> "1:02:05", as YouTube shows times.
+    hours, rest = divmod(int(seconds), 3600)
+    minutes, secs = divmod(rest, 60)
+    return f"{hours}:{minutes:02d}:{secs:02d}" if hours else f"{minutes}:{secs:02d}"
 
 
 def _when(value: datetime | None) -> str:

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% from "macros.html" import where %}
+{% block title %}Video {{ video.video_id }} · Knowledge Engine{% endblock %}
+{% block main %}
+<p><a href="/videos">← All videos</a></p>
+<h1>Video <code>{{ video.video_id }}</code></h1>
+<p><a href="https://www.youtube.com/watch?v={{ video.video_id }}" rel="noreferrer noopener">Watch on YouTube</a> <span class="muted">(opens the real site)</span></p>
+<p class="muted">Transcript: {{ video.transcript_status | replace("_", " ") }} · {{ video.transcripts }} attached.
+{% if video.transcripts == 0 %}To add one you have: <code>ke transcript add {{ video.video_id }} FILE</code>{% endif %}</p>
+<h2>Mentioned {{ video.mentions | length }} time{{ "" if video.mentions | length == 1 else "s" }}</h2>
+<table>
+  <thead><tr><th>Where</th><th>As written</th><th>From</th></tr></thead>
+  <tbody>
+  {% for m in video.mentions %}
+  <tr>
+    <td>{{ where(m.place) }}</td>
+    <td class="wrap"><code>{{ m.written }}</code>{% if m.playlist_id %} <span class="muted">(in a playlist)</span>{% endif %}</td>
+    <td>{% if m.t_seconds is not none %}<a href="https://www.youtube.com/watch?v={{ video.video_id }}&amp;t={{ m.t_seconds }}s" rel="noreferrer noopener">{{ m.t_seconds | clock }}</a>{% else %}<span class="muted">start</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

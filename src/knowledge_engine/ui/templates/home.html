@@ -11,7 +11,12 @@
   <li><strong>{{ status.not_seen }}</strong> not seen lately (kept)</li>
   <li><strong>{{ status.imports }}</strong> imports</li>
 </ul>
-<p><a href="/chats">Browse your chats →</a></p>
+<form method="get" action="/search" class="search">
+  <label for="q">Search every message</label>
+  <input id="q" name="q" type="text">
+  <button type="submit">Search</button>
+</form>
+<p><a href="/chats">Browse your chats →</a> · <a href="/links">Links</a> · <a href="/videos">Videos</a> · <a href="/accounts">Accounts</a></p>
 <h2>Imports</h2>
 <p><a class="button" href="/import">Import an export</a></p>
 {% if imports %}
