@@ -594,3 +594,10 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - links/video_transcripts.py (TranscriptAcquisitionRow, TranscriptSnapshotRow, TranscriptCueRow, ProviderAnswer, TranscriptProvider protocol, attach_user_transcript, request_transcript with egress gate and bounded retries, video_status), ids transcript_snapshot_id/transcript_acquisition_id, migration 0011, CLI `ke transcript add|status`.
 - Tests: test_video_transcripts.py (6, fake provider call counts). Full suite 655 passed, 6 skipped. ruff, mypy, git_guard OK; no migration drift.
 - Next: SOC-001/002.
+
+## 2026-10-28 00:55 LEG-001 (#189)
+- evaluation/synthetic.py: _legacy_cases (legacy_regressions: interleaved edit+regen, same-title pair, short replies, code/execution_output/tool + chart image, orphan image); builder writes execution_output text. Fixture regenerated (existing fixtures byte-identical).
+- tests/integration/test_legacy_regressions.py (7, each citing §2a). Engine numbering counts code/tool messages (REV-003 bug not present).
+- Issues created: REV-010 #185, REV-011 #186, REV-012 #187 (under #134).
+- Full suite 672 passed, 6 skipped. ruff, mypy, git_guard OK.
+- Next: SOC-001/002.

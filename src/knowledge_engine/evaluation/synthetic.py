@@ -182,6 +182,8 @@ class ConversationBuilder:
         content: JsonDict = {"content_type": content_type}
         if content_type == "code":
             content.update({"language": "python", "text": parts[0] if parts else ""})
+        elif content_type == "execution_output":
+            content["text"] = parts[0] if parts else ""
         else:
             content["parts"] = parts
         message = {
@@ -418,6 +420,9 @@ IMG_SEDIMENT = SyntheticImage(
 )
 IMG_AMBIGUOUS_A = SyntheticImage("file-SYN0005", "file-SYN0005-a.png", (90, 90, 90))
 IMG_AMBIGUOUS_B = SyntheticImage("file-SYN0005", "file-SYN0005-b.png", (91, 91, 91))
+IMG_CHART = SyntheticImage("file-SYN0006", "file-SYN0006-synthetic.png", (240, 200, 20))
+# In the export, used by no message: must be reported as unreferenced.
+IMG_ORPHAN = SyntheticImage("file-SYN0007", "file-SYN0007-synthetic.png", (20, 20, 240))
 
 
 def _core_set() -> tuple[list[JsonDict], list[SyntheticImage]]:
@@ -867,6 +872,97 @@ def _format_cases() -> list[Case]:
     ]
 
 
+def _legacy_cases() -> list[Case]:
+    """LEG-001: failures the owner's earlier pipelines had, as regression cases."""
+    # 1. Branches whose timestamps interleave: a pipeline that sorted by time
+    #    stitched answers from different branches into one exchange.
+    mixed = ConversationBuilder(
+        "c0000006-0000-4000-8000-000000000001", "Synthetic interleaved", BASE_EPOCH + 86_400 * 20
+    )
+    t = mixed.start
+    sys_node = mixed.add("mix-sys", mixed.root, "system", [""], timestamp=t)
+    first_q = mixed.add("mix-u0", sys_node, "user", ["Synthetic first wording?"], timestamp=t + 10)
+    mixed.add(
+        "mix-a0", first_q, "assistant", ["Synthetic answer to first wording."], timestamp=t + 20
+    )
+    edited_q = mixed.add(
+        "mix-u0b", sys_node, "user", ["Synthetic second wording?"], timestamp=t + 30
+    )
+    mixed.add(
+        "mix-a0r", first_q, "assistant", ["Synthetic regenerated old answer."], timestamp=t + 40
+    )
+    mixed.add(
+        "mix-a0b", edited_q, "assistant", ["Synthetic answer to second wording."], timestamp=t + 35
+    )
+    mixed.current_node = "mix-a0b"
+
+    # 2. Short replies: "no", "y", "ok" are decisions, not noise to filter.
+    #    (Every fixture text carries the word "synthetic", so they're two words.)
+    short = _chat(
+        "c0000006-0000-4000-8000-000000000002",
+        "Synthetic same title",
+        21,
+        [
+            ("Synthetic: shall I go ahead?", "Synthetic: here is the plan."),
+            ("Synthetic no", "Synthetic ok"),
+            ("Synthetic y", "Synthetic k"),
+        ],
+    )
+    # 3. A different chat with the same title: two conversations, never merged.
+    twin = _chat(
+        "c0000006-0000-4000-8000-000000000003",
+        "Synthetic same title",
+        22,
+        [("Synthetic unrelated question?", "Synthetic unrelated answer.")],
+    )
+    # 4. Code, its execution output and a generated chart image: earlier
+    #    pipelines dropped non-text messages, which shifted every later
+    #    message number (the answer-key numbering bug, REV-003).
+    code = _chat("c0000006-0000-4000-8000-000000000004", "Synthetic code run", 23, [])
+    node = code.add("code-u0", f"{code.conversation_id}-sys", "user", ["Synthetic: plot it."])
+    node = code.add("code-a0", node, "assistant", ["print('synthetic')"], content_type="code")
+    node = code.add("code-t0", node, "tool", ["synthetic"], content_type="execution_output")
+    node = code.add(
+        "code-a1",
+        node,
+        "assistant",
+        [image_part("file-service://file-SYN0006"), "Synthetic: here is the chart."],
+        content_type="multimodal_text",
+    )
+    code.add("code-u1", node, "user", ["Synthetic thanks"])
+    return [
+        Case(
+            "legacy_regressions",
+            "LEG-001: interleaved branches stay apart; short replies, same-title chats, "
+            "code and execution output, and image occurrences are all kept.",
+            "official",
+            [mixed.native(), short.native(), twin.native(), code.native()],
+            images=[IMG_CHART, IMG_ORPHAN],
+            expected={
+                "conversations": 4,
+                "mapping_nodes": 7 + 8 + 4 + 7,
+                "messages": 6 + 7 + 3 + 6,
+                "branch_points": {"edit": 1, "regeneration": 1},
+                "active_path_node_ids": ["mix-sys", "mix-u0b", "mix-a0b"],
+                "inactive_node_ids": ["mix-u0", "mix-a0", "mix-a0r"],
+                "active_path_messages": {
+                    "c0000006-0000-4000-8000-000000000001": 3,
+                    "c0000006-0000-4000-8000-000000000002": 7,
+                    "c0000006-0000-4000-8000-000000000003": 3,
+                    "c0000006-0000-4000-8000-000000000004": 6,
+                },
+                "short_replies": ["Synthetic no", "Synthetic ok", "Synthetic y", "Synthetic k"],
+                "message_numbers": {"code-a0": 3, "code-t0": 4, "code-a1": 5, "code-u1": 6},
+                "asset_occurrences": {"available": 1},
+                "assets": 1,
+                "image_files": 2,
+                "unreferenced_image_files": 1,
+                "warnings": [],
+            },
+        )
+    ]
+
+
 def without_children(native: JsonDict) -> JsonDict:
     """Return a copy of a native conversation with every ``children`` list removed."""
     copy: JsonDict = json.loads(json.dumps(native))
@@ -883,6 +979,7 @@ def all_cases() -> list[Case]:
         *_media_cases(),
         *_reexport_cases(),
         *_identity_cases(),
+        *_legacy_cases(),
     ]
 
 

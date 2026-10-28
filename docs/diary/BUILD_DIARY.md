@@ -968,3 +968,24 @@ Fix attempts: 0.
 **Talking points:**
 - "Draw the old pipeline before you design the new one. You see where it broke at a glance."
 - "My old pre-process threw away the word 'no'. That's the most important word in a decision."
+
+### 00:55 — LEG-001: the old pipelines' failures, as tests
+**What:** a new synthetic fixture and 7 tests. Each one guards a failure from Louis's earlier attempts and cites the step in `docs/reference/previous-attempts-review.md` §2a where it happened:
+- an edit and a regeneration whose timestamps interleave stay on separate branches; the old P4 sorted everything by time and stitched them together;
+- two chats with the same title stay two conversations (P1 named files by title);
+- short replies like "no" and "ok" are kept word for word, each with its own anchored line (P6 scored them as filler and dropped them);
+- code and its execution output are kept and counted when numbering. Dropping them shifted every later number, which is the answer-key bug REV-003 found;
+- a generated chart is linked to the message that shows it (P2/P3 linked 0 of 931 images), and an image file no message uses is reported as unreferenced.
+
+Already covered, so not repeated: one image used by two messages (`repeated_image`), and the separate edit and regeneration cases.
+**A wrinkle:** the fixture rules require every text to say "synthetic", so the short replies are "Synthetic no" and "Synthetic ok". They are still two-word replies, the kind the old scorer threw away.
+**Numbering check:** REV-003 found two answer-key chats numbered without code messages. The engine's numbering counts every message, and a test now pins that down.
+**Teach-back (`evaluation/synthetic.py` legacy case):** "Each old failure became a small fake chat that would have tripped it: branches with mixed-up timestamps, two chats with one title, one-word answers, code output and an image. The tests prove the importer keeps all of it straight. If someone 'optimises' it back into the old bugs, a test goes red."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 108 source files
+pytest -q               # 672 passed, 6 skipped
+```
+Fix attempts: 1 (the fixture's short replies first lacked the required "synthetic" marker).
+
+**Next exact task:** SOC-001 + SOC-002 (social account mentions and registry).

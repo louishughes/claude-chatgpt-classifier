@@ -1,0 +1,736 @@
+[
+  {
+    "title": "Synthetic interleaved",
+    "create_time": 1705795200.0,
+    "update_time": 1705795620.0,
+    "mapping": {
+      "c0000006-0000-4000-8000-000000000001-root": {
+        "id": "c0000006-0000-4000-8000-000000000001-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "mix-sys"
+        ]
+      },
+      "mix-sys": {
+        "id": "mix-sys",
+        "message": {
+          "id": "mix-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705795200.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000006-0000-4000-8000-000000000001-root",
+        "children": [
+          "mix-u0",
+          "mix-u0b"
+        ]
+      },
+      "mix-u0": {
+        "id": "mix-u0",
+        "message": {
+          "id": "mix-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705795210.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic first wording?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "mix-sys",
+        "children": [
+          "mix-a0",
+          "mix-a0r"
+        ]
+      },
+      "mix-a0": {
+        "id": "mix-a0",
+        "message": {
+          "id": "mix-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705795220.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer to first wording."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "mix-u0",
+        "children": []
+      },
+      "mix-u0b": {
+        "id": "mix-u0b",
+        "message": {
+          "id": "mix-u0b",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705795230.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic second wording?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "mix-sys",
+        "children": [
+          "mix-a0b"
+        ]
+      },
+      "mix-a0r": {
+        "id": "mix-a0r",
+        "message": {
+          "id": "mix-a0r",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705795240.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic regenerated old answer."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "mix-u0",
+        "children": []
+      },
+      "mix-a0b": {
+        "id": "mix-a0b",
+        "message": {
+          "id": "mix-a0b",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705795235.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer to second wording."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "mix-u0b",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "mix-a0b",
+    "plugin_ids": null,
+    "conversation_id": "c0000006-0000-4000-8000-000000000001",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000006-0000-4000-8000-000000000001"
+  },
+  {
+    "title": "Synthetic same title",
+    "create_time": 1705881600.0,
+    "update_time": 1705882080.0,
+    "mapping": {
+      "c0000006-0000-4000-8000-000000000002-root": {
+        "id": "c0000006-0000-4000-8000-000000000002-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000006-0000-4000-8000-000000000002-sys"
+        ]
+      },
+      "c0000006-0000-4000-8000-000000000002-sys": {
+        "id": "c0000006-0000-4000-8000-000000000002-sys",
+        "message": {
+          "id": "c0000006-0000-4000-8000-000000000002-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705881660.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000006-0000-4000-8000-000000000002-root",
+        "children": [
+          "c0000006-0000-4000-8000-000000000002-u0"
+        ]
+      },
+      "c0000006-0000-4000-8000-000000000002-u0": {
+        "id": "c0000006-0000-4000-8000-000000000002-u0",
+        "message": {
+          "id": "c0000006-0000-4000-8000-000000000002-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705881720.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: shall I go ahead?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000006-0000-4000-8000-000000000002-sys",
+        "children": [
+          "c0000006-0000-4000-8000-000000000002-a0"
+        ]
+      },
+      "c0000006-0000-4000-8000-000000000002-a0": {
+        "id": "c0000006-0000-4000-8000-000000000002-a0",
+        "message": {
+          "id": "c0000006-0000-4000-8000-000000000002-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705881780.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: here is the plan."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000006-0000-4000-8000-000000000002-u0",
+        "children": [
+          "c0000006-0000-4000-8000-000000000002-u1"
+        ]
+      },
+      "c0000006-0000-4000-8000-000000000002-u1": {
+        "id": "c0000006-0000-4000-8000-000000000002-u1",
+        "message": {
+          "id": "c0000006-0000-4000-8000-000000000002-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705881840.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic no"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000006-0000-4000-8000-000000000002-a0",
+        "children": [
+          "c0000006-0000-4000-8000-000000000002-a1"
+        ]
+      },
+      "c0000006-0000-4000-8000-000000000002-a1": {
+        "id": "c0000006-0000-4000-8000-000000000002-a1",
+        "message": {
+          "id": "c0000006-0000-4000-8000-000000000002-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705881900.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic ok"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000006-0000-4000-8000-000000000002-u1",
+        "children": [
+          "c0000006-0000-4000-8000-000000000002-u2"
+        ]
+      },
+      "c0000006-0000-4000-8000-000000000002-u2": {
+        "id": "c0000006-0000-4000-8000-000000000002-u2",
+        "message": {
+          "id": "c0000006-0000-4000-8000-000000000002-u2",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705881960.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic y"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000006-0000-4000-8000-000000000002-a1",
+        "children": [
+          "c0000006-0000-4000-8000-000000000002-a2"
+        ]
+      },
+      "c0000006-0000-4000-8000-000000000002-a2": {
+        "id": "c0000006-0000-4000-8000-000000000002-a2",
+        "message": {
+          "id": "c0000006-0000-4000-8000-000000000002-a2",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705882020.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic k"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000006-0000-4000-8000-000000000002-u2",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000006-0000-4000-8000-000000000002-a2",
+    "plugin_ids": null,
+    "conversation_id": "c0000006-0000-4000-8000-000000000002",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000006-0000-4000-8000-000000000002"
+  },
+  {
+    "title": "Synthetic same title",
+    "create_time": 1705968000.0,
+    "update_time": 1705968240.0,
+    "mapping": {
+      "c0000006-0000-4000-8000-000000000003-root": {
+        "id": "c0000006-0000-4000-8000-000000000003-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000006-0000-4000-8000-000000000003-sys"
+        ]
+      },
+      "c0000006-0000-4000-8000-000000000003-sys": {
+        "id": "c0000006-0000-4000-8000-000000000003-sys",
+        "message": {
+          "id": "c0000006-0000-4000-8000-000000000003-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705968060.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000006-0000-4000-8000-000000000003-root",
+        "children": [
+          "c0000006-0000-4000-8000-000000000003-u0"
+        ]
+      },
+      "c0000006-0000-4000-8000-000000000003-u0": {
+        "id": "c0000006-0000-4000-8000-000000000003-u0",
+        "message": {
+          "id": "c0000006-0000-4000-8000-000000000003-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705968120.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic unrelated question?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000006-0000-4000-8000-000000000003-sys",
+        "children": [
+          "c0000006-0000-4000-8000-000000000003-a0"
+        ]
+      },
+      "c0000006-0000-4000-8000-000000000003-a0": {
+        "id": "c0000006-0000-4000-8000-000000000003-a0",
+        "message": {
+          "id": "c0000006-0000-4000-8000-000000000003-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1705968180.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic unrelated answer."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000006-0000-4000-8000-000000000003-u0",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000006-0000-4000-8000-000000000003-a0",
+    "plugin_ids": null,
+    "conversation_id": "c0000006-0000-4000-8000-000000000003",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000006-0000-4000-8000-000000000003"
+  },
+  {
+    "title": "Synthetic code run",
+    "create_time": 1706054400.0,
+    "update_time": 1706054820.0,
+    "mapping": {
+      "c0000006-0000-4000-8000-000000000004-root": {
+        "id": "c0000006-0000-4000-8000-000000000004-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000006-0000-4000-8000-000000000004-sys"
+        ]
+      },
+      "c0000006-0000-4000-8000-000000000004-sys": {
+        "id": "c0000006-0000-4000-8000-000000000004-sys",
+        "message": {
+          "id": "c0000006-0000-4000-8000-000000000004-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706054460.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000006-0000-4000-8000-000000000004-root",
+        "children": [
+          "code-u0"
+        ]
+      },
+      "code-u0": {
+        "id": "code-u0",
+        "message": {
+          "id": "code-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706054520.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: plot it."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000006-0000-4000-8000-000000000004-sys",
+        "children": [
+          "code-a0"
+        ]
+      },
+      "code-a0": {
+        "id": "code-a0",
+        "message": {
+          "id": "code-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706054580.0,
+          "update_time": null,
+          "content": {
+            "content_type": "code",
+            "language": "python",
+            "text": "print('synthetic')"
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "code-u0",
+        "children": [
+          "code-t0"
+        ]
+      },
+      "code-t0": {
+        "id": "code-t0",
+        "message": {
+          "id": "code-t0",
+          "author": {
+            "role": "tool",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706054640.0,
+          "update_time": null,
+          "content": {
+            "content_type": "execution_output",
+            "text": "synthetic"
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "code-a0",
+        "children": [
+          "code-a1"
+        ]
+      },
+      "code-a1": {
+        "id": "code-a1",
+        "message": {
+          "id": "code-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706054700.0,
+          "update_time": null,
+          "content": {
+            "content_type": "multimodal_text",
+            "parts": [
+              {
+                "content_type": "image_asset_pointer",
+                "asset_pointer": "file-service://file-SYN0006",
+                "size_bytes": 0,
+                "width": 4,
+                "height": 4,
+                "fovea": null,
+                "metadata": null
+              },
+              "Synthetic: here is the chart."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "code-t0",
+        "children": [
+          "code-u1"
+        ]
+      },
+      "code-u1": {
+        "id": "code-u1",
+        "message": {
+          "id": "code-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706054760.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic thanks"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "code-a1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "code-u1",
+    "plugin_ids": null,
+    "conversation_id": "c0000006-0000-4000-8000-000000000004",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000006-0000-4000-8000-000000000004"
+  }
+]
