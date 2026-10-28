@@ -2937,3 +2937,22 @@ tests/integration/test_note_checks.py   7 passed (the real note passes; each bre
 Fix attempts: 2 (my FakeProvider digest left out the required intent; the table-cell pipe escape).
 
 **Next exact task:** keywords into the note (NOTE-007 wiring), then NOTE-008.
+
+### 17:00 — NOTE-015 and NOTE-020: running the extractor for real, and labels in digest notes
+
+The first real score (`docs/evaluation/NOTE-011_REAL.md`) found decisions and open questions nearly empty, because the model-backed extractor (NOTE-005) had no way to run outside tests. **`ke extract run`** now works the same way as `ke digest run` and `ke classify run`: the first run writes request files for a Claude session to answer, and the next run collects the answers, applies NOTE-005's three attribution checks and the evidence gate, and stores the records. Segments already done are skipped, so a third run asks for nothing.
+
+Building it found a real bug in the extraction runner. When an answer hadn't arrived yet, the runner rolled back everything the segment's attempt had written, including the ledger row that says "this request was sent, in batch file 1". So the next run sent the same requests again in new files and never read the answers. A pending answer now keeps the ledger rows; nothing else is in that savepoint yet, because the records come from the answer.
+
+**NOTE-020:** `ke digest run --vault` wrote notes with no taxonomy, so they showed no labels. It now uses `--taxonomy`, or the newest published version by default.
+
+**Teach-back (`_extract`, the `ke extract run` command):** It sends every segment of the chosen chats to the model-backed extractor through request files, which a Claude session on the subscription answers. Running it again collects the answers, checks who really said what, and stores the records with their quotes. Work already done is skipped, so repeating it costs nothing.
+
+Checks:
+```
+tests/integration/test_extract_run.py   4 passed (egress off writes nothing; requests -> answers -> records -> nothing new; digest notes under the newest or given version)
+tests/integration/test_digest_dry_run.py, test_model_knowledge.py, test_extraction_gate_runner.py   unchanged, pass
+```
+Fix attempts: 2 (the runner rollback; egress is checked before running, because the runner counts a refused request as a failed attempt).
+
+**Next exact task:** NOTE-018, a suggested category instead of "unclassified".

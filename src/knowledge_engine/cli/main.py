@@ -1060,6 +1060,7 @@ def _digest(settings: Settings, args: argparse.Namespace) -> CommandResult:
     from knowledge_engine.providers.ledger import ModelStageRunner
     from knowledge_engine.rendering.transcript import find_conversation, load_conversation
     from knowledge_engine.settings import EgressDisabledError
+    from knowledge_engine.taxonomy.registry import TaxonomyRegistry
 
     name = "digest run"
     db = database_path(settings)
@@ -1085,6 +1086,20 @@ def _digest(settings: Settings, args: argparse.Namespace) -> CommandResult:
                         name, ExitCode.USAGE, message="no such conversation", error_code="not_found"
                     )
                 ids = [cid for cid in found if cid is not None]
+            # Notes show labels under one published version: the one asked
+            # for, or the newest (NOTE-020; before, notes had no labels).
+            registry = TaxonomyRegistry(session)
+            published = registry.versions()
+            version: str | None = args.taxonomy or (published[-1] if published else None)
+            try:
+                taxonomy = registry.snapshot(version) if version else None
+            except (KeyError, ValueError):
+                return CommandResult(
+                    name,
+                    ExitCode.USAGE,
+                    message="no such published taxonomy version",
+                    error_code="no_taxonomy",
+                )
             provider = FileBatchProvider(settings.model_batch_root, args.run_id, settings.egress)
             stage = DigestStage(ModelStageRunner(session, provider, settings.egress))
             counts: Counter[str] = Counter()
@@ -1100,6 +1115,7 @@ def _digest(settings: Settings, args: argparse.Namespace) -> CommandResult:
                             conversation_id,
                             args.vault,
                             settings.workspace_root / "archive",
+                            taxonomy=taxonomy,
                             digest=outcome.digest,
                         )
                         counts["notes"] += 1
@@ -1120,6 +1136,7 @@ def _digest(settings: Settings, args: argparse.Namespace) -> CommandResult:
         message=(
             f"{data['done']} done, {data['pending']} waiting for answers, "
             f"{data['review_required']} need review, {data['notes']} note(s) written"
+            + (f" (labels under {version})" if data["notes"] and version else "")
         ),
     )
 
@@ -1221,6 +1238,102 @@ def _classify(settings: Settings, args: argparse.Namespace) -> CommandResult:
         message=(
             f"{data['done']} done, {data['pending']} waiting for answers, "
             f"{data['review_required']} need review ({len(ids)} chats, {len(results)} segments)"
+        ),
+    )
+
+
+def _extract(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Run the model-backed knowledge extractor through request files (NOTE-015).
+
+    The same request-file flow as ``ke digest run``: the first run writes one
+    request per segment (or part of a long one) for a Claude session on the
+    subscription to answer (docs/runbooks/LABELLING_SESSION.md); the next run
+    collects the answers, applies the NOTE-005 attribution checks and the
+    EXT-002 evidence gate, and stores the records. Segments already done are
+    skipped, so running it again asks for nothing new.
+    """
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.extraction.model_knowledge import knowledge_extractor
+    from knowledge_engine.extraction.runner import run
+    from knowledge_engine.extraction.text import segment_extraction_messages
+    from knowledge_engine.importer.records import ConversationRow
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.providers.file_batch import FileBatchProvider
+    from knowledge_engine.providers.ledger import ModelStageRunner
+    from knowledge_engine.rendering.transcript import find_conversation, load_conversation
+    from knowledge_engine.segmentation.overrides import load_segments
+
+    name = "extract run"
+    if not settings.egress.text_llm:
+        # Checked first: the runner would record a refused request as a
+        # failed attempt, and three of those give up on the segment.
+        return CommandResult(
+            name,
+            ExitCode.USAGE,
+            message="text_llm is off: turn it on in [egress] to write request files",
+            error_code="egress_off",
+        )
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    refs = list(args.conversations)
+    if args.ids_file is not None:
+        refs += [
+            line.strip()
+            for line in args.ids_file.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.startswith("#")
+        ]
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            if args.all:
+                ids = list(
+                    session.scalars(
+                        select(ConversationRow.conversation_id).order_by(
+                            ConversationRow.conversation_id
+                        )
+                    )
+                )
+            else:
+                found = [find_conversation(session, ref) for ref in refs]
+                if not found or None in found:
+                    return CommandResult(
+                        name, ExitCode.USAGE, message="no such conversation", error_code="not_found"
+                    )
+                ids = sorted({cid for cid in found if cid is not None})
+            provider = FileBatchProvider(settings.model_batch_root, args.run_id, settings.egress)
+            extractor = knowledge_extractor(ModelStageRunner(session, provider, settings.egress))
+            segments = []
+            for conversation_id in ids:
+                chat = load_conversation(session, conversation_id)
+                segments += [
+                    (seg.segment_id, segment_extraction_messages(chat, seg))
+                    for seg in load_segments(session, chat)
+                ]
+            report = run(session, segments, [extractor])
+            session.commit()
+    finally:
+        engine.dispose()
+    data = {
+        "chats": len(ids),
+        "segments": len(segments),
+        "done": len(report.done),
+        "already_done": len(report.skipped),
+        "pending": len(report.pending),
+        "failed": len(report.failed) + len(report.gave_up),
+        "records": report.records,
+    }
+    return CommandResult(
+        name,
+        data=data,
+        message=(
+            f"{data['done']} done now, {data['already_done']} already done, "
+            f"{data['pending']} waiting for answers, {data['failed']} failed; "
+            f"{data['records']} record(s) stored ({len(ids)} chats, {len(segments)} segments)"
         ),
     )
 
@@ -3502,6 +3615,9 @@ def build_parser() -> argparse.ArgumentParser:
     digest_run.add_argument("--all", action="store_true", help="every imported chat")
     digest_run.add_argument("--run-id", required=True, help="the batch folder name, e.g. gold-40")
     digest_run.add_argument("--vault", type=Path, help="write each finished chat's rich note here")
+    digest_run.add_argument(
+        "--taxonomy", help="label notes under this published version (default: the newest)"
+    )
     digest.set_defaults(handler=_digest)
     classify = commands.add_parser(
         "classify", help="label chats under a published taxonomy through request files"
@@ -3516,6 +3632,18 @@ def build_parser() -> argparse.ArgumentParser:
     classify_run.add_argument("--taxonomy", required=True, help="the published version, e.g. tax-1")
     classify_run.add_argument("--run-id", required=True, help="the batch folder name, e.g. gold-40")
     classify.set_defaults(handler=_classify)
+    extract = commands.add_parser(
+        "extract", help="find decisions, suggestions and questions through request files"
+    )
+    extract_commands = extract.add_subparsers(dest="extract_command", required=True)
+    extract_run = extract_commands.add_parser(
+        "run", help="write extraction requests, or collect answers and store records (run again)"
+    )
+    extract_run.add_argument("conversations", nargs="*", help="conv_ or export conversation IDs")
+    extract_run.add_argument("--ids-file", type=Path, help="a file with one chat ID per line")
+    extract_run.add_argument("--all", action="store_true", help="every imported chat")
+    extract_run.add_argument("--run-id", required=True, help="the batch folder name, e.g. gold-40")
+    extract.set_defaults(handler=_extract)
     web = commands.add_parser("web", help="fetch web pages (allowlisted, network_fetch on)")
     web_commands = web.add_subparsers(dest="web_command", required=True)
     web_fetch = web_commands.add_parser("fetch", help="fetch one page into located blocks")
