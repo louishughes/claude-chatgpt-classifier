@@ -224,6 +224,43 @@ def test_import_from_the_browser_runs_and_shows_the_report(
     assert home.count('href="/imports/') == 1
 
 
+class _FinishesWhileRead:
+    """A job that finishes the moment its state is first looked at (#288).
+
+    The real job runs on another thread, so it can finish between the page's
+    "is it done?" check and the template drawing the page. This stand-in
+    makes that unlucky timing happen every time instead of once in a while.
+    """
+
+    import_id = "imp_0123456789abcdef"
+    status = "succeeded"
+    error = None
+
+    def __init__(self) -> None:
+        self._reads = 0
+
+    @property
+    def state(self) -> str:
+        self._reads += 1
+        return "running" if self._reads == 1 else "done"
+
+
+def test_job_page_is_consistent_when_the_import_finishes_mid_request(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from knowledge_engine.ui.jobs import ImportJobs
+
+    monkeypatch.setattr(ImportJobs, "get", lambda self, job_id: _FinishesWhileRead())
+    status, headers, body = _call(make_app(settings), "/jobs/abc")
+    # Either "still running, check again" or "done, here's the report":
+    # never a failure page for an import that didn't fail.
+    if status.startswith("303"):
+        assert headers["Location"].startswith("/imports/")
+    else:
+        assert 'http-equiv="refresh"' in body
+        assert "didn't finish" not in body
+
+
 def test_import_form_rejects_forged_and_bad_requests(settings: Settings, tmp_path: Path) -> None:
     app = make_app(settings)
     token = _token(app)
