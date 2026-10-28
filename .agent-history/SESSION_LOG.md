@@ -912,3 +912,6 @@ docs/operations/HOSTING_AND_SECURITY.md; OD-19; authz log by account ID; rotate_
 
 ## 2026-10-28 11:42 INT-001 (#130)
 ingestion/web.py (allowlist, SSRF checks per hop, pinned connection, size/type caps, canonical anchoring, located blocks, snapshot), settings.web_allowlist, `ke web fetch`. Tests: test_web_fetch.py (24, no network). Docs: docs/operations/WEB_FETCH.md.
+
+## 2026-10-28 11:58 INT-002 (#131)
+links/youtube_captions.py (Data API v3 captions.list/download, OAuth token from env, statuses, spacing, ASR flag), ProviderAnswer.detail into provenance, settings.youtube_access_token, `ke transcript fetch`. Tests: test_youtube_captions.py (11, no network). Docs: docs/operations/YOUTUBE_CAPTIONS.md.

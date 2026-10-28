@@ -327,6 +327,56 @@ def _transcript_add(settings: Settings, args: argparse.Namespace) -> CommandResu
     return CommandResult("transcript add", data=data, message="Transcript attached")
 
 
+def _transcript_fetch(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Ask the YouTube Data API for a video's captions, if allowed (INT-002)."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.ingestion.transcripts import TranscriptTooLargeError
+    from knowledge_engine.links.video_transcripts import UnknownVideoError, request_transcript
+    from knowledge_engine.links.youtube_captions import YouTubeCaptionsProvider
+
+    name = "transcript fetch"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    if settings.youtube_access_token is None:
+        return CommandResult(
+            name,
+            ExitCode.USAGE,
+            message="set KE_YOUTUBE_ACCESS_TOKEN (an OAuth token for your YouTube account) first",
+            error_code="no_token",
+        )
+    provider = YouTubeCaptionsProvider(settings.youtube_access_token, language=args.language)
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session, session.begin():
+            try:
+                row = request_transcript(session, settings, args.video, provider)
+            except UnknownVideoError:
+                return CommandResult(
+                    name,
+                    ExitCode.ERROR,
+                    message="that video isn't linked in any imported chat",
+                    error_code="unknown_video",
+                )
+            except TranscriptTooLargeError:
+                return CommandResult(
+                    name,
+                    ExitCode.ERROR,
+                    message="the captions are over the size limit",
+                    error_code="too_large",
+                )
+            data = {"status": row.status, "reason": row.last_error, "attempts": row.attempts}
+            if row.transcript_id:
+                data |= _transcript_data(session, row.transcript_id)
+    finally:
+        engine.dispose()
+    return CommandResult(name, data=data, message=f"transcript: {data['status']}")
+
+
 def _transcript_status(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Show a video's transcript status and attached transcripts (counts only)."""
     from sqlalchemy import select
@@ -2782,6 +2832,13 @@ def build_parser() -> argparse.ArgumentParser:
     attach.add_argument("--source-url", help="where the file came from")
     attach.add_argument("--note", help="a short note on where it came from")
     attach.set_defaults(handler=_transcript_add)
+    fetch_cmd = transcript_commands.add_parser(
+        "fetch",
+        help="ask the YouTube Data API for captions (transcript_fetch on, your own token)",
+    )
+    fetch_cmd.add_argument("video", help="the 11-character YouTube video ID")
+    fetch_cmd.add_argument("--language", help="preferred language tag, e.g. en")
+    fetch_cmd.set_defaults(handler=_transcript_fetch)
     status_cmd = transcript_commands.add_parser("status", help="a video's transcript status")
     status_cmd.add_argument("video", help="the 11-character YouTube video ID")
     status_cmd.set_defaults(handler=_transcript_status)

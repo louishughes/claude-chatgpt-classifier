@@ -2544,3 +2544,22 @@ tests/integration/test_web_fetch.py   24 passed (no network)
 Fix attempts: 0.
 
 **Next exact task:** INT-002 (YouTube transcript input workflow).
+
+### 11:58 — INT-002: YouTube captions, the official way only
+
+- `links/youtube_captions.py`: a provider for YTB-002's `request_transcript`, so the `transcript_fetch` switch, the bounded retries and the recorded statuses all apply unchanged. It calls `captions.list`, picks a track, and downloads it as WebVTT with my own OAuth token.
+- YouTube only lets an account download captions for videos it may edit. So for most videos the honest answer is `permission_required`, and that is what gets recorded. There is no fallback to scraping or unofficial endpoints, on purpose.
+- An automatic (ASR) track is accepted but labelled `machine_generated: yes` in the snapshot's provenance, with the track ID and kind, so nobody quotes it as what the speaker wrote.
+- Quota and 429 answers count as temporary: at most 3 tries, at least a second apart, then `failed`.
+- `ke transcript fetch VIDEO [--language]` needs `KE_YOUTUBE_ACCESS_TOKEN` in the environment; without it the answer is `no_token`.
+
+**Teach-back (`YouTubeCaptionsProvider`):** It asks YouTube's official API, signed in as me, which caption tracks a video has, and downloads the best one, preferring my language and a human-made track. If YouTube says no, it records exactly why (permission, not found, no tracks or quota) and never invents or scrapes the words. An automatic track is kept but clearly labelled as machine-generated.
+
+Checks:
+```
+tests/integration/test_youtube_captions.py   11 passed (no network)
+tests/integration/test_video_transcripts.py  6 passed (unchanged)
+```
+Fix attempts: 0.
+
+**Next exact task:** open the queued PRs, then INT-003 (watched folders).
