@@ -3017,7 +3017,7 @@ Checks:
 ```
 tests/integration/test_answer_key_convert.py   2 passed (synthetic key: 5 records placed, 3 unmapped, 1 unverified, 1 v1-style skip, 1 number mismatch, key folder hash unchanged, the output loads and `ke gold score` reads it; output inside the key folder refused)
 ```
-Fix attempts: 0.
+Fix attempts: 1 (the repo guard wants a SYNTHETIC marker in every fixture folder).
 
 **Next exact task:** on the PC, run `ke gold convert --key private/answer-key/v2`, then score. Check that v1's and v2's hashes are unchanged (the hashes are recorded in OPEN_DECISIONS).
 
