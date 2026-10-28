@@ -2837,3 +2837,26 @@ Talking points:
 - "A test that only failed on one OS and one Python version turned out to be a clock-resolution bug: Python 3.12 on Windows only ticks every 16 ms."
 - "I couldn't run Windows, so I faked a coarse clock in a test plugin to reproduce it deterministically before fixing it."
 - "When I couldn't reproduce the second flake, I didn't guess. I made CI print the full error so the next failure explains itself."
+
+### 15:30 — NOTE-011 (code half): checking that a rich note is honest
+
+Before anyone scores whether a note is *good*, a program can check it isn't making things up. `evaluation/note_checks.py` reads the rendered Markdown, the way a reader would, and compares it with the stored chat:
+
+- **citations_real**: every `[m12]` link points at a message of this chat, and the number is the one the transcript shows (`alt` off the active path).
+- **claims_cited**: every summary sentence, the Purpose and Outcome cells, and every item under Decisions, Suggestions, Action items, Open questions, Requirements, Insights, Tensions and Next steps cites a message.
+- **decisions_user_held**: every decision and "ruled out" record is held by the user and quotes the user.
+- **tensions_next_steps**: a next step that repeats something ruled out, or restates a tension, is a warning (word overlap, so it can't be a hard fail).
+- **empty_sections** and **budget**: no evidence box under an empty section; the body under its length budget.
+- `ke docs rubric [chats] [--all]` builds each chat's note in memory (with its stored digest), runs the checks, and prints counts per check and the problems (IDs only, no chat text). It writes nothing.
+
+The first run of the checks on the engine's own note found something: a citation inside the knowledge card's table writes its pipe as `\|`, which my link pattern read as part of the anchor. The note was right (that's how Obsidian tables need it); the pattern was fixed.
+
+**Teach-back (`check_note`):** It takes a finished note and the chat it came from and checks six things a program can judge: every message number points at the right message, every claim has a number, every decision is the user's own words, no next step repeats a rejected idea, empty sections stay empty, and the note isn't too long. It reads the Markdown rather than the renderer's internals, so a renderer bug shows up too. It doesn't judge whether the summary is right; that's the independent reference set on the PC.
+
+Checks:
+```
+tests/integration/test_note_checks.py   7 passed (the real note passes; each break caught by exactly one check)
+```
+Fix attempts: 2 (my FakeProvider digest left out the required intent; the table-cell pipe escape).
+
+**Next exact task:** keywords into the note (NOTE-007 wiring), then NOTE-008.
