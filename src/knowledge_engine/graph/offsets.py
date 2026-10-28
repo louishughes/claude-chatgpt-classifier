@@ -129,6 +129,106 @@ def find_all(text: str, quote: str) -> list[Span]:
     return spans
 
 
+# Characters that mean the same in a quote but are often typed differently
+# (LEG-004). Nothing else is folded: no case, accents or spacing.
+_FOLD = str.maketrans(
+    {
+        "\u2018": "'",  # ‘
+        "\u2019": "'",  # ’ (also the curly apostrophe in "X’s")
+        "\u201a": "'",  # ‚
+        "\u201b": "'",  # ‛
+        "\u201c": '"',  # “
+        "\u201d": '"',  # ”
+        "\u201e": '"',  # „
+        "\u201f": '"',  # ‟
+    }
+)
+_ESCAPES = {"\\n": "\n", "\\r": "\r", "\\t": "\t", '\\"': '"', "\\'": "'"}
+
+
+def normalise_for_match(text: str) -> tuple[str, list[tuple[int, int]]]:
+    r"""Fold quote styles and line endings, keeping a map back to the original.
+
+    The single normalisation used to find a cited quote in real text
+    (LEG-004): curly quotes and apostrophes become straight ones, and
+    ``\r\n`` or a lone ``\r`` becomes ``\n``. Nothing else changes.
+
+    Returns:
+        The folded text, and for each folded character the ``[start, end)``
+        it came from in ``text``, so a match maps back to exact original
+        positions (line endings and all).
+    """
+    folded: list[str] = []
+    origin: list[tuple[int, int]] = []
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if char == "\r":
+            width = 2 if text[index + 1 : index + 2] == "\n" else 1
+            folded.append("\n")
+            origin.append((index, index + width))
+            index += width
+            continue
+        folded.append(char.translate(_FOLD))
+        origin.append((index, index + 1))
+        index += 1
+    return "".join(folded), origin
+
+
+def _unescape(quote: str) -> str:
+    for escaped, plain in _ESCAPES.items():
+        quote = quote.replace(escaped, plain)
+    return quote
+
+
+def find_quote(text: str, quote: str) -> list[Span]:
+    r"""Find a cited quote in real text; spans point at the **original** text.
+
+    Tries, in order, and stops at the first that matches:
+
+    1. the quote exactly (``find_all``);
+    2. both sides through ``normalise_for_match`` (curly vs straight
+       quotes, possessives like X’s / X's, line endings);
+    3. the same with escape sequences in the quote undone (a model writing
+       ``\n`` as backslash + n).
+
+    Every match must start and end on a word boundary, so a quote never
+    matches part of a word ("cat" is not found in "concatenate").
+
+    Raises:
+        OffsetError: If ``quote`` is empty.
+    """
+    exact = [s for s in find_all(text, quote) if _whole_words(text, s)]
+    if exact:
+        return exact
+    folded, origin = normalise_for_match(text)
+    for needle in dict.fromkeys([quote, _unescape(quote)]):
+        wanted, _ = normalise_for_match(needle)
+        if not wanted:
+            continue
+        spans = [
+            Span(origin[s.start][0], origin[s.end - 1][1])
+            for s in find_all(folded, wanted)
+            if _whole_words(folded, s)
+        ]
+        if spans:
+            return spans
+    return []
+
+
+def _whole_words(text: str, span: Span) -> bool:
+    first, last = text[span.start], text[span.end - 1]
+    before = text[span.start - 1] if span.start > 0 else ""
+    after = text[span.end] if span.end < len(text) else ""
+    starts_clean = not (_word(first) and _word(before))
+    ends_clean = not (_word(last) and _word(after))
+    return starts_clean and ends_clean
+
+
+def _word(char: str) -> bool:
+    return bool(char) and (char.isalnum() or char == "_")
+
+
 def to_utf16(text: str, span: Span) -> Span:
     """Convert a code-point span to UTF-16 code units (JavaScript, editors)."""
     span.of(text)

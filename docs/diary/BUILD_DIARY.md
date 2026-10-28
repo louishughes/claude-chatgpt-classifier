@@ -1461,3 +1461,24 @@ migration drift         # 0
 Fix attempts: 0.
 
 **Next exact task:** LEG-003 (provider failure cases) + LEG-004 (quote matching on real text).
+
+### 12:00 — LEG-003 + LEG-004: provider failures, and quotes in real text
+**What:** two lessons from the old runs, turned into code and tests.
+- **Provider failures (LEG-003).** A new `RawResponse` describes what an HTTP-style provider got back. `result_from_response` sorts it in one place:
+  - an error envelope (even inside HTTP 200), a 429 or a 5xx is **transient**: the provider failed, not the model. The same ask is sent again without using the one repair, at most 3 tries in total, then review;
+  - `finish_reason=length` is a recorded format error, even if the cut-off text parses;
+  - a list longer than the schema allows is trimmed to the maximum and logged (`model.trimmed`), not retried.
+
+  Provider failures are counted in their own columns (migration 0020), so a rate limit can never overwrite the repair context in `last_error`. They are left out of the schema failure rate.
+- **Quote matching (LEG-004).** `normalise_for_match` folds curly to straight quotes and apostrophes (so X’s matches X's) and CRLF/CR to LF, keeping a map back to the original positions. `find_quote` tries the exact quote, then the folded one, then the quote with escape sequences undone. Every match must start and end on a word boundary. Spacing and case are never folded. The model extractor now uses it.
+
+**Teach-back (`graph/offsets.py` `find_quote`):** "When a model cites words, I look for them in the real message: first exactly, then allowing curly versus straight quotes and different line endings, then undoing a backslash-n the model typed. A match must be whole words, so 'cat' never matches inside 'concatenate'. The position I store always points at the original text, so the fingerprint still checks out."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 123 source files
+pytest -q               # 1001 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 0. Ruff asked for raw docstrings where they show backslashes.
+
+**Next exact task:** LEG-005 (no clipping; split long segments; truncation_count and length bands; late short "no" fixture).

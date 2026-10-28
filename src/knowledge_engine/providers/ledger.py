@@ -24,6 +24,10 @@ Two tables:
    past ``provider_timeout_s`` each end as a recorded, bounded outcome
    (``review_required`` with a ``limit:``/``timeout`` error, or ``capped``
    and left for the next run).
+4. A *provider* failure (an error envelope even inside HTTP 200, a rate
+   limit, an overload) is not a model answer: the same ask is sent again,
+   up to ``MAX_TRANSIENT_FAILURES`` tries, without touching ``last_error``,
+   so a repair keeps its context (LEG-003).
 
 Talking points:
     - "Same stage key, same answer: the cache is checked before any model is
@@ -48,7 +52,6 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    func,
     select,
 )
 from sqlalchemy.orm import Mapped, Session, mapped_column
@@ -71,6 +74,9 @@ REVIEW_REQUIRED = "review_required"
 LIMIT_TOKENS = "limit:max_input_tokens"
 LIMIT_CALLS = "limit:max_model_calls_per_run"
 TIMEOUT = "timeout"
+# A request is sent at most this many times when the *provider* fails
+# (not the model): the first try and two retries (LEG-003).
+MAX_TRANSIENT_FAILURES = 3
 
 
 def _utc_now() -> datetime:
@@ -96,6 +102,10 @@ class ModelRequestRow(Base):
     batch_ids_json: Mapped[str] = mapped_column(Text, default="[]")
     characters: Mapped[int] = mapped_column(Integer, default=0)
     last_error: Mapped[str | None] = mapped_column(Text, default=None)
+    # Provider failures (error envelope, rate limit, overload), kept apart
+    # from ``last_error`` so a retry never erases the repair context (LEG-003).
+    transient_failures: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    last_transient: Mapped[str | None] = mapped_column(String(40), default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
 
@@ -136,6 +146,7 @@ class StageReport:
             timed out (OPS-002), and need a person.
         capped: Stage keys not sent because the run's call budget ran out;
             a later run picks them up.
+        resent: Stage keys asked again after a provider failure (LEG-003).
     """
 
     outputs: dict[str, BaseModel] = field(default_factory=dict)
@@ -145,6 +156,7 @@ class StageReport:
     repairs: list[str] = field(default_factory=list)
     review_required: list[str] = field(default_factory=list)
     capped: list[str] = field(default_factory=list)
+    resent: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -290,17 +302,34 @@ class ModelStageRunner:
             return report
         handle = BatchHandle(tuple(batches), tuple(waiting))
         repairs: list[ModelRequest] = []
+        # (stage key, the exact ask to repeat: the first try or the repair)
+        resend: list[tuple[str, ModelRequest]] = []
         for result in self.provider.collect(handle, waiting):
             original = next(r for r in requests if result.request_id in _ids(r))
             row = rows[original.request_id]
             if result.state is ResultState.PENDING:
                 report.pending.append(original.request_id)
+            elif result.state is ResultState.TRANSIENT:
+                # The provider failed, not the model. ``last_error`` (what the
+                # repair must fix) is left alone; the same ask goes again.
+                row.transient_failures += 1
+                row.last_transient = (result.error or "transient")[:40]
+                row.updated_at = self.clock()
+                self._event("model.transient", original, attempts=row.transient_failures)
+                if row.transient_failures >= MAX_TRANSIENT_FAILURES:
+                    row.state = REVIEW_REQUIRED
+                    report.review_required.append(original.request_id)
+                else:
+                    resend.append((original.request_id, waiting[result.request_id]))
             elif result.state is ResultState.OK and result.output is not None:
                 self._store(original, row, result.output, result.served_model, result.session_ref)
                 report.outputs[original.request_id] = result.output
                 self._event(
                     "model.stored", original, attempts=row.attempts, model=result.served_model
                 )
+                if result.trimmed:
+                    # LEG-003: an over-long list is cut back and logged, not retried.
+                    self._event("model.trimmed", original, count=len(result.trimmed))
             elif row.attempts == 1:
                 row.last_error = result.error
                 repairs.append(original)
@@ -310,6 +339,8 @@ class ModelStageRunner:
                 row.updated_at = _utc_now()
                 report.review_required.append(original.request_id)
                 self._event("model.review_required", original, attempts=row.attempts)
+        if resend:
+            self._resend(resend, rows, report)
         if repairs and self.budget is not None:
             allowed = self.budget.take_calls(len(repairs))
             for request in repairs[allowed:]:
@@ -334,6 +365,27 @@ class ModelStageRunner:
                 self._event("model.repair", request, attempts=2, characters=row.characters)
         self.session.flush()
         return report
+
+    def _resend(
+        self,
+        asks: list[tuple[str, ModelRequest]],
+        rows: dict[str, ModelRequestRow],
+        report: StageReport,
+    ) -> None:
+        if self.budget is not None:
+            allowed = self.budget.take_calls(len(asks))
+            for key, _ask in asks[allowed:]:
+                rows[key].state = REVIEW_REQUIRED
+                rows[key].last_error = rows[key].last_error or LIMIT_CALLS
+                report.review_required.append(key)
+            asks = asks[:allowed]
+        if not asks:
+            return
+        handle = self._send([ask for _, ask in asks])
+        for key, ask in asks:
+            rows[key].batch_ids_json = json.dumps(list(handle.batch_ids))
+            rows[key].characters += ask.characters
+            report.resent.append(key)
 
     def _timed_out(self, row: ModelRequestRow) -> bool:
         if self.budget is None:
@@ -404,15 +456,21 @@ def schema_failures(session: Session, stage_id: str | None = None) -> Mapping[st
         ``requests`` (answered or given up), ``repaired`` (needed the one
         repair), ``review_required`` (failed twice, or failed once with no
         budget left for the repair), ``first_try_failure_rate`` (repaired
-        or failed, over requests). Requests that timed out or were too big
-        to send (OPS-002) never produced an answer, so they say nothing
-        about the schema and are left out; ``not_answered`` counts them.
+        or failed, over requests). Requests that timed out, were too big
+        to send (OPS-002) or kept failing at the provider (LEG-003) never
+        produced an answer to judge, so they are left out;
+        ``not_answered`` counts them.
     """
     query = select(ModelRequestRow).where(ModelRequestRow.state != PENDING)
     if stage_id is not None:
         query = query.where(ModelRequestRow.stage_id == stage_id)
     every = list(session.scalars(query))
-    rows = [r for r in every if r.last_error not in (TIMEOUT, LIMIT_TOKENS)]
+    rows = [
+        r
+        for r in every
+        if r.last_error not in (TIMEOUT, LIMIT_TOKENS)
+        and r.transient_failures < MAX_TRANSIENT_FAILURES
+    ]
     repaired = sum(1 for r in rows if r.attempts >= 2 and r.state == DONE)
     failed = sum(1 for r in rows if r.state == REVIEW_REQUIRED)
     rate = round((repaired + failed) / len(rows), 6) if rows else 0.0
@@ -425,11 +483,13 @@ def schema_failures(session: Session, stage_id: str | None = None) -> Mapping[st
 
 
 def not_answered(session: Session, stage_id: str | None = None) -> Mapping[str, int]:
-    """Requests that ended without any answer (OPS-002): timed out, or too big to send."""
-    query = select(ModelRequestRow.last_error, func.count()).where(
-        ModelRequestRow.last_error.in_([TIMEOUT, LIMIT_TOKENS])
-    )
+    """Requests that ended without an answer: timed out, too big, or the provider kept failing."""
+    query = select(ModelRequestRow).where(ModelRequestRow.state == REVIEW_REQUIRED)
     if stage_id is not None:
         query = query.where(ModelRequestRow.stage_id == stage_id)
-    counts = dict(session.execute(query.group_by(ModelRequestRow.last_error)).tuples().all())
-    return {"timeout": counts.get(TIMEOUT, 0), "too_big": counts.get(LIMIT_TOKENS, 0)}
+    rows = list(session.scalars(query))
+    return {
+        "timeout": sum(1 for r in rows if r.last_error == TIMEOUT),
+        "too_big": sum(1 for r in rows if r.last_error == LIMIT_TOKENS),
+        "provider_failed": sum(1 for r in rows if r.transient_failures >= MAX_TRANSIENT_FAILURES),
+    }

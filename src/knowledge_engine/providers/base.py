@@ -39,6 +39,10 @@ class ResultState(StrEnum):
     OK = "ok"  # arrived and validated
     INVALID = "invalid"  # arrived, failed validation (never stored)
     PENDING = "pending"  # no answer yet
+    # The provider failed, not the model (an error envelope, a rate limit,
+    # an overload): there is no answer to judge, so it is asked again
+    # without using up the one repair (LEG-003).
+    TRANSIENT = "transient"
 
 
 @dataclass(frozen=True)
@@ -118,6 +122,8 @@ class ProviderResult:
         error: Why it was refused, only when ``invalid``.
         served_model: The model that answered, as reported (may be None).
         session_ref: The session or batch that produced it, as reported.
+        trimmed: Lists cut back to their schema maximum (LEG-003), as
+            ``field.path`` strings; logged, never retried.
     """
 
     request_id: str
@@ -126,6 +132,32 @@ class ProviderResult:
     error: str | None = None
     served_model: str | None = None
     session_ref: str | None = None
+    trimmed: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class RawResponse:
+    """What an HTTP-style provider got back for one request, before any checks.
+
+    Real providers can report a failure in several ways that older runs
+    mistook for a model answer (LEG-003). An adapter fills this in and
+    ``result_from_response`` sorts it out in one place.
+
+    Attributes:
+        http_status: The HTTP status (200 even for some provider errors).
+        body: The model's text (JSON expected), if any.
+        error_type: A provider error envelope's type, e.g. ``overloaded``
+            or ``rate_limit``, even when the status was 200.
+        finish_reason: Why generation stopped: ``stop``, ``length``...
+    """
+
+    http_status: int = 200
+    body: str | Mapping[str, Any] | None = None
+    error_type: str | None = None
+    finish_reason: str | None = None
+
+
+TRUNCATED = "truncated: the answer hit the output length limit (finish_reason=length)"
 
 
 @dataclass(frozen=True)
@@ -175,6 +207,13 @@ def validate_output(raw: str | Mapping[str, Any], model: type[BaseModel]) -> Bas
         The validated model, or a short error message (never the raw text,
         which may contain private content).
     """
+    checked = _validate(raw, model)
+    return checked if isinstance(checked, str) else checked[0]
+
+
+def _validate(
+    raw: str | Mapping[str, Any], model: type[BaseModel]
+) -> tuple[BaseModel, tuple[str, ...]] | str:
     try:
         data = json.loads(raw) if isinstance(raw, str) else raw
     except json.JSONDecodeError as error:
@@ -182,13 +221,41 @@ def validate_output(raw: str | Mapping[str, Any], model: type[BaseModel]) -> Bas
     if not isinstance(data, Mapping):
         return "answer must be a JSON object"
     try:
-        return model.model_validate(data, strict=False)
+        return model.model_validate(data, strict=False), ()
     except ValidationError as error:
-        problems = [
-            f"{'.'.join(str(p) for p in item['loc']) or '(root)'}: {item['type']}"
-            for item in error.errors(include_input=False, include_url=False)
-        ]
-        return "does not fit the schema: " + "; ".join(problems[:10])
+        errors = error.errors(include_input=False, include_url=False)
+    # A list longer than the schema allows is cut back to the maximum, once,
+    # instead of spending the repair on it (LEG-003): the extra items are
+    # the model's lowest-ranked, and a retry tends to overflow again.
+    if errors and all(e["type"] == "too_long" for e in errors):
+        trimmed_data = json.loads(json.dumps(data))
+        trimmed = []
+        for item in errors:
+            if _trim(trimmed_data, item["loc"], int((item.get("ctx") or {}).get("max_length", 0))):
+                trimmed.append(".".join(str(p) for p in item["loc"]))
+        if trimmed:
+            try:
+                return model.model_validate(trimmed_data, strict=False), tuple(trimmed)
+            except ValidationError as again:
+                errors = again.errors(include_input=False, include_url=False)
+    problems = [
+        f"{'.'.join(str(p) for p in item['loc']) or '(root)'}: {item['type']}" for item in errors
+    ]
+    return "does not fit the schema: " + "; ".join(problems[:10])
+
+
+def _trim(data: Any, loc: tuple[int | str, ...], max_length: int) -> bool:
+    for part in loc[:-1]:
+        try:
+            data = data[part]
+        except (KeyError, IndexError, TypeError):
+            return False
+    last = loc[-1] if loc else None
+    target = data.get(last) if isinstance(data, dict) else None
+    if not isinstance(target, list) or max_length <= 0:
+        return False
+    data[last] = target[:max_length]
+    return True
 
 
 def result_from_raw(
@@ -199,15 +266,48 @@ def result_from_raw(
     session_ref: str | None = None,
 ) -> ProviderResult:
     """Validate a raw answer and wrap it as an ``ok`` or ``invalid`` result."""
-    checked = validate_output(raw, request.output_model)
+    checked = _validate(raw, request.output_model)
     if isinstance(checked, str):
         return ProviderResult(request.request_id, ResultState.INVALID, error=checked)
+    output, trimmed = checked
     return ProviderResult(
         request.request_id,
         ResultState.OK,
-        output=checked,
+        output=output,
         served_model=served_model,
         session_ref=session_ref,
+        trimmed=trimmed,
+    )
+
+
+def result_from_response(
+    request: ModelRequest,
+    response: RawResponse,
+    *,
+    served_model: str | None = None,
+    session_ref: str | None = None,
+) -> ProviderResult:
+    """Sort out one HTTP-style response (LEG-003).
+
+    * An error envelope, a rate limit (429) or a server error (5xx) is
+      ``transient``, even inside HTTP 200: the provider failed, so there is
+      no model answer to judge.
+    * ``finish_reason=length`` is a format error (``invalid``, recorded),
+      even if the cut-off text happens to parse.
+    * Anything else is validated like any answer.
+    """
+    status = response.http_status
+    if response.error_type or status == 429 or status >= 500:
+        kind = response.error_type or ("rate_limit" if status == 429 else f"http_{status}")
+        return ProviderResult(request.request_id, ResultState.TRANSIENT, error=kind)
+    if response.finish_reason == "length":
+        return ProviderResult(request.request_id, ResultState.INVALID, error=TRUNCATED)
+    if response.body is None or status != 200:
+        return ProviderResult(
+            request.request_id, ResultState.INVALID, error=f"no answer ({status})"
+        )
+    return result_from_raw(
+        request, response.body, served_model=served_model, session_ref=session_ref
     )
 
 
@@ -220,7 +320,7 @@ class FakeProvider:
     given, so a test can prove a cache hit made zero provider calls.
     """
 
-    answer: Callable[[ModelRequest], str | Mapping[str, Any] | None]
+    answer: Callable[[ModelRequest], str | Mapping[str, Any] | RawResponse | None]
     served_model: str = "fake-model"
     submitted: list[ModelRequest] = field(default_factory=list)
 
@@ -245,6 +345,8 @@ class FakeProvider:
             raw = self.answer(request)
             if raw is None:
                 results.append(ProviderResult(request_id, ResultState.PENDING))
+            elif isinstance(raw, RawResponse):
+                results.append(result_from_response(request, raw, served_model=self.served_model))
             else:
                 results.append(result_from_raw(request, raw, served_model=self.served_model))
         return results
