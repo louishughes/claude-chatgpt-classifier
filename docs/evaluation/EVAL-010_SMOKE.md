@@ -43,5 +43,5 @@ Spot checks with `ke inspect` covered three conversations: the largest (45 nodes
 
 Found and filed as follow-ups (they don't fail the gate):
 - **Speed.** Time barely grows with the number of conversations (50 → 100 adds about 80 s), and a re-import takes about twice as long as the first import. Something done once per run over the whole `raw/` tree dominates, probably hashing all files including about 900 images, and the re-import does it again.
-- **Peak memory** is `null` on Windows, because the measurement uses the Unix-only `resource` module.
-- **`ke inspect`** prints the full native conversation ID. Reports elsewhere use 8-character prefixes.
+- **Peak memory** is `null` on Windows, because the measurement uses the Unix-only `resource` module. *Fixed in OPS-009: Windows reads `PeakWorkingSetSize` through `ctypes`; a platform with neither says `"unavailable_on_platform"`.*
+- **`ke inspect`** prints the full native conversation ID. Reports elsewhere use 8-character prefixes. *Fixed in OPS-009: the rule is that `inspect` stays complete (a local debugging tool) and anything quoted in a report or checklist uses `ke inspect <id> --redact`, which prints the prefix. The G1 demonstration in `IMPLEMENTATION_PLAN.md` §6 now uses `--redact`.*

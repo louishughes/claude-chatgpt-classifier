@@ -2495,3 +2495,19 @@ tests/integration/test_tenant_isolation.py   4 passed
 Fix attempts: 1 (the test read `items` where search answers `hits`).
 
 **Next exact task:** fix the `[m:id]` evidence parsing, then PROD-004.
+
+### 12:55 — OPS-009: peak memory on Windows, and ID prefixes in `inspect`
+
+- `ke eval smoke` reported `peak_memory_mb: null` on Windows. Now it asks Windows for the process's `PeakWorkingSetSize` through `ctypes` (no new dependency). A platform with neither that nor the POSIX `resource` module reports `"unavailable_on_platform"`, so a missing number always says why.
+- `ke inspect` keeps printing the export's full conversation ID, because it's a local debugging tool; its help now says so. `--redact` prints the 8-character prefix instead, and the G1 checklist uses it, matching every other report.
+
+**Teach-back (`_peak_memory_mb`):** It reports the most memory the smoke test's process used. On Linux and Mac it asks the operating system's resource counters; on Windows it asks the same question through a Windows system call. If neither is available it says "unavailable on this platform" rather than leaving a blank.
+
+Checks:
+```
+tests/integration/test_redact_and_memory.py   3 passed
+tests/integration/test_source_browser.py, smoke tests   34 passed (unchanged)
+```
+Fix attempts: 0. The Windows branch is exercised on the Windows CI runners (the test expects a positive number there).
+
+**Next exact task:** REV-011 (#186).
