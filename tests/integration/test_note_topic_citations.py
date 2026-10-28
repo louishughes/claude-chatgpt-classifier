@@ -75,7 +75,9 @@ def test_topics_from_one_message_share_one_citation(tmp_path: Path) -> None:
         [cid] = session.scalars(select(ConversationRow.conversation_id)).all()
         chat = load_conversation(session, cid)
         messages = [
-            m for seg in load_segments(session, chat) for m in segment_extraction_messages(chat, seg)
+            m
+            for seg in load_segments(session, chat)
+            for m in segment_extraction_messages(chat, seg)
         ]
         first = next(m.native_id for m in messages if m.text == FIRST)
         second = next(m.native_id for m in messages if m.text == SECOND)
