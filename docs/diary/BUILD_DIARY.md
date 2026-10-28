@@ -817,7 +817,7 @@ Fix attempts: 0.
 - "Evaluation doesn't need me: an independent, blind reviewer builds the reference, and code checks the evidence."
 - "Everything the CLI does has a plain browser screen, local-only."
 
-### 00:35 — Wayfinder check: is the build on track?
+### 00:19 — Wayfinder check: is the build on track?
 **What:** Louis asked for a "wayfinder" check that everything is on track. I compared the real state of the project with the plan: all GitHub issues (#4–#175), every merged PR, `IMPLEMENTATION_PLAN.md`, `M1_CONSOLIDATION.md`, `REVIEW_ACTION_PLAN.md`, ADR-0009 and `OPEN_DECISIONS.md`. Then I ran the full test suite myself on `main` instead of trusting the logs: 555 passed, 6 skipped.
 **Verdict:** on track. All of M1's code slices are merged in plan order, one or two tickets per PR. Every closed M1 issue has a merged PR behind it, and every code PR has a teach-back in this diary. The two open M1 issues (EVAL-010's real-data half and the REV-009 checkpoint) are honestly open. There's no paid-API code in `src/`. The only test files touched after they were written just gained new tests, so no existing test was changed.
 **Problems found:**
