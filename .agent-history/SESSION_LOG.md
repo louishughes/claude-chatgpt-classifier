@@ -584,3 +584,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - links/extract.py (find_in_text with _trim rules, find_in_metadata for citations/content_references, canonical_url, context), links/store.py (LinkTargetRow, LinkOccurrenceRow, record_links), migration 0009_links. ConversationDelta.links; run_import records links in the same transaction; ImportReport.links.
 - Tests: test_link_extract.py (15 incl. Hypothesis), test_link_registry.py (3). Full suite 623 passed, 6 skipped. ruff, mypy, git_guard OK; autogen shows no drift.
 - Next: YTB-001/002.
+
+## 2026-10-28 00:45 YTB-001 (slice Y1)
+- links/youtube.py (parse_youtube, YouTubeRef, YouTubeVideoRow, YouTubeMentionRow, record_mention), domain TranscriptStatus enum, record_links marks youtube targets and records mentions (also for existing occurrences), migration 0010_youtube.
+- Tests: test_youtube_urls.py (25), test_youtube_registry.py (1). Full suite 649 passed, 6 skipped. ruff, mypy, git_guard OK; no migration drift.
+- Next: YTB-002.

@@ -179,3 +179,19 @@ def check_transition(
         allowed = _REVIEW_TRANSITIONS[current]
     if new not in allowed:
         raise InvalidTransitionError(f"cannot go from {current.value!r} to {new.value!r}")
+
+
+class TranscriptStatus(StrEnum):
+    """Where getting a video's transcript stands (YTB-001/002, DATA_MODEL §10).
+
+    Every video starts at ``not_requested``. Nothing is fetched unless a
+    job is queued and the network switch allows it.
+    """
+
+    NOT_REQUESTED = "not_requested"
+    QUEUED = "queued"
+    SUCCEEDED = "succeeded"
+    UNAVAILABLE = "unavailable"
+    PERMISSION_REQUIRED = "permission_required"
+    RATE_LIMITED = "rate_limited"
+    FAILED = "failed"
