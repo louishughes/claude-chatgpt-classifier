@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from knowledge_engine.access import accounts as acc
 from knowledge_engine.access.tenants import (
     TenantError,
+    _writable_then_retry,
     create_tenant,
     delete_tenant,
     list_tenants,
@@ -93,8 +94,15 @@ def test_an_erased_account_leaves_no_name_behind(hosted: dict[str, Any]) -> None
     assert _get(client, zelda, "a") == 401
     assert _get(client, token, "a") == 200  # nobody else is affected
     assert f"deleted-{short}" in json.dumps(log) and "zelda-erasable" not in json.dumps(log)
-    with sqlite3.connect(database_path(a)) as db:
+    db = sqlite3.connect(database_path(a))
+    try:
         db.execute("VACUUM")
+        # The database runs in WAL mode: fold the vacuumed pages back into the
+        # main file now, instead of whenever the last connection closes
+        # (on Windows the API's pooled connections are still open here).
+        db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    finally:
+        db.close()
     assert b"zelda-erasable" not in database_path(a).read_bytes()
 
 
@@ -134,7 +142,7 @@ def test_a_workspace_folder_that_is_a_link_out_is_not_followed(
     settings, root = hosted["settings"], hosted["root"]
     outside = tmp_path / "precious"
     shutil.copytree(root / "workspaces" / "b", outside)
-    shutil.rmtree(root / "workspaces" / "b")
+    shutil.rmtree(root / "workspaces" / "b", onexc=_writable_then_retry)
     try:
         (root / "workspaces" / "b").symlink_to(outside, target_is_directory=True)
     except OSError:

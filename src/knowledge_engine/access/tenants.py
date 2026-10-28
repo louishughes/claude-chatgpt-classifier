@@ -25,8 +25,11 @@ Talking points:
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
+import stat
+from collections.abc import Callable
 from pathlib import Path
 
 from knowledge_engine.access.accounts import add_account, grant, issue_token
@@ -140,6 +143,14 @@ def delete_tenant(settings: Settings, name: str, confirm: str) -> list[str]:
         if folder.is_symlink() or not folder.resolve().is_relative_to(root):
             raise TenantError("a workspace folder points outside tenants_root; delete it by hand")
         if folder.exists():
-            shutil.rmtree(folder)
+            shutil.rmtree(folder, onexc=_writable_then_retry)
             removed.append(str(folder.relative_to(root)))
     return removed
+
+
+def _writable_then_retry(func: Callable[[str], object], path: str, _error: BaseException) -> None:
+    # Archived files are read-only on purpose (evidence). Windows won't
+    # delete a read-only file, so a deliberate workspace delete makes each
+    # one writable first. Any other failure is raised again.
+    os.chmod(path, stat.S_IREAD | stat.S_IWRITE)
+    func(path)
