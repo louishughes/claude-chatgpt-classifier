@@ -1678,3 +1678,29 @@ migration drift         # 0
 Fix attempts: 0 (two expectations in the new unit test corrected while writing it: RRF arithmetic and a two-letter code).
 
 **Next exact task:** RET-006 (source context hydrator and citation resolver), then RET-007.
+
+### 09:10 — RET-006 + RET-007: checked citations, and answers that cite every sentence or say "I don't know"
+**RET-006.** `retrieval/citations.py` turns hits into evidence.
+- A citation is (revision, start, end, quote fingerprint), with a stable `kcit_` ID made from those four.
+- `resolve` checks it against the stored text: the revision exists, the range fits, the fingerprint matches, and the speaker matches when known. Otherwise it is rejected with a problem code.
+- Stale index hits (a purged revision) and unknown records are rejected, never returned. `audit` re-checks citations, so a forged or altered ID is caught.
+- `hydrate` adds a source window: the messages before (ancestors) and after (along the selected branch). The window is shown, never cited.
+- An edited message keeps its old version citable, flagged `newest_version: false`.
+
+**RET-007.** `retrieval/answers.py`: route → relevance gate → hydrate → write → audit → answer or abstain.
+- Meaning-only hits must have similarity ≥ 0.3. Unrelated questions score under 0.2 with the local embedder; without this gate every question would "find" something.
+- Every sentence carries citation IDs. A sentence citing something it wasn't given, citing nothing, or citing something stale is dropped. If nothing is left, the answer is "I can't find this in your chats." with no citations.
+- Decision questions list current, conflicted, unchecked and replaced records ("replaced by: …"). Status is `answered`, `conflicted` or `unknown`.
+- The default `ExtractiveWriter` uses no model. `ModelWriter` (any FND-007 provider) checks the egress switch before sending, and puts evidence only in the untrusted input, never in the instructions. Its draft gets the same audit. It was tested with the fake provider only: no paid calls.
+- New command `ke ask`.
+
+**Teach-back (`retrieval/answers.py`):** "It finds the evidence for a question, throws away weak meaning-only matches, and checks that every quote is still exactly where it says in the stored chats. Then it writes the answer one sentence at a time, and any sentence that doesn't point at evidence it was actually given is deleted. If nothing survives, it says it can't find the answer instead of guessing."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 144 source files
+pytest -q               # 1103 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 0 (three expectations in the new test corrected while writing it: speaker parity, which hit ranks first, sentence order).
+
+**Next exact task:** RET-008 (retrieval benchmarks and tuning report).
