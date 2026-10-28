@@ -241,9 +241,17 @@ def run_order(
     engine = create_sqlite_engine(database_path(settings))
     try:
         with Session(engine) as session:
+            # Sorted by the export's own IDs before the seeded shuffle: the
+            # conv_ IDs include the (random) workspace ID, so their order
+            # differs between runs and the "same" seed would shuffle a
+            # different list.
             conversations = [
                 load_conversation(session, c)
-                for c in session.scalars(select(ConversationRow.conversation_id)).all()
+                for c in session.scalars(
+                    select(ConversationRow.conversation_id).order_by(
+                        ConversationRow.native_conversation_id
+                    )
+                ).all()
             ]
             shuffle(conversations)
             items = [(c, s) for c in conversations for s in load_segments(session, c)]
