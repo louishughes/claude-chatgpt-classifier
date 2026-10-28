@@ -904,6 +904,9 @@ classification/store.py review_reason_kind; semantic_smoke review_reasons + repl
 ## 2026-10-28 11:17 PROD-003 (#128)
 ADR-0011; access/tenants.py; settings.tenants_root; api/deps get_settings by X-KE-Workspace; per-tenant job lists; hosted check_access; imports inbox-only; `ke tenant`. Tests: test_tenant_isolation.py (4). #255 replay on the PC: 53 evidence_outside_segment (all `[m:id]` tags, a parsing bug), 23 model_unsure.
 
+## 2026-10-28 12:40 PERF-001 (#200)
+archive.put_file/put_bytes: hash first, write only new bytes; ledger skips re-verifying the file just checked; evaluation/import_timing.py (phase timer, synthetic tree). Tests: tests/unit/test_archive_reuse.py (5). Linux: re-import 7.47 → 5.79 s. Table in docs/evaluation/EVAL-010_SMOKE.md.
+
 ## 2026-10-28 11:24 m:ID fix (#255 follow-up)
 providers/base.py MessageRef/bare_message_id; classification evidence and extraction ModelQuote use it. Tests: tests/unit/test_message_ref.py (9).
 

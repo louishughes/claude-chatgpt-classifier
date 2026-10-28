@@ -2496,6 +2496,25 @@ Fix attempts: 1 (the test read `items` where search answers `hits`).
 
 **Next exact task:** fix the `[m:id]` evidence parsing, then PROD-004.
 
+### 12:40 — PERF-001: why a re-import was twice as slow as an import
+
+- **Measured first.** `evaluation/import_timing.py` builds a synthetic export shaped like mine (1,100 per-chat files, 900 images the chats don't use), imports it twice and times each phase with cProfile.
+- **Cause.** Every source file is archived on every run. For bytes already stored, the archive still wrote a temporary copy and fsynced it, hashed the stored copy, threw the temporary copy away, and then the ledger hashed the stored copy again. On Windows every new file is also scanned by the antivirus, so a re-import paid for 1,100 pointless writes.
+- **Fix.** Known bytes are hashed once from the source and the stored copy is checked once. Nothing is written. New bytes are stored exactly as before. The raw-unchanged proof and the check of every reused stored copy are untouched.
+- Linux numbers: re-import 7.47 s → 5.79 s, its fsync time 0.89 s → 0; the re-import is now quicker than the import. The Windows run of the same command goes in EVAL-010_SMOKE.md.
+
+**Teach-back (`BlobStore.put_file`):** It stores a copy of an input file under the fingerprint of its bytes. If that fingerprint is already in the store, it checks that the stored copy still matches and writes nothing, because the evidence is already there. Only new bytes are written, through a temporary file that is made safe on disk before it takes its real name.
+
+Checks:
+```
+tests/unit/test_archive_reuse.py   5 passed (would fail on the old code: a temporary file was made)
+tests/unit/test_archive_store.py  21 passed (unchanged)
+import/archive/media/purge tests  170 passed, 19 skipped
+```
+Fix attempts: 0.
+
+**Next exact task:** Windows timing on Louis's PC, then OPS-009 (#201).
+
 ### 11:24 — Citations written as `[m:id]` now count
 
 The paid run's 53 "evidence outside the segment" flags were our bug. Requests show each message as `[m:ID] user:`, the model cited `[m:ID]` back, and the check compared that whole string with bare IDs. `providers/base.py` now has `MessageRef`, a string type whose validator turns `[m:abc]` or `m:abc` into `abc` and leaves everything else alone, so a real citation outside the segment is still caught. Classification evidence and extraction quotes both use it. The prompt, schema and stage keys are unchanged, so the saved answers still replay from the cache and can be re-checked for free.
