@@ -41,6 +41,7 @@ TABLE_MODULES = (
     "knowledge_engine.retention.tombstones",
     "knowledge_engine.segmentation.overrides",
     "knowledge_engine.taxonomy.changes",
+    "knowledge_engine.taxonomy.refresh",
     "knowledge_engine.taxonomy.registry",
 )
 
