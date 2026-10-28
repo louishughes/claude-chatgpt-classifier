@@ -888,3 +888,6 @@ evaluation/variance.py: conversations sorted by native ID before the seeded shuf
 
 ## 2026-10-28 10:30 API-004 (#119)
 api/retrieval.py (search, find, answers, decision history; index sync under a lock). Tests: test_api_retrieval.py (5): citations resolve via /sources nodes; as_of before the switch. ci 5/5, 1237 passed.
+
+## 2026-10-28 10:36 API-005 (#120)
+api/documents.py (documents list/preview, exports by name into <workspace>/exports, background job, one per destination). Tests: test_api_documents.py (13); ci 5/5, 1250 passed.

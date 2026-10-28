@@ -2398,3 +2398,22 @@ Fix attempts: 0.
 **Talking points:**
 - "For each topic section, the dashboard puts the answer key's labels next to what the classifier stored, with readable names, so I can see exactly where it goes wrong."
 - "It also counts every model request, with retries and how much text was sent, without ever showing the text."
+
+### 10:36 — API-005: documents and exports over the API
+
+- `api/documents.py`: `GET /documents` lists every note an export would write (path, kind, size) and `GET /documents/preview` shows one note's Markdown. Both only plan; nothing is written. The preview looks the path up among the planned notes and never opens it as a file, so `../../etc/passwd` is just "not found".
+- `POST /exports` answers 202 with a job and runs DOC-006's `sync_vault` in the background; `GET /exports/jobs/{id}` gives the counts.
+- **Destinations are names, not paths.** `{"destination": "main"}` means `<workspace>/exports/main`. `../outside`, `/tmp/x`, `C:\Users\x`, `a/b`, `.`, `..` and a planted link to another folder are all refused (`invalid_destination`) before anything is created; the tests check nothing was written. Writing into a vault elsewhere stays a deliberate `ke docs vault --vault <folder>`.
+- **No overwrite of user files**, tested through the API: a note edited above the marker is reported as a conflict and kept byte for byte; a file of mine at a path the engine wants is reported as occupied and left alone.
+- One export per destination at a time (`export_running`), so two jobs can't race on the same manifest.
+
+**Teach-back (`api/documents.py`):** Over the API I can list and preview the notes the engine would write, and start an export that runs in the background. An export can only go into a named folder inside my workspace, so a request can't point it at any other place on my computer. Even there it never overwrites a file I made or a note I edited; it reports them instead.
+
+Checks:
+```
+tests/integration/test_api_documents.py   13 passed
+ci                                        5/5 ok, 1250 passed, 7 skipped
+```
+Fix attempts: 0.
+
+**Next exact task:** PROD-001 (PostgreSQL proof of concept): M5 is complete once API-004/005 merge.
