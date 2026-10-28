@@ -704,3 +704,9 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - evaluation/extraction_eval.py (ScoredRecord, scored_records, evaluate_extraction, ExtractionReport.passed); infrastructure/logs.py (EventLog, FIELDS, scrub, error_type, search, totals, event_log, null_log); ledger and extraction runner emit events; CLI `ke logs`; docs/evaluation/EVAL-004_BASELINE.md, docs/operations/LOGGING.md.
 - Tests: test_extraction_eval.py (3), test_structured_logs.py (4). Full suite 965 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: OPS-002 + EVAL-011.
+
+## 2026-10-28 11:05 OPS-002 + EVAL-011 (#81, #82)
+- orchestration/limits.py (RunBudget, Deadline, estimated_tokens); Limits: max_archive_entries, max_input_tokens_per_request, max_requests_per_batch, provider_timeout_s, stage_deadline_s; ledger: budget, batching, timeout, LIMIT_* errors, capped, not_answered(); extraction runner deadline/deferred; ZIP member cap; evaluation/semantic_smoke.py; CLI `ke eval semantic`.
+- Tests: test_limits_and_semantic_smoke.py (7). Full suite 972 passed, 7 skipped; ruff, mypy OK; drift 0.
+- EVAL-011 real-provider run not done (needs owner opt-in); issue stays open.
+- Next: LEG-002..005, REV-012.

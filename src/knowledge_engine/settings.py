@@ -159,6 +159,19 @@ class Limits(BaseModel):
             may be spent.
         import_lock_timeout_s: How long an import waits for another import
             into the same workspace to finish (IMP-004).
+        max_archive_entries: Most members a ZIP export may list before it
+            is refused (OPS-002): a listing is held in memory.
+        max_input_tokens_per_request: Largest model request, estimated at
+            four characters per token. A bigger one is never sent; it is
+            recorded as a capped failure for review (OPS-002).
+        max_requests_per_batch: Most requests sent to a provider at once:
+            the batch concurrency and rate limit (OPS-002).
+        provider_timeout_s: How long a submitted request may wait for an
+            answer before it is recorded as timed out (OPS-002). Batch
+            APIs can take up to a day, hence the default.
+        stage_deadline_s: Wall-clock budget for one stage run (e.g. all
+            extraction for a batch). Work not started by then is deferred
+            to the next run, never dropped (OPS-002).
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -169,6 +182,11 @@ class Limits(BaseModel):
     max_model_calls_per_run: int = Field(default=0, ge=0)
     max_cost_usd_per_run: float = Field(default=0.0, ge=0.0, allow_inf_nan=False)
     import_lock_timeout_s: float = Field(default=600.0, ge=0.0, allow_inf_nan=False)
+    max_archive_entries: int = Field(default=500_000, gt=0)
+    max_input_tokens_per_request: int = Field(default=100_000, gt=0)
+    max_requests_per_batch: int = Field(default=50, gt=0, le=10_000)
+    provider_timeout_s: float = Field(default=86_400.0, gt=0.0, allow_inf_nan=False)
+    stage_deadline_s: float = Field(default=3_600.0, gt=0.0, allow_inf_nan=False)
 
 
 class Settings(BaseSettings):

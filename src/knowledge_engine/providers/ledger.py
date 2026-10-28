@@ -18,6 +18,12 @@ Two tables:
 2. ``collect``: valid answers are stored; an invalid first answer gets **one**
    repair request (same question plus the validation error); an invalid
    repair marks the request ``review_required`` for a person. Nothing loops.
+3. With a ``RunBudget`` (OPS-002), requests are sent in batches of at most
+   ``max_requests_per_batch``; an oversize request, a request past the
+   run's call budget, a repair with no budget left and a request waiting
+   past ``provider_timeout_s`` each end as a recorded, bounded outcome
+   (``review_required`` with a ``limit:``/``timeout`` error, or ``capped``
+   and left for the next run).
 
 Talking points:
     - "Same stage key, same answer: the cache is checked before any model is
@@ -30,16 +36,26 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 
 from pydantic import BaseModel
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Text, select
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    func,
+    select,
+)
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from knowledge_engine.infrastructure.db import Base
 from knowledge_engine.infrastructure.logs import EventLog, null_log
+from knowledge_engine.orchestration.limits import RunBudget
 from knowledge_engine.providers.base import (
     BatchHandle,
     ModelRequest,
@@ -51,6 +67,10 @@ from knowledge_engine.settings import EgressPolicy
 PENDING = "pending"
 DONE = "done"
 REVIEW_REQUIRED = "review_required"
+# Errors recorded when an OPS-002 limit stops a request.
+LIMIT_TOKENS = "limit:max_input_tokens"
+LIMIT_CALLS = "limit:max_model_calls_per_run"
+TIMEOUT = "timeout"
 
 
 def _utc_now() -> datetime:
@@ -112,7 +132,10 @@ class StageReport:
         submitted: Stage keys sent to the provider in this call.
         pending: Stage keys still waiting.
         repairs: Stage keys that got their one repair request.
-        review_required: Stage keys that failed twice and need a person.
+        review_required: Stage keys that failed twice, or hit a limit or
+            timed out (OPS-002), and need a person.
+        capped: Stage keys not sent because the run's call budget ran out;
+            a later run picks them up.
     """
 
     outputs: dict[str, BaseModel] = field(default_factory=dict)
@@ -121,6 +144,7 @@ class StageReport:
     pending: list[str] = field(default_factory=list)
     repairs: list[str] = field(default_factory=list)
     review_required: list[str] = field(default_factory=list)
+    capped: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -131,6 +155,8 @@ class ModelStageRunner:
     provider: StructuredModelProvider
     egress: EgressPolicy
     log: EventLog = field(default_factory=null_log)
+    budget: RunBudget | None = None
+    clock: Callable[[], datetime] = _utc_now
 
     def _event(self, event: str, request: ModelRequest, **fields: int | str | None) -> None:
         self.log.emit(
@@ -175,9 +201,13 @@ class ModelStageRunner:
                 report.pending.append(request.request_id)
             elif row.state == REVIEW_REQUIRED:
                 report.review_required.append(request.request_id)
-        if fresh:
-            handle = self._send(fresh)
-            for request in fresh:
+        if self.budget is not None:
+            fresh = self._within_limits(fresh, report)
+        size = self.budget.limits.max_requests_per_batch if self.budget else len(fresh) or 1
+        for start in range(0, len(fresh), size):
+            chunk = fresh[start : start + size]
+            handle = self._send(chunk)
+            for request in chunk:
                 self.session.add(
                     ModelRequestRow(
                         stage_key=request.request_id,
@@ -188,6 +218,7 @@ class ModelStageRunner:
                         waiting_id=request.request_id,
                         batch_ids_json=json.dumps(list(handle.batch_ids)),
                         characters=request.characters,
+                        updated_at=self.clock(),
                     )
                 )
                 report.submitted.append(request.request_id)
@@ -197,8 +228,35 @@ class ModelStageRunner:
                     characters=request.characters,
                     batch_id=",".join(handle.batch_ids),
                 )
-            self.session.flush()
+        self.session.flush()
         return report
+
+    def _within_limits(self, fresh: list[ModelRequest], report: StageReport) -> list[ModelRequest]:
+        # OPS-002: an oversize request is recorded as a capped failure and
+        # never sent; requests past the call budget stay unsent (no row),
+        # so a later run with budget left picks them up.
+        assert self.budget is not None
+        sendable = []
+        for request in fresh:
+            if self.budget.fits(request.characters, stage_key=request.request_id):
+                sendable.append(request)
+                continue
+            self.session.add(
+                ModelRequestRow(
+                    stage_key=request.request_id,
+                    stage_id=request.stage_id,
+                    provider_id=self.provider.identity.provider_id,
+                    state=REVIEW_REQUIRED,
+                    attempts=1,
+                    waiting_id=request.request_id,
+                    characters=0,  # nothing was sent
+                    last_error=LIMIT_TOKENS,
+                )
+            )
+            report.review_required.append(request.request_id)
+        allowed = self.budget.take_calls(len(sendable))
+        report.capped.extend(r.request_id for r in sendable[allowed:])
+        return sendable[:allowed]
 
     def collect(self, requests: Sequence[ModelRequest]) -> StageReport:
         """Collect answers for waiting requests; store, repair or flag them.
@@ -216,6 +274,13 @@ class ModelStageRunner:
         for request in requests:
             row = self.session.get(ModelRequestRow, request.request_id)
             if row is None or row.state != PENDING:
+                continue
+            if self._timed_out(row):
+                row.state = REVIEW_REQUIRED
+                row.last_error = TIMEOUT
+                row.updated_at = self.clock()
+                report.review_required.append(request.request_id)
+                self._event("model.timeout", request, attempts=row.attempts)
                 continue
             rows[request.request_id] = row
             asked = request if row.attempts == 1 else self._repair(request, row.last_error)
@@ -245,6 +310,16 @@ class ModelStageRunner:
                 row.updated_at = _utc_now()
                 report.review_required.append(original.request_id)
                 self._event("model.review_required", original, attempts=row.attempts)
+        if repairs and self.budget is not None:
+            allowed = self.budget.take_calls(len(repairs))
+            for request in repairs[allowed:]:
+                # No budget left for the one repair: a recorded, capped failure.
+                row = rows[request.request_id]
+                row.state = REVIEW_REQUIRED
+                row.last_error = LIMIT_CALLS
+                row.updated_at = self.clock()
+                report.review_required.append(request.request_id)
+            repairs = repairs[:allowed]
         if repairs:
             repair_requests = [self._repair(r, rows[r.request_id].last_error) for r in repairs]
             repair_handle = self._send(repair_requests)
@@ -254,11 +329,20 @@ class ModelStageRunner:
                 row.waiting_id = repair_id(request.request_id)
                 row.batch_ids_json = json.dumps(list(repair_handle.batch_ids))
                 row.characters += len(row.last_error or "") + request.characters
-                row.updated_at = _utc_now()
+                row.updated_at = self.clock()
                 report.repairs.append(request.request_id)
                 self._event("model.repair", request, attempts=2, characters=row.characters)
         self.session.flush()
         return report
+
+    def _timed_out(self, row: ModelRequestRow) -> bool:
+        if self.budget is None:
+            return False
+        updated = row.updated_at
+        if updated.tzinfo is None:  # SQLite hands back naive UTC times
+            updated = updated.replace(tzinfo=UTC)
+        waited = (self.clock() - updated).total_seconds()
+        return waited > self.budget.limits.provider_timeout_s
 
     def _repair(self, request: ModelRequest, error: str | None) -> ModelRequest:
         return replace(
@@ -318,13 +402,17 @@ def schema_failures(session: Session, stage_id: str | None = None) -> Mapping[st
 
     Returns:
         ``requests`` (answered or given up), ``repaired`` (needed the one
-        repair), ``review_required`` (failed twice), and
-        ``first_try_failure_rate`` (repaired or failed, over requests).
+        repair), ``review_required`` (failed twice, or failed once with no
+        budget left for the repair), ``first_try_failure_rate`` (repaired
+        or failed, over requests). Requests that timed out or were too big
+        to send (OPS-002) never produced an answer, so they say nothing
+        about the schema and are left out; ``not_answered`` counts them.
     """
     query = select(ModelRequestRow).where(ModelRequestRow.state != PENDING)
     if stage_id is not None:
         query = query.where(ModelRequestRow.stage_id == stage_id)
-    rows = list(session.scalars(query))
+    every = list(session.scalars(query))
+    rows = [r for r in every if r.last_error not in (TIMEOUT, LIMIT_TOKENS)]
     repaired = sum(1 for r in rows if r.attempts >= 2 and r.state == DONE)
     failed = sum(1 for r in rows if r.state == REVIEW_REQUIRED)
     rate = round((repaired + failed) / len(rows), 6) if rows else 0.0
@@ -334,3 +422,14 @@ def schema_failures(session: Session, stage_id: str | None = None) -> Mapping[st
         "review_required": failed,
         "first_try_failure_rate": rate,
     }
+
+
+def not_answered(session: Session, stage_id: str | None = None) -> Mapping[str, int]:
+    """Requests that ended without any answer (OPS-002): timed out, or too big to send."""
+    query = select(ModelRequestRow.last_error, func.count()).where(
+        ModelRequestRow.last_error.in_([TIMEOUT, LIMIT_TOKENS])
+    )
+    if stage_id is not None:
+        query = query.where(ModelRequestRow.stage_id == stage_id)
+    counts = dict(session.execute(query.group_by(ModelRequestRow.last_error)).tuples().all())
+    return {"timeout": counts.get(TIMEOUT, 0), "too_big": counts.get(LIMIT_TOKENS, 0)}
