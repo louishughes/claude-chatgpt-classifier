@@ -2,8 +2,8 @@
 
 # Release gate (EVAL-007)
 
-- Gate: `eval-007-v1`; commit `95a4b9e + EVAL-007`
-- Overall: **BLOCKED** 3 BLOCKED, 2 REVIEW, 7 PASS
+- Gate: `eval-007-v1`; commit `d3b03cc + EVAL-008`
+- Overall: **BLOCKED** 3 BLOCKED, 2 REVIEW, 8 PASS
 - Every check ran once; nothing was re-run. `synthetic` numbers prove the plumbing, not quality on real chats.
 
 | Check | Ticket | Status | Measured | Threshold | Data | Run alone |
@@ -16,6 +16,7 @@
 | extraction.decision_recall | EVAL-004 | **PASS** | decision recall 1.000 | explicit decision recall >= 0.90 | synthetic | `pytest tests/integration/test_extraction_eval.py` |
 | temporal.supersession | EVAL-005 | **REVIEW** | 29 of 31 pairs as expected, 0 false supersession(s) | 0 false supersessions; history kept | synthetic | `ke eval temporal` |
 | end_to_end.vault | EVAL-006 | **PASS** | 13 notes, 35 links, 0 broken; 0 golden difference(s) | ZIP to vault: every link resolves; shape matches the golden | synthetic | `ke eval e2e` |
+| variance.order_and_repeats | EVAL-008 | **PASS** | 3 orders, 0 difference(s), 0 new request(s) on repeat | same answers in 3 shuffled orders and on pinned repeats; differences go to review | synthetic | `ke eval variance` |
 | retrieval.recall_at_10 | RET-008 | **PASS** | hybrid Recall@10 0.971 | Recall@10 >= 0.90 | synthetic | `ke eval retrieval` |
 | relationships.precision | REL-002 | **BLOCKED** | not run | directional relationship precision >= 0.90 | real | `-` |
 | quality.real_golden_set | EVAL-001 | **BLOCKED** | not run | the thresholds above, on the private golden set | real | `ke gold (on the owner's PC)` |

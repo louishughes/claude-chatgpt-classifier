@@ -818,3 +818,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - evaluation/gate.py (Status, Outcome, Check, GateInputs, Result, GateReport, CHECKS, run_gate, classification_report, extraction_report, to_dict, to_markdown); `ke eval gate [--fixtures] [--out] [--commit]`; report docs/evaluation/EVAL-007_GATE.md. Filed #240 (EVAL-012 relationship answer key). No migration.
 - Tests: test_gate.py (4). Full suite 1159 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: EVAL-008.
+
+## 2026-10-28 15:20 EVAL-008 (#112)
+- evaluation/variance.py (SEEDS, SOURCES, ReviewItem, RunView, VarianceReport, shuffled_export, pinned_fake, run_order, differences, run_variance, to_dict); gate line `variance.order_and_repeats`; `ke eval variance [--fixtures]`; docs/evaluation/EVAL-007_GATE.md regenerated (8 PASS, 2 REVIEW, 3 BLOCKED, 0 FAIL). No migration.
+- Tests: test_variance.py (4). Full suite 1163 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: check UI-005 issue #175, then M5.
