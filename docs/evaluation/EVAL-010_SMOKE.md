@@ -84,4 +84,19 @@ ke --json eval links --limit 100
 
 Two URL forms of one video (`youtu.be/…` and `watch?v=…&t=42`) are two link targets but one video: the link registry keeps each URL as written, and the video registry deduplicates by video ID.
 
-**Real 100 chats:** not run yet. It runs on Louis's PC against the imported workspace, and the counts go here.
+**Real 100 chats** (2026-10-28 19:40 UTC, Louis's PC, `workspace/gold-real`, main `dc62616`; `ke --json eval links --limit 100`, read-only, no model calls, counts only):
+
+| Measure | Count |
+|---|---|
+| Chats checked | 100 |
+| Chats with links | 9 |
+| Link occurrences | 95 (66 in message text, 29 from citation metadata) |
+| Distinct targets | 50 (47 web, 3 YouTube videos) |
+| YouTube mentions | 3 (3 distinct videos; 0 with a playlist, 0 with a timestamp; transcripts `not_requested`: 3) |
+| Social account mentions | 7 (3 resolved, 4 ambiguous) |
+| Distinct accounts | 1 (YouTube, `probable`) |
+| Ambiguous bare @names | 3, kept apart and never linked |
+
+```json
+{"conversations": 100, "links": {"conversations_with_links": 9, "distinct_targets": 50, "occurrences": 95, "occurrences_by_origin": {"citation_metadata": 29, "message_text": 66}, "targets_by_kind": {"web": 47, "youtube_video": 3}}, "social": {"accounts_by_platform": {"youtube": 1}, "accounts_by_status": {"probable": 1}, "ambiguous_handles": 3, "distinct_accounts": 1, "mentions": 7, "mentions_by_resolution": {"ambiguous": 4, "resolved": 3}}, "youtube": {"distinct_videos": 3, "mentions": 3, "transcript_status": {"not_requested": 3}, "with_playlist": 0, "with_timestamp": 0}}
+```
