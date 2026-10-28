@@ -2916,3 +2916,24 @@ tests/integration/test_note_checks.py   7 passed (the real note passes; each bre
 Fix attempts: 2 (my FakeProvider digest left out the required intent; the table-cell pipe escape).
 
 **Next exact task:** keywords into the note (NOTE-007 wiring), then NOTE-008.
+
+### 16:10 — NOTE-009: related chats, and a pasted prompt is not a link
+
+The rich note already had a "Related chats" section (from REL-003/REL-004 and NOTE-001): same-project, same-topic and shared-entity links, each naming the other chat's *knowledge note* with a "Why:" reason. What it lacked was a guard against the most common false link in a real archive: many chats open with the same pasted setup prompt ("You are a careful assistant..."). Before this change that prompt alone made two unrelated chats look like a copied opening (`forked_from`), a quoted paragraph (`quotes`), and similar text (`related_to`).
+
+- `extraction/preamble.py` holds one test, `looks_like_preamble`: a user message of 200+ characters that starts like a setup prompt. NOTE-005 already had it privately; it moved to a module with no imports so the relationship detectors can use it without an import cycle.
+- The copied-opening detector skips a setup prompt at the very start; the quote detector ignores setup-prompt paragraphs; the related-chat profile leaves them out of the text it compares.
+- Detector names stay the same (`prefix-v1`, `quote-v1`, `related-v1`) because the evaluation fixtures expect them and evaluation criteria don't change without Louis.
+
+Not done: the issue mentions a one-sentence model-written reason per link. The deterministic reasons ("both chats are labelled with project X", "both chats name the same named thing") are already there and cite evidence; a model sentence can come with the digest stage later if the scoring says the reasons read badly.
+
+**Teach-back (`looks_like_preamble`):** Lots of chats start with the same pasted instructions, so two chats sharing that text says nothing about them being related. This function spots such a prompt: a long user message that opens with words like "You are" or "Act as". The link detectors skip it, so links only come from what the chats are actually about.
+
+Checks:
+```
+tests/integration/test_note_related.py   3 passed (each of the three filters, removed on its own, makes the shared-prompt test fail)
+tests/integration/test_conversation_relationships.py, test_related_conversations.py   unchanged, pass
+```
+Fix attempts: 1 (the first test run showed the copied-opening detector also needed the filter).
+
+**Next exact task:** NOTE-012 dashboard chat view.
