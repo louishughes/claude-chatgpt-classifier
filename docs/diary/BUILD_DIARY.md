@@ -1099,3 +1099,16 @@ pytest -q               # 780 passed, 6 skipped
 Fix attempts: 1 (a variable reused with two types).
 
 **Next exact task:** NRM-004 (topic segments), then the taxonomy tickets.
+
+### 03:05 — The M1 gate passes on Louis's PC
+**What:** the gate run finished in the Remote Control session on Louis's PC (Windows, Python 3.13.2, `main` at d878333). It was read-only, with outputs only in the git-ignored `workspace\rev009\` and nothing committed.
+- **Tests on Windows:** ruff clean, mypy clean, pytest 589 passed, 6 skipped, 0 failed. That includes the ZIP test that used to fail on Windows.
+- **Real smoke, 50 and 100 conversations:** all seven checks passed in both runs (everything rendered, no broken embeds, raw unchanged, counts reconciled, a re-import adds nothing, zero model calls). `raw/` has 2,074 files and none was touched.
+- **`ke inspect`:** three real chats, no graph issues, and branch counts that add up.
+- **`ke ui` on Windows:** home page 200; the chat list 200 with exactly 50 chat links, matching the 50 conversations.
+
+So REV-009 (#143) and EVAL-010 (#39) are closed.
+**Worth fixing (filed, not blocking):** import time hardly grows with the number of conversations, and a re-import takes twice as long as the first import. Something done once over all of `raw/`, probably hashing about 900 images, is repeated (PERF-001, #200). Peak memory isn't measured on Windows, and `ke inspect` prints full native IDs (OPS-009, #201).
+**Talking points:**
+- "The gate isn't my tests passing in the cloud. It's the real export, on the real machine, unchanged afterwards."
+- "Doubling the chats barely changed the time. That tells you the cost is somewhere else."
