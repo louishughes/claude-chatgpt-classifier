@@ -3083,6 +3083,16 @@ Talking points:
 - "Precision for links needs a closed world: the key lists every chat it covers, so a link it doesn't contain really is wrong."
 - "A link pointing the wrong way and a link of the wrong kind need different fixes, so they're counted separately from invented ones."
 - "The answer key is written by a session that never saw the engine's output, and code checks every quote before a single point is scored."
+### 16:45 — NOTE-005 real run and re-score: decisions found went from 5 to 12 out of 22
+
+- `ke extract run` landed on main (#313). Its real run on the 40 gold chats was 85 requests, answered by 5 fresh Claude sessions on the subscription with every quote checked in code, and stored 94 records.
+- The 40 notes were re-rendered and the code rubric passes 35 of 40 (size only).
+- A new scorer session that hadn't seen the first scoring compared them with the same 15 references, which were left unchanged. Decision recall went from 23% to 55%. Open questions stayed at almost zero. The "from the chat" sections are still noisy: 42 lines of pasted custom instructions, left over from the older rule extractor.
+- The report is in `docs/evaluation/NOTE-011_REAL.md` (counts only). The next fixes are to retire rule records once a model extraction exists, take open questions from how a chat ends, add a digest merge step for long chats, and reclassify the 4 unclassified chats.
+
+Talking points:
+- "Same answer key, new scorer: the AI extractor more than doubled how many of my real decisions the notes catch."
+- "The score also showed exactly what's still wrong, which is old rule-based records cluttering the notes, so the next fix is specific."
 
 ### 16:05 UTC — REV-010: answer key v2, written beside v1
 
