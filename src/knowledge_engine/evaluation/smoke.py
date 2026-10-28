@@ -191,12 +191,20 @@ def _windows_peak_mb() -> float | str:
         windll = ctypes.WinDLL  # type: ignore[attr-defined,unused-ignore]
         psapi, kernel32 = windll("psapi"), windll("kernel32")
         kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+        # Without argtypes ctypes passes the process pseudo-handle (-1 as an
+        # unsigned 64-bit value) as a C int, which overflows on 64-bit Windows.
+        psapi.GetProcessMemoryInfo.argtypes = [
+            wintypes.HANDLE,
+            ctypes.POINTER(Counters),
+            wintypes.DWORD,
+        ]
+        psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
         counters = Counters()
         counters.cb = ctypes.sizeof(Counters)
         ok = psapi.GetProcessMemoryInfo(
             kernel32.GetCurrentProcess(), ctypes.byref(counters), counters.cb
         )
-    except (AttributeError, OSError):
+    except (AttributeError, OSError, ctypes.ArgumentError):
         return UNAVAILABLE
     if not ok:
         return UNAVAILABLE
