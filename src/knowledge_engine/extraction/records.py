@@ -40,7 +40,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from knowledge_engine.domain.enums import Role
 from knowledge_engine.domain.models import EvidenceRef
 
-RECORD_SCHEMA_VERSION = "ext-001-v1"
+# v2 (EXT-004): optional strength, polarity and attributed_to.
+RECORD_SCHEMA_VERSION = "ext-001-v2"
 
 
 class RecordType(StrEnum):
@@ -85,6 +86,20 @@ class Scope(StrEnum):
     PROJECT = "project"
     CONVERSATION = "conversation"
     SEGMENT = "segment"
+
+
+class Strength(StrEnum):
+    """How firm a preference or requirement is (EXT-004)."""
+
+    SOFT = "soft"  # "ideally", "would be nice", "I'd rather"
+    HARD = "hard"  # "must", "has to", "never"
+
+
+class Polarity(StrEnum):
+    """For or against."""
+
+    FOR = "for"
+    AGAINST = "against"
 
 
 class Trust(StrEnum):
@@ -155,6 +170,11 @@ class CandidateRecord(BaseModel):
         term_ids: Approved taxonomy term IDs it concerns.
         evidence: The exact quotes it rests on.
         review_reason: Why the extractor itself is unsure, if it is.
+        strength: Soft or hard, for preferences and requirements.
+        polarity: For or against, for preferences.
+        attributed_to: Set when the speaker reports someone else's view
+            ("my client wants..."): a category such as ``external``, never
+            a guessed name. Such a record is not the speaker's own.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -170,6 +190,9 @@ class CandidateRecord(BaseModel):
     term_ids: tuple[str, ...] = ()
     evidence: tuple[EvidenceRef, ...] = ()
     review_reason: str | None = Field(default=None, max_length=500)
+    strength: Strength | None = None
+    polarity: Polarity | None = None
+    attributed_to: str | None = Field(default=None, max_length=40)
 
     @model_validator(mode="after")
     def _check(self) -> CandidateRecord:

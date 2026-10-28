@@ -678,3 +678,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - extraction/records.py (RecordType, Origin, Acceptance, Scope, Trust, TRANSITIONS, COMMITMENTS, Provenance, CandidateRecord, KnowledgeRecord, advance, TrustTransitionError); extraction/evidence.py (check_record, revision_text, Verdict, EvidenceCheck, EvidenceProblem).
 - Tests: test_knowledge_records.py (14), test_evidence_validator.py (7). Full suite 908 passed, 6 skipped; ruff, mypy OK; drift 0.
 - Next: EXT-003 + EXT-004.
+
+## 2026-10-28 07:40 EXT-003 + EXT-004 (#71, #72)
+- extraction/text.py (ExtractionMessage, segment_extraction_messages, sentences, quote); extraction/decisions.py (extract_decisions); extraction/preferences.py (extract_preferences); records.py v2 (Strength, Polarity, attributed_to); evidence.py (quoted_at, inside_quotation, someone_elses_view); synthetic case extraction_rules.
+- Tests: test_rule_extractors.py (8). Full suite 926 passed, 6 skipped; ruff, mypy OK; drift 0.
+- Next: EXT-005 + EXT-006.
