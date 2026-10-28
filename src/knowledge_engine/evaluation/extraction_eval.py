@@ -293,6 +293,68 @@ def _compare(agreement: dict[str, Agreement], gold: GoldRecord, item: ScoredReco
         agreement["strength"].add(record.strength is gold.strength)
 
 
+@dataclass
+class Matching:
+    """Which produced record answered which expected one (the pairing behind the numbers).
+
+    ``evaluate_extraction`` counts these; the evaluation dashboard (UI-006)
+    shows them one by one, so both read the very same pairing.
+
+    Attributes:
+        matched: (native conversation ID, expected record, produced record).
+        missed: (native conversation ID, expected record) nobody produced.
+        extra: Produced records in annotated conversations that no
+            expected record claimed (false positives).
+        forbidden: (produced record, the forbidden entry it hit).
+        scored_ids: Record IDs in conversations annotated for records.
+    """
+
+    matched: list[tuple[str, GoldRecord, ScoredRecord]] = field(default_factory=list)
+    missed: list[tuple[str, GoldRecord]] = field(default_factory=list)
+    extra: list[ScoredRecord] = field(default_factory=list)
+    forbidden: list[tuple[ScoredRecord, GoldForbidden]] = field(default_factory=list)
+    scored_ids: set[str] = field(default_factory=set)
+
+
+def match_extraction(gold: GoldSet, produced: Sequence[ScoredRecord]) -> Matching:
+    """Pair produced records with the answer key. Rejected records are ignored.
+
+    Args:
+        gold: The answer keys.
+        produced: Stored records (``scored_records``).
+    """
+    live = [item for item in produced if item.record.trust is not Trust.REJECTED]
+    found = Matching()
+    for conversation in gold.conversations:
+        native = conversation.native_conversation_id
+        here = [item for item in live if item.native_conversation_id == native]
+        for rule in conversation.forbidden:
+            found.forbidden += [(item, rule) for item in here if _forbidden_hit(item, native, rule)]
+        if not conversation.records_annotated:
+            continue
+        unmatched = list(here)
+        found.scored_ids |= {item.record.record_id for item in here}
+        for expected in conversation.records:
+            candidates = [
+                item
+                for item in unmatched
+                if item.record.record_type is expected.record_type
+                and _quotes(item, native, expected.message_id)
+            ]
+            if not candidates:
+                found.missed.append((native, expected))
+                continue
+            # Two records of one type can quote the same message (the user's
+            # own preference and a client's). Pair each gold record with the
+            # candidate that agrees on the most attributes, so a correct
+            # record isn't paired with its twin and miscounted.
+            best = max(candidates, key=lambda c: _agreements(expected, c))
+            unmatched.remove(best)
+            found.matched.append((native, expected, best))
+        found.extra += unmatched
+    return found
+
+
 def evaluate_extraction(
     gold: GoldSet,
     produced: Sequence[ScoredRecord],
@@ -317,51 +379,32 @@ def evaluate_extraction(
             (``segmenter.truncation_count``); must be 0. None: not measured.
     """
     live = [item for item in produced if item.record.trust is not Trust.REJECTED]
+    found = match_extraction(gold, live)
     by_type: dict[str, TypeScore] = defaultdict(TypeScore)
     by_band: dict[str, TypeScore] = defaultdict(TypeScore)
     agreement: dict[str, Agreement] = defaultdict(Agreement)
-    forbidden_produced: list[str] = []
-    forbidden_in_truth: list[str] = []
-    unsupported: list[str] = []
-    scored_ids: set[str] = set()
-    forbidden_ids: set[str] = set()
+
+    def band(native: str) -> TypeScore:
+        return by_band[length_band(lengths.get(native) if lengths else None)]
+
+    # Every annotated conversation's band is listed, even one with no records.
     for conversation in gold.conversations:
-        native = conversation.native_conversation_id
-        here = [item for item in live if item.native_conversation_id == native]
-        for rule in conversation.forbidden:
-            for item in here:
-                if _forbidden_hit(item, native, rule):
-                    forbidden_ids.add(item.record.record_id)
-                    forbidden_produced.append(item.record.record_id)
-                    if item.record.trust in _TRUTH:
-                        forbidden_in_truth.append(item.record.record_id)
-        if not conversation.records_annotated:
-            continue
-        unmatched = list(here)
-        scored_ids |= {item.record.record_id for item in here}
-        band = by_band[length_band(lengths.get(native) if lengths else None)]
-        for expected in conversation.records:
-            candidates = [
-                item
-                for item in unmatched
-                if item.record.record_type is expected.record_type
-                and _quotes(item, native, expected.message_id)
-            ]
-            if not candidates:
-                by_type[expected.record_type.value].false_neg += 1
-                band.false_neg += 1
-                continue
-            # Two records of one type can quote the same message (the user's
-            # own preference and a client's). Pair each gold record with the
-            # candidate that agrees on the most attributes, so a correct
-            # record isn't paired with its twin and miscounted.
-            best = max(candidates, key=lambda c: _agreements(expected, c))
-            unmatched.remove(best)
-            by_type[expected.record_type.value].true_pos += 1
-            band.true_pos += 1
-            _compare(agreement, expected, best)
-        for item in unmatched:
-            by_type[item.record.record_type.value].false_pos += 1
+        if conversation.records_annotated:
+            band(conversation.native_conversation_id)
+    for native, expected, item in found.matched:
+        by_type[expected.record_type.value].true_pos += 1
+        band(native).true_pos += 1
+        _compare(agreement, expected, item)
+    for native, expected in found.missed:
+        by_type[expected.record_type.value].false_neg += 1
+        band(native).false_neg += 1
+    for item in found.extra:
+        by_type[item.record.record_type.value].false_pos += 1
+    forbidden_ids = {item.record.record_id for item, _ in found.forbidden}
+    forbidden_in_truth = [
+        item.record.record_id for item, _ in found.forbidden if item.record.trust in _TRUTH
+    ]
+    unsupported: list[str] = []
     for item in live:
         record = item.record
         if record.record_type is not RecordType.DECISION or record.trust not in _TRUTH:
@@ -382,9 +425,9 @@ def evaluate_extraction(
         by_type=dict(sorted(by_type.items())),
         agreement=dict(sorted(agreement.items())),
         produced=len(live),
-        unscored=len(live) - len(scored_ids),
+        unscored=len(live) - len(found.scored_ids),
         anchors_valid=sum(1 for item in live if item.anchors_valid),
-        forbidden_produced=sorted(set(forbidden_produced)),
+        forbidden_produced=sorted(forbidden_ids),
         forbidden_in_truth=sorted(set(forbidden_in_truth)),
         unsupported_truth_decisions=sorted(set(unsupported)),
         key=key or key_from_gold(gold),

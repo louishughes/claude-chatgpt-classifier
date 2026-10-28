@@ -45,3 +45,13 @@ form.search button { margin-top: 0; }
 fieldset.modes { grid-column: 1 / -1; border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: .3rem 1.2rem; }
 fieldset.modes label { margin-top: 0; }
 header { flex-wrap: wrap; }
+.keyblock { border-left: 4px solid var(--info); padding: .3rem .8rem; margin: 1rem 0; }
+.keyblock h2 { margin: .2rem 0; font-size: 1.1rem; }
+.good { color: var(--good); }
+.look { color: var(--look); }
+.verdict.matched { color: var(--good); }
+.verdict.extra, .verdict.forbidden, .verdict.missed { color: var(--look); }
+tr.total td { font-weight: 600; }
+.columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0 1.5rem; }
+.columns h3 { font-size: 1rem; margin-bottom: .2rem; }
+blockquote.quote { margin: .8rem 0 .2rem; padding: .4rem .8rem; border-left: 4px solid var(--line); white-space: pre-wrap; overflow-wrap: anywhere; }

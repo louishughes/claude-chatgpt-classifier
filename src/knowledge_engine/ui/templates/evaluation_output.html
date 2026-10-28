@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "macros.html" import where %}
+{% block title %}Output · Evaluation · Knowledge Engine{% endblock %}
+{% block main %}
+{% set r = found.record %}
+<p class="muted"><a href="/evaluation/outputs">← Each output</a></p>
+<h1>{{ r.type }}: {{ r.assertion }}</h1>
+<p>Whose: <strong>{{ r.actor }}</strong>{% if r.attributed_to %} (reports {{ r.attributed_to }}){% endif %} · acceptance {{ r.acceptance }}{% if r.strength %} · strength {{ r.strength }}{% endif %} · trust <strong>{{ r.trust }}</strong> <span class="muted">({{ r.trust_words }})</span></p>
+{% if found.made_by %}<p class="muted">Made by <code>{{ found.made_by.stage }}</code> version <code>{{ found.made_by.version }}</code>{% if found.made_by.provider %} through <code>{{ found.made_by.provider }}</code>{% endif %}{% if found.made_by.model %} ({{ found.made_by.model }}){% endif %}.</p>{% else %}<p class="muted">Entered by a reviewer, not an extractor.</p>{% endif %}
+{% if r.why %}<p>Sent to review because: {{ r.why }}</p>{% endif %}
+
+<h2>Evidence</h2>
+{% for q in found.quotes %}
+<blockquote class="quote">{% if q.text is not none %}{{ q.text }}{% else %}<span class="muted">(the quoted message isn't in this workspace)</span>{% endif %}</blockquote>
+<p class="muted">{{ q.speaker }} said it · characters {{ q.span }} · {{ where(q.place) }}</p>
+{% else %}<p class="muted">No quotes.</p>{% endfor %}
+<p>Automatic evidence check today: <strong>{{ found.check.verdict }}</strong>{% if found.check.problems %} ({{ found.check.problems | join(", ") }}){% endif %} <span class="muted">· code, validator <code>{{ found.check.version }}</code></span></p>
+
+<h2>Against the answer key</h2>
+{% with key = found.key, key_error = found.key_error %}{% include "_keyblock.html" %}{% endwith %}
+{% set c = found.comparison %}
+{% if c %}
+<p class="verdict {{ c.verdict }}"><strong>{{ c.verdict_words }}</strong></p>
+{% if c.expected %}
+<p class="muted">Expected record quotes {% if c.expected.place %}<a href="/chats/{{ c.expected.place[0] }}#{{ c.expected.place[2] }}">this message in {{ c.expected.place[1] }}</a>{% else %}a message not in this workspace{% endif %}.</p>
+<table>
+  <thead><tr><th>Attribute</th><th>Answer key</th><th>This output</th><th></th></tr></thead>
+  <tbody>{% for row in c.rows %}<tr><td>{{ row.name }}</td><td>{{ row.expected }}</td><td>{{ row.produced }}</td><td class="{{ 'good' if row.agrees else 'look' }}">{{ "agrees" if row.agrees else "differs" }}</td></tr>{% endfor %}</tbody>
+</table>
+{% endif %}
+{% for f in c.forbidden %}<p class="error">Forbidden by the key ({{ f.type }} by {{ f.actor }}): {{ f.reason }}</p>{% endfor %}
+{% endif %}
+
+<h2>History</h2>
+<p class="muted">Who changed this output's trust, and why. Reviewer names are as recorded; the owner delegated review to independent AI sessions, so a name here is not your approval.</p>
+<table>
+  <thead><tr><th>When</th><th>Who</th><th>Change</th><th>Reason</th></tr></thead>
+  <tbody>{% for h in found.history %}<tr><td class="muted">{{ h.at | when }}</td><td{% if h.is_validator %} class="muted"{% endif %}>{{ h.who }}</td><td>{{ h.change }}</td><td>{{ h.note or "" }}</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}

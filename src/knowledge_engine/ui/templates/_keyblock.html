@@ -1,0 +1,12 @@
+{# Who checked the answer key: printed above every score (LEG-002, REV-012). #}
+{% if key %}
+<div class="keyblock">
+  <h2>{{ key.heading }}</h2>
+  <p>Answer key <code>{{ key.version }}</code>, SHA-256 <code class="wrap">{{ key.sha256 }}</code>.<br>
+  Checked by: <strong>{{ key.label }}</strong> (<code>{{ key.kind }}</code>){% if key.review_sha256 %}; review record SHA-256 <code class="wrap">{{ key.review_sha256 }}</code>{% endif %}.</p>
+</div>
+{% elif key_error %}
+<p class="error">{{ key_error }} Scores are shown as unscored.</p>
+{% else %}
+<p class="keyblock muted">No answer key loaded, so nothing here is scored. Start the interface with <code>ke ui --gold PATH --reviewer ai_session --review REVIEW.md</code> to compare outputs with a private answer key.</p>
+{% endif %}

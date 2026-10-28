@@ -2340,3 +2340,34 @@ ci                                        5/5 ok, 1237 passed, 7 skipped
 Fix attempts: 0.
 
 **Next exact task:** API-005 (document build, preview and export endpoints).
+
+### 11:20 — UI-006: an evaluation dashboard in `ke ui` (#260)
+
+**What Louis asked:** "I also need a dashboard to evaluate each output and all the other outputs." He doesn't label or review anything himself (project rule), so this had to be a page for *judging*, not a labelling tool: read only, no forms, and every score saying who checked the answer key.
+
+**What was built:**
+- `/evaluation` is the overview. It counts every output the engine stored: knowledge records by type and trust, classifications, chat links, vocabulary proposals and model requests. Reviewer decisions and the automatic evidence check are counted separately. With an answer key loaded it shows precision, recall and F1 per record type, attribute agreement, how many quotes are still valid and the hard gate.
+- `/evaluation/outputs` lists every knowledge record with its verdict: matches the key, not in the key, forbidden, not scored or rejected. Below that come the expected records nothing found, each linked to the message.
+- `/evaluation/outputs/<id>` shows one output: its quotes in full, what the evidence check says *today*, who changed its trust and why, and a row-by-row comparison with the expected record.
+- `ke ui --gold PATH --reviewer ai_session --review REVIEW.md` points it at the private key. The key is only read and stays in the git-ignored workspace. `--gold` without `--reviewer` is refused, so a score can't appear without saying who checked the key.
+
+**Key decision: one pairing, two readers.** The EVAL-004 scorer only returned totals, so the page couldn't say *which* record was the false positive. I moved its matching loop into `match_extraction()`, which returns the pairs, and made `evaluate_extraction()` count those pairs. The rules are the same and so are the numbers: the existing scorer tests pass unchanged, and a new test checks the dashboard's counts against the scorer's. A second, look-alike copy of the matching for the page would have drifted from the real one sooner or later.
+
+**Challenge:** the synthetic answer key scores a perfect 1.000 on the rule extractors, so the "extra" and "missed" paths were never exercised. One test now writes a changed *copy* of the key to a temp folder: one expected type is changed and one record is forbidden. The committed key is untouched.
+
+**Teach-back (`ui/evaluation.py`):** The dashboard reads what the engine stored and compares it with a private answer key, using exactly the same pairing as the scoring report, so the page and the report always agree. For each output it shows the quotes, today's automatic check, the review history and whether it matched, wasn't expected, was forbidden or wasn't scored. Every number names the answer key it used and who checked that key, and only my own review could ever show "Owner verdict".
+
+Checks:
+```
+tests/integration/test_ui_evaluation.py   8 passed
+tests/integration/test_extraction_eval.py, test_gold_score.py, test_gate.py   unchanged, pass
+ci                                        lint, format, types, guard ok; 1240 passed, 7 skipped
+```
+Fix attempts: 1 (a test read a field the key leaves out when false).
+
+**Next exact task:** PR 2 of the dashboard: classifications per segment against the key's labels, the model-request ledger, and saved gate reports.
+
+**Talking points:**
+- "I built a dashboard to judge my AI's output without labelling anything myself. Every score says which answer key it used and that an AI checked that key, not me."
+- "The page and the report use one matching function, so they can't disagree."
+- "It's deliberately read-only. An evaluation page that let me edit answers would turn me into the labeller, and grading against your own edits is how the last attempt fooled itself."

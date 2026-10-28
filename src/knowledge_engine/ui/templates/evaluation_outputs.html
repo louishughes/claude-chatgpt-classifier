@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% from "macros.html" import where %}
+{% block title %}Outputs · Evaluation · Knowledge Engine{% endblock %}
+{% block main %}
+<h1>Each output</h1>
+<p class="muted"><a href="/evaluation">← Evaluation overview</a>. Every knowledge record, with what the answer key says about it. Open one to see its quotes, checks and history. This page only shows; it changes nothing.</p>
+{% if found is none %}
+<p>Nothing imported yet.</p>
+{% else %}
+{% with key = found.key, key_error = found.key_error %}{% include "_keyblock.html" %}{% endwith %}
+<p>{% for v, n, words in found.tally %}<a href="/evaluation/outputs?verdict={{ v }}{% if found.record_type %}&amp;type={{ found.record_type }}{% endif %}"{% if found.verdict == v %} class="current"{% endif %}>{{ words }}</a> {{ n }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+<form method="get" action="/evaluation/outputs">
+  <label>Type <select name="type"><option value="">any</option>{% for t in found.types %}<option{% if found.record_type == t %} selected{% endif %}>{{ t }}</option>{% endfor %}</select></label>
+  {% if found.key %}<label>Verdict <select name="verdict"><option value="">any</option>{% for v in found.verdicts %}<option{% if found.verdict == v %} selected{% endif %}>{{ v }}</option>{% endfor %}</select></label>{% endif %}
+  <button>Show</button>
+</form>
+{% if found.records %}
+<table>
+  <thead><tr><th>Type</th><th>Output</th><th>Whose</th><th>Trust</th><th>Against the key</th></tr></thead>
+  <tbody>
+  {% for r in found.records %}
+  <tr><td>{{ r.type }}</td><td><a href="/evaluation/outputs/{{ r.record_id }}">{{ r.assertion }}</a></td><td>{{ r.actor }}</td><td>{{ r.trust }}</td><td class="verdict {{ r.verdict }}">{{ r.verdict_words }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% elif found.verdict != "missed" %}<p>No outputs{% if found.verdict or found.record_type %} match this filter{% endif %}.</p>{% endif %}
+{% if found.missed %}
+<h2>Expected but missed</h2>
+<p class="muted">Records the answer key expects that no output matched. Follow the link to read the message.</p>
+<table>
+  <thead><tr><th>Type</th><th>Whose</th><th>Expected details</th><th>Message</th></tr></thead>
+  <tbody>
+  {% for m in found.missed %}
+  <tr><td>{{ m.type }}</td><td>{{ m.actor }}</td><td class="muted">{% if m.acceptance %}acceptance {{ m.acceptance }} {% endif %}{% if m.attributed_to %}reports {{ m.attributed_to }} {% endif %}{% if m.strength %}strength {{ m.strength }}{% endif %}</td><td>{% if m.place %}<a href="/chats/{{ m.place[0] }}#{{ m.place[2] }}">{{ m.place[1] }}</a>{% else %}<span class="muted">(message not in this workspace)</span>{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endif %}
+{% endblock %}
