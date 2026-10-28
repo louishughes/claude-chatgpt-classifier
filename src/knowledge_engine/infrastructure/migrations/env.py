@@ -20,6 +20,7 @@ from knowledge_engine.infrastructure import jobs as _jobs  # noqa: F401
 from knowledge_engine.infrastructure import workspace as _workspace  # noqa: F401
 from knowledge_engine.infrastructure.db import Base
 from knowledge_engine.links import store as _links  # noqa: F401
+from knowledge_engine.links import video_transcripts as _video_transcripts  # noqa: F401
 from knowledge_engine.links import youtube as _youtube  # noqa: F401
 
 engine = context.config.attributes.get("engine")
