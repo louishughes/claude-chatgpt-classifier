@@ -534,3 +534,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - MediaLibrary.resolve + Resolution (rules: no_scheme/unknown_scheme, no_matching_file/listed_but_absent, file_id_name, conversation_folder, identical_bytes, several_files, too_large); asset_occurrences.evidence_json (migration 0008). graph.nodes.attachment_pointers (metadata.attachments). SourceListing.declared_media from split-export index files (forgiving reader; entry shape to confirm at REV-009).
 - Tests: test_pointer_resolution.py (6), test_canonical_nodes.py +1. Full suite 504 passed, 6 skipped.
 - Next: slice I6 (ING-007 + IMP-005).
+
+## 2026-10-28 00:01 ING-007 + IMP-005 (slice I6)
+- importer/integrity.py (source_counts from raw JSON, IntegrityTally, mismatches -> integrity_mismatch warning); ConversationDelta gains nodes/content_types/unparsed_parts; MediaDelta.duplicate_assets; MediaLibrary.referenced; ImportReport.integrity + summary(); cli `ke imports report [latest|ID]` reads the ledger only; nested dicts in text output are bracketed.
+- Tests: test_import_report.py (20, incl. all 14 fixture manifests). Full suite 524 passed, 6 skipped.
+- Next: slice R2 (MED-004).

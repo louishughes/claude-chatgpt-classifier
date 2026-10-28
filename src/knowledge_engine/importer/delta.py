@@ -35,6 +35,7 @@ from knowledge_engine.domain.ids import (
 from knowledge_engine.graph.conversation import ConversationGraph
 from knowledge_engine.graph.nodes import (
     AssetPointer,
+    PartKind,
     attachment_pointers,
     canonical_json,
     canonical_node,
@@ -68,6 +69,10 @@ class ConversationDelta:
         pointers: ``(revision_id, pointer)`` for every asset pointer and
             attachment in the conversation's current revisions, for the
             media step.
+        nodes: Graph nodes written or confirmed (for ING-007's reconciliation).
+        content_types: Message content type -> count.
+        unparsed_parts: Content parts kept only as raw JSON because their
+            shape isn't understood yet. Kept, never dropped, but counted.
     """
 
     conversation_id: str
@@ -78,6 +83,9 @@ class ConversationDelta:
     new_branches: int = 0
     raw_observations: int = 0
     pointers: list[tuple[str, AssetPointer]] = field(default_factory=list)
+    nodes: int = 0
+    content_types: Counter[str] = field(default_factory=Counter)
+    unparsed_parts: int = 0
 
 
 def native_conversation_id(native: Mapping[str, Any]) -> str | None:
@@ -156,7 +164,7 @@ def apply_conversation(
     conversation.presence = "present"
     conversation.last_import_id = import_id
 
-    delta = ConversationDelta(conv_key, DeltaCategory.NEW)
+    delta = ConversationDelta(conv_key, DeltaCategory.NEW, nodes=len(graph.nodes))
     for issue in graph.issues:
         delta.warnings[f"graph_{issue.code.value}"] += 1
 
@@ -180,6 +188,8 @@ def apply_conversation(
 
         canonical = canonical_node(node_id, mapping[node_id])
         if canonical is not None:
+            delta.content_types[canonical.content_type or "none"] += 1
+            delta.unparsed_parts += sum(1 for p in canonical.parts if p.kind is PartKind.OTHER)
             for warning in canonical.warnings:
                 delta.warnings[f"content_{warning.value}"] += 1
             revision_key = message_revision_id(node_key, canonical.canonical_content_hash)

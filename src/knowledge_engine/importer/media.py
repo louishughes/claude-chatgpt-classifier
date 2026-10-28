@@ -32,7 +32,7 @@ from __future__ import annotations
 import struct
 import zipfile
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -170,6 +170,8 @@ class MediaDelta:
         availability: Availability state -> count, over every occurrence
             this import saw (new or not).
         warnings: Warning code -> count.
+        asset_blobs: Asset ID -> blob hash, for every available asset this
+            import saw (to count assets that share bytes).
     """
 
     new_blobs: int = 0
@@ -177,6 +179,11 @@ class MediaDelta:
     new_occurrences: int = 0
     availability: Counter[str] = field(default_factory=Counter)
     warnings: Counter[str] = field(default_factory=Counter)
+    asset_blobs: dict[str, str] = field(default_factory=dict)
+
+    def duplicate_assets(self) -> int:
+        """Return how many assets seen are byte-for-byte copies of another."""
+        return len(self.asset_blobs) - len(set(self.asset_blobs.values()))
 
     def counts(self) -> dict[str, int]:
         """Return the ``new_*`` counts as a dict."""
@@ -251,6 +258,17 @@ class MediaLibrary:
             Matching files, sorted by path.
         """
         return [media for media in self._by_name if _belongs(media.name, file_id)]
+
+    def referenced(self, file_ids: Iterable[str]) -> int:
+        """Return how many listed files at least one of ``file_ids`` names.
+
+        Args:
+            file_ids: File IDs from the pointers an import saw.
+
+        Returns:
+            The count of distinct files (ING-007's "referenced").
+        """
+        return len({m.path for file_id in set(file_ids) for m in self.candidates(file_id)})
 
     def resolve(self, pointer: AssetPointer, conversation_native_id: str | None) -> Resolution:
         """Decide which file, if any, a pointer refers to.
@@ -371,6 +389,7 @@ def record_occurrences(
         row = session.get(AssetOccurrenceRow, occurrence_key)
         if row is not None and row.availability == AssetAvailability.AVAILABLE.value:
             delta.availability[row.availability] += 1
+            _note_blob(session, row.asset_id, delta)
             continue
         resolution = library.resolve(pointer, conversation_native_id)
         asset_id = _apply(
@@ -404,7 +423,15 @@ def record_occurrences(
             row.evidence_json = resolution.evidence()
             row.resolved_import_id = import_id
         delta.availability[state.value] += 1
+        if state is AssetAvailability.AVAILABLE:
+            _note_blob(session, asset_id, delta)
     session.flush()
+
+
+def _note_blob(session: Session, asset_id: str | None, delta: MediaDelta) -> None:
+    asset = session.get(MediaAssetRow, asset_id) if asset_id else None
+    if asset is not None and asset.blob_sha256 is not None:
+        delta.asset_blobs[asset.asset_id] = asset.blob_sha256
 
 
 def _apply(

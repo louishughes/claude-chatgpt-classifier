@@ -727,3 +727,25 @@ pytest -q               # 504 passed, 6 skipped (7 new)
 Finish line: `asset_problems` states by pointer match the answer key exactly; a manifest-listed but absent file is `missing` with rule `listed_but_absent`; ambiguous candidates store no blob; no occurrence has an invented path. Fix attempts: 0.
 
 **Next exact task:** slice I6 (ING-007 integrity reconciliation + IMP-005 import report and `ke imports report latest`).
+
+### 00:01 — ING-007 + IMP-005: the import checks its own work, and keeps the receipt
+**What:** Every import now counts the source twice: once straight from the raw files, once from what it actually stored. If they disagree, the report says `reconciled: false` and names what's off, instead of quietly losing something. The report is saved with the import, and `ke imports report` shows it again later, as JSON or readable text. 20 new tests, 524 in total.
+**What the report now answers:**
+- **What changed:** new, unchanged and revised conversations and messages, new branches, new images.
+- **What needs a look:** missing or ambiguous images, chats with duplicate or missing IDs, failures, and images whose bytes duplicate another's.
+- **What later stages must redo:** how many conversations and message versions changed. On an identical re-import that's zero.
+- **Fidelity:** which message types appeared, how many content pieces are kept only as raw JSON because I don't understand them yet, and how many image files no message mentions.
+**Checked against every fixture:** all 14 fake exports reconcile, and their reports match each answer key's counts. A test breaks one on purpose (a broken entry in the message tree) and the report flags it.
+**Privacy:** the report is counts and codes only. A test scans the JSON and the text output for every title and message from the fake export and finds none.
+**Teach-back (`importer/integrity.py`):** "The importer counts the source and counts what it stored, separately. If the numbers don't match, the report says which ones and raises a warning, so nothing is ever lost quietly. Anything the parser doesn't understand yet is kept as raw JSON and counted, so it stays visible."
+**Talking points:**
+- "Every import comes with a receipt, and the receipt checks itself."
+- "An identical re-import says, in numbers, that there's nothing to redo."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 77 source files
+pytest -q               # 524 passed, 6 skipped (20 new)
+```
+Finish line: `ke imports report latest` matches each fixture manifest (14 cases), the identical re-import is all unchanged with 0 model calls, and `reexport_v1` → `v2` matches its answer key. Fix attempts: 1 (first draft of the report command called a method that doesn't exist; caught by mypy before any test ran).
+
+**Next exact task:** slice R2 (MED-004: image embeds and missing-image markers in notes).
