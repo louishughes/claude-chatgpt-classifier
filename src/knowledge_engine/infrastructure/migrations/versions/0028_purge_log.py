@@ -10,6 +10,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
+from knowledge_engine.infrastructure.dialects import run_triggers
 from knowledge_engine.retention.tombstones import PURGE_LOG_TRIGGERS
 
 revision: str = "0028_purge_log"
@@ -46,8 +47,7 @@ def upgrade() -> None:
         batch_op.create_index(
             batch_op.f("ix_purge_tombstones_purge_id"), ["purge_id"], unique=False
         )
-    for statement in PURGE_LOG_TRIGGERS:
-        op.execute(statement)
+    run_triggers(PURGE_LOG_TRIGGERS)
 
 
 def downgrade() -> None:

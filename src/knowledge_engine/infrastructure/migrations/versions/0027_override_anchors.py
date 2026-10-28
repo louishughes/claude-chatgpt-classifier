@@ -11,6 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 from knowledge_engine.importer.corrections import APPEND_ONLY_TRIGGERS
+from knowledge_engine.infrastructure.dialects import run_triggers
 
 revision: str = "0027_override_anchors"
 down_revision: str | None = "0026_document_builds"
@@ -36,8 +37,7 @@ def upgrade() -> None:
             batch_op.create_index(
                 batch_op.f(f"ix_override_anchors_{column}"), [column], unique=False
             )
-    for statement in APPEND_ONLY_TRIGGERS:
-        op.execute(statement)
+    run_triggers(APPEND_ONLY_TRIGGERS)
 
 
 def downgrade() -> None:
