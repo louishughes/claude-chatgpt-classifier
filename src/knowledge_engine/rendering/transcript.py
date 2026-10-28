@@ -201,6 +201,69 @@ def node_key_for_anchor(anchor: str) -> str:
     return anchor.replace("-", "_", 1)
 
 
+@dataclass(frozen=True)
+class TranscriptSection:
+    """One run of messages in a transcript, shared by notes and the web view.
+
+    Attributes:
+        kind: ``active``, ``alternate`` or ``outside`` (left off every path
+            by a damaged tree).
+        messages: Native node IDs, in reading order.
+        branch_kind: For an alternate: the fork kind (``edit``,
+            ``regeneration``...), else None.
+        parent: For an alternate: the message it branches off after, or
+            None when it starts the conversation or its parent is missing.
+        detached: For an alternate whose first message has no parent at all.
+    """
+
+    kind: str
+    messages: tuple[str, ...]
+    branch_kind: str | None = None
+    parent: str | None = None
+    detached: bool = False
+
+
+def transcript_sections(conversation: StoredConversation) -> list[TranscriptSection]:
+    """Split a conversation into its active path, alternates and leftovers.
+
+    Every message node appears in exactly one section, exactly once. Nothing
+    is merged: an alternate branch is its own sequence.
+
+    Args:
+        conversation: From ``load_conversation``.
+
+    Returns:
+        The active path first, then each alternate branch, then any messages
+        outside the tree.
+    """
+    graph = conversation.graph
+    rendered: set[str] = set(graph.active_messages)
+    sections = [TranscriptSection("active", tuple(graph.active_messages))]
+    kinds = {point.parent_id: point.kind.value for point in graph.branch_points}
+    for path in sorted(graph.alternate_paths()):
+        fresh = [n for n in path if n not in rendered and n in conversation.messages]
+        if not fresh:
+            continue
+        start = path.index(fresh[0])
+        parent = path[start - 1] if start > 0 else None
+        members = tuple(n for n in path[start:] if n in conversation.messages and n not in rendered)
+        rendered.update(members)
+        sections.append(
+            TranscriptSection(
+                "alternate",
+                members,
+                branch_kind=kinds.get(parent, "other") if parent is not None else None,
+                parent=parent,
+                detached=parent is None,
+            )
+        )
+    # Anything a damaged tree left off every path (e.g. inside a loop).
+    leftover = tuple(sorted(n for n in conversation.messages if n not in rendered))
+    if leftover:
+        sections.append(TranscriptSection("outside", leftover))
+    return sections
+
+
 def transcript_model(conversation: StoredConversation) -> DocumentModel:
     """Build the transcript note for one conversation.
 
@@ -211,35 +274,27 @@ def transcript_model(conversation: StoredConversation) -> DocumentModel:
         The note model. Every message node appears exactly once.
     """
     graph = conversation.graph
-    rendered: set[str] = set()
-    blocks: list[Block] = [Heading("Active path", 2)]
-    for native_id in graph.active_messages:
-        blocks += _message_blocks(conversation, native_id, graph.message_number(native_id))
-        rendered.add(native_id)
-
-    kinds = {point.parent_id: point.kind.value for point in graph.branch_points}
+    blocks: list[Block] = []
     alternates: list[Block] = []
-    for path in sorted(graph.alternate_paths()):
-        fresh = [n for n in path if n not in rendered and n in conversation.messages]
-        if not fresh:
-            continue
-        start = path.index(fresh[0])
-        parent = path[start - 1] if start > 0 else None
-        heading, where = _branch_label(conversation, parent, kinds)
-        alternates += [Heading(heading, 3), Paragraph(where, trusted=True)]
-        for native_id in path[start:]:
-            if native_id in conversation.messages and native_id not in rendered:
+    for section in transcript_sections(conversation):
+        if section.kind == "active":
+            blocks.append(Heading("Active path", 2))
+            for native_id in section.messages:
+                blocks += _message_blocks(conversation, native_id, graph.message_number(native_id))
+        elif section.kind == "alternate":
+            heading, where = _branch_label(conversation, section)
+            alternates += [Heading(heading, 3), Paragraph(where, trusted=True)]
+            for native_id in section.messages:
                 alternates += _message_blocks(conversation, native_id, None)
-                rendered.add(native_id)
+        else:
+            if alternates:
+                blocks += [Heading("Alternate branches", 2), *alternates]
+                alternates = []
+            blocks.append(Heading("Messages outside the tree", 2))
+            for native_id in section.messages:
+                blocks += _message_blocks(conversation, native_id, None)
     if alternates:
         blocks += [Heading("Alternate branches", 2), *alternates]
-
-    # Anything a damaged tree left off every path (e.g. inside a loop).
-    leftover = sorted(n for n in conversation.messages if n not in rendered)
-    if leftover:
-        blocks.append(Heading("Messages outside the tree", 2))
-        for native_id in leftover:
-            blocks += _message_blocks(conversation, native_id, None)
 
     properties: dict[str, PropertyValue] = {
         "ke_type": "source_transcript",
@@ -342,15 +397,13 @@ def _message_blocks(
     return blocks
 
 
-def _branch_label(
-    conversation: StoredConversation, parent: str | None, kinds: Mapping[str, str]
-) -> tuple[str, str]:
+def _branch_label(conversation: StoredConversation, section: TranscriptSection) -> tuple[str, str]:
     # Returns the heading and a line saying where the branch leaves. The
     # line is built only from numbers and generated anchors, so it is safe
     # to render unescaped (headings are always escaped, links included).
-    if parent is None:
+    parent = section.parent
+    if section.detached or parent is None:
         return "Detached messages", "Their parent message is missing from the export."
-    kind = kinds.get(parent, "other")
     number = conversation.graph.message_number(parent)
     if number is not None:
         where = f"Branches off after message {number} of the active path."
@@ -358,4 +411,4 @@ def _branch_label(
         where = f"Branches off after [[#^{message_anchor(conversation.node_keys[parent])}]]."
     else:
         where = "Branches off at the start of the conversation."
-    return f"Alternate ({kind})", where
+    return f"Alternate ({section.branch_kind or 'other'})", where

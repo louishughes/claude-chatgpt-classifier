@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ chat.title }} · Knowledge Engine{% endblock %}
+{% macro show(m) %}
+<article class="message {{ m.role }}" id="{{ m.anchor }}">
+  <p class="who"><a href="#{{ m.anchor }}">{% if m.number %}{{ m.number }} · {% endif %}{{ m.role }}</a></p>
+  {% if m.text %}<div class="text">{{ m.text }}</div>{% else %}<p class="muted">(no text)</p>{% endif %}
+  {% for item in m.media %}
+    {% if item.url and item.inline %}
+    <a href="{{ item.url }}"><img src="{{ item.url }}" alt="Image from this message" loading="lazy"></a>
+    {% elif item.url %}
+    <p><a href="{{ item.url }}">Download attached file</a></p>
+    {% else %}
+    <p class="error">Image {{ item.state }}: <code>{{ item.pointer }}</code> ({{ item.reason }})</p>
+    {% endif %}
+  {% endfor %}
+</article>
+{% endmacro %}
+{% block main %}
+<p><a href="/chats">← All chats</a></p>
+<h1>{{ chat.title }}</h1>
+<p class="muted">
+  {{ chat.created | when }} · {{ chat.messages }} messages · {{ chat.branch_points }} branch point{{ "" if chat.branch_points == 1 else "s" }} · {{ chat.images }} image link{{ "" if chat.images == 1 else "s" }}
+  {% if chat.presence == "not_seen" %} · not in the latest full export (kept){% endif %}
+</p>
+{% for section in chat.sections if section.kind == "active" %}
+<h2>The conversation</h2>
+<p class="muted">The version ChatGPT shows: the path it last had selected.</p>
+{% for m in section.messages %}{{ show(m) }}{% endfor %}
+{% endfor %}
+{% set alternates = chat.sections | selectattr("kind", "equalto", "alternate") | list %}
+{% if alternates %}
+<h2>Other branches</h2>
+<p class="muted">Edited questions and regenerated answers. Each is kept separate; nothing is merged.</p>
+{% for section in alternates %}
+<section class="branch">
+  <h3>{% if section.detached %}Detached messages{% else %}Branch ({{ section.branch_kind or "other" }}){% endif %}</h3>
+  <p class="muted">{{ section.where.text }}{% if section.where.anchor %} <a href="#{{ section.where.anchor }}">Go there</a>{% endif %}</p>
+  {% for m in section.messages %}{{ show(m) }}{% endfor %}
+</section>
+{% endfor %}
+{% endif %}
+{% for section in chat.sections if section.kind == "outside" %}
+<h2>Messages outside the tree</h2>
+<p class="muted">The export's message tree is damaged here; these are shown so nothing is lost.</p>
+{% for m in section.messages %}{{ show(m) }}{% endfor %}
+{% endfor %}
+<p class="muted">Chat ID <code>{{ chat.conversation_id }}</code>. Same as <code>ke inspect {{ chat.conversation_id }}</code>.</p>
+{% endblock %}

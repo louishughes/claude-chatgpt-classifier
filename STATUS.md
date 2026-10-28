@@ -40,9 +40,10 @@ Live ticket status for the build. The original ticket list is `docs/TICKETS.csv`
 | BRW-001 Source browser and transcript notes | VERIFIED (slice R3: transcript from stored records, labelled branches, per-message anchors, image embeds; `ke inspect [ID] [--note VAULT]` counts only) | SESSION_LOG 2026-10-28 BRW-001 |
 | UI-001 `ke ui` local web interface: home and import reports | VERIFIED (loopback-only server, Host check, CSP, autoescaped Jinja2 pages, plain-words report) | SESSION_LOG 2026-10-28 UI-001 |
 | UI-002 Import from the browser (and `ke import`) | VERIFIED (Import page with form token + Origin check, background job with self-refreshing progress page, plain failure reasons; `ke import SOURCE [--account] [--format] [--partial]`; placeholder test replaced by real tests) | SESSION_LOG 2026-10-28 UI-002 |
+| UI-003 Chat, branch and image browser | VERIFIED (/chats list with title search and paging; /chats/<id> active path, labelled branches with links to where they leave, outside-tree messages, images inline or missing markers with reasons; /media/<sha> re-hashes before serving; shares transcript_sections with the notes, output byte-identical on all fixtures) | SESSION_LOG 2026-10-28 UI-003 |
 | EVAL-010 Batch smoke test (50/100) | IN_PROGRESS (synthetic 50/100 pass, `ke eval smoke`, docs/evaluation/EVAL-010_SMOKE.md; real-data half waits for a session on Louis's PC, REV-009) | SESSION_LOG 2026-10-28 EVAL-010 |
 
-**Next unblocked:** UI-003 (chat, branch and image browser), then Milestone 2 (ING-010, NRM-003, LNK-001, YTB-001/002, SOC-001/002, REL-002, RET-001). The M1 gate also needs a Windows test run on Louis's PC, in the same session as the real-data runs.
+**Next unblocked:** Milestone 2 in plan order: ING-010 + NRM-003 (transcript adapter and offsets), then LNK-001, YTB-001/002, SOC-001/002, REL-002, RET-001, UI-004. The M1 gate still needs the real-data runs and a Windows test run on Louis's PC (one session).
 
 **Needs Louis (logged, skipped, not waited on):**
 - Real-data checkpoint: REV-009 (#143) and the real half of EVAL-010 (#39) need a read-only session on your PC: `ke inspect` on a few conversations and `ke eval smoke raw --limit 50` / `--limit 100`. Synthetic runs pass.

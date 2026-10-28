@@ -10,9 +10,11 @@ Talking points:
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import func, select
@@ -162,3 +164,197 @@ def _counts(row: ImportBatchRow) -> dict[str, Any]:
 
 def _n(count: int, singular: str, plural: str | None = None) -> str:
     return f"{count} {singular if count == 1 else (plural or singular + 's')}"
+
+
+# ---------------------------------------------------------------- UI-003
+
+_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
+
+
+@dataclass(frozen=True)
+class ChatRow:
+    """One conversation in the chat list."""
+
+    conversation_id: str
+    title: str
+    created: datetime | None
+    presence: str
+    messages: int
+
+
+def list_conversations(
+    session: Session, query: str = "", offset: int = 0, limit: int = 100
+) -> tuple[list[ChatRow], int]:
+    """Return one page of conversations, newest first, optionally filtered by title.
+
+    Args:
+        session: A read session.
+        query: Words to look for in titles (case-insensitive); empty for all.
+        offset: How many to skip.
+        limit: Page size.
+
+    Returns:
+        The page and the total number of matches.
+    """
+    from knowledge_engine.importer.records import MessageNodeRow, MessageRevisionRow
+
+    where = []
+    if query.strip():
+        # Escape LIKE's wildcards so a search for "100%" means the text "100%".
+        pattern = query.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        where.append(ConversationRow.title.ilike(f"%{pattern}%", escape="\\"))
+    total = session.scalar(select(func.count()).select_from(ConversationRow).where(*where))
+    # Messages = nodes that carry a message (the tree's empty root doesn't).
+    nodes = (
+        select(
+            MessageNodeRow.conversation_id,
+            func.count(func.distinct(MessageRevisionRow.node_key)).label("n"),
+        )
+        .join(MessageRevisionRow, MessageRevisionRow.node_key == MessageNodeRow.node_key)
+        .group_by(MessageNodeRow.conversation_id)
+        .subquery()
+    )
+    rows = session.execute(
+        select(ConversationRow, nodes.c.n)
+        .outerjoin(nodes, nodes.c.conversation_id == ConversationRow.conversation_id)
+        .where(*where)
+        .order_by(ConversationRow.create_time.desc().nulls_last(), ConversationRow.conversation_id)
+        .offset(offset)
+        .limit(limit)
+    ).all()
+    page = [
+        ChatRow(
+            conversation_id=row.conversation_id,
+            title=row.title or "Untitled conversation",
+            created=datetime.fromtimestamp(row.create_time, UTC) if row.create_time else None,
+            presence=row.presence,
+            messages=int(n or 0),
+        )
+        for row, n in rows
+    ]
+    return page, int(total or 0)
+
+
+def conversation_page(session: Session, conversation_id: str) -> dict[str, Any] | None:
+    """Return everything the chat page shows, or None if there's no such chat.
+
+    The page follows the transcript note exactly (BRW-001): the active path,
+    then each alternate branch labelled with where it leaves, then anything
+    outside the tree. Every message appears once.
+
+    Args:
+        session: A read session.
+        conversation_id: The ``conv_`` ID.
+
+    Returns:
+        Title, facts and sections, ready for the template.
+    """
+    from knowledge_engine.rendering.media import REASONS
+    from knowledge_engine.rendering.transcript import (
+        load_conversation,
+        message_anchor,
+        transcript_sections,
+    )
+
+    try:
+        conversation = load_conversation(session, conversation_id)
+    except KeyError:
+        return None
+    graph = conversation.graph
+
+    def message(native_id: str, numbered: bool) -> dict[str, Any]:
+        node = conversation.messages[native_id]
+        revision = conversation.revisions.get(native_id, "")
+        media = []
+        for ref in conversation.media.get(revision, []):
+            available = ref.availability == "available" and ref.blob_sha256
+            media.append(
+                {
+                    "state": ref.availability,
+                    "pointer": ref.pointer,
+                    "reason": REASONS.get(ref.rule or "", "no reason recorded"),
+                    "url": f"/media/{ref.blob_sha256}" if available else None,
+                    "inline": bool(available) and ref.media_type in _IMAGE_TYPES,
+                }
+            )
+        return {
+            "anchor": message_anchor(conversation.node_keys[native_id]),
+            "number": graph.message_number(native_id) if numbered else None,
+            "role": node.role or "unknown",
+            "text": node.text or "",
+            "media": media,
+        }
+
+    sections = []
+    for section in transcript_sections(conversation):
+        where: dict[str, Any] = {}
+        if section.kind == "alternate":
+            parent = section.parent
+            if section.detached or parent is None:
+                where = {"text": "Their parent message is missing from the export."}
+            elif (number := graph.message_number(parent)) is not None:
+                where = {
+                    "text": f"Branches off after message {number} of the active path.",
+                    "anchor": message_anchor(conversation.node_keys[parent]),
+                }
+            elif parent in conversation.messages:
+                where = {
+                    "text": "Branches off after another branch's message.",
+                    "anchor": message_anchor(conversation.node_keys[parent]),
+                }
+            else:
+                where = {"text": "Branches off at the start of the conversation."}
+        sections.append(
+            {
+                "kind": section.kind,
+                "branch_kind": section.branch_kind,
+                "detached": section.detached,
+                "where": where,
+                "messages": [message(n, section.kind == "active") for n in section.messages],
+            }
+        )
+    return {
+        "conversation_id": conversation.conversation_id,
+        "title": conversation.title or "Untitled conversation",
+        "created": (
+            datetime.fromtimestamp(conversation.create_time, UTC)
+            if conversation.create_time
+            else None
+        ),
+        "presence": conversation.presence,
+        "messages": len(conversation.messages),
+        "branch_points": len(graph.branch_points),
+        "images": sum(len(uses) for uses in conversation.media.values()),
+        "sections": sections,
+    }
+
+
+def media_file(session: Session, store_root: Path, blob_sha256: str) -> tuple[bytes, str] | None:
+    """Return a stored image's bytes and media type, after checking its fingerprint.
+
+    Args:
+        session: A read session.
+        store_root: The workspace's content-addressed store.
+        blob_sha256: The fingerprint from the page's link.
+
+    Returns:
+        ``(bytes, media_type)``, or None if unknown, gone or changed. Only
+        known image types get their real type; anything else is sent as a
+        download so a browser never runs it.
+    """
+    from knowledge_engine.importer.media import MediaBlobRow
+    from knowledge_engine.rendering.media import blob_sources
+
+    row = session.get(MediaBlobRow, blob_sha256)
+    if row is None:
+        return None
+    try:
+        content = blob_sources(session, store_root)(blob_sha256).read_bytes()
+    except OSError:
+        return None
+    # Reference-mode files live outside the workspace and could have been
+    # edited since import: serve them only if they are still the same bytes.
+    if hashlib.sha256(content).hexdigest() != blob_sha256:
+        return None
+    media_type = row.media_type if row.media_type in _IMAGE_TYPES else "application/octet-stream"
+    return content, media_type
