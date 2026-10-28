@@ -491,6 +491,46 @@ def _segments(settings: Settings, args: argparse.Namespace) -> CommandResult:
     return CommandResult("segments", data=data, message=f"{len(found)} segment(s)")
 
 
+def _corpus(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Summarise the corpus by segment and draw a seeded sample (NRM-006); no text shown."""
+    from dataclasses import asdict
+
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.segmentation.inventory import (
+        corpus_inventory,
+        sample,
+        sample_ids,
+        summarise,
+    )
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "corpus", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            items = list(corpus_inventory(session))
+    finally:
+        engine.dispose()
+    summary = summarise(items)
+    data: dict[str, Any] = asdict(summary)
+    if args.sample:
+        data["sample"] = {
+            "seed": args.seed,
+            "segment_ids": sample_ids(sample(items, args.sample, seed=args.seed)),
+        }
+    return CommandResult(
+        "corpus",
+        data=data,
+        message=f"{summary.segments} segment(s) in {summary.conversations} chat(s), "
+        f"{summary.themes} theme(s)",
+    )
+
+
 def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Search message text (RET-001). Brings the search index up to date first."""
     from sqlalchemy import select
@@ -917,6 +957,12 @@ def build_parser() -> argparse.ArgumentParser:
     segments = commands.add_parser("segments", help="a chat's topic segments (no text shown)")
     segments.add_argument("conversation", help="the conv_ ID")
     segments.set_defaults(handler=_segments)
+    corpus = commands.add_parser(
+        "corpus", help="segment counts and a seeded sample of segment IDs (no text shown)"
+    )
+    corpus.add_argument("--sample", type=int, default=0, help="how many segments to sample")
+    corpus.add_argument("--seed", default="nrm-006", help="same seed, same sample")
+    corpus.set_defaults(handler=_corpus)
 
     search = commands.add_parser("search", help="find messages by words, phrase or exact text")
     search.add_argument("query", help="what to look for")
