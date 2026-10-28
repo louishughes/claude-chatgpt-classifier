@@ -319,6 +319,15 @@ def sync_index(session: Session, index: LexicalIndex) -> int:
     return added
 
 
+def passages(session: Session, skip: set[str]) -> Iterator[Passage]:
+    """Every stored message revision as a passage, except those in ``skip``.
+
+    Shared with the semantic index (RET-003), so both indexes see exactly
+    the same text for every revision.
+    """
+    return _passages(session, skip)
+
+
 def _passages(session: Session, skip: set[str]) -> Iterator[Passage]:
     rows = session.execute(
         select(

@@ -753,3 +753,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - reconciliation/projection.py (Status, Entry, ProposalEntry, Projection, project); reconciliation/graph.py (Edge, Step, Direction, edges, walk, describe); `ke state`, `ke walk`. No migration.
 - Tests: test_state_and_walk.py (4). Full suite 1064 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: RET-002.
+
+## 2026-10-28 08:10 RET-002 + RET-003
+- retrieval/embeddings.py (EmbeddingIdentity, Embedder, embed, stem, LocalHashEmbedder, FakeEmbedder, cosine, normalise); retrieval/semantic.py (SemanticIndex, StaleIndexError, SyncReport, SemanticHit, sync_semantic, semantic_index_path); lexical.passages made public; `ke similar`; OD-18 added (embedding model, default local).
+- Tests: test_semantic_search.py (6). Full suite 1070 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: RET-004.

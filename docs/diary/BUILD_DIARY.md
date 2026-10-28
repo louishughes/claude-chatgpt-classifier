@@ -1631,3 +1631,26 @@ migration drift         # 0
 Fix attempts: 0.
 
 **Next exact task:** RET-002 (embeddings provider and index protocol), then RET-003.
+
+### 08:10 — RET-002 + RET-003: search by meaning, locally, with the model stamped on the index
+**RET-002.** Every embedder declares who it is: provider, model, vector size and version. The fingerprint of those goes on every index. `embed()` checks the `embedding` egress switch before any embedder that sends data, and checks the vectors that come back.
+- The built-in `LocalHashEmbedder` is local, free and deterministic: rough word stems plus three-letter pieces, hashed into 512 numbers.
+- It finds reworded, re-ordered, inflected and misspelt text, but not synonyms. That limit is recorded as **OD-18**, with the default kept; a real model can be plugged in behind the same interface later.
+
+**RET-003.** A separate, rebuildable `index/vectors.db` holds one vector per message revision, with the same context keys as the word index.
+- Opening it with another model or vector size is refused (`StaleIndexError`) until it is rebuilt.
+- A sync only embeds new or changed text: running it twice embeds nothing the second time.
+- Search is scoped to one workspace (optionally some chats or roles), with ties broken by ID.
+- Five golden queries ("painting sheds red", "kubernetis clustr"...) each find their message first.
+- New command `ke similar`.
+
+**Teach-back (`retrieval/semantic.py`):** "It keeps a cache file with one vector per message, stamped with the model that made them, and refuses to mix in a different model until I rebuild it. Each sync only embeds messages that are new or changed, so re-running it costs nothing. A search compares the query's vector with every message in the chosen workspace and returns the closest, always in the same order."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 140 source files
+pytest -q               # 1070 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 0.
+
+**Next exact task:** RET-004 (hybrid rank fusion), then RET-005/006.
