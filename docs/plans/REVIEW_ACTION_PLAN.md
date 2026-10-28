@@ -14,7 +14,7 @@ The foundation thread ("Build chat import foundation", branch `claude/project-th
 |---|---|---|---|---|---|
 | REV-001 (#135) | Commit to M1 + M2; re-plan M3 at gate G2; park M5/M6 product tickets | agent (adopted under owner authority 22:10) | docs | — | Decision recorded in `OPEN_DECISIONS.md`; `IMPLEMENTATION_PLAN.md` §4/§10 amended; M3–M6 map issues carry a "planned, not committed" note; API/PROD/packaging tickets labelled `parked` |
 | REV-002 (#136) | ADR-0009: the model step under the no-paid-API rule | agent | docs | — | ADR written (batch-file provider: session fills JSONL under `private/`, app validates as if from an API; throughput estimate; stability measurement; cost of the paid alternative); FND-009, EVAL-011, OD-04/05 annotated |
-| REV-003 (#137) | Owner reviews the 10-chat answer key (ok / fix / drop) | Louis | human | — | Every item marked; file hash recorded in `OPEN_DECISIONS.md`; becomes an entry condition for M3 |
+| REV-003 (#137) | Agent reviews the 10-chat answer key independently (owner opted out of tagging, 00:13 UTC 28 Oct) | Remote Control session | device | — | **Done 2026-10-28 00:46 UTC.** 113 checked: 82 ok, 29 fix, 2 drop, 28 add. Hash and counts in `OPEN_DECISIONS.md`, labelled agent-reviewed, not owner-approved |
 | REV-004 (#138) | M1 service consolidation design | agent (design), foundation thread (code) | docs | — | Design note mapping the 33 M1 tickets onto fewer modules (conversation graph, import with one "import → report" interface, narrower adapter seam, events deferred); names the single test that owns "identical re-import adds nothing"; keeps ADR-0003 keys and ticket IDs |
 | REV-005 (#139) | Process rules: one or two tickets per PR, teach-back before merge | agent | docs | — | Rule added to `AGENTS.md` and `CLAUDE.md` §4; diary template gains a "Teach-back" line |
 | REV-006 (#140) | Close the record: ADR-0002..0008 and OD-01..16 defaults become `accepted (owner authority 22:10)`; GitHub Issues is the tracker; licence stays undecided | agent | docs | — | ADR statuses and OD defaults updated with the authority note; CSV/Markdown get a frozen "see GitHub Issues" banner; OD-08 closed; OD-16 (licence) left open with a one-line note that "no licence" currently means all rights reserved, because a licence is a legal choice the owner should make awake |
@@ -27,7 +27,7 @@ The foundation thread ("Build chat import foundation", branch `claude/project-th
 1. Now, in parallel and without touching the foundation thread's files: REV-001, REV-002, REV-004, REV-005, REV-006, REV-008.
 2. REV-007 at the next Remote Control session (needs the owner's PC awake, not the owner).
 3. REV-009 when ING-005 lands (foundation thread).
-4. REV-003 when the owner is back. It needs him and nobody else.
+4. REV-003 done by a Remote Control session on the PC (owner opted out). Follow-ups REV-010 and REV-011 go to the coordinator for new threads.
 
 ## Not in this plan
 
