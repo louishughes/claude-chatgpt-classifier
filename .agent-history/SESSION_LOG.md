@@ -960,3 +960,7 @@ extraction/preamble.py (looks_like_preamble, shared by NOTE-005 and the detector
 
 ## 2026-10-28 18:20 NOTE-022 (#321)
 documents/rich_note.py _prefer_model: records whose extraction run's segment also has a DONE run with a prompt version, and that have no prompt version themselves, are left out of the rich note; the Source paragraph counts them; nothing deleted. Tests: tests/integration/test_note_prefers_model_records.py (1).
+
+
+## 2026-10-28 15:20 NOTE-014 (#299)
+taxonomy/refresh.py (queue: unlabelled / review_required / new_chat per segment, worked out from classifications each time; build_refresh_pack: NOTE-006 pack from queued segments only plus current vocabulary labels; record_pack + migration 0030 taxonomy_refresh_packs (fingerprint, counts, import IDs, no text); RefreshPlan (categories optional); relabel: TAX-007 diff + invalidate, redo unlabelled / cites_changed / mentions_new_term, carry the rest as method `carried` rows under the new version; refresh_status counts), `ke taxonomy refresh [--out]`, `ke taxonomy relabel OLD NEW [--run-id] [--vault]`, Vocabulary tiles on the `ke ui` home page; queued_chats + collect_topics file NOTE-007 unmatched digest topics once (skip waiting, rejected, approved). Tests: tests/integration/test_taxonomy_refresh.py (7).

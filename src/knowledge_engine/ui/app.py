@@ -39,6 +39,7 @@ from sqlalchemy.orm import Session
 from knowledge_engine import __version__
 from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
 from knowledge_engine.settings import Settings
+from knowledge_engine.taxonomy.refresh import refresh_status
 from knowledge_engine.ui import data, evaluation, registries, review
 from knowledge_engine.ui.jobs import ImportJobs
 
@@ -236,6 +237,8 @@ def _home(settings: Settings) -> Page:
             values = {
                 "status": data.workspace_status(session),
                 "imports": data.list_imports(session),
+                # NOTE-014: what the current vocabulary doesn't cover yet.
+                "vocabulary": refresh_status(session),
             }
     finally:
         engine.dispose()
