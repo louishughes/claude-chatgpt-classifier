@@ -2318,3 +2318,7 @@ ci                                        5/5 ok, 1232 passed, 7 skipped
 Fix attempts: 1 (supporting a confirmed record was a silent no-op; now refused).
 
 **Next exact task:** API-004 (search, answers and decision history).
+
+### 10:37 — Flaky variance test: seeded shuffle of an unseeded list
+
+`test_order_dependent_answers_become_review_items` failed once in CI (#258, Ubuntu 3.13) and passed on the other three jobs and 25 local runs. Cause: `run_order` shuffled the conversations with a fixed seed, but it read them in `conv_` ID order, and those IDs include the workspace's random ID. So each run shuffled a differently ordered list and the "same" seed gave a different order. Roughly one run in n² (n segments) put the same segment first in all three orders, and then the test's drifting model flagged the same segment every time, so no difference showed. Fix: read them sorted by the export's own conversation IDs before shuffling. The test is unchanged; it is now deterministic (passes 25/25).

@@ -882,3 +882,6 @@ api/imports.py (POST imports -> 202 job; jobs, imports, sources, nodes; paging);
 
 ## 2026-10-28 10:17 API-003 (#118)
 api/knowledge.py (taxonomy, versions, governance, proposals + review; knowledge, review queue, record + history, record review); 403 reviewer_not_allowed, 409 invalid_transition, one transaction per request. Tests: test_api_knowledge.py (8); ci 5/5, 1232 passed. API-002 merged (#257).
+
+## 2026-10-28 10:37 Flaky variance test fixed
+evaluation/variance.py: conversations sorted by native ID before the seeded shuffle (conv_ IDs carry the random workspace ID). Test unchanged; 25/25 local runs pass.
