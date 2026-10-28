@@ -1,0 +1,661 @@
+"""Rich conversation notes, template v2: the readable parts first (NOTE-001).
+
+The DOC-003 note (``notes.py``) lists everything a chat holds, but a reader
+learns little from it: it opens with counts and shows every record in the
+same shape. This module renders the *same stored facts* in the layout
+agreed in ``docs/plans/RICH_NOTES_GAP_ANALYSIS.md`` §7:
+
+* **Summary** and a **knowledge card** at the top, so the first screen says
+  what the chat was about and where it sits in the taxonomy;
+* records sorted into the sections a person thinks in: **decisions**
+  (what the user settled or ruled out), **suggestions not taken up**,
+  **action items**, **open questions**, **requirements and preferences**;
+* the generated sections (**insights**, **tensions**, **next steps**) as
+  placeholders until the digest step (NOTE-003) fills them;
+* **category and subcategory**, **related chats** (linked to the other
+  chat's *knowledge note*, so the vault becomes a web of notes), and the
+  existing links, images and branches sections.
+
+How evidence is shown, and why (the old v2 notes drowned in it):
+
+* a citation is ``[m12]``: a link to message 12 of the transcript note,
+  numbered exactly as the transcript numbers it. A message on another
+  branch has no number and is cited as ``[alt]``;
+* the quotes sit in a folded callout under the item, at most two per item,
+  each re-checked word for word against the stored message first (RET-006)
+  and cut at a word boundary;
+* an empty section is one plain sentence, never an evidence block;
+* hashes, record IDs and stage keys go to a JSON sidecar in
+  ``Knowledge/.meta/`` instead of the reader's way.
+
+Only stored facts are used: nothing here calls a model, and a section with
+nothing behind it says so instead of guessing. DOC-003 stays the default
+note; this one is chosen with ``ke docs chat --template v2``.
+
+Talking points:
+    - "The note answers 'what happened in this chat?' on the first screen,
+      and every claim is one click from the exact message."
+    - "Evidence is folded away, not deleted: open the box and the quote is
+      there, re-checked against the archive."
+"""
+
+from __future__ import annotations
+
+import json
+from collections import Counter
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path, PurePosixPath
+
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from knowledge_engine.classification.store import effective_labels
+from knowledge_engine.documents.model import DocItem, DocumentKind, build_document
+from knowledge_engine.documents.notes import _branches, _images, _links, knowledge_path
+from knowledge_engine.documents.render import transcript_stem
+from knowledge_engine.domain.models import EvidenceRef
+from knowledge_engine.extraction.records import KnowledgeRecord
+from knowledge_engine.extraction.store import KnowledgeRecordRow
+from knowledge_engine.importer.records import ConversationRow
+from knowledge_engine.relationships.view import RelatedLink, related_links
+from knowledge_engine.rendering.markdown import (
+    Block,
+    BulletList,
+    Callout,
+    DocumentModel,
+    Heading,
+    Paragraph,
+    PropertyValue,
+    escape_text,
+    render_note,
+    safe_relative_path,
+    write_note,
+)
+from knowledge_engine.rendering.media import MediaRef, blob_sources, export_attachments
+from knowledge_engine.rendering.transcript import (
+    StoredConversation,
+    load_conversation,
+    message_anchor,
+)
+from knowledge_engine.retrieval.citations import Citation, quote, resolve
+from knowledge_engine.segmentation.overrides import load_segments
+from knowledge_engine.taxonomy.registry import Dimension, TaxonomySnapshot, UnknownTermError
+
+TEMPLATE_VERSION = "note-001-v2"
+META_DIR = ".meta"
+MAX_QUOTES = 2  # quotes shown per item; the rest are counted
+QUOTE_CHARS = 240  # a quote longer than this is cut at a word boundary
+
+# Body size the note should stay under: room for the fixed sections plus a
+# little per message, and a hard ceiling. The v2 attempt wrote 44 KB for a
+# 3-message chat; this keeps a short chat to a screen or two.
+BUDGET_BASE = 6_000
+BUDGET_PER_MESSAGE = 250
+BUDGET_MAX = 40_000
+
+WAITING = "Not written yet: the digest step hasn't run for this chat."
+
+
+def body_budget(messages: int) -> int:
+    """The most characters a note body should take for a chat this long."""
+    return min(BUDGET_MAX, BUDGET_BASE + BUDGET_PER_MESSAGE * messages)
+
+
+def body_of(text: str) -> str:
+    """A rendered note without its front matter."""
+    if text.startswith("---\n"):
+        return text.split("\n---\n", 1)[1]
+    return text
+
+
+# ---------------------------------------------------------------- citations
+
+
+@dataclass(frozen=True)
+class Citer:
+    """Turns message references into ``[m12]`` links to the transcript."""
+
+    chat: StoredConversation
+    stem: str  # the transcript note's file stem
+
+    def native(self, native_id: str) -> str:
+        """``[[transcript#^node-…|m12]]`` (``alt`` off the active path)."""
+        number = self.chat.graph.message_number(native_id)
+        label = f"m{number}" if number is not None else "alt"
+        anchor = message_anchor(self.chat.node_keys[native_id])
+        return f"[[{self.stem}#^{anchor}|{label}]]"
+
+    def revision(self, revision_id: str) -> str | None:
+        """The citation for a message revision of this chat, or None."""
+        native = self._natives().get(revision_id)
+        return self.native(native) if native is not None else None
+
+    def label(self, revision_id: str) -> str:
+        """``m12``, ``alt``, or ``elsewhere`` (a revision from another chat)."""
+        native = self._natives().get(revision_id)
+        if native is None:
+            return "elsewhere"
+        number = self.chat.graph.message_number(native)
+        return f"m{number}" if number is not None else "alt"
+
+    def _natives(self) -> dict[str, str]:
+        return {rev: native for native, rev in self.chat.revisions.items()}
+
+
+def _short(text: str) -> str:
+    """One line, cut at a word boundary to ``QUOTE_CHARS`` with an ellipsis."""
+    line = " ".join(text.split())
+    if len(line) <= QUOTE_CHARS:
+        return line
+    cut = line[:QUOTE_CHARS].rsplit(" ", 1)[0] or line[:QUOTE_CHARS]
+    return cut.rstrip(" ,.;:") + " …"
+
+
+def _evidence_callout(
+    session: Session, refs: Sequence[EvidenceRef], citer: Citer
+) -> Callout | None:
+    """The folded evidence box for one item, or None when it has no evidence.
+
+    Each span is re-checked against the stored text; one that no longer
+    matches is named with its problem instead of being shown.
+    """
+    if not refs:
+        return None
+    lines = []
+    for ref in refs[:MAX_QUOTES]:
+        where = citer.label(ref.revision_id)
+        found = resolve(
+            session, ref.revision_id, ref.start, ref.end, ref.quote_sha256, actor=ref.actor
+        )
+        if not isinstance(found, Citation):
+            lines.append(f"{where}: quote not shown ({found.problem.value})")
+            continue
+        said = escape_text(_short(quote(session, found)))
+        lines.append(f'{where} ({found.actor}): "{said}"')
+    if len(refs) > MAX_QUOTES:
+        lines.append(f"and {len(refs) - MAX_QUOTES} more")
+    # The quotes were escaped above; the rest is the engine's own words.
+    return Callout("quote", "Evidence", tuple(lines), trusted=True)
+
+
+# ---------------------------------------------------------------- records
+
+
+@dataclass(frozen=True)
+class _Item:
+    """One record, ready to place: what it says, its status and its proof."""
+
+    item: DocItem
+    record: KnowledgeRecord
+
+
+_PROPOSAL_STATUS = {
+    "accepted": "accepted later",
+    "rejected": "turned down",
+    "open": "open",
+}
+
+
+def _cites(item: _Item, citer: Citer) -> str:
+    """The item's citations, each message once, in transcript order."""
+    natives = {rev: native for native, rev in citer.chat.revisions.items()}
+    order = {native: i for i, native in enumerate(citer.chat.graph.active_messages)}
+    revisions = sorted(
+        {r for r in item.item.revisions if r in natives},
+        key=lambda r: (order.get(natives[r], len(order)), r),
+    )
+    return " ".join(citer.native(natives[r]) for r in revisions)
+
+
+def _item_blocks(session: Session, item: _Item, citer: Citer, note: str = "") -> list[Block]:
+    """A one-line bullet (bold claim, status, citations) and its folded evidence."""
+    line = f"**{escape_text(' '.join(item.item.assertion.split()))}**"
+    if note:
+        line += f" {note}."
+    cites = _cites(item, citer)
+    if cites:
+        line += f" {cites}"
+    blocks: list[Block] = [BulletList((line,), trusted=True)]
+    box = _evidence_callout(session, item.record.evidence, citer)
+    if box is not None:
+        blocks.append(box)
+    return blocks
+
+
+def _load_items(session: Session, items: Sequence[DocItem]) -> list[_Item]:
+    wanted = {i.record_id: i for i in items}
+    rows = session.scalars(
+        select(KnowledgeRecordRow).where(KnowledgeRecordRow.record_id.in_(sorted(wanted)))
+    )
+    loaded = {r.record_id: KnowledgeRecord.model_validate_json(r.record_json) for r in rows}
+    return [_Item(wanted[k], loaded[k]) for k in sorted(wanted) if k in loaded]
+
+
+@dataclass(frozen=True)
+class _Sorted:
+    """A chat's records, sorted into the note's sections."""
+
+    decisions: list[_Item]
+    ruled_out: list[_Item]
+    suggestions: list[_Item]
+    actions: list[_Item]
+    questions: list[_Item]
+    stated: list[_Item]  # requirements, preferences and facts
+    artefacts: list[_Item]
+    references: list[_Item]
+
+
+def _sort(items: Sequence[_Item]) -> _Sorted:
+    """Place each record in exactly one section.
+
+    Who holds it matters as much as its type: an assistant's task is a
+    *suggestion*, not the user's action item (EXT-005), so it goes with the
+    suggestions.
+    """
+    out = _Sorted([], [], [], [], [], [], [], [])
+    for it in items:
+        kind, actor = it.item.record_type, it.item.actor
+        if kind == "decision":
+            out.decisions.append(it)
+        elif kind == "rejection":
+            out.ruled_out.append(it)
+        elif kind in ("proposal", "recommendation", "idea"):
+            out.suggestions.append(it)
+        elif kind == "action":
+            (out.actions if actor == "user" else out.suggestions).append(it)
+        elif kind == "question":
+            out.questions.append(it)
+        elif kind == "artefact":
+            out.artefacts.append(it)
+        elif kind == "reference":
+            out.references.append(it)
+        else:  # requirement, preference, fact
+            out.stated.append(it)
+    return out
+
+
+def _section(title: str, provenance: str, blocks: list[Block], empty: str) -> list[Block]:
+    """A section: heading, a small provenance line, then items or one sentence."""
+    head: list[Block] = [Heading(title, 2), Paragraph(f"*{provenance}*", True)]
+    return head + (blocks or [Paragraph(empty, True)])
+
+
+# ---------------------------------------------------------------- labels
+
+
+@dataclass(frozen=True)
+class ChatLabels:
+    """A chat's labels, rolled up from its segments.
+
+    The classifier labels segments (a chat can cover several subjects). A
+    chat-level label is the one that covers the most messages: each
+    segment's primary counts once per message it holds. Ties go to the
+    lower ID, so the result never depends on the order rows come back.
+
+    Attributes:
+        category: The domain term's parent label (or the term's own label
+            when it has no parent), or None when nothing is labelled.
+        subcategory: The domain term's label when it has a parent.
+        facets: Purpose and output labels, by facet name.
+        tags: Topic labels, most-covering first.
+        project: The leading project's name, or None.
+        segments: How many segments were labelled at all.
+    """
+
+    category: str | None = None
+    subcategory: str | None = None
+    facets: dict[str, list[str]] | None = None
+    tags: tuple[str, ...] = ()
+    project: str | None = None
+    segments: int = 0
+
+
+def _ranked(weights: dict[str, float]) -> list[str]:
+    return [term for term, _ in sorted(weights.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+
+def chat_labels(
+    session: Session, chat: StoredConversation, snapshot: TaxonomySnapshot | None
+) -> ChatLabels:
+    """Roll segment labels up to the chat (see ``ChatLabels``)."""
+    if snapshot is None:
+        return ChatLabels()
+    weights: dict[str, dict[str, float]] = {}
+    labelled = 0
+    for segment in load_segments(session, chat):
+        found = False
+        for name, labels in effective_labels(session, segment.segment_id, snapshot).items():
+            if labels.source == "none":
+                continue
+            found = True
+            ids = [labels.primary] if labels.primary else []
+            for term in ids + list(labels.secondary):
+                # Primary labels carry the segment's full weight, secondaries a third,
+                # so a side subject never outranks the main one of the same segment.
+                size = len(segment.messages)
+                share = size if term == labels.primary else size / 3
+                field = weights.setdefault(name, {})
+                field[term] = field.get(term, 0.0) + share
+        labelled += found
+
+    def label(term_id: str) -> str:
+        try:
+            return snapshot.term(term_id).label
+        except UnknownTermError:
+            names = {p.project_id: p.name for p in snapshot.projects}
+            return names.get(term_id, term_id)
+
+    category = subcategory = None
+    domain = _ranked(weights.get(Dimension.DOMAIN.value, {}))
+    if domain:
+        lead = snapshot.term(domain[0])
+        if lead.parent_id is not None:
+            category, subcategory = snapshot.term(lead.parent_id).label, lead.label
+        else:
+            category = lead.label
+    facets = {
+        facet: [label(t) for t in _ranked(weights.get(dim.value, {}))]
+        for facet, dim in (("activity", Dimension.PURPOSE), ("output", Dimension.OUTPUT))
+    }
+    projects = _ranked(weights.get("projects", {}))
+    return ChatLabels(
+        category=category,
+        subcategory=subcategory,
+        facets={k: v for k, v in facets.items() if v},
+        tags=tuple(label(t) for t in _ranked(weights.get(Dimension.TOPIC.value, {}))),
+        project=label(projects[0]) if projects else None,
+        segments=labelled,
+    )
+
+
+# ---------------------------------------------------------------- related chats
+
+
+def _related_lines(
+    session: Session, links: Sequence[RelatedLink], here: str
+) -> tuple[list[str], list[str]]:
+    """One plain line per link, naming the other chat's knowledge note.
+
+    Returns the lines and the wikilinks (for the ``related`` property).
+    """
+    others = sorted({link.other(here) for link in links})
+    titles = dict(
+        session.execute(
+            select(ConversationRow.conversation_id, ConversationRow.title).where(
+                ConversationRow.conversation_id.in_(others)
+            )
+        )
+        .tuples()
+        .all()
+    )
+    lines, wikilinks = [], []
+    for link in links:
+        other = link.other(here)
+        note = f"[[{knowledge_path(other, titles.get(other)).stem}]]"
+        direction = "this chat" if link.from_conversation_id == here else "that chat"
+        line = (
+            f"{note}: {link.kind.replace('_', ' ')} (stored as {direction} -> the other; "
+            f"{link.evidence_class}, {link.review_state})"
+        )
+        if link.because:
+            line += ". Why: " + "; ".join(escape_text(b) for b in link.because)
+        lines.append(line)
+        wikilinks.append(note)
+    return lines, list(dict.fromkeys(wikilinks))
+
+
+# ---------------------------------------------------------------- the note
+
+
+@dataclass(frozen=True)
+class RichNote:
+    """A rendered-ready rich note, the images it embeds and its sidecar data."""
+
+    model: DocumentModel
+    media: tuple[MediaRef, ...]
+    meta: dict[str, object]
+
+
+def _artefact_names(session: Session, items: Sequence[_Item]) -> list[str]:
+    """What the chat made, by name: "2 image(s) or file(s)", "code block (python)".
+
+    A code block's language is read from its fence's first line, through the
+    same checked quote the evidence uses; a block without one is just "code block".
+    """
+    images = sum(len(i.record.asset_occurrences) for i in items)
+    names = [f"{images} image(s) or file(s)"] if images else []
+    blocks: Counter[str] = Counter()
+    for it in items:
+        if it.record.asset_occurrences or not it.record.evidence:
+            continue
+        ref = it.record.evidence[0]
+        found = resolve(session, ref.revision_id, ref.start, ref.end, ref.quote_sha256)
+        text = quote(session, found) if isinstance(found, Citation) else ""
+        words = text.lstrip("`~ ").split("\n", 1)[0].split()
+        language = words[0][:20] if words else ""
+        named = language.isascii() and language.isalnum()
+        blocks[f"code block ({language})" if named else "code block"] += 1
+    names += [f"{n} x{c}" if c > 1 else n for n, c in sorted(blocks.items())]
+    return names
+
+
+def _cell(text: str) -> str:
+    """Text safe inside a Markdown table cell (a pipe would split the cell)."""
+    return text.replace("|", "\\|")
+
+
+def rich_conversation_note(
+    session: Session, conversation_id: str, *, taxonomy: TaxonomySnapshot | None = None
+) -> RichNote:
+    """Build one chat's rich note (template v2) from stored facts. Reads only.
+
+    Args:
+        session: A read session.
+        conversation_id: The ``conv_`` ID.
+        taxonomy: The published version to show labels under, or None.
+    """
+    chat = load_conversation(session, conversation_id)
+    stem = transcript_stem(conversation_id, chat.title)
+    citer = Citer(chat, stem)
+    document = build_document(session, DocumentKind.CONVERSATION, conversation_id)
+    items = _load_items(session, [i for s in document.sections for i in s.items])
+    sorted_ = _sort(items)
+    labels = chat_labels(session, chat, taxonomy)
+    links = related_links(session, [conversation_id])
+    related, related_notes = _related_lines(session, links, conversation_id)
+    branches = _branches(chat)
+    image_blocks, refs = _images(chat)
+    urls, videos, accounts = _links(session, chat)
+    messages = len(chat.graph.active_messages)
+
+    category = labels.category or "unclassified"
+    where = category if labels.subcategory is None else f"{category} › {labels.subcategory}"
+    names = sorted(
+        {" ".join(i.record.entity.name.split()) for i in sorted_.references if i.record.entity}
+    )
+    made = _artefact_names(session, sorted_.artefacts)
+    card = [
+        "| | |",
+        "|---|---|",
+        "| **Purpose** | not written yet |",
+        "| **Outcome** | not written yet |",
+        f"| **Category** | {_cell(escape_text(where))} |",
+        f"| **Project** | {_cell(escape_text(labels.project or 'none matched'))} |",
+        "| **Tools and names** | "
+        + (_cell(", ".join(escape_text(n) for n in names)) or "none recorded")
+        + " |",
+        f"| **Made in this chat** | {', '.join(made) or 'nothing recorded'} |",
+        f"| **Length** | {messages} message(s) on the active path, {len(branches)} other "
+        f"branch(es), {len(refs)} image(s), {len(urls)} link(s) |",
+    ]
+
+    blocks: list[Block] = [
+        Callout("summary", "Summary", (WAITING,), trusted=True, collapsed=False),
+        Heading("Knowledge card", 2),
+        Paragraph("\n".join(card), True),
+    ]
+
+    decided: list[Block] = []
+    for it in sorted_.decisions:
+        decided += _item_blocks(session, it, citer, "Decided")
+    for it in sorted_.ruled_out:
+        decided += _item_blocks(session, it, citer, "Ruled out")
+    blocks += _section(
+        "Decisions",
+        "From the chat: the user's own words only",
+        decided,
+        "Nothing was decided in this chat.",
+    )
+    # A suggestion the user answered is shown with that answer. The decision
+    # extractor cites the proposal it answers (its antecedent), so a shared
+    # evidence span is the link; the stored proposal status may lag behind it.
+    answered = {
+        (ref.revision_id, ref.start, ref.end): verdict
+        for verdict, group in (("taken up", sorted_.decisions), ("turned down", sorted_.ruled_out))
+        for it in group
+        for ref in it.record.evidence
+    }
+    suggested: list[Block] = []
+    for it in sorted_.suggestions:
+        status = _PROPOSAL_STATUS.get(it.item.status, it.item.status)
+        spans = {(r.revision_id, r.start, r.end) for r in it.record.evidence}
+        verdicts = {answered[s] for s in spans if s in answered}
+        if len(verdicts) == 1:
+            status = f"{verdicts.pop()} (see Decisions)"
+        suggested += _item_blocks(session, it, citer, f"Suggested by the {it.item.actor}, {status}")
+    blocks += _section(
+        "Suggestions",
+        "From the chat: proposed, and whether the user took them up",
+        suggested,
+        "No suggestions recorded.",
+    )
+    blocks += _section(
+        "Action items",
+        "From the chat: things the user said they would do",
+        [b for it in sorted_.actions for b in _item_blocks(session, it, citer)],
+        "None in this chat.",
+    )
+    blocks += _section(
+        "Open questions",
+        "From the chat: asked and not answered",
+        [b for it in sorted_.questions for b in _item_blocks(session, it, citer)],
+        "None recorded.",
+    )
+    blocks += _section(
+        "Requirements and preferences",
+        "From the chat",
+        [
+            b
+            for it in sorted_.stated
+            for b in _item_blocks(session, it, citer, it.item.record_type.capitalize())
+        ],
+        "None recorded.",
+    )
+    for title in ("Insights", "Tensions and trade-offs", "Next steps"):
+        blocks += _section(title, "Generated (check before relying on it)", [], WAITING)
+
+    if taxonomy is None:
+        classified = "No taxonomy version was given, so labels aren't shown."
+    elif labels.segments == 0:
+        classified = f"No segment is labelled under {taxonomy.version} yet."
+    else:
+        classified = (
+            f"**{escape_text(where)}** under {taxonomy.version}, "
+            f"from {labels.segments} labelled segment(s)."
+        )
+    tag_lines = [classified]
+    if labels.tags:
+        tag_lines.append("Topics: " + ", ".join(escape_text(t) for t in labels.tags))
+    for facet, values in (labels.facets or {}).items():
+        tag_lines.append(f"{facet.capitalize()}: " + ", ".join(escape_text(v) for v in values))
+    blocks += [
+        Heading("Category and subcategory", 2),
+        Paragraph("*Classification*", True),
+        BulletList(tuple(tag_lines), trusted=True),
+    ]
+    blocks += _section(
+        "Keywords and topics", "Candidates; only approved terms become tags", [], WAITING
+    )
+    blocks += _section(
+        "Related chats",
+        "Links between chats; rejected ones are left out",
+        [BulletList(tuple(related), trusted=True)] if related else [],
+        "None found yet.",
+    )
+    if urls or videos or accounts:
+        blocks.append(Heading("Links, videos and accounts", 2))
+        blocks.append(BulletList(tuple(urls + videos + accounts), trusted=True))
+    if image_blocks:
+        blocks += [Heading("Images", 2), *image_blocks]
+    if branches:
+        blocks += [Heading("Branches", 2), BulletList(tuple(branches), trusted=True)]
+    blocks += [
+        Heading("Source", 2),
+        Paragraph(
+            f"Full transcript: [[{stem}]]. Built from stored records by {TEMPLATE_VERSION}; "
+            "no summary has been written or scored yet.",
+            True,
+        ),
+    ]
+
+    created = datetime.fromtimestamp(chat.create_time, UTC).date() if chat.create_time else None
+    properties: dict[str, PropertyValue] = {
+        "ke_type": "conversation_knowledge",
+        "conversation_id": conversation_id,
+        "date": created,
+        "messages": messages,
+        "category": category,
+        "subcategory": labels.subcategory,
+        "activity": list((labels.facets or {}).get("activity", [])),
+        "output": list((labels.facets or {}).get("output", [])),
+        "tags": list(labels.tags),
+        "project": labels.project,
+        "related": related_notes,
+        "transcript": f"[[{stem}]]",
+        "taxonomy_version": taxonomy.version if taxonomy else "none",
+        "digest": "not written",
+        "generator": TEMPLATE_VERSION,
+    }
+    meta: dict[str, object] = {
+        "conversation_id": conversation_id,
+        "generator": TEMPLATE_VERSION,
+        "document_id": document.document_id,
+        "content_hash": document.content_hash,
+        "record_ids": list(document.record_ids),
+        "revision_ids": list(document.revision_ids),
+        "relationship_ids": [link.relationship_id for link in links],
+        "taxonomy_version": taxonomy.version if taxonomy else None,
+    }
+    title = chat.title or "Untitled conversation"
+    return RichNote(DocumentModel(title, properties, tuple(blocks)), tuple(refs), meta)
+
+
+def meta_path(conversation_id: str, title: str | None) -> PurePosixPath:
+    """Where a rich note's sidecar lives (``Knowledge/.meta/<note stem>.json``)."""
+    note = knowledge_path(conversation_id, title)
+    return safe_relative_path(note.parts[0], META_DIR, f"{note.stem}.json")
+
+
+def write_rich_note(
+    session: Session,
+    conversation_id: str,
+    vault_root: Path,
+    store_root: Path,
+    *,
+    taxonomy: TaxonomySnapshot | None = None,
+) -> PurePosixPath:
+    """Write a chat's rich note into ``vault_root/Knowledge``, its images and sidecar.
+
+    It goes where the DOC-003 note would, so a vault holds one knowledge
+    note per chat whichever template wrote it.
+    """
+    note = rich_conversation_note(session, conversation_id, taxonomy=taxonomy)
+    export_attachments(note.media, vault_root, blob_sources(session, store_root))
+    title = session.get_one(ConversationRow, conversation_id).title
+    relative = knowledge_path(conversation_id, title)
+    write_note(vault_root, relative, render_note(note.model))
+    sidecar = json.dumps(note.meta, indent=2, sort_keys=True) + "\n"
+    write_note(vault_root, meta_path(conversation_id, title), sidecar)
+    return relative
