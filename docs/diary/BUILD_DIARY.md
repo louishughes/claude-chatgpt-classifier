@@ -1150,3 +1150,18 @@ pytest -q               # 811 passed, 6 skipped
 Fix attempts: 2. An alias row was flushed before its term, which broke the foreign key. Then one of my own new tests used an example that wasn't actually a collision.
 
 **Next exact task:** TAX-003 (alias matching) + TAX-004 (proposal review and publish).
+
+### 04:25 — TAX-003 + TAX-004: matching names, and reviewing changes
+**What:** turning text into vocabulary IDs, and the only way the vocabulary changes.
+- **Alias matching (TAX-003).** `AliasResolver` is built from a *published* snapshot, so it can only ever answer with approved IDs. "UE5", "ue5", "Unreal Engine 5" and "unreal-engine 5" all reach the same term. When a spelling names things in two places (a topic and a purpose, say), the answer is **ambiguous** with every candidate listed; narrowing the scope to one dimension (or `project`) settles it. Nothing is guessed. `find()` scans longer text for whole-word mentions only ("UE" never matches inside "queue"), lets the longest alias win, and keeps each mention's exact span. `collisions()` lists every shared spelling for review.
+- **Review workflow (TAX-004).** A change starts as a proposal: add, rename, alias, merge, retire or reparent, for terms or projects. A proposed term doesn't exist as a term at all until someone *other than the proposer* approves it, and then only from the next published version. Every rule is checked at approval time: alias collisions, a third level, merging across dimensions, retiring a term that still has children, or touching something that isn't approved. Rename keeps the old label as an alias. Merge moves the aliases and keeps the old ID pointing at the new one. Decisions are final, and the proposal row records reviewer, note, time and the ID an approved add created. That row is the audit trail. Migration 0016 adds the note and the created ID.
+
+**Teach-back (`taxonomy/review.py`):** "Nobody edits the vocabulary directly; they propose a change. Only a different person can approve it, and the approval is when the change is checked and applied. Classifiers still see nothing until the next frozen version is published."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 145 source files
+pytest -q               # 827 passed, 6 skipped
+```
+Fix attempts: 0.
+
+**Next exact task:** TAX-005 (project identity and merge proposals) + TAX-006 (corpus discovery).
