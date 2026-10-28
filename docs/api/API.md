@@ -32,6 +32,8 @@ ke api                          # http://127.0.0.1:8766/api/v1/docs (Ctrl+C to s
 | `invalid_account` | 400 | `POST /imports`: account labels use letters, numbers, `-` and `_` only. |
 | `invalid_proposal` | 400 | `POST /taxonomy/proposals`: a required field is missing or the dimension is unknown. |
 | `reviewer_not_allowed` | 403 | A review decision from the proposer of that proposal, or under the built-in `validator` name. |
+| `invalid_destination` | 400 | `POST /exports`: the destination isn't a plain name, or it is a link leading outside the exports folder. Nothing is written. |
+| `export_running` | 409 | An export to that destination is still running. |
 | `stale_index` | 503 | The meaning index was built by another embedder: run `ke similar --rebuild` once. |
 | `invalid_transition` | 409 | A decision the review workflow doesn't allow: deciding twice, supporting a confirmed record, a reject without a reason, an alias clash, a suggestion becoming the user's decision without acceptance. Nothing is changed. |
 | `no_database` | 503 | Nothing has been imported into this workspace yet. |
@@ -92,7 +94,19 @@ Each of these first brings the word and meaning indexes up to date (cheap when n
 
 **`as_of`** is epoch seconds, read as *when the chats said it*. For decision questions, a decision made after that time doesn't exist yet and a replacement made after it hasn't happened, so "what did I decide, as of March" gives March's answer.
 
-Document endpoints follow in API-005.
+## Documents and exports (API-005)
+
+| Method and path | Answers |
+|---|---|
+| `GET /api/v1/documents?kind=&taxonomy=` | Every note an export would write: vault path, kind (`transcript`, `knowledge`, `project`, `topic`, `video`, `accounts`, `account`), size and media count. Topic notes need a published `taxonomy` version. Writes nothing. |
+| `GET /api/v1/documents/preview?path=&taxonomy=` | One note's Markdown as an export would write it (the part above the marker line). `path` is looked up among the planned notes; it is never opened as a file, so any other path is just `not_found`. |
+| `GET /api/v1/exports` | Existing export destinations, by name. |
+| `POST /api/v1/exports` | `{"destination": "main", "taxonomy": null}`. **202** with the job at once; the export writes into `<workspace>/exports/main` in the background. |
+| `GET /api/v1/exports/jobs/{job_id}` | `state` `running`, `done` (with counts: created, written, unchanged, conflicts, occupied, removed, kept_stale, broken embeds, attachments) or `failed` (the error type only). |
+
+**Where exports go.** A destination is a **name** (letters, digits, `-`, `_`; at most 64), never a path, so `../x`, `/etc`, drive paths and `a/b` are refused before anything is touched. A destination that is a link to somewhere else is refused too. One export per destination runs at a time. To write into a vault elsewhere on your computer, use `ke docs vault --vault <folder>`.
+
+**Your files are safe in it.** The export is DOC-006's `sync_vault`: it writes only files listed in its own manifest. A file of yours where it wants to write is counted as `occupied` and left alone; a note you edited above the marker line is counted as a `conflict` and kept; anything below the marker line is carried into every new version.
 
 ## Swapping parts in tests
 
