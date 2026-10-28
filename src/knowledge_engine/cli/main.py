@@ -796,12 +796,18 @@ def _tenant(settings: Settings, args: argparse.Namespace) -> CommandResult:
     from knowledge_engine.access.tenants import (
         TenantError,
         create_tenant,
+        delete_tenant,
         list_tenants,
         tenant_inbox,
     )
 
     name = f"tenant {args.tenant_command}"
     try:
+        if args.tenant_command == "delete":
+            removed = delete_tenant(settings, args.name, args.confirm)
+            return CommandResult(
+                name, data={"removed": removed}, message=f"deleted workspace {args.name}"
+            )
         if args.tenant_command == "list":
             names = list_tenants(settings)
             return CommandResult(
@@ -866,6 +872,16 @@ def _access(settings: Settings, args: argparse.Namespace) -> CommandResult:
                     token = acc.issue_token(session, args.name)
                     data = {"name": args.name, "token": token}
                     message = f"API token for {args.name} (shown once, keep it secret)"
+                elif command == "rotate":
+                    token = acc.rotate_token(session, args.name)
+                    data = {"name": args.name, "token": token}
+                    message = f"old tokens revoked; new API token for {args.name} (shown once)"
+                elif command == "delete":
+                    if args.confirm != args.name:
+                        raise acc.AccessError("repeat the account name with --confirm")
+                    short = acc.delete_account(session, args.name, by="cli")
+                    data = {"deleted": short}
+                    message = f"account erased; the log now shows it as deleted-{short}"
                 elif command == "revoke":
                     count = acc.revoke_tokens(session, args.name)
                     data, message = {"revoked": count}, f"revoked {count} token(s)"
@@ -2821,8 +2837,14 @@ def build_parser() -> argparse.ArgumentParser:
         ("token", "make a new API token (shown once)"),
         ("revoke", "revoke all of an account's tokens"),
         ("disable", "stop an account logging in"),
+        ("rotate", "revoke all tokens and make one new one"),
     ):
         access_commands.add_parser(sub, help=text).add_argument("name")
+    access_delete = access_commands.add_parser(
+        "delete", help="erase an account, its tokens and roles (the log keeps only an ID)"
+    )
+    access_delete.add_argument("name")
+    access_delete.add_argument("--confirm", required=True, help="the account name again")
     access_grant = access_commands.add_parser("grant", help="give an account a role")
     access_grant.add_argument("name")
     access_grant.add_argument("role", choices=["viewer", "editor", "reviewer", "owner"])
@@ -2845,6 +2867,11 @@ def build_parser() -> argparse.ArgumentParser:
     tenant_add.add_argument("name", help="letters, digits, '-' and '_'")
     tenant_add.add_argument("--owner", required=True, help="the owner's account name")
     tenant_commands.add_parser("list", help="created workspaces")
+    tenant_delete = tenant_commands.add_parser(
+        "delete", help="erase a whole workspace and its inbox (cannot be undone)"
+    )
+    tenant_delete.add_argument("name")
+    tenant_delete.add_argument("--confirm", required=True, help="the workspace name again")
     tenant.set_defaults(handler=_tenant)
 
     purge = commands.add_parser(
