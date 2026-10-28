@@ -30,6 +30,7 @@ from sqlalchemy.orm import Session
 
 from knowledge_engine.evaluation.extraction_eval import (
     ExtractionReport,
+    TypeEquivalents,
     evaluate_extraction,
     scored_records,
 )
@@ -54,6 +55,7 @@ def score_extraction(
     *,
     review_file: Path | None = None,
     run_rules: bool = True,
+    count_as: TypeEquivalents | None = None,
 ) -> WorkspaceScore:
     """Score the golden set's chats in this workspace. The caller commits.
 
@@ -63,6 +65,8 @@ def score_extraction(
         reviewer: Who reviewed the key.
         review_file: The review record, whose hash the report prints.
         run_rules: Run the rule extractors on the key's chats first.
+        count_as: Extra produced types that may answer a key type (see
+            ``match_extraction``); empty means strict.
     """
     from knowledge_engine.evaluation.semantic_smoke import _rule_extractors
     from knowledge_engine.extraction import actions, decisions, entities, preferences
@@ -122,5 +126,6 @@ def score_extraction(
         key=key_from_file(gold_path, reviewer, review_file),
         lengths=lengths,
         truncation_count=truncation_count([s for v in segments.values() for s in v]),
+        count_as=count_as,
     )
     return WorkspaceScore(report, len(wanted), len(conversations), rules_run)

@@ -873,6 +873,7 @@ def _gold_score(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Score this workspace's records against a private answer key; numbers only."""
     from sqlalchemy.orm import Session
 
+    from knowledge_engine.evaluation.extraction_eval import parse_count_as
     from knowledge_engine.evaluation.report_labels import ReviewerKind
     from knowledge_engine.evaluation.workspace_score import score_extraction
     from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
@@ -881,6 +882,12 @@ def _gold_score(settings: Settings, args: argparse.Namespace) -> CommandResult:
     if not db.exists():
         return CommandResult(
             "gold score", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    try:
+        count_as = parse_count_as(args.count_as or [])
+    except ValueError as problem:
+        return CommandResult(
+            "gold score", ExitCode.USAGE, message=str(problem), error_code="bad_count_as"
         )
     for path in (args.gold, args.review):
         if path is not None and not path.is_file():
@@ -899,6 +906,7 @@ def _gold_score(settings: Settings, args: argparse.Namespace) -> CommandResult:
                 ReviewerKind(args.reviewer),
                 review_file=args.review,
                 run_rules=not args.no_rules,
+                count_as=count_as,
             )
             session.commit()
     finally:
@@ -925,6 +933,7 @@ def _gold_score(settings: Settings, args: argparse.Namespace) -> CommandResult:
         "forbidden_in_truth": len(report.forbidden_in_truth),
         "unsupported_truth_decisions": len(report.unsupported_truth_decisions),
         "gate_passed": report.passed,
+        "count_as": report.count_as,
     }
     message = (
         f"{score.found_conversations} of {score.key_conversations} key chats found; "
@@ -3993,6 +4002,12 @@ def build_parser() -> argparse.ArgumentParser:
     score.add_argument("--out", type=Path, help="write the Markdown report here")
     score.add_argument(
         "--no-rules", action="store_true", help="don't run the rule extractors first"
+    )
+    score.add_argument(
+        "--count-as",
+        action="append",
+        metavar="KEY_TYPE=PRODUCED_TYPE",
+        help="also count a produced type as the key's type, e.g. idea=proposal (repeatable)",
     )
     score.set_defaults(handler=_gold_score)
     convert = gold_commands.add_parser(
