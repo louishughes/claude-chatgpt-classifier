@@ -1007,6 +1007,48 @@ def _eval_retrieval(settings: Settings, args: argparse.Namespace) -> CommandResu
     )
 
 
+def _corrections(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """List human corrections and whether they still stand after re-imports (IMP-006)."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.importer.corrections import OverrideState, check_overrides
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "corrections", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            checks = check_overrides(session)
+    finally:
+        engine.dispose()
+    counts: dict[str, int] = {}
+    for check in checks:
+        counts[check.state.value] = counts.get(check.state.value, 0) + 1
+    # IDs only: both revisions are named so a reviewer can open them side by side.
+    flagged = [
+        {
+            "kind": c.kind.value,
+            "override": c.override_ref,
+            "changes": [
+                {"node_key": x.node_key, "decided_on": x.decided_on, "now": x.now}
+                for x in c.changes
+            ],
+        }
+        for c in checks
+        if c.state is OverrideState.REVIEW_REQUIRED
+    ]
+    return CommandResult(
+        "corrections",
+        data={"counts": dict(sorted(counts.items())), "review_required": flagged},
+        message=f"{counts.get('kept', 0)} kept, {len(flagged)} need another look "
+        "(their messages changed)",
+    )
+
+
 def _docs_note(settings: Settings, session: Any, args: argparse.Namespace) -> CommandResult:
     """Write one chat's knowledge note (DOC-003) or one topic's master note (DOC-005)."""
     from knowledge_engine.documents.notes import (
@@ -1929,6 +1971,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--rebuild", action="store_true", help="rebuild a meaning index made by another embedder"
     )
     ask.set_defaults(handler=_ask)
+
+    corrections = commands.add_parser(
+        "corrections", help="which human corrections still stand after re-imports"
+    )
+    corrections.set_defaults(handler=_corrections)
 
     docs = commands.add_parser("docs", help="knowledge documents and what a change affects")
     docs_commands = docs.add_subparsers(dest="docs_command", metavar="ACTION", parser_class=_Parser)
