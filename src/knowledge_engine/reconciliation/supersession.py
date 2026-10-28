@@ -21,8 +21,16 @@ is named in the verdict:
    "should we", question mark and the like;
 7. **intent**: the later quote says it replaces something: "instead",
    "switch to", "change of plan", "no longer", "scrap that"...
+8. **target** (EVAL-005): the later quote names *what* it replaces
+   ("instead of Unity", "rather than Unity", "no longer using Unity",
+   "replace Unity") and the earlier record mentions it. Sharing a project
+   and a word like "game" isn't enough: "Blender instead of Maya for the
+   game models" is about modelling, not the engine. A named target the
+   earlier record never mentions makes the pair ``unrelated``; no named
+   target at all sends an otherwise clean pair to review (checked last, so
+   a pair already going to review isn't marked twice).
 
-All seven: ``supersedes``, recorded as a REC-004 event (later -> earlier).
+All eight: ``supersedes``, recorded as a REC-004 event (later -> earlier).
 Tests 1-3 pass but a later one fails: ``review_required``, listed for a
 reviewer and never recorded as a replacement. Otherwise: ``unrelated``.
 
@@ -32,7 +40,8 @@ never stored in the verdict.
 
 Talking points:
     - "A newer decision only replaces an older one if it's the same thing,
-      in the same project, firmly decided, and the words say 'instead'."
+      in the same project, firmly decided, and the words say 'instead' of
+      what, naming the thing the older one chose."
     - "'What if we used Godot?' never overrides 'we're using Unity'."
 """
 
@@ -55,12 +64,20 @@ from knowledge_engine.reconciliation.equivalence import content_words
 from knowledge_engine.reconciliation.relations import Placed, place
 from knowledge_engine.reconciliation.timeline import CHOICES, Transition, record_event
 
-DETECTOR_VERSION = "rec-005-v1"
+DETECTOR_VERSION = "rec-005-v2"  # v2: the target test (EVAL-005)
 
 _INTENT = re.compile(
     r"\b(?:instead|switch(?:ing|ed)? (?:over )?to|change of plan|changed my mind|no longer|"
     r"not any ?more|scrap (?:that|the)|replac(?:e|es|ed|ing)\b|from now on|"
     r"mov(?:e|ing|ed) (?:away from|over to)|rather than|drop(?:ping)? \w+ (?:for|in favou?r of))",
+    re.IGNORECASE,
+)
+# What a replacement names as replaced: the phrase after the marker, up to
+# a joining word or punctuation ("instead of Unity for the engine" -> "Unity").
+_TARGET = re.compile(
+    r"\b(?:instead of|rather than|no longer(?: using| use| going with)?|replac(?:e|es|ed|ing)|"
+    r"(?:away|over) from|drop(?:ping)?)\s+(?:the |our |my |a |an )?((?:(?!(?:with|for|by|in|on|"
+    r"to|and|but|so|then|because|from|at|as)\b)[^\W_][\w'.+#-]*\s*){1,5})",
     re.IGNORECASE,
 )
 _HYPOTHETICAL = re.compile(
@@ -115,7 +132,7 @@ def stored_quotes(session: Session) -> Quotes:
 
 
 def evaluate(earlier: Placed, later: Placed, quotes: Quotes) -> Verdict:
-    """Run the seven tests (see the module text) on one ordered pair."""
+    """Run the eight tests (see the module text) on one ordered pair."""
     a, b = earlier.record, later.record
     pair = (b.record_id, a.record_id)
     if (
@@ -130,6 +147,13 @@ def evaluate(earlier: Placed, later: Placed, quotes: Quotes) -> Verdict:
     shared_terms = set(a.term_ids) & set(b.term_ids)
     if not shared_terms and not content_words(a.assertion) & content_words(b.assertion):
         return Verdict(*pair, Outcome.UNRELATED, ("subject",))
+    said = quotes(b)
+    # The phrase's last word is what it is about: "the shed game's pixel font" is a font.
+    heads = {m.group(1).split()[-1].rstrip(".") for m in _TARGET.finditer(said)}
+    named = content_words(" ".join(heads))
+    mentioned = content_words(a.assertion) | content_words(quotes(a))
+    if named and not named & mentioned:
+        return Verdict(*pair, Outcome.UNRELATED, ("target",))
     failed = []
     if (
         later.first_time is None
@@ -140,11 +164,12 @@ def evaluate(earlier: Placed, later: Placed, quotes: Quotes) -> Verdict:
     accepted = b.acceptance is Acceptance.EXPLICIT and b.trust in (Trust.SUPPORTED, Trust.CONFIRMED)
     if not accepted:
         failed.append("accepted")
-    said = quotes(b)
     if _HYPOTHETICAL.search(said):
         failed.append("hypothetical")
     if not _INTENT.search(said):
         failed.append("intent")
+    if not failed and not named:
+        failed.append("target")  # says it replaces something, but not what
     if failed:
         return Verdict(*pair, Outcome.REVIEW_REQUIRED, tuple(failed))
     return Verdict(*pair, Outcome.SUPERSEDES, ())
@@ -196,7 +221,9 @@ def reconcile(session: Session) -> SupersessionReport:
                 by_id[verdict.later],
                 by_id[verdict.earlier],
                 actor=DETECTOR_VERSION,
-                evidence={"tests": "kinds,scope,subject,order,accepted,not_hypothetical,intent"},
+                evidence={
+                    "tests": "kinds,scope,subject,order,accepted,not_hypothetical,intent,target"
+                },
             )
             superseded.append((verdict.later, verdict.earlier))
         else:
