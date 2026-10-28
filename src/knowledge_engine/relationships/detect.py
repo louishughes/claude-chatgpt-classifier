@@ -4,11 +4,16 @@ Four detectors, each using only exact evidence:
 
 * **shared node IDs** (native): two conversations contain a message with the
   same native node ID, as when ChatGPT copies messages into a new chat. The
-  newer one is proposed as ``forked_from`` the older;
+  newer one is proposed as ``forked_from`` the older. Each chat gets **one
+  parent**: the older chat it shares the most nodes with, the earliest on a
+  tie. Two forks of the same chat both hold their parent's nodes, and a fork
+  of a fork holds its grandparent's, but neither is the chat it came from
+  (EVAL-012 caught the engine calling siblings and grandparents parents);
 * **copied prefix** (structural): two conversations open with the same
   messages, word for word, in the same order (at least two, including a user
   message; OD-12). The newer one is proposed as ``forked_from`` the earlier
-  conversation it shares the longest opening with. A pasted setup prompt
+  conversation it shares the longest opening with (the earliest on a tie),
+  unless shared node IDs already gave it a parent. A pasted setup prompt
   ("You are...") at the very start is skipped first (NOTE-009): many
   unrelated chats open with the same one;
 * **ChatGPT URLs** (native): a message links to ``chatgpt.com/c/<id>`` and
@@ -103,7 +108,8 @@ def detect_relationships(
     chats = {chat.conversation_id: chat for chat in _load(session, workspace_id)}
     forks: set[frozenset[str]] = set()
 
-    for older, newer, evidence in _shared_nodes(session, workspace_id, chats):
+    native = list(_shared_nodes(session, workspace_id, chats))
+    for older, newer, evidence in native:
         forks.add(frozenset((older, newer)))
         if _propose(
             session,
@@ -119,9 +125,12 @@ def detect_relationships(
         ):
             counts["new_forked_from_native"] += 1
 
+    # Shared node IDs are the stronger proof: a chat they gave a parent
+    # doesn't get a second one from a copied opening.
+    has_parent = {newer for _, newer, _ in native}
     for older, newer, shared in _copied_prefixes(list(chats.values())):
-        if frozenset((older, newer)) in forks:
-            continue  # already proposed from shared node IDs, the stronger proof
+        if newer in has_parent or frozenset((older, newer)) in forks:
+            continue
         forks.add(frozenset((older, newer)))
         evidence = {
             "shared_messages": shared,
@@ -291,6 +300,7 @@ def _copied_prefixes(chats: list[_Chat]) -> Iterator[tuple[str, str, int]]:
     for members in groups.values():
         if len(members) < 2:
             continue
+        members.sort(key=_age)  # so a tie keeps the earliest (strict > below)
         for chat in members:
             best: tuple[int, str] | None = None
             for other in members:
@@ -343,8 +353,21 @@ def _shared_nodes(
     for members in by_node.values():
         for a, b in combinations(sorted(set(members)), 2):
             pairs[_older_newer(chats[a], chats[b])] += 1
-    for (older, newer), count in sorted(pairs.items()):
+    # One parent per chat: the older chat sharing the most nodes with it,
+    # the earliest on a tie. A sibling holds only the parent's nodes (a tie,
+    # which the parent wins by being older); a grandparent holds fewer of
+    # them than the parent does.
+    parent: dict[str, tuple[str, int]] = {}
+    for (older, newer), count in sorted(pairs.items(), key=lambda item: _age(chats[item[0][0]])):
+        if newer not in parent or count > parent[newer][1]:
+            parent[newer] = (older, count)
+    for newer, (older, count) in sorted(parent.items()):
         yield older, newer, {"shared_native_nodes": count}
+
+
+def _age(chat: _Chat) -> tuple[bool, float, str]:
+    """Sort key, oldest first; chats without a create time last, by ID."""
+    return (chat.create_time is None, chat.create_time or 0.0, chat.conversation_id)
 
 
 def _chatgpt_links(

@@ -449,8 +449,11 @@ CHECKS: tuple[Check, ...] = (
         "REL-002",
         "directional relationship precision >= 0.90",
         "real",
-        "-",
-        _blocked("no labelled relationship answer key yet (EVAL-012, #240)"),
+        "ke eval relationships --key <key> (on the owner's PC)",
+        _blocked(
+            "the private key relkey-v1 (30 chats, 49 links, independent session) is on the "
+            "owner's PC; scored there, numbers only (docs/evaluation/EVAL-012_REAL.md)"
+        ),
     ),
     Check(
         "quality.real_golden_set",
