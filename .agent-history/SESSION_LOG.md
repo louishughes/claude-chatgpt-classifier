@@ -954,3 +954,6 @@ evaluation/note_checks.py (check_note: citations_real, claims_cited, decisions_u
 
 ## 2026-10-28 16:45 NOTE-012 (#284)
 ui/notes.py (note_view: rich note built in memory with the newest taxonomy and stored digest; note_html: escaped converter for the note's own shapes, citations -> #node anchors; notes_index: chats by category with status and open questions), /notes page, chat page two-column layout, sidebar link. Tests: tests/integration/test_ui_notes.py (5).
+
+## 2026-10-28 16:10 NOTE-009 (#281)
+extraction/preamble.py (looks_like_preamble, shared by NOTE-005 and the detectors); relationships/detect.py skips a leading setup prompt in copied openings and setup-prompt paragraphs in quotes; relationships/related.py leaves them out of similarity profiles. Tests: tests/integration/test_note_related.py (3).
