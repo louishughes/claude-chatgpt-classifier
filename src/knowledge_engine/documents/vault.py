@@ -3,7 +3,9 @@
 ``sync_vault`` writes every note the engine owns into an Obsidian vault:
 source transcripts (``Sources/``), chat knowledge notes (``Knowledge/``),
 project masters (``Projects/``) and, given a taxonomy, topic masters
-(``Topics/``), plus the images they embed (``_attachments/``).
+(``Topics/``), video notes (``Videos/``) and the account registry with one
+note per account (``Accounts/``), plus the images they embed
+(``_attachments/``).
 
 Three promises make it safe to run again and again on a vault people use:
 
@@ -48,8 +50,18 @@ from knowledge_engine.documents.notes import (
     topic_master,
     topic_path,
 )
+from knowledge_engine.documents.registries import (
+    account_note,
+    account_path,
+    account_registry_note,
+    registry_path,
+    video_note,
+    video_path,
+)
 from knowledge_engine.documents.render import project_master, project_path
 from knowledge_engine.importer.records import ConversationRow
+from knowledge_engine.links.social_store import SocialAccountRow, ambiguous_handles
+from knowledge_engine.links.youtube import YouTubeVideoRow
 from knowledge_engine.rendering.markdown import render_note, safe_relative_path, write_note
 from knowledge_engine.rendering.media import (
     MediaRef,
@@ -75,7 +87,7 @@ class PlannedNote:
     """One note the engine owns: where it goes, what it says, what it embeds."""
 
     path: PurePosixPath
-    kind: str  # transcript | knowledge | project | topic
+    kind: str  # transcript | knowledge | project | topic | video | accounts | account
     text: str
     media: tuple[MediaRef, ...] = ()
 
@@ -122,6 +134,19 @@ def _planned(session: Session, taxonomy: TaxonomySnapshot | None) -> Iterator[Pl
             yield PlannedNote(
                 path, "topic", render_note(topic_master(session, document.subject_id, taxonomy))
             )
+    for video_id in session.scalars(
+        select(YouTubeVideoRow.video_id).order_by(YouTubeVideoRow.video_id)
+    ):
+        yield PlannedNote(video_path(video_id), "video", render_note(video_note(session, video_id)))
+    accounts = session.scalars(
+        select(SocialAccountRow.account_id).order_by(SocialAccountRow.account_id)
+    ).all()
+    if accounts or ambiguous_handles(session):  # no registry note for an archive without any
+        yield PlannedNote(registry_path(), "accounts", render_note(account_registry_note(session)))
+    for account_id in accounts:
+        yield PlannedNote(
+            account_path(account_id), "account", render_note(account_note(session, account_id))
+        )
 
 
 def _sha(text: str) -> str:
