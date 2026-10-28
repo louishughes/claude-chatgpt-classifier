@@ -2344,9 +2344,19 @@ def _docs_note(settings: Settings, session: Any, args: argparse.Namespace) -> Co
                 error_code="no_taxonomy",
             )
         try:
-            path = write_topic_master(
-                session, args.topic, snapshot, args.vault, mode=Mode(args.mode)
-            )
+            if args.template == "v2":
+                # The readable layout (NOTE-010); v1 (DOC-005) stays the default.
+                from knowledge_engine.documents.readable_master import (
+                    write_readable_topic_master,
+                )
+
+                path = write_readable_topic_master(
+                    session, args.topic, snapshot, args.vault, mode=Mode(args.mode)
+                )
+            else:
+                path = write_topic_master(
+                    session, args.topic, snapshot, args.vault, mode=Mode(args.mode)
+                )
         except TopicNotFound as error:
             return CommandResult(command, ExitCode.USAGE, message=str(error), error_code="no_topic")
     return CommandResult(
@@ -2373,7 +2383,19 @@ def _docs(settings: Settings, args: argparse.Namespace) -> CommandResult:
             if args.docs_command == "project":
                 from knowledge_engine.documents.render import Mode, write_project_master
 
-                path = write_project_master(session, args.project, args.vault, mode=Mode(args.mode))
+                if args.template == "v2":
+                    # The readable layout (NOTE-010); v1 (DOC-004) stays the default.
+                    from knowledge_engine.documents.readable_master import (
+                        write_readable_project_master,
+                    )
+
+                    path = write_readable_project_master(
+                        session, args.project, args.vault, mode=Mode(args.mode)
+                    )
+                else:
+                    path = write_project_master(
+                        session, args.project, args.vault, mode=Mode(args.mode)
+                    )
                 return CommandResult(
                     "docs project",
                     data={"note": path.as_posix(), "mode": args.mode},
@@ -3664,6 +3686,12 @@ def build_parser() -> argparse.ArgumentParser:
     docs_project.add_argument(
         "--mode", choices=["current", "history", "all"], default="all", help="default: all"
     )
+    docs_project.add_argument(
+        "--template",
+        choices=("v1", "v2"),
+        default="v1",
+        help="v1: the DOC-004 master; v2: the readable layout (summary first, one line per item)",
+    )
     docs_project.set_defaults(handler=_docs)
     docs_chat = docs_commands.add_parser(
         "chat", help="write a chat's knowledge note (labels, quotes, branches, images, links)"
@@ -3686,6 +3714,12 @@ def build_parser() -> argparse.ArgumentParser:
     docs_topic.add_argument("--taxonomy", help="taxonomy version (required)")
     docs_topic.add_argument(
         "--mode", choices=["current", "history", "all"], default="all", help="default: all"
+    )
+    docs_topic.add_argument(
+        "--template",
+        choices=("v1", "v2"),
+        default="v1",
+        help="v1: the DOC-005 master; v2: the readable layout (summary first, one line per item)",
     )
     docs_topic.set_defaults(handler=_docs)
     docs_vault = docs_commands.add_parser(

@@ -36,6 +36,7 @@ import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
+from knowledge_engine.documents.readable_master import MASTER_TEMPLATE_VERSION, master_budget
 from knowledge_engine.documents.rich_note import TEMPLATE_VERSION, body_budget
 from knowledge_engine.documents.vault import MARKER
 
@@ -56,10 +57,18 @@ def _rich_note_budget(properties: Mapping[str, object]) -> int | None:
     return body_budget(messages) if isinstance(messages, int) and messages >= 0 else None
 
 
+def _master_budget(properties: Mapping[str, object]) -> int | None:
+    records, chats = properties.get("records"), properties.get("chats")
+    if isinstance(records, int) and isinstance(chats, int):
+        return master_budget(records, chats)
+    return None
+
+
 # generator -> how to work out the note's body budget from its own properties.
 # A generator listed here has promised the §7 layout.
 BUDGETS: dict[str, Callable[[Mapping[str, object]], int | None]] = {
     TEMPLATE_VERSION: _rich_note_budget,
+    MASTER_TEMPLATE_VERSION: _master_budget,
 }
 
 

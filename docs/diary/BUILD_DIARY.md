@@ -2966,4 +2966,33 @@ Talking points:
 - "The first real run caught a bug in the checker, not the notes. Same bug I'd fixed in another checker that morning, which says the pipe-in-a-table rule deserves one shared helper."
 - "Two agents claimed the same ticket. The fix was simple: check the open PRs before starting, and back off when someone's ahead."
 
-**Next exact task:** NOTE-010 part 2, the topic and project masters in the readable layout.
+### 15:45 — NOTE-010 (part 2): topic and project masters you can read
+
+The topic and project masters (DOC-004/005) were complete but hard going: every record printed as its claim, then a list of status, sources, record ID and event IDs, then its quotes in full. `documents/readable_master.py` renders the same document in the chat-note style, chosen with `ke docs topic|project --template v2` (the old layout stays the default, so nothing that uses it changes):
+
+- a **summary** box first, in the engine's own words ("3 items from 2 chats: 1 current, 2 replaced"), with the topic's definition;
+- **one line per item**: the claim in bold, its kind and who holds it, and short citations;
+- a citation is `[c2·m12]`, message 12 of chat 2. A master spans many chats, so the chats are numbered once in a **Chats** list at the end, which keeps every link short;
+- quotes **folded** under the item, at most two, each re-checked against the archive;
+- the DOC-004 rule still holds: a replaced choice says what replaced it, now in words ("Replaced by "…" (c2·m4)") instead of a record ID;
+- **How these connect** and the **Decision timeline** name items by their words and place too;
+- IDs and hashes go to a `.meta/` JSON sidecar; the front matter is flat counts and labels Dataview can filter on.
+
+Masters get their own budget in `ke docs check` (a base plus so much per item and per chat), since a topic grows with the archive.
+
+**Decision:** the place in brackets after a claim ("(c1·m2)") was added after I read the first rendered master. Two chats had made the same decision in the same words, so "How these connect" showed two identical lines. The place tells them apart without bringing record IDs back.
+
+**Teach-back (`documents/readable_master.py`):** It takes a topic's or project's list of knowledge items, already sorted into current, replaced, in conflict and suggestions, and writes it as a note a person can skim: a short summary, then one line per item with links to the exact messages. Each chat gets a number, so a link reads "c2·m12" instead of a long title. Anything only a program needs, like record IDs, goes in a separate file next to the note.
+
+Checks:
+```
+tests/integration/test_readable_masters.py   5 passed (summary first; every replaced line names its replacement; no IDs in the note; every c·m number is the transcript's; vault check clean; CLI v2)
+python -m knowledge_engine.devtools.ci       lint, format, types, guard ok; 1448 passed, 22 skipped
+```
+Fix attempts: 2 (a query result needed `.all()` before `dict()`; my test unpacked `write_transcript`'s return value wrongly).
+
+Talking points:
+- "A master note now reads like a briefing: summary, then one line per decision, with a link to the exact message."
+- "Old decisions are still labelled, just in words instead of IDs."
+
+**Next exact task:** NOTE-007 wiring (keyword candidates into the note's Keywords and topics section) once #296 merges.
