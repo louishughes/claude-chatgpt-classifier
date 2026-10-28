@@ -693,3 +693,9 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - extraction/store.py (KnowledgeRecordRow, KnowledgeRecordEventRow, add_candidates, gate, decide, current_truth, review_queue, history, Decision, GateError); extraction/runner.py (ExtractionRunRow, run, run_key, RuleExtractor, ModelExtractor, ModelAnswer, PendingAnswer, RunReport); migration 0019_knowledge_records.
 - Tests: test_extraction_gate_runner.py (6). Full suite 945 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: EVAL-001 + EVAL-003.
+
+## 2026-10-28 09:40 EVAL-001 + EVAL-003 (#77, #78)
+- evaluation/gold.py (gold-v1 schema, load/write, annotation_template, records_annotated, label-ID check); evaluation/classification_eval.py (evaluate_classification, stability, predicted_from); providers/ledger.py schema_failures; CLI `ke gold template|schema`; synthetic gold set; docs/evaluation/ANNOTATION_GUIDE.md, EVAL-003_BASELINE.md.
+- Independent review: CHANGES_REQUESTED, 6 must-fix items applied.
+- Tests: test_gold_and_classification_eval.py (13). Full suite 958 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: EVAL-004 + EVAL-011.

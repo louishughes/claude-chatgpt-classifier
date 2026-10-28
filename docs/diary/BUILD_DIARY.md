@@ -1383,3 +1383,21 @@ migration drift         # 0
 Fix attempts: 0. One fix in my own new test: it passed a plain string where an enum was expected, which caused a serializer warning.
 
 **Next exact task:** EVAL-001 + EVAL-003, then EVAL-004/011, OPS-001/002 and the LEG/REV fold-ins.
+
+### 09:40 — EVAL-001 + EVAL-003: an answer key, and a scorer for classification
+**What:** a format for hand-made answer keys, and the evaluator that scores classification against them.
+- **Golden set (EVAL-001).** `evaluation/gold.py` defines `gold-v1`: per segment (named by its first message) the expected primary and secondary labels per field, or "ambiguous"; the records that must be found; and the records that must **never** appear, above all an assistant suggestion recorded as the user's decision.
+  - A synthetic set lives in `tests/fixtures/gold/synthetic-v1/` and covers 9 synthetic conversations. The real set is started on Louis's PC with `ke gold template`, holds IDs only, and stays in the git-ignored workspace.
+  - An independent review asked for six changes, all applied: a `records_annotated` flag (a missing record only counts against the system when the conversation was fully annotated), one doubtful forbidden record removed, one segment start corrected, reviewer must differ from annotator, the template never overwrites an existing set, and a test that every committed set is synthetic and points at SYNTHETIC fixtures. Label IDs are now checked against the set's own vocabulary, and `strength` is recorded for preferences and requirements.
+- **Evaluator (EVAL-003).** `evaluation/classification_eval.py` matches each gold segment to the stored segment containing its first message, then scores micro and macro F1, primary accuracy, project accuracy and a confusion table per field. Ambiguous segments score on whether they were sent to review. `stability()` and the ledger's `schema_failures()` cover the EVAL-001 amendment. The synthetic baseline is all 1.000, which only proves the plumbing.
+
+**Teach-back (`evaluation/classification_eval.py`):** "For every segment in the answer key, it finds the segment the system stored that starts at the same message. Then, per label field, it counts which labels were right, extra or missing, and whether the main label was right, and shows which labels get mixed up. Cases a person couldn't decide are scored on whether the system asked for review."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 117 source files
+pytest -q               # 958 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 2. A mypy type error in the evaluator's label set, and a CLI crash turning query rows into a dict.
+
+**Next exact task:** EVAL-004 (extraction precision/recall) + EVAL-011 (semantic batch smoke).

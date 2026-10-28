@@ -287,3 +287,26 @@ def usage(session: Session) -> Mapping[str, int]:
         totals[row.state] = totals.get(row.state, 0) + 1
         totals["characters"] = totals.get("characters", 0) + row.characters
     return totals
+
+
+def schema_failures(session: Session, stage_id: str | None = None) -> Mapping[str, float]:
+    """How often answers failed the schema (EVAL-001 amendment), for one stage or all.
+
+    Returns:
+        ``requests`` (answered or given up), ``repaired`` (needed the one
+        repair), ``review_required`` (failed twice), and
+        ``first_try_failure_rate`` (repaired or failed, over requests).
+    """
+    query = select(ModelRequestRow).where(ModelRequestRow.state != PENDING)
+    if stage_id is not None:
+        query = query.where(ModelRequestRow.stage_id == stage_id)
+    rows = list(session.scalars(query))
+    repaired = sum(1 for r in rows if r.attempts >= 2 and r.state == DONE)
+    failed = sum(1 for r in rows if r.state == REVIEW_REQUIRED)
+    rate = round((repaired + failed) / len(rows), 6) if rows else 0.0
+    return {
+        "requests": len(rows),
+        "repaired": repaired,
+        "review_required": failed,
+        "first_try_failure_rate": rate,
+    }
