@@ -876,3 +876,6 @@ infrastructure/upgrade.py (safe_upgrade backs up first; require_current in impor
 
 ## 2026-10-28 10:01 API-001 (#116)
 api/app.py (create_app, get_settings/get_sessions/get_provider, ApiError + one error shape, loopback Host middleware, /api/v1 health/status/counts); `ke api`; `server` extra; docs/api/API.md. Tests: test_api.py (8); ci 5/5. OPS-007 merged (#254); release.yml dispatched on main.
+
+## 2026-10-28 10:09 API-002 (#117)
+api/imports.py (POST imports -> 202 job; jobs, imports, sources, nodes; paging); api/deps.py (dependencies moved, get_jobs); JSON + local Origin required for non-GET. Tests: test_api_imports.py (9); ci 5/5, 1224 passed. API-001 merged (#256); release check green on Linux and Windows (run 40668805737).
