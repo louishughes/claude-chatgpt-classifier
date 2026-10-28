@@ -42,6 +42,7 @@ from sqlalchemy.orm import Session
 
 from knowledge_engine.domain.enums import Role
 from knowledge_engine.evaluation.gold import GoldForbidden, GoldRecord, GoldSet
+from knowledge_engine.evaluation.report_labels import UNSCORED, AnswerKey, key_from_gold
 from knowledge_engine.extraction.evidence import Verdict, check_record
 from knowledge_engine.extraction.records import Acceptance, KnowledgeRecord, RecordType, Trust
 from knowledge_engine.importer.records import ConversationRow, MessageNodeRow, MessageRevisionRow
@@ -130,6 +131,7 @@ class ExtractionReport:
     forbidden_produced: list[str] = field(default_factory=list)
     forbidden_in_truth: list[str] = field(default_factory=list)
     unsupported_truth_decisions: list[str] = field(default_factory=list)
+    key: AnswerKey | None = None
 
     @property
     def anchor_validity(self) -> float:
@@ -152,11 +154,19 @@ class ExtractionReport:
         return not (self.forbidden_in_truth or self.unsupported_truth_decisions)
 
     def as_markdown(self) -> str:
-        """A readable report (record IDs and numbers only)."""
+        """A readable report (record IDs and numbers only).
+
+        Raises:
+            ValueError: The answer key is missing its version, hash or
+                reviewer label (LEG-002, REV-012).
+        """
+        if self.key is None:
+            return f"# Extraction baseline ({self.gold}): {UNSCORED}\n\nNo answer key.\n"
         total = self.total
         lines = [
             f"# Extraction baseline ({self.gold})",
             "",
+            *self.key.lines(),
             f"- Evaluator: `{self.eval_version}`; gold schema `{self.gold_schema}`",
             *(f"- {name}: `{value}`" for name, value in sorted(self.versions.items())),
             f"- Produced records: {self.produced}; in conversations not annotated for "
@@ -268,7 +278,11 @@ def _compare(agreement: dict[str, Agreement], gold: GoldRecord, item: ScoredReco
 
 
 def evaluate_extraction(
-    gold: GoldSet, produced: Sequence[ScoredRecord], versions: Mapping[str, str]
+    gold: GoldSet,
+    produced: Sequence[ScoredRecord],
+    versions: Mapping[str, str],
+    *,
+    key: AnswerKey | None = None,
 ) -> ExtractionReport:
     """Score produced records against the golden set.
 
@@ -277,6 +291,8 @@ def evaluate_extraction(
         produced: Stored records, usually every record of the gold
             conversations (``scored_records``). Rejected ones are ignored.
         versions: What produced them (extractor versions, validator...).
+        key: The key's version, hash and reviewer (``key_from_file``);
+            defaults to a content hash with no review claimed.
     """
     live = [item for item in produced if item.record.trust is not Trust.REJECTED]
     by_type: dict[str, TypeScore] = defaultdict(TypeScore)
@@ -345,4 +361,5 @@ def evaluate_extraction(
         forbidden_produced=sorted(set(forbidden_produced)),
         forbidden_in_truth=sorted(set(forbidden_in_truth)),
         unsupported_truth_decisions=sorted(set(unsupported)),
+        key=key or key_from_gold(gold),
     )

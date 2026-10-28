@@ -4,13 +4,19 @@
 
 # Extraction baseline (golden-synthetic-v1)
 
+## AI check (not owner-verified)
+
+- Answer key: `golden-synthetic-v1 (gold-v1)`, SHA-256 `278c3ea9f1cc7d827f10c13cfd349a56f6596d042a818b6ca88dcd864c3a8235`
+- Reviewer: agent-reviewed, not owner-approved (`ai_session`)
+- Review file SHA-256: `3e25adcd519ca7698fde71bb31c4614ac698e9243b923eafe462e1a6c729cc82`
+
 - Evaluator: `eval-004-v1`; gold schema `gold-v1`
 - actions: `ext-005-rules-v1`
 - decisions: `ext-003-rules-v1`
 - entities: `ext-006-rules-v1`
 - preferences: `ext-004-rules-v1`
 - validator: `ext-002-v1`
-- Produced records: 29; in conversations not annotated for records (unscored): 0
+- Produced records: 31; in conversations not annotated for records (unscored): 2
 - Evidence anchor validity: 1.000
 - Forbidden records produced: 0; in current truth: 0
 - Unsupported user decisions in current truth: 0

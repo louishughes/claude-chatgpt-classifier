@@ -4,6 +4,12 @@
 
 # Classification baseline (golden-synthetic-v1)
 
+## AI check (not owner-verified)
+
+- Answer key: `golden-synthetic-v1 (gold-v1)`, SHA-256 `278c3ea9f1cc7d827f10c13cfd349a56f6596d042a818b6ca88dcd864c3a8235`
+- Reviewer: agent-reviewed, not owner-approved (`ai_session`)
+- Review file SHA-256: `3e25adcd519ca7698fde71bb31c4614ac698e9243b923eafe462e1a6c729cc82`
+
 - Evaluator: `eval-003-v1`; gold schema `gold-v1`; taxonomy `tax-gold-1`
 - classifier: `keyword`
 - classifier_code: `cls-001-v1`
@@ -33,4 +39,3 @@
 | term_godot | term_godot | 1 |
 | term_packaging | term_packaging | 1 |
 | term_shed | term_shed | 2 |
-

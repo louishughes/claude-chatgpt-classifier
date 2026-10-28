@@ -20,7 +20,8 @@ it didn't: the right behaviour for an undecidable segment is to ask.
 
 The report carries every version it depends on (gold set, schema,
 taxonomy, classifier method and stage keys) and numbers only, never text,
-so it can be committed as a baseline.
+so it can be committed as a baseline. It opens with the answer key's
+version, hash and reviewer label (``report_labels``).
 
 Talking points:
     - "Scores are per field: F1 for all labels, accuracy for the primary,
@@ -38,6 +39,7 @@ from dataclasses import dataclass, field
 from knowledge_engine.classification.classifier import REVIEW_REQUIRED, SegmentClassification
 from knowledge_engine.classification.schema import Rank, assignments
 from knowledge_engine.evaluation.gold import FIELDS, GoldSet
+from knowledge_engine.evaluation.report_labels import UNSCORED, AnswerKey, key_from_gold
 from knowledge_engine.rendering.transcript import StoredConversation
 from knowledge_engine.segmentation.segmenter import Segment
 
@@ -111,6 +113,7 @@ class ClassificationReport:
     unmatched_segments: int
     ambiguous_flagged: int
     ambiguous_missed: int
+    key: AnswerKey | None = None
 
     @property
     def project_accuracy(self) -> float:
@@ -118,10 +121,18 @@ class ClassificationReport:
         return self.fields["projects"].primary_accuracy if "projects" in self.fields else 0.0
 
     def as_markdown(self) -> str:
-        """A readable report (IDs and numbers only)."""
+        """A readable report (IDs and numbers only).
+
+        Raises:
+            ValueError: The answer key is missing its version, hash or
+                reviewer label (LEG-002, REV-012).
+        """
+        if self.key is None:
+            return f"# Classification baseline ({self.gold}): {UNSCORED}\n\nNo answer key.\n"
         lines = [
             f"# Classification baseline ({self.gold})",
             "",
+            *self.key.lines(),
             f"- Evaluator: `{self.eval_version}`; gold schema `{self.gold_schema}`; "
             f"taxonomy `{self.taxonomy_version}`",
             *(f"- {name}: `{value}`" for name, value in sorted(self.versions.items())),
@@ -153,7 +164,11 @@ def _ratio(top: float, bottom: float) -> float:
 
 
 def evaluate_classification(
-    gold: GoldSet, predicted: Sequence[Predicted], versions: Mapping[str, str]
+    gold: GoldSet,
+    predicted: Sequence[Predicted],
+    versions: Mapping[str, str],
+    *,
+    key: AnswerKey | None = None,
 ) -> ClassificationReport:
     """Score stored predictions against the golden set.
 
@@ -161,6 +176,8 @@ def evaluate_classification(
         gold: The answer keys.
         predicted: Every stored segment of the gold conversations.
         versions: What produced the predictions (method, stage versions...).
+        key: The key's version, hash and reviewer (``key_from_file``);
+            defaults to a content hash with no review claimed.
     """
     by_message: dict[tuple[str, str], Predicted] = {}
     for item in predicted:
@@ -215,6 +232,7 @@ def evaluate_classification(
         unmatched_segments=unmatched,
         ambiguous_flagged=flagged,
         ambiguous_missed=missed,
+        key=key or key_from_gold(gold),
     )
 
 

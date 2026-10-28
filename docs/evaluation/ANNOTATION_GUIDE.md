@@ -66,3 +66,28 @@ A golden set is annotated by one person (`annotator`) and checked by another (`r
 ## Stability and schema failures
 
 The EVAL-001 amendment asks for run-to-run label stability and the schema-failure rate. Neither needs extra annotation: stability compares two runs of the same versions on the gold conversations (`stability()` in `classification_eval.py`), and the schema-failure rate comes from the model ledger (`schema_failures()`). Compare stability only between runs with the same taxonomy, prompt and model versions.
+
+## Report labels (LEG-002, REV-012)
+
+Every scored report (`ClassificationReport.as_markdown`, `ExtractionReport.as_markdown`) opens with the answer key it was scored against:
+
+```
+## AI check (not owner-verified)
+
+- Answer key: `golden-synthetic-v1 (gold-v1)`, SHA-256 `…`
+- Reviewer: agent-reviewed, not owner-approved (`ai_session`)
+- Review file SHA-256: `…`
+```
+
+| `reviewer_kind` | Heading | Reviewer label |
+|---|---|---|
+| `owner` | Owner verdict | owner-approved |
+| `ai_session` | AI check (not owner-verified) | agent-reviewed, not owner-approved |
+| `same_model` | AI check (not owner-verified) | checked by the same model that made it, not owner-approved |
+| `none` | AI check (not owner-verified) | not reviewed, not owner-approved |
+
+- "Owner verdict" prints **only** when the key's reviewer is the owner.
+- Any reviewed kind needs the review file's hash. The synthetic set's review is `docs/reviews/GOLD_SYNTHETIC_V1_REVIEW.md`.
+- A report missing the key's version, hash or label refuses to render.
+- A report with no key prints `unscored` and no numbers.
+- `evaluate_*` without an explicit key uses a content hash and claims no review (`none`). Use `key_from_file(path, kind, review_file)` for a published baseline.
