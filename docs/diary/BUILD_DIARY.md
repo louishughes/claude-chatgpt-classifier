@@ -2319,6 +2319,24 @@ Fix attempts: 1 (supporting a confirmed record was a silent no-op; now refused).
 
 **Next exact task:** API-004 (search, answers and decision history).
 
-### 10:37 — Flaky variance test: seeded shuffle of an unseeded list
+### 10:28 — Flaky variance test: seeded shuffle of an unseeded list
 
 `test_order_dependent_answers_become_review_items` failed once in CI (#258, Ubuntu 3.13) and passed on the other three jobs and 25 local runs. Cause: `run_order` shuffled the conversations with a fixed seed, but it read them in `conv_` ID order, and those IDs include the workspace's random ID. So each run shuffled a differently ordered list and the "same" seed gave a different order. Roughly one run in n² (n segments) put the same segment first in all three orders, and then the test's drifting model flagged the same segment every time, so no difference showed. Fix: read them sorted by the export's own conversation IDs before shuffling. The test is unchanged; it is now deterministic (passes 25/25).
+
+### 10:30 — API-004: search, answers and decision history over the API
+
+- `api/retrieval.py`: `GET /search` (words, phrase or exact), `GET /find` (the planner's route: decision records first, then messages), `POST /answers` (every sentence cited, or "I don't know"), `GET /decisions/{id}/history` (every event touching a decision, each with its evidence).
+- Each request syncs the word and meaning indexes first, under a lock, because the index files have one writer. No model is called: the extractive writer and the local embedder.
+- The acceptance test follows every citation back through the API's own `/sources/{id}/nodes`: same revision, a span inside that message's text, and the cited words are about the shed.
+- `as_of` is tested on the engine-switch chats: asked as of one second before the switch, the answer has no Godot and no "Replaced decision"; asked now, it has both.
+
+**Teach-back (`api/retrieval.py`):** These endpoints search my chats and answer questions from them, and every sentence of an answer points at the exact characters in the message it came from, which a program can open through the API. If nothing supports an answer, it says it doesn't know. Asking "as of" a date gives the decisions as they stood then, before anything that replaced them.
+
+Checks:
+```
+tests/integration/test_api_retrieval.py   5 passed
+ci                                        5/5 ok, 1237 passed, 7 skipped
+```
+Fix attempts: 0.
+
+**Next exact task:** API-005 (document build, preview and export endpoints).

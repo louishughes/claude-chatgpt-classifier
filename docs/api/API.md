@@ -32,6 +32,7 @@ ke api                          # http://127.0.0.1:8766/api/v1/docs (Ctrl+C to s
 | `invalid_account` | 400 | `POST /imports`: account labels use letters, numbers, `-` and `_` only. |
 | `invalid_proposal` | 400 | `POST /taxonomy/proposals`: a required field is missing or the dimension is unknown. |
 | `reviewer_not_allowed` | 403 | A review decision from the proposer of that proposal, or under the built-in `validator` name. |
+| `stale_index` | 503 | The meaning index was built by another embedder: run `ke similar --rebuild` once. |
 | `invalid_transition` | 409 | A decision the review workflow doesn't allow: deciding twice, supporting a confirmed record, a reject without a reason, an alias clash, a suggestion becoming the user's decision without acceptance. Nothing is changed. |
 | `no_database` | 503 | Nothing has been imported into this workspace yet. |
 | `schema_mismatch` | 503 | The database is older than the code (run `ke db upgrade`) or from a newer version (OPS-007). |
@@ -78,7 +79,20 @@ The review rules are the command line's (TAX-004, EXT-007); the API only passes 
 | `GET /api/v1/knowledge/{record_id}` | One record at any trust, with its evidence anchors (message revision, character span, quote hash, who said it) and every trust change: from, to, who, note, problems, when. |
 | `POST /api/v1/knowledge/{record_id}/review` | `{"decision": "support" / "confirm" / "reject", "reviewer": "name", "note": "why"}`. `support` applies to `review_required`; `confirm` and `reject` to `review_required` or `supported`. A candidate must go through the evidence gate first. Confirmed and rejected records are final here. |
 
-Search, answer and document endpoints follow in API-004 and API-005.
+## Search, answers and decision history (API-004)
+
+Each of these first brings the word and meaning indexes up to date (cheap when nothing changed), so a new import is searchable straight away. No model is called: answers use the local extractive writer, and the meaning index uses the local embedder.
+
+| Method and path | Answers |
+|---|---|
+| `GET /api/v1/search?q=&mode=tokens/phrase/exact&conversation_id=&limit=` | Messages containing the words: conversation, message, revision, role and a short snippet. `limit` 1–100, default 20. |
+| `GET /api/v1/find?q=&limit=&as_of=` | What `ke find` does: the planner chooses a route (`structured` for decision questions, `exact`, or `hybrid`) and returns knowledge records (status `current`, `superseded`, `conflicted`, `pending` or `unknown`, with what replaced or contradicts them) and message hits. |
+| `POST /api/v1/answers` | `{"question": "...", "limit": 8, "as_of": null}`. Every sentence cites at least one citation, or the answer is the abstention with `status: "unknown"`. A citation gives `conversation_id`, `native_node_id`, `revision_id` and the character span `start`/`end` of that revision's text, so `GET /sources/{conversation_id}/nodes` shows the exact words. `answer` is the first answered workspace's result (or the abstention); `answers` has one per workspace. |
+| `GET /api/v1/decisions/{record_id}/history` | One knowledge record's evidence quotes and every decision event touching it, oldest first by when the chats said it: `supersedes`, conflicts, and revocations (revoked events stay, marked), each with its own evidence. |
+
+**`as_of`** is epoch seconds, read as *when the chats said it*. For decision questions, a decision made after that time doesn't exist yet and a replacement made after it hasn't happened, so "what did I decide, as of March" gives March's answer.
+
+Document endpoints follow in API-005.
 
 ## Swapping parts in tests
 
