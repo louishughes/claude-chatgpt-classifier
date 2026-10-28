@@ -3,9 +3,12 @@
 {% block title %}Output · Evaluation · Knowledge Engine{% endblock %}
 {% block main %}
 {% set r = found.record %}
-<p class="muted"><a href="/evaluation/outputs">← Each output</a></p>
-<h1>{{ r.type }}: {{ r.assertion }}</h1>
-<p>Whose: <strong>{{ r.actor }}</strong>{% if r.attributed_to %} (reports {{ r.attributed_to }}){% endif %} · acceptance {{ r.acceptance }}{% if r.strength %} · strength {{ r.strength }}{% endif %} · trust <strong>{{ r.trust }}</strong> <span class="muted">({{ r.trust_words }})</span></p>
+<p class="back"><a href="/evaluation/outputs">← Each output</a></p>
+<header class="page-head">
+  <p class="eyebrow">Check the AI · {{ r.type }}</p>
+  <h1>{{ r.assertion }}</h1>
+</header>
+<p>Whose: <strong>{{ r.actor }}</strong>{% if r.attributed_to %} (reports {{ r.attributed_to }}){% endif %} · acceptance {{ r.acceptance }}{% if r.strength %} · strength {{ r.strength }}{% endif %} · trust <span class="pill {{ {"supported": "info", "confirmed": "good", "review_required": "look", "rejected": "bad"}.get(r.trust, "") }}" title="{{ r.trust }}">{{ r.trust | replace("_", " ") }}</span> <span class="muted">({{ r.trust_words }})</span></p>
 {% if found.made_by %}<p class="muted">Made by <code>{{ found.made_by.stage }}</code> version <code>{{ found.made_by.version }}</code>{% if found.made_by.provider %} through <code>{{ found.made_by.provider }}</code>{% endif %}{% if found.made_by.model %} ({{ found.made_by.model }}){% endif %}.</p>{% else %}<p class="muted">Entered by a reviewer, not an extractor.</p>{% endif %}
 {% if r.why %}<p>Sent to review because: {{ r.why }}</p>{% endif %}
 
@@ -23,18 +26,18 @@
 <p class="verdict {{ c.verdict }}"><strong>{{ c.verdict_words }}</strong></p>
 {% if c.expected %}
 <p class="muted">Expected record quotes {% if c.expected.place %}<a href="/chats/{{ c.expected.place[0] }}#{{ c.expected.place[2] }}">this message in {{ c.expected.place[1] }}</a>{% else %}a message not in this workspace{% endif %}.</p>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>Attribute</th><th>Answer key</th><th>This output</th><th></th></tr></thead>
   <tbody>{% for row in c.rows %}<tr><td>{{ row.name }}</td><td>{{ row.expected }}</td><td>{{ row.produced }}</td><td class="{{ 'good' if row.agrees else 'look' }}">{{ "agrees" if row.agrees else "differs" }}</td></tr>{% endfor %}</tbody>
-</table>
+</table></div>
 {% endif %}
 {% for f in c.forbidden %}<p class="error">Forbidden by the key ({{ f.type }} by {{ f.actor }}): {{ f.reason }}</p>{% endfor %}
 {% endif %}
 
 <h2>History</h2>
 <p class="muted">Who changed this output's trust, and why. Reviewer names are as recorded; the owner delegated review to independent AI sessions, so a name here is not your approval.</p>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>When</th><th>Who</th><th>Change</th><th>Reason</th></tr></thead>
   <tbody>{% for h in found.history %}<tr><td class="muted">{{ h.at | when }}</td><td{% if h.is_validator %} class="muted"{% endif %}>{{ h.who }}</td><td>{{ h.change }}</td><td>{{ h.note or "" }}</td></tr>{% endfor %}</tbody>
-</table>
+</table></div>
 {% endblock %}

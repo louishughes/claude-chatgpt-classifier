@@ -2496,6 +2496,37 @@ Fix attempts: 1 (the test read `items` where search answers `hits`).
 
 **Next exact task:** fix the `[m:id]` evidence parsing, then PROD-004.
 
+### 12:30 — Why the chat notes feel thin: the old rich notes against today's pipeline
+
+Louis said the dashboard is interesting but the chat analysis is very weak, and asked for the full rich notes the old attempts made, with better formatting. Before building anything, I compared the old material with what the engine produces now. Write-up: `docs/plans/RICH_NOTES_GAP_ANALYSIS.md`.
+
+What I did:
+
+- Read the two old attempts on `P:\` (read-only): the v1 word-frequency pre-pass and its vocabulary, the v1 prompts, skill contract and runbook, a v1 smoke note, and the whole v2 smoke-50 run (967 files, 50 notes).
+- Generated today's knowledge notes for the same two chats from the real workspace, into a scratch folder outside Git.
+- Measured instead of guessing: note sizes, evidence blocks, filler blocks, record counts by type.
+
+What I found:
+
+- **v1 had good content in the wrong place.** A 17-message chat gave a sharp four-sentence summary and 14 typed, quoted knowledge objects, but almost all of it sat in YAML front matter where nobody reads it. Its vocabulary auto-promoted any word seen in three notes, so words like "new" and "red" became terms.
+- **v2 had the right sections and drowned them.** All 50 notes share 15 sections (summary, knowledge card, category and subcategory analysis, decisions, insights, tensions, next steps...), but they hold 3,094 evidence blocks and 165 "not applicable" blocks; the median note is 76 KB. In 22 of 50 notes "key decisions" were just every user message, including a pasted role-play prompt. Every note called itself "certified" while its own data said "review required".
+- **Today's engine is the reverse.** The plumbing is far better than either attempt (branches, images, links, exact quotes, provenance), but the meaning is missing: no taxonomy has been published on the real chats, so nothing has a category; the rule extractors found 0 decisions in 85 real segments; the same 17-message chat now gets a note with 0 knowledge records and a line of counts.
+
+Decisions and proposal (Louis decides; nothing is approved yet):
+
+- A note template that puts the readable content first: summary, knowledge card, decisions, suggestions not taken up, open questions, generated insights, tensions and next steps (clearly labelled as generated), category analysis, keyword and topic candidates, related chats. Evidence becomes a short `[m12]` link to the transcript with the quote in a collapsed block, and hashes move to a sidecar file.
+- 13 proposed `NOTE-` tickets. The core new piece is a per-chat "conversation digest" step that runs through the existing file-batch provider, answered by a Claude session on the subscription, never a paid API, and scored by a separate session that never sees the output.
+- Eight decisions listed for Louis, including priority over the parked product work, who approves the first taxonomy, and approving a new quality rubric for notes.
+
+Challenges: `gh` isn't on this PC's PATH, and the `ke.exe` launcher was locked by the running `ke ui`, so I ran the CLI as `python -m knowledge_engine.cli.main`. Keeping private chat text out of the write-up meant describing the old notes by shape and numbers and using placeholders in the template.
+
+Talking points:
+
+- "My first two attempts had the right sections but the wrong trust model: the pipeline graded itself and stamped its own notes 'certified'."
+- "The rebuild got the hard plumbing right first. Now the meaning goes on top, with every sentence cited to a message."
+- "Frequency isn't a category: the old vocabulary auto-promoted words like 'new' and 'red'."
+- "Evidence should be one click away, not 3,000 copies of a hash in the reader's face."
+
 ### 12:55 — OPS-009: peak memory on Windows, and ID prefixes in `inspect`
 
 - `ke eval smoke` reported `peak_memory_mb: null` on Windows. Now it asks Windows for the process's `PeakWorkingSetSize` through `ctypes` (no new dependency). A platform with neither that nor the POSIX `resource` module reports `"unavailable_on_platform"`, so a missing number always says why.
@@ -2632,6 +2663,24 @@ Fix attempts: 0.
 
 **Next exact task:** open the queued PRs, then INT-003 (watched folders).
 
+### 12:20 — INT-003: watched folders
+
+- `importer/watch.py`: `FolderWatcher.tick()` looks at a folder once. Each top-level export folder or ZIP must have the same metadata fingerprint on two looks at least `settle_s` apart (so a half-downloaded ZIP waits), then it is compared with the watch state: same metadata is skipped unread, the same contents (touched, re-downloaded, or a second copy under another name) are recorded without importing, and only new contents go to the importer.
+- A broken export is recorded with its error code and left alone until it changes, so it can't loop.
+- If an import changed something and a vault is set, the vault is synced once; DOC-006 already keeps unrelated notes untouched, and the test checks their bytes and modified times.
+- The state file is written atomically and holds fingerprints and import IDs only; the report holds counts and IDs, never export names.
+- `ke watch FOLDER [--once] [--vault DIR] [--partial] [--interval] [--settle]`. The workspace itself can't be watched (it would watch its own writes).
+
+**Teach-back (`FolderWatcher`):** It looks at a folder now and then and waits until an export has stopped changing before touching it. It remembers a fingerprint of everything it has imported, so the same export dropped again, touched, or saved under another name never imports twice, and a broken one is noted once and left alone. When an import did change something, it refreshes the notes vault, which only rewrites the notes that actually changed.
+
+Checks:
+```
+tests/integration/test_watch_folder.py   7 passed (fake clock)
+```
+Fix attempts: 1 (my test touched the source and then expected its fingerprint unchanged; moved the fingerprint after the touch).
+
+**Next exact task:** open the INT PRs, then PERF-001 (#200).
+
 ### 13:05 — NOTE-002: the conversation digest contract
 
 Louis approved the rich-notes plan (`docs/plans/RICH_NOTES_GAP_ANALYSIS.md`), so the NOTE tickets come next. This one is the shape of the *digest*: what a model writes about a whole chat so the note reads well.
@@ -2727,3 +2776,41 @@ tests/unit/test_keyword_candidates.py   8 passed (misspelt entity, pasted preamb
 Fix attempts: 1 (my test's "common phrase" was said once per chat, so it never ranked; and the setup exclusions were cut alphabetically instead of by count).
 
 **Next exact task:** merge the open PRs on full green, then wire keywords into the note and start NOTE-011's code checks.
+
+### 13:30 — A design pass on the dashboard (`ke ui`)
+
+Louis asked for the local dashboard to be easier to use and nicer to look at. It worked, but it was a page of links separated by dots, long grey tables and raw state names like `review_required`, and on a phone the tables pushed the whole page sideways.
+
+What changed (templates, CSS and one line in `ui/app.py`; no new routes, still read-only):
+
+- **One visual system** in `style.css`: every colour is a named token, and dark mode only swaps the tokens. Colour always means something: green fine, amber look at this, red wrong, and **violet for "an AI said so, not the owner"**.
+- **A sidebar grouped by purpose** (Your archive / Found in chats / Check the AI / Add) that highlights where you are. `app.py` now passes the current address to the templates for that. On a phone it becomes a wrapping top bar.
+- **Tables** sit in their own scrolling box, with small-caps headers and right-aligned numbers, so a wide table never drags the page sideways.
+- **Plain labels**: trust states are pills that say "review required" instead of `review_required`, the filter links are chips with counts, and long hashes are folded under "Fingerprints".
+- **Empty states** say what's missing and the next step ("Run `ke extract`…", "Import your ChatGPT export").
+- **Charts on the Evaluation page**: a stacked bar per record type (found and expected / found but not expected / expected but missed) and one for how far each output got (trust). Score tiles get a thin meter. Every score block carries "Scored against: AI check (not owner-verified)", in violet.
+
+Challenges:
+
+- **The page's security policy blocks scripts and inline styles.** That's on purpose (chat text must never become code), but it rules out chart libraries and `style="width: 40%"`. The fix: draw the bars as plain SVG from the template, where `width="40%"` is an attribute, not a style, and colour them from the stylesheet. Hover text comes from SVG `<title>`, which needs no script.
+- **Tests pin exact HTML** (for example `<td>(\d+)</td>` for the message count). My first pass added `class="num"` to those cells and broke two tests. Tests can't be changed without Louis, so I put the cells back and right-aligned the columns from CSS instead.
+- **The sidebar stopped halfway down** long pages in full-page screenshots, because a sticky box is only one screen tall. Painting the sidebar's panel onto the page background fixed it at any length.
+
+Before and after screenshots, all from synthetic test fixtures: `docs/diary/img/ui-design-2026-10-28/`.
+
+**Teach-back (`stackbar` in `ui/templates/macros.html`):** It draws one horizontal bar made of coloured pieces, such as found and expected, found but not expected, and missed. Every bar on a chart shares one scale, the biggest total, so you can compare their lengths fairly. It's plain SVG with percentage widths and a hover title, because the page isn't allowed to run scripts.
+
+Checks:
+```
+pytest tests/   1340 passed, 22 skipped (no test changed)
+ruff check src/knowledge_engine/ui   clean
+Screenshots: 11 pages, light and dark, plus 400px phone width
+```
+Fix attempts: 1 (the two HTML-pinning tests above).
+
+Talking points:
+- "My dashboard has no JavaScript at all, for security, so the charts are SVG drawn by the server-side template."
+- "Colour carries meaning: violet always means an AI checked this, not me, so a score can't look more certain than it is."
+- "The tests guard the exact numbers on the page, so a redesign that broke them got caught straight away."
+
+**Next exact task:** Louis looks at the screenshots and says what to change; possible follow-ups are a light/dark switch and a chart on the segment-labels page.
