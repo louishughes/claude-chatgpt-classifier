@@ -612,3 +612,9 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - Fixtures copied_prefix, similar_unrelated (existing fixtures byte-identical). Tests: test_conversation_relationships.py (5), test_relationship_detectors.py (5).
 - Full suite 729 passed, 6 skipped. ruff, mypy, git_guard OK; no migration drift. Detection 2.7 s over 1,000 generated chats.
 - Next: RET-001.
+
+## 2026-10-28 02:10 RET-001 (#51)
+- retrieval/lexical.py (LexicalIndex over <workspace>/index/search.db, external-content FTS5, SearchMode tokens|phrase|exact, match_expression quoting, sync_index), import syncs when anything changed (report.search_indexed; sqlite errors -> warning search_index_unavailable), CLI `ke search`.
+- Fixture search_terms (12 expected queries). Tests: test_lexical_search.py (16), test_search_query.py (2, Hypothesis).
+- Full suite 757 passed, 6 skipped. ruff, mypy, git_guard OK. No archive migration (index is a separate file).
+- Next: UI-004.

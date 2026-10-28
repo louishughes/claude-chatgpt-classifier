@@ -1030,3 +1030,24 @@ pytest -q               # 729 passed, 6 skipped
 Fix attempts: 1 (the new fixture manifests lacked the conversation count the fixture tests check).
 
 **Next exact task:** RET-001.
+
+### 02:10 — RET-001: search every message
+**What:** `ke search "words"` finds messages across every imported chat, using SQLite's built-in full-text search (FTS5). It has three modes:
+- **tokens** (the default): all the words, in any order.
+- **phrase:** the words together, in order.
+- **exact:** character for character, case included, for error codes and IDs such as `SYN-CODE-4471`.
+
+The first two ignore case and accents, so `cafe` finds `café`. Every hit names the exact message version, its chat and its node, and shows a snippet with the match in [brackets]. Search is always limited to one workspace.
+
+**Design choice:** the index is its own file, `workspace/index/search.db`, and not part of the archive database. It only holds things that can be rebuilt, so deleting it is always safe: the next import or search refills it. It does copy message text, so the future deletion feature must clear it too, and OPEN_DECISIONS says so.
+**Safety:** what you type never becomes search syntax. Every word is quoted, so searching `NOT AND OR` finds those words. A Hypothesis test throws random text at it and checks that no query breaks.
+**Cost:** imports index only new message versions, and an identical re-import indexes nothing. A workspace imported before this change is indexed on its first search: 1.3 s for 1,000 generated chats, then about 0.7 s per search including start-up.
+**Teach-back (`retrieval/lexical.py`):** "Every message version is copied into a separate search file that SQLite indexes word by word. A search quotes each word you type and returns the best-ranked messages, each pointing back to its exact chat and message. Because the file is only a cache, I can delete it at any time and it rebuilds itself."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 123 source files
+pytest -q               # 757 passed, 6 skipped
+```
+Fix attempts: 1 (a typing error from building a hit out of a row slice).
+
+**Next exact task:** UI-004 (links, YouTube and accounts pages, plus a search box).

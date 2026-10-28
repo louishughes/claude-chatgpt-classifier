@@ -24,6 +24,7 @@ Talking points:
 
 from __future__ import annotations
 
+import sqlite3
 from collections import Counter
 from collections.abc import Iterator
 from itertools import islice
@@ -55,6 +56,7 @@ from knowledge_engine.ingestion.source import NativeConversation, SourceListing,
 from knowledge_engine.links.social_store import record_accounts
 from knowledge_engine.links.store import record_links
 from knowledge_engine.relationships.detect import detect_relationships
+from knowledge_engine.retrieval.lexical import LexicalIndex, search_index_path, sync_index
 from knowledge_engine.settings import Settings
 
 DEFAULT_WORKSPACE_NAME = "default"
@@ -310,6 +312,7 @@ def _run(
     else:
         status = ImportBatchStatus.SUCCEEDED
     relationship_counts: Counter[str] = Counter()
+    search_added = 0
     if changed:
         # Whole-workspace and idempotent; skipped when nothing changed, so
         # an identical re-import does no extra work.
@@ -317,6 +320,16 @@ def _run(
             relationship_counts = detect_relationships(
                 session, workspace_id=workspace_id, import_id=import_id
             )
+        try:
+            with (
+                factory.transaction(write=False) as session,
+                LexicalIndex(search_index_path(settings)) as index,
+            ):
+                search_added = sync_index(session, index)
+        except sqlite3.Error:
+            # The index is a rebuildable cache: the import stands without it,
+            # and the next search tries again.
+            warnings["search_index_unavailable"] += 1
     report = ImportReport(
         import_id=import_id,
         status=status,
@@ -329,6 +342,7 @@ def _run(
         links=dict(sorted(link_counts.items())),
         accounts=dict(sorted(account_counts.items())),
         relationships=dict(sorted(relationship_counts.items())),
+        search_indexed=search_added,
         new_branches=new_branches,
         raw_observations=raw_observations,
         candidate_matches=dict(candidates),
