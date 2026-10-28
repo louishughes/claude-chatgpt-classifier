@@ -2916,3 +2916,20 @@ tests/integration/test_note_checks.py   7 passed (the real note passes; each bre
 Fix attempts: 2 (my FakeProvider digest left out the required intent; the table-cell pipe escape).
 
 **Next exact task:** keywords into the note (NOTE-007 wiring), then NOTE-008.
+
+### 15:55 — Step 4: tax-1 published, 40 real chats classified and digested, and the notes scored by a separate session
+
+Louis approved tax-1 and asked me to run the publish ("I need you to run it"); this PC's safety check had blocked my first try.
+
+- `ke classify run` (new): the same request-file flow as `ke digest run`. The engine writes requests, fresh Claude sessions on the subscription answer them, and the engine validates every answer against the pinned version. 85 segments: 67 labelled, 18 to review.
+- Digests for all 40 chats came from 4 fresh sessions, with every quote checked in code. That gave 40 rich notes; the code rubric passes 36 and fails 4 on size only.
+- **Independent score:** one session (a different model) wrote reference summaries for 15 sampled chats without seeing the notes. A third session scored the notes against them. Summary mean 1.53/2; top-level category right 11 of 11 where given; but decisions were found for only 5 of 22 and open questions for 1 of 9. Full report: `docs/evaluation/NOTE-011_REAL.md`.
+- The honest headline: the notes now say what happened and where it sits, but not yet what Louis decided. The model extractor (NOTE-005) hasn't run on these chats yet, and pasted custom instructions are polluting the requirement lists.
+
+Challenges: the config file's `text_llm = false` overrides the environment variable, so the labelling runs use a private copy of the config with it switched on. One labeller's first script crashed after writing two lines; append-only meant nothing was lost or duplicated.
+
+Talking points:
+- "Three different AI sessions: one wrote the notes, one wrote the answer key without seeing them, one marked the difference. That's how I know decisions are the weak spot."
+- "Every label the classifier gives has to be a term from the published list, checked in code, so it can't make up categories."
+
+**Next exact task:** run the NOTE-005 extractor on the 40 chats, re-render, re-score against the same references.
