@@ -133,7 +133,12 @@ def propose(
 
 
 def approve(
-    session: Session, proposal_id: str, *, reviewer: str, note: str | None = None
+    session: Session,
+    proposal_id: str,
+    *,
+    reviewer: str,
+    note: str | None = None,
+    label: str | None = None,
 ) -> TaxonomyProposalRow:
     """Apply an open proposal to the live vocabulary and record the decision.
 
@@ -141,7 +146,11 @@ def approve(
         session: The caller commits (or rolls back if this raises).
         proposal_id: The ``prop_`` ID.
         reviewer: Who approved; must not be the proposer.
-        note: Why, optionally.
+        note: Why. Required for high-impact changes: renaming or merging a
+            project (TAX-005), because every label on it moves too.
+        label: For an ``add`` only: the label the reviewer chose instead of
+            the proposed one, e.g. to tell apart two projects that share a
+            name. Recorded in the decision note.
 
     Returns:
         The decided proposal; ``result_id`` holds the ID an ``add`` created.
@@ -154,6 +163,13 @@ def approve(
     row = _open(session, proposal_id, reviewer)
     payload = json.loads(row.payload_json)
     operation = Operation(row.operation)
+    if _high_impact(session, operation, payload) and not (note or "").strip():
+        raise ReviewError("renaming or merging a project is high-impact: give a note")
+    if label is not None:
+        if operation is not Operation.ADD or not label.strip():
+            raise ReviewError("a replacement label applies to a new term or project only")
+        note = f"[label set by reviewer: {label.strip()}] {note or ''}".strip()
+        payload["label"] = label.strip()
     result = _APPLY[operation](TaxonomyRegistry(session), payload)
     _decide(row, APPROVED, reviewer, note)
     row.result_id = result
@@ -179,6 +195,13 @@ def proposals(session: Session, status: str | None = OPEN) -> list[TaxonomyPropo
     if status is not None:
         query = query.where(TaxonomyProposalRow.status == status)
     return list(session.scalars(query))
+
+
+def _high_impact(session: Session, operation: Operation, payload: Mapping[str, Any]) -> bool:
+    if operation not in (Operation.RENAME, Operation.MERGE):
+        return False
+    ids = (payload.get("target_id"), payload.get("source_id"))
+    return any(i is not None and session.get(ProjectRow, i) is not None for i in ids)
 
 
 def _open(session: Session, proposal_id: str, reviewer: str) -> TaxonomyProposalRow:

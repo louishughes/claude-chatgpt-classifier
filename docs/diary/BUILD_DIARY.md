@@ -1165,3 +1165,20 @@ pytest -q               # 827 passed, 6 skipped
 Fix attempts: 0.
 
 **Next exact task:** TAX-005 (project identity and merge proposals) + TAX-006 (corpus discovery).
+
+### 04:45 — NRM-006 + TAX-005: a fair look at the corpus, and project names as questions
+**What:** the input for taxonomy discovery, and how project names enter the registry.
+- **Corpus inventory (NRM-006).** `corpus_inventory` reads every stored chat, segments it and keeps each segment's text in memory. It writes nothing; a test checks the database file is byte-identical afterwards. `summarise` gives counts only (chats, segments, characters, sections, length bands, themes), so it is safe to print.
+- **A sample that reaches rare subjects.** Each segment's *theme word* is its most distinctive word by TF-IDF. `sample(items, n, seed=...)` takes one segment from every theme, rarest first, then a second from each, and so on. Within a theme the order is a hash of seed and segment ID, so the same seed always gives the same sample, whatever order the input came in. In the test, 40 shed segments and 3 rare ones (sourdough, beekeeping): every seed's sample of 4 includes both rare subjects.
+- **Project candidates (TAX-005).** `propose_project` turns a name seen in chats into an `add` proposal and never creates or extends a project itself. If the name already belongs to an approved project, the proposal says `same_name_as` and waits. The reviewer either rejects it (same project) or approves it under a distinguishing label ("Atlas map script"), which is recorded in the decision note. The same candidate twice reuses the open proposal. Renaming or merging a project now needs a reviewer's note, because every label on it moves too.
+- `ke corpus [--sample N --seed S]` prints the counts and sampled segment IDs, never text.
+
+**Teach-back (`segmentation/inventory.py`):** "I find each segment's most unusual word and group segments that share it. The sample takes one from every group, smallest groups first, so rare subjects always show up. The order inside a group is a hash of the seed, so the same seed gives the same sample."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 150 source files
+pytest -q               # 839 passed, 6 skipped
+```
+Fix attempts: 1. Two of my own new tests were wrong: one rolled back a proposal it hadn't committed, the other assumed a segment's text starts with its first user message.
+
+**Next exact task:** TAX-006 (discovery candidates) + TAX-007 (version diff and invalidation).

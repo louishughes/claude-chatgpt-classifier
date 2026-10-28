@@ -648,3 +648,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - taxonomy/aliases.py (AliasResolver.resolve/find/collisions, MatchStatus, Candidate, Resolution, Mention); taxonomy/review.py (Operation, propose, approve, reject, proposals, ReviewError); TaxonomyProposalRow.decision_note/result_id; migration 0016.
 - Tests: test_alias_resolver.py (7), test_taxonomy_review.py (9). Full suite 827 passed, 6 skipped. ruff, mypy OK; no migration drift.
 - Next: TAX-005/006.
+
+## 2026-10-28 04:45 NRM-006 + TAX-005 (#55, #60)
+- segmentation/inventory.py (SegmentText, CorpusSummary, segment_texts, corpus_inventory, theme_words, summarise, sample, sample_ids); CLI `ke corpus`. taxonomy/projects.py (same_name_projects, propose_project); review.approve gains `label` override and the high-impact note rule for project rename/merge.
+- Tests: test_corpus_sample.py (5), test_corpus_inventory.py (2), test_project_proposals.py (5). Full suite 839 passed, 6 skipped. ruff, mypy OK; no migration drift.
+- Next: TAX-006/007.
