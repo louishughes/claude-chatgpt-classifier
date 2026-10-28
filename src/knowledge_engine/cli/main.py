@@ -967,6 +967,46 @@ def _ask(settings: Settings, args: argparse.Namespace) -> CommandResult:
     return CommandResult("ask", data={"answers": answers}, message=str(shown["answer"]))
 
 
+def _eval_retrieval(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Run the pinned retrieval benchmark (RET-008) in a scratch folder; fail below a floor."""
+    import tempfile
+
+    from knowledge_engine.evaluation.retrieval_bench import check, run_benchmark, to_markdown
+
+    with tempfile.TemporaryDirectory(prefix="ke-bench-") as scratch:
+        report = run_benchmark(Path(scratch))
+    text = to_markdown(report)
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(text, encoding="utf-8")
+    failures = check(report)
+    data = {
+        "scores": {
+            m: {"recall": s.recall, "mrr": s.mrr, "exact_term_hit": s.exact_term_hit}
+            for m, s in report.scores.items()
+        },
+        "answered_with_right_citation": report.answered_with_right_citation,
+        "abstained_when_unanswerable": report.abstained_when_unanswerable,
+        "model_requests": report.model_requests,
+        "seconds": round(report.seconds, 2),
+        "failures": failures,
+    }
+    if failures:
+        return CommandResult(
+            "eval retrieval",
+            ExitCode.ERROR,
+            data=data,
+            message="below a pinned floor: " + "; ".join(failures),
+            error_code="regression",
+        )
+    hybrid = report.scores["hybrid"]
+    return CommandResult(
+        "eval retrieval",
+        data=data,
+        message=f"PASS: hybrid recall@5 {hybrid.recall[5]:.3f}, MRR {hybrid.mrr:.3f}",
+    )
+
+
 def _state(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """What holds now or on a date, with the events behind it (REC-006); no text."""
     from datetime import UTC, datetime
@@ -1629,6 +1669,12 @@ def build_parser() -> argparse.ArgumentParser:
     semantic.add_argument("--invalid-every", type=int, default=7, help="every Nth answer is broken")
     semantic.add_argument("--silent-every", type=int, default=13, help="every Nth never answers")
     semantic.set_defaults(handler=_eval_semantic)
+
+    retrieval_bench = eval_commands.add_parser(
+        "retrieval", help="the pinned retrieval benchmark: words vs meaning vs combined"
+    )
+    retrieval_bench.add_argument("--out", type=Path, help="write the Markdown report here")
+    retrieval_bench.set_defaults(handler=_eval_retrieval)
 
     transcript = commands.add_parser("transcript", help="YouTube video transcripts")
     transcript_commands = transcript.add_subparsers(
