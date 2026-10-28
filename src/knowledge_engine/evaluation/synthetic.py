@@ -1397,6 +1397,107 @@ def _extraction_cases() -> list[Case]:
     ]
 
 
+def _action_entity_cases() -> list[Case]:
+    """EXT-005 / EXT-006: suggested vs own tasks, open questions, artefacts, named things."""
+    conv = "c0000040-0000-4000-8000-000000000001"
+    work = ConversationBuilder(conv, "Synthetic workshop tasks", BASE_EPOCH + 86_400 * 70)
+    node = work.add(f"{conv}-sys", work.root, "system", [""])
+    script: list[tuple[str, str, list[Any], str]] = [
+        (
+            "wk-u0",
+            "user",
+            ["Synthetic question: how do I refinish the table? What finish lasts longest?"],
+            "text",
+        ),
+        (
+            "wk-a0",
+            "assistant",
+            [
+                "Synthetic answer: you should sand it first. Make sure to wipe "
+                "off the dust. Oil lasts longest."
+            ],
+            "text",
+        ),
+        (
+            "wk-u1",
+            "user",
+            ["Synthetic note: I'll sand it tomorrow. Which grit is best for oak?"],
+            "text",
+        ),
+        ("wk-a1", "assistant", ["Synthetic answer: I'm not sure, it depends on the oak."], "text"),
+        ("wk-u2", "user", ["Synthetic request: draw the finished table."], "text"),
+        (
+            "wk-a2",
+            "assistant",
+            [
+                image_part("file-service://file-SYN0001"),
+                image_part("file-service://file-SYNGONE"),  # referenced, never exported
+                "Synthetic: here are two sketches.",
+            ],
+            "multimodal_text",
+        ),
+        ("wk-u3", "user", ["Synthetic: and a script to list the photos?"], "text"),
+        ("wk-a3", "assistant", ["Synthetic answer:\n```python\nprint('synthetic')\n```"], "text"),
+        ("wk-u4", "user", ["Synthetic: is walnut oil food safe?"], "text"),
+    ]
+    for node_id, role, parts, content_type in script:
+        node = work.add(node_id, node, role, parts, content_type=content_type)
+    media = _chat(
+        "c0000040-0000-4000-8000-000000000002",
+        "Synthetic media chat",
+        71,
+        [
+            (
+                "Synthetic: I keep playing Celeste and reading the book Dune by Frank Herbert.",
+                "Synthetic answer: you could try the game Hollow Knight next.",
+            ),
+            (
+                "Synthetic: I'm using Blender for renders, see https://example.com/playing "
+                "and playing Celeste again.",
+                "Synthetic answer: noted.",
+            ),
+        ],
+    )
+    m = media.conversation_id
+    return [
+        Case(
+            "actions_entities",
+            "EXT-005/EXT-006: an assistant's suggested task is not the user's commitment; "
+            "only unanswered or 'not sure' questions are open; a produced image artefact "
+            "lists its real occurrences and reports the missing one; named games, books, "
+            "software and a book's author are found by cue, grouped per entity, never from "
+            "a URL, and never create a project.",
+            "split",
+            [work.native(), media.native()],
+            [IMG_RED],
+            expected={
+                "conversations": 2,
+                # (record_type, actor, first evidence message or None).
+                "actions": [
+                    ["action", "assistant", "wk-a0"],
+                    ["action", "assistant", "wk-a0"],
+                    ["action", "user", "wk-u1"],
+                    ["question", "user", "wk-u1"],
+                    ["artefact", "assistant", "wk-a2"],
+                    ["artefact", "assistant", "wk-a3"],
+                    ["question", "user", "wk-u4"],
+                ],
+                "artefact_occurrences": {"available": 1, "missing": 1},
+                # (entity_type, name, mentions, details), in order of first mention.
+                "entities": {
+                    m: [
+                        ["game", "Celeste", 2, {}],
+                        ["book", "Dune", 1, {"author": "Frank Herbert"}],
+                        ["person", "Frank Herbert", 1, {}],
+                        ["game", "Hollow Knight", 1, {}],
+                        ["software", "Blender", 1, {}],
+                    ]
+                },
+            },
+        )
+    ]
+
+
 def without_children(native: JsonDict) -> JsonDict:
     """Return a copy of a native conversation with every ``children`` list removed."""
     copy: JsonDict = json.loads(json.dumps(native))
@@ -1419,6 +1520,7 @@ def all_cases() -> list[Case]:
         *_segment_cases(),
         *_classification_cases(),
         *_extraction_cases(),
+        *_action_entity_cases(),
     ]
 
 

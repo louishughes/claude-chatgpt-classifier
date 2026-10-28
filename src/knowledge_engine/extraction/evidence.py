@@ -6,7 +6,8 @@ at every piece of evidence and gives one of three verdicts:
 * ``invalid``: a reference is **malformed**. The message revision doesn't
   exist, the range runs past the text, the quote fingerprint doesn't match
   (wrong offsets, or the text changed), the speaker named on the evidence
-  isn't who wrote that message, or the same quote is cited twice. Such a
+  isn't who wrote that message, the same quote is cited twice, an asset
+  occurrence doesn't exist, or the record misstates which ones are missing. Such a
   record is refused, never stored as knowledge.
 * ``review_required``: the references are sound but the **meaning is
   ambiguous**:
@@ -18,6 +19,8 @@ at every piece of evidence and gives one of three verdicts:
     question;
   - the quote sits inside a quotation (a ``>`` line or quotation marks), so
     the speaker may be repeating someone else;
+  - an artefact whose image or file bytes are missing (reported, so a
+    person sees it, but not refused: the reference itself is real);
   - the record is ``inferred``, reports someone else's view
     (``attributed_to``), or its extractor already flagged it.
 * ``valid``: everything checks. A valid record may become ``supported``
@@ -42,7 +45,7 @@ from enum import StrEnum
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from knowledge_engine.domain.enums import Role
+from knowledge_engine.domain.enums import AssetAvailability, Role
 from knowledge_engine.domain.models import EvidenceRef
 from knowledge_engine.extraction.records import (
     COMMITMENTS,
@@ -53,6 +56,7 @@ from knowledge_engine.extraction.records import (
 )
 from knowledge_engine.graph.nodes import canonical_node
 from knowledge_engine.graph.offsets import Span, verify
+from knowledge_engine.importer.media import AssetOccurrenceRow
 from knowledge_engine.importer.records import MessageNodeRow, MessageRevisionRow
 
 VALIDATOR_VERSION = "ext-002-v1"
@@ -97,7 +101,15 @@ class EvidenceCheck:
 
 # Problems that make a reference malformed (the rest are about meaning).
 _MALFORMED = frozenset(
-    {"revision_missing", "span_out_of_range", "quote_mismatch", "actor_mismatch", "duplicate"}
+    {
+        "revision_missing",
+        "span_out_of_range",
+        "quote_mismatch",
+        "actor_mismatch",
+        "duplicate",
+        "occurrence_missing",
+        "availability_mismatch",
+    }
 )
 
 
@@ -173,6 +185,7 @@ def check_record(session: Session, record: CandidateRecord) -> EvidenceCheck:
             user_quotes.append(quote)
             if record.record_type in _NEEDS_USER_WORDS and _hedged(quote):
                 problems.append(EvidenceProblem("hedged_or_question", index))
+    problems += _occurrence_problems(session, record)
     if any(p.code in _MALFORMED for p in problems):
         return EvidenceCheck(Verdict.INVALID, tuple(problems))
     problems += _meaning_problems(record, user_quotes)
@@ -193,6 +206,22 @@ def _meaning_problems(record: CandidateRecord, user_quotes: list[str]) -> list[E
         found.append(EvidenceProblem("extractor_flagged"))
     if record.attributed_to:
         found.append(EvidenceProblem("someone_elses_view"))
+    return found
+
+
+def _occurrence_problems(session: Session, record: CandidateRecord) -> list[EvidenceProblem]:
+    # An artefact's images must be real occurrences, and the record must
+    # say truthfully which of them have no bytes.
+    found = []
+    missing = set(record.missing_occurrences)
+    for occurrence_id in record.asset_occurrences:
+        row = session.get(AssetOccurrenceRow, occurrence_id)
+        if row is None:
+            found.append(EvidenceProblem("occurrence_missing"))
+        elif (row.availability != AssetAvailability.AVAILABLE) != (occurrence_id in missing):
+            found.append(EvidenceProblem("availability_mismatch"))
+    if missing:
+        found.append(EvidenceProblem("artefact_bytes_missing"))
     return found
 
 

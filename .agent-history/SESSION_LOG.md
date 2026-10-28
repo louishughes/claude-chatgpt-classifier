@@ -683,3 +683,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - extraction/text.py (ExtractionMessage, segment_extraction_messages, sentences, quote); extraction/decisions.py (extract_decisions); extraction/preferences.py (extract_preferences); records.py v2 (Strength, Polarity, attributed_to); evidence.py (quoted_at, inside_quotation, someone_elses_view); synthetic case extraction_rules.
 - Tests: test_rule_extractors.py (8). Full suite 926 passed, 6 skipped; ruff, mypy OK; drift 0.
 - Next: EXT-005 + EXT-006.
+
+## 2026-10-28 08:10 EXT-005 + EXT-006 (#73, #74)
+- extraction/actions.py (extract_actions, load_occurrences, Occurrence); extraction/entities.py (extract_entities); records.py v3 (EntityType, Entity, asset_occurrences, missing_occurrences); evidence.py occurrence checks; synthetic case actions_entities.
+- Tests: test_action_entity_extractors.py (4). Full suite 939 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: EXT-007 + EXT-008.

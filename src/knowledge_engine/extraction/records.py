@@ -41,7 +41,8 @@ from knowledge_engine.domain.enums import Role
 from knowledge_engine.domain.models import EvidenceRef
 
 # v2 (EXT-004): optional strength, polarity and attributed_to.
-RECORD_SCHEMA_VERSION = "ext-001-v2"
+# v3 (EXT-005/006): asset occurrences for artefacts; a typed entity for references.
+RECORD_SCHEMA_VERSION = "ext-001-v3"
 
 
 class RecordType(StrEnum):
@@ -100,6 +101,38 @@ class Polarity(StrEnum):
 
     FOR = "for"
     AGAINST = "against"
+
+
+class EntityType(StrEnum):
+    """What a named reference is (EXT-006)."""
+
+    GAME = "game"
+    SOFTWARE = "software"
+    BOOK = "book"
+    FILM = "film"
+    PERSON = "person"  # only a named creator ("by ..."), never guessed from a bare name
+    OTHER = "other"
+
+
+class Entity(BaseModel):
+    """A named thing a reference record is about.
+
+    Attributes:
+        entity_type: Game, software, book...
+        name: As written (private).
+        norm_name: The comparison form, for grouping mentions.
+        matched_id: An approved taxonomy term or project ID whose alias it
+            matches, if exactly one does. Never a newly created one.
+        details: Type-specific fields, e.g. ``{"author": ...}`` for a book.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    entity_type: EntityType
+    name: str = Field(min_length=1, max_length=200)
+    norm_name: str = Field(min_length=1, max_length=200)
+    matched_id: str | None = None
+    details: dict[str, str] = Field(default_factory=dict)
 
 
 class Trust(StrEnum):
@@ -175,6 +208,10 @@ class CandidateRecord(BaseModel):
         attributed_to: Set when the speaker reports someone else's view
             ("my client wants..."): a category such as ``external``, never
             a guessed name. Such a record is not the speaker's own.
+        asset_occurrences: For artefacts, the ``occ_`` IDs of the images or
+            files it consists of (MED-003).
+        missing_occurrences: Those of them whose bytes are not available.
+        entity: For references, what is referred to.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -193,16 +230,32 @@ class CandidateRecord(BaseModel):
     strength: Strength | None = None
     polarity: Polarity | None = None
     attributed_to: str | None = Field(default=None, max_length=40)
+    asset_occurrences: tuple[str, ...] = ()
+    missing_occurrences: tuple[str, ...] = ()
+    entity: Entity | None = None
 
     @model_validator(mode="after")
     def _check(self) -> CandidateRecord:
         if self.origin is Origin.REVIEWER:
             raise ValueError("an extractor can't claim to be a reviewer")
-        if self.origin is Origin.EXTRACTED and not self.evidence:
-            raise ValueError("an extracted record needs source evidence")
-        if self.scope is not Scope.GLOBAL and not self.scope_id:
-            raise ValueError("a scoped record needs scope_id")
+        _check_shared(self)
         return self
+
+
+def _check_shared(record: CandidateRecord) -> None:
+    """Rules for candidates and stored records alike."""
+    # An artefact can be an image with no words at all: its asset
+    # occurrences are then its evidence.
+    if record.origin is Origin.EXTRACTED and not (record.evidence or record.asset_occurrences):
+        raise ValueError("an extracted record needs source evidence")
+    if record.scope is not Scope.GLOBAL and not record.scope_id:
+        raise ValueError("a scoped record needs scope_id")
+    if record.asset_occurrences and record.record_type is not RecordType.ARTEFACT:
+        raise ValueError("only an artefact lists asset occurrences")
+    if not set(record.missing_occurrences) <= set(record.asset_occurrences):
+        raise ValueError("missing occurrences must be among the asset occurrences")
+    if record.entity is not None and record.record_type is not RecordType.REFERENCE:
+        raise ValueError("only a reference names an entity")
 
 
 class KnowledgeRecord(CandidateRecord):
@@ -228,15 +281,12 @@ class KnowledgeRecord(CandidateRecord):
     # record may be a reviewer's own entry, which a candidate may not.
     @model_validator(mode="after")
     def _check(self) -> KnowledgeRecord:
-        if self.origin is Origin.EXTRACTED and not self.evidence:
-            raise ValueError("an extracted record needs source evidence")
-        if self.scope is not Scope.GLOBAL and not self.scope_id:
-            raise ValueError("a scoped record needs scope_id")
+        _check_shared(self)
         if self.origin is not Origin.REVIEWER and self.provenance is None:
             raise ValueError("a machine-made record needs provenance")
         trusted = self.trust in (Trust.SUPPORTED, Trust.CONFIRMED)
         if trusted and self.origin is not Origin.REVIEWER:
-            if not self.evidence or not self.evidence_checked_by:
+            if not (self.evidence or self.asset_occurrences) or not self.evidence_checked_by:
                 raise ValueError(f"{self.trust} needs evidence that passed validation")
         if self.trust is Trust.CONFIRMED:
             if not self.reviewer:

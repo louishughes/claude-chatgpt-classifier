@@ -1332,3 +1332,29 @@ migration drift         # 0
 Fix attempts: 1. In the fixture, a quoted preference started mid-sentence, so the sentence start sat outside the quotes. The check now uses the cue's position (`quoted_at`). Separately, I first wrote the fixture's expected list to include the reported "they want" sentence, which needed its own branch.
 
 **Next exact task:** EXT-005 (actions, questions, artefacts) + EXT-006 (named entities).
+
+### 08:10 — EXT-005 + EXT-006: tasks, open questions, artefacts and named things
+**What:** two more rule-based extractors, plus a small change to the record contract.
+- **Actions, questions, artefacts (EXT-005).**
+  - **Tasks.** "I'll sand it tomorrow" is the user's task, accepted explicitly. "You should sand it first" is a task the assistant suggested: it is held by the assistant with no acceptance, so it is never the user's commitment.
+  - **Open questions.** Only user questions with no answer after them, or answered with "I'm not sure", count as open.
+  - **Artefacts.** Images an assistant or tool produced become an artefact listing the real `occ_` IDs, with the ones whose bytes are missing listed again. Fenced code blocks are artefacts too.
+  - **Evidence check.** EXT-002 now checks that each occurrence exists and that the missing list is truthful. Hiding a missing image makes the record invalid. A truthful missing list is sent to review so a person sees the gap.
+- **Named references (EXT-006).**
+  - A name needs a type cue: "playing Celeste", "the book Dune by Frank Herbert", "using Blender".
+  - Mentions are grouped per entity, so Celeste mentioned twice gives one record with two quotes, in order of first mention.
+  - A book's author is a detail and also its own person reference. People are never guessed from a bare name.
+  - Links are skipped, because the link registries own them.
+  - A name that matches an approved alias gets that ID. Unknown games create **nothing**: no project and no proposal.
+- **Contract change.** The record contract is now `ext-001-v3`: `asset_occurrences`, `missing_occurrences` and `entity`. An artefact made only of images may use its occurrences as evidence.
+
+**Teach-back (`extraction/actions.py`):** "When the assistant says 'you should sand it', I record that as the assistant's suggested task, not mine; only 'I'll sand it' is my task. A question is open only if nobody answered it or the answer was 'I'm not sure'. When the assistant produced an image, the record points at the real image occurrences and says plainly which ones have no bytes."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 179 source files
+pytest -q               # 939 passed, 7 skipped (the new split-layout case adds one expected skip)
+migration drift         # 0
+```
+Fix attempts: 1. Entity records first came out grouped by cue type rather than in text order. They are now sorted by first mention, and the new fixture's expected order was written to match.
+
+**Next exact task:** EXT-007 (evidence promotion and review queue) + EXT-008 (extraction runner and versions).
