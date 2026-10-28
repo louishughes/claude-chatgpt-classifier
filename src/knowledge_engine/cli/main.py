@@ -327,6 +327,56 @@ def _transcript_add(settings: Settings, args: argparse.Namespace) -> CommandResu
     return CommandResult("transcript add", data=data, message="Transcript attached")
 
 
+def _transcript_fetch(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Ask the YouTube Data API for a video's captions, if allowed (INT-002)."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.ingestion.transcripts import TranscriptTooLargeError
+    from knowledge_engine.links.video_transcripts import UnknownVideoError, request_transcript
+    from knowledge_engine.links.youtube_captions import YouTubeCaptionsProvider
+
+    name = "transcript fetch"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    if settings.youtube_access_token is None:
+        return CommandResult(
+            name,
+            ExitCode.USAGE,
+            message="set KE_YOUTUBE_ACCESS_TOKEN (an OAuth token for your YouTube account) first",
+            error_code="no_token",
+        )
+    provider = YouTubeCaptionsProvider(settings.youtube_access_token, language=args.language)
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session, session.begin():
+            try:
+                row = request_transcript(session, settings, args.video, provider)
+            except UnknownVideoError:
+                return CommandResult(
+                    name,
+                    ExitCode.ERROR,
+                    message="that video isn't linked in any imported chat",
+                    error_code="unknown_video",
+                )
+            except TranscriptTooLargeError:
+                return CommandResult(
+                    name,
+                    ExitCode.ERROR,
+                    message="the captions are over the size limit",
+                    error_code="too_large",
+                )
+            data = {"status": row.status, "reason": row.last_error, "attempts": row.attempts}
+            if row.transcript_id:
+                data |= _transcript_data(session, row.transcript_id)
+    finally:
+        engine.dispose()
+    return CommandResult(name, data=data, message=f"transcript: {data['status']}")
+
+
 def _transcript_status(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Show a video's transcript status and attached transcripts (counts only)."""
     from sqlalchemy import select
@@ -902,6 +952,39 @@ def _access(settings: Settings, args: argparse.Namespace) -> CommandResult:
             return CommandResult(name, data=data, message=message)
     finally:
         engine.dispose()
+
+
+def _web(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Fetch one web page safely and show where it came from (INT-001)."""
+    from knowledge_engine.ingestion.web import WebFetchError, fetch_page, save_snapshot
+    from knowledge_engine.settings import EgressDisabledError
+
+    name = "web fetch"
+    try:
+        page = fetch_page(args.url, settings.egress, settings.web_allowlist)
+    except EgressDisabledError:
+        return CommandResult(
+            name,
+            ExitCode.USAGE,
+            message="network_fetch is off: turn it on in [egress] to fetch pages",
+            error_code="egress_off",
+        )
+    except WebFetchError as error:
+        return CommandResult(name, ExitCode.ERROR, message=str(error), error_code=error.code)
+    document = page.document
+    data = {
+        "final_url": page.final_url,
+        "declared_canonical": page.declared_canonical,
+        "redirects": list(page.redirects),
+        "sha256": document.sha256,
+        "bytes": document.size,
+        "title": (document.frontmatter or {}).get("title"),
+        "blocks": len(document.blocks),
+        "headings": [b.text for b in document.headings()][:20],
+        "warnings": list(document.warnings),
+        "snapshot": str(save_snapshot(page, settings.workspace_root)) if args.save else None,
+    }
+    return CommandResult(name, data=data, message=f"read {len(document.blocks)} block(s)")
 
 
 def _purge(settings: Settings, args: argparse.Namespace) -> CommandResult:
@@ -2766,6 +2849,13 @@ def build_parser() -> argparse.ArgumentParser:
     attach.add_argument("--source-url", help="where the file came from")
     attach.add_argument("--note", help="a short note on where it came from")
     attach.set_defaults(handler=_transcript_add)
+    fetch_cmd = transcript_commands.add_parser(
+        "fetch",
+        help="ask the YouTube Data API for captions (transcript_fetch on, your own token)",
+    )
+    fetch_cmd.add_argument("video", help="the 11-character YouTube video ID")
+    fetch_cmd.add_argument("--language", help="preferred language tag, e.g. en")
+    fetch_cmd.set_defaults(handler=_transcript_fetch)
     status_cmd = transcript_commands.add_parser("status", help="a video's transcript status")
     status_cmd.add_argument("video", help="the 11-character YouTube video ID")
     status_cmd.set_defaults(handler=_transcript_status)
@@ -2913,6 +3003,12 @@ def build_parser() -> argparse.ArgumentParser:
     backup_restore.add_argument("folder", type=Path, help="the backup folder")
     backup_restore.add_argument("--to", type=Path, required=True, help="an empty folder")
     backup_restore.set_defaults(handler=_backup)
+    web = commands.add_parser("web", help="fetch web pages (allowlisted, network_fetch on)")
+    web_commands = web.add_subparsers(dest="web_command", required=True)
+    web_fetch = web_commands.add_parser("fetch", help="fetch one page into located blocks")
+    web_fetch.add_argument("url")
+    web_fetch.add_argument("--save", action="store_true", help="keep the page's bytes by hash")
+    web.set_defaults(handler=_web)
     file_parser = commands.add_parser("file", help="read a note, text, Word or PDF file")
     file_commands = file_parser.add_subparsers(dest="file_command", required=True)
     file_read = file_commands.add_parser(

@@ -45,3 +45,27 @@ Found and filed as follow-ups (they don't fail the gate):
 - **Speed.** Time barely grows with the number of conversations (50 → 100 adds about 80 s), and a re-import takes about twice as long as the first import. Something done once per run over the whole `raw/` tree dominates, probably hashing all files including about 900 images, and the re-import does it again.
 - **Peak memory** is `null` on Windows, because the measurement uses the Unix-only `resource` module. *Fixed in OPS-009: Windows reads `PeakWorkingSetSize` through `ctypes`; a platform with neither says `"unavailable_on_platform"`.*
 - **`ke inspect`** prints the full native conversation ID. Reports elsewhere use 8-character prefixes. *Fixed in OPS-009: the rule is that `inspect` stays complete (a local debugging tool) and anything quoted in a report or checklist uses `ke inspect <id> --redact`, which prints the prefix. The G1 demonstration in `IMPLEMENTATION_PLAN.md` §6 now uses `--redact`.*
+
+## Import timing by phase (PERF-001, 2026-10-28)
+
+On Louis's PC a `--limit 50` import took 410 s and the re-import 856 s. Doubling the conversations added only 80 s, so the time went on work done once per run over the whole raw tree.
+
+**Cause.** Every source file in the export is archived on every run, whatever `--limit` says (the snapshot is of the whole export). For a file already stored, the archive still wrote a temporary copy, fsynced it, hashed the stored copy, deleted the temporary copy, and then the ledger hashed the stored copy a second time. On Windows each new file is also scanned by the antivirus, so those throwaway writes were the expensive part, and a re-import paid them on top of the reads.
+
+**Fix.** Bytes already in the store are hashed once from the source and the stored copy is checked once; nothing is written. Small files (up to 16 MB) are read once into memory. New bytes are stored exactly as before (temporary file, fsync, atomic rename, read-only). The `raw_unchanged` check and the check of every stored copy that is reused are unchanged.
+
+**Measured** with `python -m knowledge_engine.evaluation.import_timing` (synthetic split export: 1,100 chats, 2,215 files, 900 unused noise images; `--limit 50`; the same tree imported twice into a fresh workspace). Linux, this container:
+
+| Phase (seconds) | Import before | Re-import before | Import after | Re-import after |
+|---|---|---|---|---|
+| Total | 8.85 | 7.47 | 9.42 | **5.79** |
+| Raw tree fingerprint (before and after) | 0.38 | 0.37 | 0.38 | 0.37 |
+| List the export | 0.37 | 0.36 | 0.37 | 0.36 |
+| Archive source files | 4.51 | 4.97 | 4.79 | 3.13 |
+| … of which fsync | 0.90 | 0.89 | 1.12 | **0.00** |
+| Conversations and messages | 2.4 | 1.6 | 2.37 | 1.59 |
+| Images, links, related chats, search | 0.6 | 0.1 | 0.58 | 0.06 |
+
+A re-import is now faster than the first import, and does no writes to the archive. The Windows run of the same command is recorded below when it is done; the Linux container has no antivirus, so it understates the gain there.
+
+Still per-run by design: hashing each source file once (needed to know whether it changed) and the before/after tree fingerprint (the `raw_unchanged` proof).
