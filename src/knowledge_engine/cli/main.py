@@ -2161,6 +2161,26 @@ def _ui(settings: Settings, args: argparse.Namespace) -> CommandResult:
     return CommandResult("ui", data={"url": url}, message="Stopped the web interface")
 
 
+def _api(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Serve the JSON API until Ctrl+C. Listens on 127.0.0.1 only (API-001)."""
+    try:
+        import uvicorn
+
+        from knowledge_engine.api.app import PREFIX, create_app
+    except ImportError:
+        return CommandResult(
+            "api",
+            ExitCode.ERROR,
+            message='the API needs its extra: pip install -e ".[server]"',
+            error_code="missing_dependency",
+        )
+    url = f"http://127.0.0.1:{args.port}{PREFIX}/docs"
+    print(f"Knowledge Engine API at {url} (Ctrl+C to stop)", flush=True)
+    # The host is fixed: the API never listens on the network.
+    uvicorn.run(create_app(settings), host="127.0.0.1", port=args.port, log_level="warning")
+    return CommandResult("api", data={"url": url}, message="Stopped the API")
+
+
 def _inspect(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Show stored conversations as counts only; optionally write a transcript note."""
     from sqlalchemy import func, select
@@ -2857,6 +2877,10 @@ def build_parser() -> argparse.ArgumentParser:
     ui.add_argument("--port", type=int, default=8765, help="port on 127.0.0.1 (default 8765)")
     ui.add_argument("--no-browser", action="store_true", help="don't open a browser window")
     ui.set_defaults(handler=_ui)
+
+    api = commands.add_parser("api", help="serve the JSON API (this computer only)")
+    api.add_argument("--port", type=int, default=8766, help="port on 127.0.0.1 (default 8766)")
+    api.set_defaults(handler=_api)
 
     importer = commands.add_parser("import", help="import an export (folder or ZIP; only read)")
     importer.add_argument("source", type=Path, help="export ZIP or folder")

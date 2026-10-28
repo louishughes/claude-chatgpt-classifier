@@ -2254,3 +2254,25 @@ ci                                  5/5 ok, 1199 passed
 Fix attempts: 1 (`create_sqlite_engine` needs a Path in the release check's step-back script).
 
 **Next exact task:** M6.
+
+### 10:01 — API-001: the JSON API's skeleton
+
+`ke ui` is web pages for a person; the API is the same engine as JSON, for scripts. This ticket only builds the frame every later endpoint hangs on.
+
+- `api/app.py`: `create_app(settings)` builds a FastAPI app. Endpoints get the settings, the database and the model provider through dependencies (`get_settings`, `get_sessions`, `get_provider`). A test swaps them with `app.dependency_overrides`, which is the ticket's acceptance check: a test client runs against a temporary database and a fake provider, and the app's own workspace is never opened.
+- One error shape for everything, `{"error": {"code", "message"}}`, with a table of stable codes in `docs/api/API.md`. Validation errors name fields, never values, and a crash returns `internal_error` with no traceback, since both could carry private text.
+- Everything is under `/api/v1`, and the OpenAPI document carries the package version.
+- This computer only: requests with a non-loopback `Host` are refused (`host_not_local`), no CORS headers, and `ke api` binds 127.0.0.1 with no option to change it.
+- A database older or newer than the code gives `schema_mismatch` (OPS-007's rule). `status` still works, so a program can see why.
+- Endpoints so far: `health`, `status` and `counts`. FastAPI and uvicorn are in a new `server` extra, so the engine itself doesn't need them.
+
+**Teach-back (`api/app.py`):** The API is built by one function, and everything an endpoint needs (settings, database, model) is plugged in from outside, so tests plug in a temporary database and a fake model. Every error comes back in the same shape with a fixed code, and never repeats what was sent, so private text can't leak through an error. It only answers requests addressed to this computer.
+
+Checks:
+```
+tests/integration/test_api.py   8 passed
+ci                              5/5 ok
+```
+Fix attempts: 1 (an error-handler parameter named `_error` hid the `_error` helper; the provider identity field is `provider_id`).
+
+**Next exact task:** API-002 (import and job status endpoints).

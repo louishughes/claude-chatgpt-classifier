@@ -873,3 +873,6 @@ One owner-approved run (08:54 UTC) on Louis's PC at 80fc4e0: 50 synthetic chats,
 
 ## 2026-10-28 09:48 OPS-007 (#125)
 infrastructure/upgrade.py (safe_upgrade backs up first; require_current in import); devtools/release_check.py + release.yml (nightly, Linux and Windows); CHANGELOG.md 0.1.0; docs/runbooks/UPGRADE_AND_ROLLBACK.md. Tests: test_upgrade.py (4), test_release.py (2); release_check 6/6; ci 5/5.
+
+## 2026-10-28 10:01 API-001 (#116)
+api/app.py (create_app, get_settings/get_sessions/get_provider, ApiError + one error shape, loopback Host middleware, /api/v1 health/status/counts); `ke api`; `server` extra; docs/api/API.md. Tests: test_api.py (8); ci 5/5. OPS-007 merged (#254); release.yml dispatched on main.

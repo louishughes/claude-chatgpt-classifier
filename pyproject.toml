@@ -40,10 +40,15 @@ dev = [
     "hypothesis>=6.115",  # property-based tests: random inputs, checked invariants
     "types-PyYAML>=6.0",  # type hints for PyYAML, so mypy can check calls into it
     "anthropic>=2.3",  # type-checks the paid adapter; tests never call it
+    "fastapi>=0.115,<1",  # the JSON API's tests (API-001)
+    "httpx>=0.27",  # FastAPI's test client sends requests through it, no network
+    "uvicorn>=0.32",  # type-checks `ke api`; tests never start a server
 ]
 # The paid model adapter (providers/anthropic_api.py). Only needed for a
 # run the owner has approved; nothing else imports it.
 api = ["anthropic>=2.3"]
+# The JSON API (API-001): `ke api`. The web pages (`ke ui`) don't need it.
+server = ["fastapi>=0.115,<1", "uvicorn>=0.32"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/knowledge_engine"]
