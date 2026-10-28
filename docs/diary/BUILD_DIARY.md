@@ -2563,3 +2563,21 @@ tests/integration/test_video_transcripts.py  6 passed (unchanged)
 Fix attempts: 0.
 
 **Next exact task:** open the queued PRs, then INT-003 (watched folders).
+
+### 12:20 — INT-003: watched folders
+
+- `importer/watch.py`: `FolderWatcher.tick()` looks at a folder once. Each top-level export folder or ZIP must have the same metadata fingerprint on two looks at least `settle_s` apart (so a half-downloaded ZIP waits), then it is compared with the watch state: same metadata is skipped unread, the same contents (touched, re-downloaded, or a second copy under another name) are recorded without importing, and only new contents go to the importer.
+- A broken export is recorded with its error code and left alone until it changes, so it can't loop.
+- If an import changed something and a vault is set, the vault is synced once; DOC-006 already keeps unrelated notes untouched, and the test checks their bytes and modified times.
+- The state file is written atomically and holds fingerprints and import IDs only; the report holds counts and IDs, never export names.
+- `ke watch FOLDER [--once] [--vault DIR] [--partial] [--interval] [--settle]`. The workspace itself can't be watched (it would watch its own writes).
+
+**Teach-back (`FolderWatcher`):** It looks at a folder now and then and waits until an export has stopped changing before touching it. It remembers a fingerprint of everything it has imported, so the same export dropped again, touched, or saved under another name never imports twice, and a broken one is noted once and left alone. When an import did change something, it refreshes the notes vault, which only rewrites the notes that actually changed.
+
+Checks:
+```
+tests/integration/test_watch_folder.py   7 passed (fake clock)
+```
+Fix attempts: 1 (my test touched the source and then expected its fingerprint unchanged; moved the fingerprint after the touch).
+
+**Next exact task:** open the INT PRs, then PERF-001 (#200).
