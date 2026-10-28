@@ -27,7 +27,7 @@ Talking points:
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -281,9 +281,21 @@ def inspect_summary(conversation: StoredConversation) -> dict[str, Any]:
         "active_path_messages": len(graph.active_messages),
         "branch_points": dict(sorted(branch_kinds.items())),
         "alternate_paths": sum(1 for _ in graph.alternate_paths()),
+        "roles": _tally(m.role or "none" for m in conversation.messages.values()),
+        "content_types": _tally(m.content_type or "none" for m in conversation.messages.values()),
+        # First 8 characters of each active-path message ID (REV-009): enough
+        # to compare with the export by eye, never message content.
+        "active_path_ids": [native_id[:8] for native_id in graph.active_messages],
         "media": media_counts(conversation.media),
         "graph_issues": sorted({issue.code.value for issue in graph.issues}),
     }
+
+
+def _tally(values: Iterable[str]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for value in values:
+        counts[value] = counts.get(value, 0) + 1
+    return dict(sorted(counts.items()))
 
 
 def write_transcript(

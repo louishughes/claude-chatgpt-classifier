@@ -804,3 +804,7 @@ pytest -q               # 554 passed, 6 skipped (4 new)
 Fix attempts: 0.
 
 **Next exact task:** Milestone 2, starting with ING-010 (in plan order); REV-009 real-data checkpoint when a session on Louis's PC is available.
+
+### 00:12 — REV-009 prep: `ke inspect` shows what the checkpoint asks for
+**What:** `ke inspect <conversation>` now also lists role counts, content-type counts and the first 8 characters of each message ID on the active path. That's everything REV-009 asks to see on real data, still with no text, titles or file names. 1 new test, 555 in total.
+**Next:** run the REV-009 checkpoint and the real half of EVAL-010 on Louis's PC (read-only, outputs in the git-ignored workspace).

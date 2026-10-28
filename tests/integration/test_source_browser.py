@@ -200,3 +200,19 @@ def test_inspect_shows_structure_without_private_text(
     assert "Synthetic" not in output  # no titles, no message text
     notes = list((tmp_path / "v" / "Sources").glob("*.md"))
     assert len(notes) == 1 and "Synthetic answer v3" in notes[0].read_text(encoding="utf-8")
+
+
+def test_inspect_summary_lists_roles_types_and_id_prefixes(
+    settings: Settings, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import_source(_root("branches_edit"), "fixture", settings=settings)
+    expected = json.loads(
+        (FIXTURES / "branches_edit" / "manifest.json").read_text(encoding="utf-8")
+    )["expected"]
+
+    _, detail = _cli(capsys, "c0000002-0000-4000-8000-000000000001")
+
+    data = detail["data"]
+    assert data["active_path_ids"] == [n[:8] for n in expected["active_path_node_ids"]]
+    assert data["roles"] == {"assistant": 2, "system": 1, "user": 2}
+    assert data["content_types"] == {"text": 5}
