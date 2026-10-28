@@ -138,6 +138,10 @@ def create_app(settings: Settings) -> FastAPI:
         dependencies=[Depends(access.check_access)],
     )
     app.state.settings = settings
+    # Per-tenant settings and job lists (PROD-003); empty for one person's engine.
+    app.state.tenants = {}
+    app.state.tenant_jobs = {}
+    app.state.tenant_export_jobs = {}
     _add_error_handlers(app)
     app.include_router(access.router, prefix=PREFIX)
     app.include_router(imports.router, prefix=PREFIX)

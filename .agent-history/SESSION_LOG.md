@@ -900,3 +900,6 @@ access/policy.py, access/accounts.py, migration 0029_accounts, api/access.py (ch
 
 ## 2026-10-28 11:06 #255 review reasons
 classification/store.py review_reason_kind; semantic_smoke review_reasons + replay_review_reasons; `ke eval review-reasons` (zero-call replay). Tests: test_review_reasons.py (10).
+
+## 2026-10-28 11:17 PROD-003 (#128)
+ADR-0011; access/tenants.py; settings.tenants_root; api/deps get_settings by X-KE-Workspace; per-tenant job lists; hosted check_access; imports inbox-only; `ke tenant`. Tests: test_tenant_isolation.py (4). #255 replay on the PC: 53 evidence_outside_segment (all `[m:id]` tags, a parsing bug), 23 model_unsure.

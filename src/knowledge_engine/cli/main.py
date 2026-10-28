@@ -790,6 +790,36 @@ def _file_read(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _tenant(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Create and list separate workspaces for the API (PROD-003)."""
+    from knowledge_engine.access.accounts import AccessError
+    from knowledge_engine.access.tenants import (
+        TenantError,
+        create_tenant,
+        list_tenants,
+        tenant_inbox,
+    )
+
+    name = f"tenant {args.tenant_command}"
+    try:
+        if args.tenant_command == "list":
+            names = list_tenants(settings)
+            return CommandResult(
+                name, data={"workspaces": names}, message=f"{len(names)} workspace(s)"
+            )
+        token = create_tenant(settings, args.name, args.owner)
+    except (TenantError, AccessError) as error:
+        return CommandResult(name, ExitCode.USAGE, message=str(error), error_code="refused")
+    return CommandResult(
+        name,
+        data={"workspace": args.name, "owner": args.owner, "token": token},
+        message=(
+            f"created workspace {args.name}; put exports in {tenant_inbox(settings, args.name)}; "
+            f"{args.owner}'s API token (shown once, keep it secret)"
+        ),
+    )
+
+
 def _access(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Accounts, API tokens and workspace roles (PROD-002)."""
     from sqlalchemy.orm import Session
@@ -2789,6 +2819,16 @@ def build_parser() -> argparse.ArgumentParser:
     access_log = access_commands.add_parser("log", help="the authorisation log, newest first")
     access_log.add_argument("--limit", type=int, default=50)
     access.set_defaults(handler=_access)
+
+    tenant = commands.add_parser(
+        "tenant", help="separate workspaces served by `ke api` (needs tenants_root)"
+    )
+    tenant_commands = tenant.add_subparsers(dest="tenant_command", required=True)
+    tenant_add = tenant_commands.add_parser("add", help="create a workspace and its owner")
+    tenant_add.add_argument("name", help="letters, digits, '-' and '_'")
+    tenant_add.add_argument("--owner", required=True, help="the owner's account name")
+    tenant_commands.add_parser("list", help="created workspaces")
+    tenant.set_defaults(handler=_tenant)
 
     purge = commands.add_parser(
         "purge", help="delete whole conversations and everything made from them"

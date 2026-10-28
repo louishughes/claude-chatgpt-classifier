@@ -39,7 +39,7 @@ from sqlalchemy.orm import Session
 
 from knowledge_engine.access.accounts import AccountRow, auth_enabled, authenticate, authorize
 from knowledge_engine.access.policy import ROLE_PERMISSIONS, Permission, Role
-from knowledge_engine.api.deps import ApiError, SettingsDep
+from knowledge_engine.api.deps import ApiError, get_settings
 from knowledge_engine.importer.run import DEFAULT_WORKSPACE_NAME
 from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
 from knowledge_engine.infrastructure.upgrade import schema_status
@@ -127,7 +127,7 @@ def _bearer(request: Request) -> str:
     return token.strip() if scheme.lower() == "bearer" else ""
 
 
-def check_access(request: Request, settings: SettingsDep) -> None:
+def check_access(request: Request) -> None:
     """Authenticate and authorise one request (see the module docstring).
 
     Raises:
@@ -143,18 +143,23 @@ def check_access(request: Request, settings: SettingsDep) -> None:
     # Unlisted routes need MANAGE, which no API endpoint grants: refused below.
     permission = ROUTE_PERMISSIONS.get(key, Permission.MANAGE)
     request.state.access = _OPEN
-    if permission is None or not database_path(settings).exists():
+    if permission is None:
         return
+    # Several workspaces (PROD-003): nobody gets in without an account, ever.
+    hosted = request.app.state.settings.tenants_root is not None
+    settings = get_settings(request)  # the tenant's own folder when hosted
+    if not database_path(settings).exists():
+        return  # one person's engine before its first import (hosted: can't happen)
     engine = create_sqlite_engine(database_path(settings))
     try:
         status = schema_status(engine)
-        if status == "ahead":
+        if status == "ahead" or (hosted and status != "current"):
             # Accounts may exist in a schema this code can't read: fail closed.
-            raise ApiError(503, "schema_mismatch", "the database is newer than this version")
+            raise ApiError(503, "schema_mismatch", "the database doesn't match this version")
         if status != "current":
             return  # older than accounts: nothing to check yet (endpoints refuse anyway)
         with Session(engine) as session:
-            if not auth_enabled(session):
+            if not hosted and not auth_enabled(session):
                 return
             if not listed:
                 raise ApiError(403, "forbidden", "this endpoint has no access rule")
