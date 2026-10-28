@@ -13,8 +13,17 @@ from knowledge_engine.importer.records import ConversationRow
 from knowledge_engine.importer.run import run_import
 from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
 from knowledge_engine.links.store import LinkOccurrenceRow
-from knowledge_engine.relationships.related import RELATED_DETECTOR, suggest_related
-from knowledge_engine.relationships.store import ConversationRelationshipRow
+from knowledge_engine.relationships.related import (
+    RELATED_DETECTOR,
+    _Candidate,
+    _strongest,
+    suggest_related,
+)
+from knowledge_engine.relationships.store import (
+    ConversationRelationshipRow,
+    EvidenceClass,
+    RelationKind,
+)
 from knowledge_engine.relationships.words import distinctive_similarity
 from knowledge_engine.settings import Settings
 
@@ -177,3 +186,32 @@ def test_words_every_chat_uses_count_for_nothing() -> None:
     scores = distinctive_similarity(docs, floor=0.0)
     assert set(scores) == {(0, 3)}
     assert distinctive_similarity(docs, floor=1.01) == {}
+
+
+def test_a_related_pair_must_rank_high_for_both_chats() -> None:
+    # One busy chat ("hub") resembles five others; each of them has nothing better.
+    def related(newer: str, older: str, confidence: float) -> _Candidate:
+        return _Candidate(
+            newer,
+            older,
+            RelationKind.RELATED_TO,
+            EvidenceClass.SEMANTIC,
+            confidence,
+            {"similarity": 0.0},
+        )
+
+    candidates = [related(f"c{n}", "hub", 0.8 - n / 100) for n in range(5)]
+    kept = _strongest(candidates)
+    assert [c.newer for c in kept] == ["c0", "c1", "c2"]  # the hub has room for three
+    same = [
+        _Candidate(
+            f"c{n}",
+            "hub",
+            RelationKind.SAME_PROJECT,
+            EvidenceClass.SEMANTIC,
+            0.5,
+            {"similarity": 0.0},
+        )
+        for n in range(5)
+    ]
+    assert len(_strongest(same)) == 5  # project links keep the "either chat" rule

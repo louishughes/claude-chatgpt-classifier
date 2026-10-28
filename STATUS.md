@@ -157,7 +157,7 @@ Live ticket status for the build. The original ticket list is `docs/TICKETS.csv`
 | NOTE-015 `ke extract run` through request files (#306) | VERIFIED (dry run on 3 fixture chats; the real run is the PC thread's) | SESSION_LOG 2026-10-28 NOTE-015 |
 | NOTE-020 `ke digest run --taxonomy` (#311) | VERIFIED | SESSION_LOG 2026-10-28 NOTE-020 |
 | NOTE-009 Related chats in the rich note (#281) | VERIFIED (synthetic fixture; reasons are the detectors' own "because" lines, not a model-written sentence) | SESSION_LOG 2026-10-28 NOTE-009 |
-| REL-005 Related chats from shared links and distinctive words; cosine alone no longer a reason (#340) | VERIFIED on fixtures; real re-score pending (PC) | SESSION_LOG 2026-10-28 REL-005 |
+| REL-005 Related chats from shared links and distinctive words; cosine alone no longer a reason; mutual top 3 (#340) | VERIFIED on fixtures; real re-score pending (PC) | SESSION_LOG 2026-10-28 REL-005 |
 | EVAL-010c Link, YouTube and social counts for Gate G2 (#334) | VERIFIED on fixtures; real 100 not run yet | SESSION_LOG 2026-10-28 EVAL-010c |
 | NOTE-026 One citation per message on the topics line (#329) | VERIFIED (fixture chat) | SESSION_LOG 2026-10-28 NOTE-026 |
 | NOTE-022 Rule records hidden where a model extraction ran (#321) | VERIFIED (fixture chat; the PC re-score is next) | SESSION_LOG 2026-10-28 NOTE-022 |

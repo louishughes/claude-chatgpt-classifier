@@ -3129,12 +3129,15 @@ So there are two new free signals and one rule:
 - two chats citing the same web page or video, when ten or fewer chats cite it;
 - two chats sharing *distinctive* words, TF-IDF over the workspace, so a word every chat uses counts for nothing;
 - the embedding cosine on its own is no longer a reason. It only adds weight to a pair that already shares something. That's the spec's line: "semantic embeddings never replace evidence".
+- a `related_to` pair must be in the top three of *both* chats, not the top five of either one.
+
+Before this, the PC ran the old `ke related suggest` on the real archive for a baseline (first fixing a crash: the command never loaded the import ledger's table, #341). It made 4,991 suggestions. Precision fell from 0.952 to 0.727, and recall rose from 0.408 to 0.490. Inside the key, 4 related links were right and 8 were wrong. The floors above were set before that result and were not tuned on the key.
 
 **Teach-back (`distinctive_similarity` in `relationships/words.py`):** Each chat becomes a list of its most telling words, its title words counted three times, with each word weighted down the more chats in the archive use it. Two chats score high when their telling words overlap, so "telescope eyepiece collimation" links two chats and "can you help me with this" links nothing. Only the score leaves the function, never the words.
 
 Checks:
 ```
-tests/integration/test_related_links_words.py   2 passed (shared link; common link ignored; distinctive words; common words only -> no link; no URL or word in the evidence)
+tests/integration/test_related_links_words.py   3 passed (shared link; common link ignored; distinctive words; common words only -> no link; no URL or word in the evidence; a busy chat keeps only its 3 strongest related partners)
 REL-003/004 and relationship tests              47 passed, unchanged
 ```
 Fix attempts: 2 (both in the new test: a SQLAlchemy result needed `.all()`, and two "plain" chats shared an uncommon title, which rightly counted).

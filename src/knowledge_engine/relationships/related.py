@@ -40,6 +40,9 @@ Rules that keep this honest:
   quote says more than "related".
 * **Bounded.** Each chat keeps at most ``PER_CHAT`` partners per kind,
   the strongest first, so one busy project can't flood the review queue.
+  A ``related_to`` pair must be among the ``RELATED_PER_CHAT`` strongest of
+  *both* chats (REL-005): on the real archive, "either chat" let every chat
+  pull in five weak partners, and EVAL-012 scored 8 of 12 of them wrong.
 
 Comparing every pair of chats is quadratic; that is fine for a personal
 archive of a few thousand chats, and is why this runs on request
@@ -96,6 +99,7 @@ MIN_CONFIDENCE = 0.3  # one distinctive shared topic or entity is just enough
 MAX_CONFIDENCE = 0.85  # resemblance is never certainty
 MAX_SPREAD = 10
 PER_CHAT = 5
+RELATED_PER_CHAT = 3  # and on both ends, not either
 MAX_CHARS = 20_000  # words per chat fed to the embedder
 _SPOKEN = frozenset({"user", "assistant"})
 # Detectors whose links already say more than "related" (REL-002).
@@ -461,7 +465,7 @@ def _newer_older(a: _Profile, b: _Profile) -> tuple[_Profile, _Profile]:
 
 
 def _strongest(candidates: list[_Candidate]) -> list[_Candidate]:
-    """Keep a pair only if it is among the ``PER_CHAT`` strongest of either chat."""
+    """Keep a pair only if it is among the strongest of either chat (both, for related_to)."""
     ranked = sorted(
         candidates,
         key=lambda c: (-c.confidence, -float(c.evidence["similarity"]), c.newer, c.older),  # type: ignore[arg-type]
@@ -470,7 +474,11 @@ def _strongest(candidates: list[_Candidate]) -> list[_Candidate]:
     kept = []
     for candidate in ranked:
         ends = [(candidate.newer, candidate.kind), (candidate.older, candidate.kind)]
-        if any(taken[end] < PER_CHAT for end in ends):
+        if candidate.kind is RelationKind.RELATED_TO:
+            room = all(taken[end] < RELATED_PER_CHAT for end in ends)
+        else:
+            room = any(taken[end] < PER_CHAT for end in ends)
+        if room:
             kept.append(candidate)
             for end in ends:
                 taken[end] += 1
