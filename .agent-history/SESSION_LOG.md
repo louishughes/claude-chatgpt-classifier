@@ -970,3 +970,6 @@ evaluation/answer_key.py convert_answer_key (per-chat spike key -> GoldSet; read
 
 ## 2026-10-28 15:20 NOTE-014 (#299)
 taxonomy/refresh.py (queue: unlabelled / review_required / new_chat per segment, worked out from classifications each time; build_refresh_pack: NOTE-006 pack from queued segments only plus current vocabulary labels; record_pack + migration 0030 taxonomy_refresh_packs (fingerprint, counts, import IDs, no text); RefreshPlan (categories optional); relabel: TAX-007 diff + invalidate, redo unlabelled / cites_changed / mentions_new_term, carry the rest as method `carried` rows under the new version; refresh_status counts), `ke taxonomy refresh [--out]`, `ke taxonomy relabel OLD NEW [--run-id] [--vault]`, Vocabulary tiles on the `ke ui` home page; queued_chats + collect_topics file NOTE-007 unmatched digest topics once (skip waiting, rejected, approved). Tests: tests/integration/test_taxonomy_refresh.py (7).
+
+## 2026-10-28 16:21 NOTE-024 (#323)
+documents/rich_note.py: card "Tools and names" keeps only names with a letter; with a digest, Purpose/Outcome rows appear only when the digest has the item (no "not stated"); without a digest both say "not written yet". Tests: tests/integration/test_rich_note_card.py (1, fails on the old code).
