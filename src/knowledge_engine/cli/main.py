@@ -663,6 +663,73 @@ def _gold_template(settings: Settings, args: argparse.Namespace) -> CommandResul
     )
 
 
+def _gold_score(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Score this workspace's records against a private answer key; numbers only."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.evaluation.report_labels import ReviewerKind
+    from knowledge_engine.evaluation.workspace_score import score_extraction
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "gold score", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    for path in (args.gold, args.review):
+        if path is not None and not path.is_file():
+            return CommandResult(
+                "gold score",
+                ExitCode.USAGE,
+                message=f"not found: {path.name}",
+                error_code="missing",
+            )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            score = score_extraction(
+                session,
+                args.gold,
+                ReviewerKind(args.reviewer),
+                review_file=args.review,
+                run_rules=not args.no_rules,
+            )
+            session.commit()
+    finally:
+        engine.dispose()
+    report = score.report
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(report.as_markdown(), encoding="utf-8")
+    total = report.total
+    data = {
+        "key_conversations": score.key_conversations,
+        "found_conversations": score.found_conversations,
+        "rule_runs": score.rules_run,
+        "produced": report.produced,
+        "precision": round(total.precision, 3),
+        "recall": round(total.recall, 3),
+        "f1": round(total.f1, 3),
+        "by_type": {
+            name: {"precision": round(t.precision, 3), "recall": round(t.recall, 3)}
+            for name, t in sorted(report.by_type.items())
+        },
+        "anchor_validity": round(report.anchor_validity, 3),
+        "forbidden_produced": len(report.forbidden_produced),
+        "forbidden_in_truth": len(report.forbidden_in_truth),
+        "unsupported_truth_decisions": len(report.unsupported_truth_decisions),
+        "gate_passed": report.passed,
+    }
+    message = (
+        f"{score.found_conversations} of {score.key_conversations} key chats found; "
+        f"P {data['precision']} R {data['recall']} F1 {data['f1']}; "
+        f"gate {'passed' if report.passed else 'FAILED'}"
+    )
+    if score.found_conversations < score.key_conversations:
+        message += " (import the missing chats for a full score)"
+    return CommandResult("gold score", data=data, message=message)
+
+
 def _gold_schema(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """The golden-set JSON Schema (EVAL-001)."""
     from knowledge_engine.evaluation.gold import gold_schema
@@ -2313,6 +2380,22 @@ def build_parser() -> argparse.ArgumentParser:
     template.add_argument("--taxonomy", required=True, help="taxonomy version to label against")
     template.add_argument("--annotator", default="reviewer", help="who will annotate")
     template.set_defaults(handler=_gold_template)
+    score = gold_commands.add_parser(
+        "score", help="score this workspace's records against a private answer key (numbers only)"
+    )
+    score.add_argument("--gold", type=Path, required=True, help="the answer key JSON")
+    score.add_argument(
+        "--reviewer",
+        choices=["owner", "ai_session", "same_model", "none"],
+        required=True,
+        help="who reviewed the key (printed on the report)",
+    )
+    score.add_argument("--review", type=Path, help="the review record (its hash is printed)")
+    score.add_argument("--out", type=Path, help="write the Markdown report here")
+    score.add_argument(
+        "--no-rules", action="store_true", help="don't run the rule extractors first"
+    )
+    score.set_defaults(handler=_gold_score)
     gold_commands.add_parser("schema", help="print the golden set JSON Schema").set_defaults(
         handler=_gold_schema
     )

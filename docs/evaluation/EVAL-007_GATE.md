@@ -2,7 +2,7 @@
 
 # Release gate (EVAL-007)
 
-- Gate: `eval-007-v1`; commit `d3b03cc + EVAL-008`
+- Gate: `eval-007-v1`; commit `48151b4 + EVAL-013`
 - Overall: **BLOCKED** 3 BLOCKED, 2 REVIEW, 8 PASS
 - Every check ran once; nothing was re-run. `synthetic` numbers prove the plumbing, not quality on real chats.
 
@@ -19,7 +19,7 @@
 | variance.order_and_repeats | EVAL-008 | **PASS** | 3 orders, 0 difference(s), 0 new request(s) on repeat | same answers in 3 shuffled orders and on pinned repeats; differences go to review | synthetic | `ke eval variance` |
 | retrieval.recall_at_10 | RET-008 | **PASS** | hybrid Recall@10 0.971 | Recall@10 >= 0.90 | synthetic | `ke eval retrieval` |
 | relationships.precision | REL-002 | **BLOCKED** | not run | directional relationship precision >= 0.90 | real | `-` |
-| quality.real_golden_set | EVAL-001 | **BLOCKED** | not run | the thresholds above, on the private golden set | real | `ke gold (on the owner's PC)` |
+| quality.real_golden_set | EVAL-013 | **BLOCKED** | not run | the extraction thresholds above, on the private golden set | real | `ke gold score --gold <key> --reviewer ai_session (on the owner's PC)` |
 | provider.real_smoke | EVAL-011 | **BLOCKED** | not run | pinned real-provider batch smoke under a cost cap | real | `ke eval semantic --provider ... (parked)` |
 
 ## Tickets to file (FAIL)
@@ -34,5 +34,5 @@
 ## Blocked
 
 - `relationships.precision` (REL-002): no labelled relationship answer key yet (EVAL-012, #240)
-- `quality.real_golden_set` (EVAL-001): the private golden set is built and scored on the owner's PC; numbers only
+- `quality.real_golden_set` (EVAL-013): the private key golden-v1 (extraction only, AI-reviewed) is on the owner's PC; scored there, numbers only
 - `provider.real_smoke` (EVAL-011): parked by the owner: no paid model calls

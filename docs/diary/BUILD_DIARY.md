@@ -2030,3 +2030,27 @@ Fix attempts: 1 (my drifting fake first answered "needs review" only once, and t
 - "When there was no vocabulary to label against, I left the labels empty instead of making one up."
 
 **Next exact task:** discover and publish the first taxonomy. After that, add segment labels to `golden-v1` with a fresh annotation and review pass.
+
+### 15:45 — EVAL-013: scoring where the private key lives
+The session on Louis's PC finished the real golden set `golden-v1` (40 chats, 398 records, 64 forbidden, reviewed by a separate AI session, extraction only). It has no GitHub access, so I opened and merged its docs-only branch as #243. I merged main into that branch so both diary histories survive; it contains no gold content.
+
+There was no command to score a workspace against a key file, so the real extraction baseline couldn't be made where the data is. **EVAL-013** (`evaluation/workspace_score.py`, `ke gold score`) adds it:
+- it runs the rule extractors once on the key's chats only (a second run repeats nothing);
+- it scores every record of those chats with EVAL-004;
+- the report is headed by the key's version, SHA-256 and reviewer label, and holds numbers and IDs only;
+- it says how many of the key's chats the workspace actually holds.
+
+The gate's `quality.real_golden_set` line now points at it. It stays BLOCKED here because the key is only on the PC. The command to run there is:
+
+`ke gold score --gold workspace/gold-real/gold/golden-v1.json --reviewer ai_session --review docs/reviews/GOLD_REAL_V1_REVIEW.md --out docs/evaluation/EVAL-004_REAL.md`
+
+**Teach-back (`evaluation/workspace_score.py`):** "On the PC where my private answer key lives, one command runs the rule extractors on just those 40 chats and scores the results against the key. The report holds only numbers and says which key it used and that an AI, not me, reviewed it. Running it again does no extra work and gives the same numbers."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 163 source files
+pytest -q               # 1165 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 0.
+
+**Next exact task:** check UI-005 (#175) against STATUS and close it if done; then M5.
