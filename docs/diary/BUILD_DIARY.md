@@ -1401,3 +1401,20 @@ migration drift         # 0
 Fix attempts: 2. A mypy type error in the evaluator's label set, and a CLI crash turning query rows into a dict.
 
 **Next exact task:** EVAL-004 (extraction precision/recall) + EVAL-011 (semantic batch smoke).
+
+### 10:20 — EVAL-004 + OPS-001: scoring extraction, and logs that can't leak
+**What:** the extraction evaluator with its hard gate, and a structured run log.
+- **Extraction evaluation (EVAL-004).** `evaluation/extraction_eval.py` pairs each gold record with a produced record of the same type that quotes the same message, preferring the one that agrees on most attributes (two records can quote one message, like the user's own preference and a client's). It reports precision, recall and F1 per record type, actor, acceptance, attribution and strength agreement, evidence anchor validity, and forbidden records. Only conversations marked `records_annotated` are scored.
+  - **The gate:** no forbidden record in current truth, and no user decision in current truth without valid anchors, the user's own words, a user actor and acceptance. It passes on the synthetic gold. A forged decision (an assistant proposal written straight into truth as a confirmed user decision) fails it; that test first passed wrongly, which is how the "user's own words" rule was added.
+- **Logs (OPS-001).** `infrastructure/logs.py` writes JSON lines to `<workspace>/logs/`. Only allow-listed fields (IDs, versions, counts, timings, cost) are accepted, so text has no way in; errors are logged by type name; strings are scrubbed for secrets. The model ledger and the extraction runner now log each step, and `ke logs --stage-key` shows one stage key's whole lineage.
+
+**Teach-back (`infrastructure/logs.py`):** "Every job writes small JSON events to a log file in the private workspace. The log only accepts a fixed list of fields, all IDs, counts and timings, so chat text can't get in, and errors are written by type, never by message. Anything that looks like a key is replaced with [secret], and you can pull up everything that happened to one stage key with `ke logs`."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 119 source files
+pytest -q               # 965 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 1. The forged-decision test showed the gate missed a decision quoting only assistant words; the rule now requires the user's own words.
+
+**Next exact task:** OPS-002 (resource, timeout and queue limits) + EVAL-011 (semantic batch smoke at 50/100).

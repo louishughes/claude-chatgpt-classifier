@@ -55,6 +55,7 @@ from knowledge_engine.extraction.store import add_candidates, gate
 from knowledge_engine.extraction.text import ExtractionMessage, quote
 from knowledge_engine.graph.offsets import find_all
 from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.logs import EventLog, null_log
 from knowledge_engine.orchestration.stage_keys import stage_key
 from knowledge_engine.providers.base import ModelRequest
 from knowledge_engine.providers.ledger import ModelStageRunner
@@ -158,6 +159,8 @@ def run(
     session: Session,
     segments: Sequence[tuple[str, Sequence[ExtractionMessage]]],
     extractors: Sequence[Extractor],
+    *,
+    log: EventLog | None = None,
 ) -> RunReport:
     """Run every extractor over every segment; skip done work; bound retries.
 
@@ -166,7 +169,9 @@ def run(
             savepoint, so one failure doesn't undo another run's records.
         segments: (segment ID, its messages) pairs.
         extractors: Rule or model extractors.
+        log: Where to write one ``extract.run`` event per run (OPS-001).
     """
+    log = log or null_log()
     report = RunReport()
     for segment_id, messages in segments:
         for extractor in extractors:
@@ -189,7 +194,21 @@ def run(
                 )
                 session.add(row)
                 session.flush()
-            _one(session, row, extractor, messages, segment_id, report)
+            with log.timed(
+                "extract.run",
+                stage_key=key,
+                segment_id=segment_id,
+                extractor=extractor.name,
+                version=extractor.version,
+            ) as fields:
+                before = report.records
+                _one(session, row, extractor, messages, segment_id, report)
+                fields.update(
+                    attempts=row.attempts,
+                    records=report.records - before,
+                    error_type=row.error,
+                    state=row.state,
+                )
     return report
 
 
