@@ -23,6 +23,7 @@ from knowledge_engine.links import social_store as _social  # noqa: F401
 from knowledge_engine.links import store as _links  # noqa: F401
 from knowledge_engine.links import video_transcripts as _video_transcripts  # noqa: F401
 from knowledge_engine.links import youtube as _youtube  # noqa: F401
+from knowledge_engine.relationships import store as _relationships  # noqa: F401
 
 engine = context.config.attributes.get("engine")
 if not isinstance(engine, Engine):

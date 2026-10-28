@@ -488,6 +488,137 @@ def _seen_fields(mentions: int, conversations: int, first: Any, last: Any) -> di
     }
 
 
+def _related_list(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """List conversation relationships with their evidence and history (REL-002)."""
+    from sqlalchemy import or_, select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.relationships.store import ConversationRelationshipRow, history
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "related list", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    query = select(ConversationRelationshipRow).order_by(
+        ConversationRelationshipRow.kind, ConversationRelationshipRow.relationship_id
+    )
+    if args.conversation:
+        query = query.where(
+            or_(
+                ConversationRelationshipRow.from_conversation_id == args.conversation,
+                ConversationRelationshipRow.to_conversation_id == args.conversation,
+            )
+        )
+    if args.state:
+        query = query.where(ConversationRelationshipRow.review_state == args.state)
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            items = [
+                {
+                    "relationship_id": row.relationship_id,
+                    "from": row.from_conversation_id,
+                    "kind": row.kind,
+                    "to": row.to_conversation_id,
+                    "evidence_class": row.evidence_class,
+                    "confidence": row.confidence,
+                    "review_state": row.review_state,
+                    "detector": row.detector,
+                    "evidence": json.loads(row.evidence_json),
+                    "history": [
+                        {
+                            "action": h.action,
+                            "from_state": h.from_state,
+                            "to_state": h.to_state,
+                            "reviewer": h.reviewer,
+                            "note": h.note,
+                            "at": h.at.isoformat(),
+                        }
+                        for h in history(session, row.relationship_id)
+                    ],
+                }
+                for row in session.scalars(query)
+            ]
+    finally:
+        engine.dispose()
+    return CommandResult(
+        "related list",
+        data={"relationships": items},
+        message="Links between conversations (read as: from <kind> to)",
+    )
+
+
+def _related_review(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Record one review decision; the history is append-only."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.relationships.store import ReviewAction, review
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "related review", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session, session.begin():
+            try:
+                entry = review(
+                    session,
+                    args.relationship,
+                    ReviewAction(args.action),
+                    reviewer=args.reviewer,
+                    note=args.note,
+                )
+            except KeyError:
+                return CommandResult(
+                    "related review",
+                    ExitCode.ERROR,
+                    message="no such relationship",
+                    error_code="unknown_relationship",
+                )
+            data = {
+                "relationship_id": args.relationship,
+                "from_state": entry.from_state,
+                "to_state": entry.to_state,
+            }
+    finally:
+        engine.dispose()
+    return CommandResult("related review", data=data, message="Review recorded")
+
+
+def _related_detect(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Run the deterministic relationship detectors over the whole workspace."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.infrastructure.workspace import WorkspaceRow
+    from knowledge_engine.relationships.detect import detect_relationships
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "related detect", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    counts: dict[str, int] = {}
+    try:
+        with Session(engine) as session, session.begin():
+            for workspace_id in session.scalars(select(WorkspaceRow.workspace_id)):
+                found = detect_relationships(session, workspace_id=workspace_id, import_id=None)
+                for key, value in found.items():
+                    counts[key] = counts.get(key, 0) + value
+    finally:
+        engine.dispose()
+    return CommandResult(
+        "related detect", data={"new": dict(sorted(counts.items()))}, message="Detectors run"
+    )
+
+
 def _ui(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Run the local web interface until Ctrl+C. Listens on 127.0.0.1 only."""
     import webbrowser
@@ -730,6 +861,29 @@ def build_parser() -> argparse.ArgumentParser:
         "--ambiguous", action="store_true", help="list bare @handles with no platform instead"
     )
     accounts.set_defaults(handler=_accounts)
+
+    related = commands.add_parser("related", help="links between conversations (forks, quotes)")
+    related_commands = related.add_subparsers(
+        dest="related_command", metavar="ACTION", parser_class=_Parser
+    )
+    listing = related_commands.add_parser("list", help="list proposed and reviewed links")
+    listing.add_argument("--conversation", help="only links to or from this conv_ ID")
+    listing.add_argument(
+        "--state",
+        choices=["candidate", "accepted", "rejected", "superseded"],
+        help="only this state",
+    )
+    listing.set_defaults(handler=_related_list)
+    decide = related_commands.add_parser("review", help="accept, reject or supersede a link")
+    decide.add_argument("relationship", help="the rel_ ID")
+    decide.add_argument("action", choices=["accept", "reject", "supersede"])
+    decide.add_argument("--note", help="why (kept in the history)")
+    decide.add_argument("--reviewer", default="owner", help="who decided (default: owner)")
+    decide.set_defaults(handler=_related_review)
+    rerun = related_commands.add_parser(
+        "detect", help="run the link detectors again (imports already do this)"
+    )
+    rerun.set_defaults(handler=_related_detect)
 
     ui = commands.add_parser("ui", help="open the local web interface (this computer only)")
     ui.add_argument("--port", type=int, default=8765, help="port on 127.0.0.1 (default 8765)")

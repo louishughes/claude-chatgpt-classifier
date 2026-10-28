@@ -1,0 +1,42 @@
+{
+  "fixture_format_version": 1,
+  "case": "copied_prefix",
+  "synthetic": true,
+  "layout": "official",
+  "proves": "REL-002: a copied opening, copied node IDs, a chatgpt.com link and a pasted paragraph each give one candidate link; a share link stays unresolved.",
+  "expected": {
+    "conversations": 5,
+    "relationships": [
+      [
+        "c0000008-0000-4000-8000-000000000002",
+        "forked_from",
+        "c0000008-0000-4000-8000-000000000001",
+        "structural",
+        "prefix-v1"
+      ],
+      [
+        "c0000008-0000-4000-8000-000000000003",
+        "references",
+        "c0000008-0000-4000-8000-000000000001",
+        "native",
+        "chatgpt-url-v1"
+      ],
+      [
+        "c0000008-0000-4000-8000-000000000004",
+        "quotes",
+        "c0000008-0000-4000-8000-000000000001",
+        "lexical",
+        "quote-v1"
+      ],
+      [
+        "c0000008-0000-4000-8000-000000000005",
+        "forked_from",
+        "c0000008-0000-4000-8000-000000000001",
+        "native",
+        "native-node-v1"
+      ]
+    ],
+    "review_state": "candidate",
+    "unresolved_share_links": 1
+  }
+}

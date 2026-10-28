@@ -1,0 +1,755 @@
+[
+  {
+    "title": "Synthetic shed plan",
+    "create_time": 1706659200.0,
+    "update_time": 1706659560.0,
+    "mapping": {
+      "c0000008-0000-4000-8000-000000000001-root": {
+        "id": "c0000008-0000-4000-8000-000000000001-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000008-0000-4000-8000-000000000001-sys"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000001-sys": {
+        "id": "c0000008-0000-4000-8000-000000000001-sys",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000001-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706659260.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000001-root",
+        "children": [
+          "c0000008-0000-4000-8000-000000000001-u0"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000001-u0": {
+        "id": "c0000008-0000-4000-8000-000000000001-u0",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000001-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706659320.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: help me plan a garden shed."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000001-sys",
+        "children": [
+          "c0000008-0000-4000-8000-000000000001-a0"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000001-a0": {
+        "id": "c0000008-0000-4000-8000-000000000001-a0",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000001-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706659380.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: start with the base, then the frame."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000001-u0",
+        "children": [
+          "c0000008-0000-4000-8000-000000000001-u1"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000001-u1": {
+        "id": "c0000008-0000-4000-8000-000000000001-u1",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000001-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706659440.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: what goes under the floor?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000001-a0",
+        "children": [
+          "c0000008-0000-4000-8000-000000000001-a1"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000001-a1": {
+        "id": "c0000008-0000-4000-8000-000000000001-a1",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000001-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706659500.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: a shed base needs a level gravel pad, treated timber bearers set on blocks, and a damp-proof membrane before the floor goes down, or the floor rots."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000001-u1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000008-0000-4000-8000-000000000001-a1",
+    "plugin_ids": null,
+    "conversation_id": "c0000008-0000-4000-8000-000000000001",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000008-0000-4000-8000-000000000001"
+  },
+  {
+    "title": "Synthetic shed plan (copy)",
+    "create_time": 1706745600.0,
+    "update_time": 1706745960.0,
+    "mapping": {
+      "c0000008-0000-4000-8000-000000000002-root": {
+        "id": "c0000008-0000-4000-8000-000000000002-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000008-0000-4000-8000-000000000002-sys"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000002-sys": {
+        "id": "c0000008-0000-4000-8000-000000000002-sys",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000002-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706745660.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000002-root",
+        "children": [
+          "c0000008-0000-4000-8000-000000000002-u0"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000002-u0": {
+        "id": "c0000008-0000-4000-8000-000000000002-u0",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000002-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706745720.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: help me plan a garden shed."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000002-sys",
+        "children": [
+          "c0000008-0000-4000-8000-000000000002-a0"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000002-a0": {
+        "id": "c0000008-0000-4000-8000-000000000002-a0",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000002-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706745780.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: start with the base, then the frame."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000002-u0",
+        "children": [
+          "c0000008-0000-4000-8000-000000000002-u1"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000002-u1": {
+        "id": "c0000008-0000-4000-8000-000000000002-u1",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000002-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706745840.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: what about the roof?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000002-a0",
+        "children": [
+          "c0000008-0000-4000-8000-000000000002-a1"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000002-a1": {
+        "id": "c0000008-0000-4000-8000-000000000002-a1",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000002-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706745900.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: felt or shingles."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000002-u1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000008-0000-4000-8000-000000000002-a1",
+    "plugin_ids": null,
+    "conversation_id": "c0000008-0000-4000-8000-000000000002",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000008-0000-4000-8000-000000000002"
+  },
+  {
+    "title": "Synthetic follow-up",
+    "create_time": 1706832000.0,
+    "update_time": 1706832240.0,
+    "mapping": {
+      "c0000008-0000-4000-8000-000000000003-root": {
+        "id": "c0000008-0000-4000-8000-000000000003-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000008-0000-4000-8000-000000000003-sys"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000003-sys": {
+        "id": "c0000008-0000-4000-8000-000000000003-sys",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000003-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706832060.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000003-root",
+        "children": [
+          "c0000008-0000-4000-8000-000000000003-u0"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000003-u0": {
+        "id": "c0000008-0000-4000-8000-000000000003-u0",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000003-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706832120.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: carry on from https://chatgpt.com/c/c0000008-0000-4000-8000-000000000001 please, and see https://chatgpt.com/share/synthetic-share-0001 too."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000003-sys",
+        "children": [
+          "c0000008-0000-4000-8000-000000000003-a0"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000003-a0": {
+        "id": "c0000008-0000-4000-8000-000000000003-a0",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000003-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706832180.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: carrying on."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000003-u0",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000008-0000-4000-8000-000000000003-a0",
+    "plugin_ids": null,
+    "conversation_id": "c0000008-0000-4000-8000-000000000003",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000008-0000-4000-8000-000000000003"
+  },
+  {
+    "title": "Synthetic second opinion",
+    "create_time": 1706918400.0,
+    "update_time": 1706918640.0,
+    "mapping": {
+      "c0000008-0000-4000-8000-000000000004-root": {
+        "id": "c0000008-0000-4000-8000-000000000004-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000008-0000-4000-8000-000000000004-sys"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000004-sys": {
+        "id": "c0000008-0000-4000-8000-000000000004-sys",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000004-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706918460.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000004-root",
+        "children": [
+          "c0000008-0000-4000-8000-000000000004-u0"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000004-u0": {
+        "id": "c0000008-0000-4000-8000-000000000004-u0",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000004-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706918520.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: a shed base needs a level gravel pad, treated timber bearers set on blocks, and a damp-proof membrane before the floor goes down, or the floor rots.\n\nSynthetic: is this right?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000004-sys",
+        "children": [
+          "c0000008-0000-4000-8000-000000000004-a0"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000004-a0": {
+        "id": "c0000008-0000-4000-8000-000000000004-a0",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000004-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1706918580.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: mostly, yes."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000004-u0",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000008-0000-4000-8000-000000000004-a0",
+    "plugin_ids": null,
+    "conversation_id": "c0000008-0000-4000-8000-000000000004",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000008-0000-4000-8000-000000000004"
+  },
+  {
+    "title": "Synthetic branched chat",
+    "create_time": 1707004800.0,
+    "update_time": 1707005220.0,
+    "mapping": {
+      "c0000008-0000-4000-8000-000000000005-root": {
+        "id": "c0000008-0000-4000-8000-000000000005-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000008-0000-4000-8000-000000000005-sys"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000005-sys": {
+        "id": "c0000008-0000-4000-8000-000000000005-sys",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000005-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707004860.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000005-root",
+        "children": [
+          "c0000008-0000-4000-8000-000000000001-u0"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000001-u0": {
+        "id": "c0000008-0000-4000-8000-000000000001-u0",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000001-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707004920.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: help me plan a garden shed."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000005-sys",
+        "children": [
+          "c0000008-0000-4000-8000-000000000001-a0"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000001-a0": {
+        "id": "c0000008-0000-4000-8000-000000000001-a0",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000001-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707004980.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: start with the base, then the frame."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000001-u0",
+        "children": [
+          "c0000008-0000-4000-8000-000000000001-u1"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000001-u1": {
+        "id": "c0000008-0000-4000-8000-000000000001-u1",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000001-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707005040.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: what goes under the floor?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000001-a0",
+        "children": [
+          "c0000008-0000-4000-8000-000000000001-a1"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000001-a1": {
+        "id": "c0000008-0000-4000-8000-000000000001-a1",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000001-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707005100.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: a shed base needs a level gravel pad, treated timber bearers set on blocks, and a damp-proof membrane before the floor goes down, or the floor rots."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000001-u1",
+        "children": [
+          "c0000008-0000-4000-8000-000000000005-u2"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000005-u2": {
+        "id": "c0000008-0000-4000-8000-000000000005-u2",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000005-u2",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707005160.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: and the walls?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000001-a1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000008-0000-4000-8000-000000000005-u2",
+    "plugin_ids": null,
+    "conversation_id": "c0000008-0000-4000-8000-000000000005",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000008-0000-4000-8000-000000000005"
+  }
+]

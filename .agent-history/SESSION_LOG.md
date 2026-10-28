@@ -606,3 +606,9 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - links/social.py (detection), links/social_store.py (SocialAccountRow, AccountAliasRow, AccountMentionRow, record_accounts), ids account_mention_id, migration 0012, importer delta/run/report wiring (report.accounts), CLI `ke accounts`.
 - Tests: test_social_detection.py (25), test_social_registry.py (2). Full suite 699 passed, 6 skipped. ruff, mypy, git_guard OK; no migration drift.
 - Next: REL-002.
+
+## 2026-10-28 01:45 REL-002 (#50)
+- relationships/store.py (ConversationRelationshipRow, RelationshipReviewRow, propose, review, history; append-only triggers), relationships/detect.py (native-node-v1, prefix-v1, chatgpt-url-v1, quote-v1), migration 0013, importer runs detection when anything changed (report.relationships), CLI `ke related list|review|detect`.
+- Fixtures copied_prefix, similar_unrelated (existing fixtures byte-identical). Tests: test_conversation_relationships.py (5), test_relationship_detectors.py (5).
+- Full suite 729 passed, 6 skipped. ruff, mypy, git_guard OK; no migration drift. Detection 2.7 s over 1,000 generated chats.
+- Next: RET-001.
