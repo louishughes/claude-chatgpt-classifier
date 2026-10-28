@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Import · Knowledge Engine{% endblock %}
+{% block main %}
+<p><a href="/">← Your archive</a></p>
+<h1>Import an export</h1>
+<p>Point at a ChatGPT export: the ZIP you downloaded, its unzipped folder, or a split-export folder. It is only read, never changed. Importing the same export again adds nothing.</p>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="/import">
+  <input type="hidden" name="token" value="{{ form_token }}">
+  <label for="source">Export folder or ZIP (full path)</label>
+  <input id="source" name="source" type="text" required value="{{ form.get('source', '') }}" placeholder="e.g. C:\Users\you\Downloads\chatgpt-export.zip">
+  {% if roots %}
+  <p class="muted">Your configured source folders:</p>
+  <ul>
+  {% for path, account in roots %}
+    <li><code>{{ path }}</code> (account <code>{{ account }}</code>)</li>
+  {% endfor %}
+  </ul>
+  {% endif %}
+  <label for="account">Account label (optional)</label>
+  <input id="account" name="account" type="text" value="{{ form.get('account', '') }}" placeholder="default">
+  <label class="check"><input type="checkbox" name="partial"{% if form.get('partial') == 'on' %} checked{% endif %}> This is only some of my chats (don't mark the others "not seen")</label>
+  <button type="submit">Import</button>
+</form>
+{% endblock %}

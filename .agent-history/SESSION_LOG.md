@@ -561,3 +561,9 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - Docs: STATUS header (TICKETS.csv frozen), ADR-0009 status accepted + independent answer-key review; OPEN_DECISIONS: placeholder-test retirement under delegated authority.
 - Tests: test_ui.py (9). Full suite 564 passed, 6 skipped. ruff, mypy, git_guard OK.
 - Next: UI-002.
+
+## 2026-10-28 00:27 UI-002
+- ui/jobs.py (ImportJobs: background import thread, job state), importer/failures.py (describe_failure: plain codes/messages, no paths), Settings.account_for. ui/app.py: GET/POST /import (form token, Origin check, path checks), /jobs/<id> (meta refresh, 303 to report on done). CLI `ke import SOURCE [--account] [--format auto|chatgpt-export-v1|chatgpt-split-v1] [--partial]`.
+- Test change: tests/unit/test_cli.py::test_import_is_an_honest_placeholder replaced by test_import_reports_a_missing_source_plainly (delegated authority, OPEN_DECISIONS). New: tests/integration/test_cli_import.py (2), test_ui.py (+3).
+- Full suite 569 passed, 6 skipped. ruff, mypy, git_guard OK.
+- Next: UI-003.

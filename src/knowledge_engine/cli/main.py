@@ -6,8 +6,8 @@ scripts and tests can rely on its exact shape. Exit codes are a closed list
 (``ExitCode``), so a script can tell "you typed it wrong" from "the config is
 invalid" from "not built yet" without reading messages.
 
-Commands that aren't built yet (``import``) exist as placeholders that exit
-with ``NOT_IMPLEMENTED``, so the interface can be tried and tested now.
+A command that isn't built yet exits with ``NOT_IMPLEMENTED`` and names
+its ticket, so the interface can be tried and tested early.
 Nothing here prints raw-folder paths, conversation text or secrets: ``status``
 shows counts and labels only.
 
@@ -222,6 +222,45 @@ def _imports_report(settings: Settings, args: argparse.Namespace) -> CommandResu
         "warnings": json.loads(batch.warnings_json or "{}"),
     }
     return CommandResult("imports report", data=data, message=f"Import report ({batch.status})")
+
+
+def _import(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Import one export and print its report (ING-003, wired in UI-002)."""
+    from knowledge_engine.importer import import_source
+    from knowledge_engine.importer.failures import describe_failure
+
+    if not args.source.exists():
+        return CommandResult(
+            "import",
+            ExitCode.ERROR,
+            message="that file or folder doesn't exist",
+            error_code="not_found",
+        )
+    account = args.account or settings.account_for(args.source)
+    try:
+        report = import_source(
+            args.source,
+            account,
+            format=None if args.format == "auto" else args.format,
+            settings=settings,
+            full_export=not args.partial,
+        )
+    except Exception as error:  # noqa: BLE001 - known errors become plain messages
+        failure = describe_failure(error)
+        if failure is None:
+            raise
+        return CommandResult(
+            "import", ExitCode.ERROR, message=failure.message, error_code=failure.code
+        )
+    data = report.to_dict()
+    code = ExitCode.OK if report.status.value == "succeeded" else ExitCode.ERROR
+    return CommandResult(
+        "import",
+        code,
+        data=data,
+        message=f"Import {report.status.value}: see `ke imports report {report.import_id}`",
+        error_code=None if code == ExitCode.OK else report.status.value,
+    )
 
 
 def _ui(settings: Settings, args: argparse.Namespace) -> CommandResult:
@@ -447,12 +486,22 @@ def build_parser() -> argparse.ArgumentParser:
     ui.add_argument("--no-browser", action="store_true", help="don't open a browser window")
     ui.set_defaults(handler=_ui)
 
-    importer = commands.add_parser("import", help="import an export (not built yet)")
+    importer = commands.add_parser("import", help="import an export (folder or ZIP; only read)")
     importer.add_argument("source", type=Path, help="export ZIP or folder")
     importer.add_argument(
-        "--format", choices=["auto", "chatgpt-export", "chatgpt-split-v1"], default="auto"
+        "--format", choices=["auto", "chatgpt-export-v1", "chatgpt-split-v1"], default="auto"
     )
-    importer.set_defaults(handler=_not_built("import", "ING-003"))
+    importer.add_argument(
+        "--account",
+        metavar="LABEL",
+        help="account label (default: the matching raw root's, or 'default')",
+    )
+    importer.add_argument(
+        "--partial",
+        action="store_true",
+        help="the source is only some chats: don't mark the others 'not seen'",
+    )
+    importer.set_defaults(handler=_import)
     return parser
 
 

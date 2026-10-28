@@ -5,10 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{% block title %}Knowledge Engine{% endblock %}</title>
 <link rel="stylesheet" href="/style.css">
+{% block head %}{% endblock %}
 </head>
 <body>
 <header>
   <a class="brand" href="/">Knowledge Engine</a>
+  <nav><a href="/import">Import</a></nav>
   <span class="muted">local only · v{{ version }}</span>
 </header>
 <main>

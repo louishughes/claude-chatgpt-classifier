@@ -27,7 +27,7 @@ Live ticket status for the build. The original ticket list is `docs/TICKETS.csv`
 | ING-011 ChatGPT split-wrapper directory adapter | VERIFIED (slice A2) | SESSION_LOG 2026-10-27 ING-011 |
 | ING-001 Secure archive storage and checksums | VERIFIED (slice I1) | SESSION_LOG 2026-10-27 ING-001 |
 | IMP-001 ImportBatch and source-file snapshot ledger | VERIFIED (slice I1) | SESSION_LOG 2026-10-27 IMP-001 |
-| ING-003 ImportCoordinator → import_source | VERIFIED (slice I2; `ke import` CLI wiring waits for Louis, see below) | SESSION_LOG 2026-10-27 ING-003 |
+| ING-003 ImportCoordinator → import_source | VERIFIED (slice I2; `ke import` wired in UI-002) | SESSION_LOG 2026-10-27 ING-003 |
 | IMP-002 Logical identity resolver | VERIFIED (slice I4: ID collisions and missing IDs become review_required candidates, never merged) | SESSION_LOG 2026-10-27 IMP-002 |
 | IMP-004 Transactional idempotent commit, resume and import locking | VERIFIED (repeat + crash rerun in I2; single-writer import lock in I5; checkpoint resume deferred per M1_CONSOLIDATION) | SESSION_LOG 2026-10-27 IMP-004 |
 | IMP-003 Message revision and graph delta engine | VERIFIED (slice I3) | SESSION_LOG 2026-10-27 IMP-003 |
@@ -39,11 +39,11 @@ Live ticket status for the build. The original ticket list is `docs/TICKETS.csv`
 | MED-004 Vault media embeds and missing markers | VERIFIED (slice R2: verified copies at _attachments/<2hex>/<sha>.<ext>, warning markers with pointer + reason, check_embeds link checker) | SESSION_LOG 2026-10-28 MED-004 |
 | BRW-001 Source browser and transcript notes | VERIFIED (slice R3: transcript from stored records, labelled branches, per-message anchors, image embeds; `ke inspect [ID] [--note VAULT]` counts only) | SESSION_LOG 2026-10-28 BRW-001 |
 | UI-001 `ke ui` local web interface: home and import reports | VERIFIED (loopback-only server, Host check, CSP, autoescaped Jinja2 pages, plain-words report) | SESSION_LOG 2026-10-28 UI-001 |
+| UI-002 Import from the browser (and `ke import`) | VERIFIED (Import page with form token + Origin check, background job with self-refreshing progress page, plain failure reasons; `ke import SOURCE [--account] [--format] [--partial]`; placeholder test replaced by real tests) | SESSION_LOG 2026-10-28 UI-002 |
 | EVAL-010 Batch smoke test (50/100) | IN_PROGRESS (synthetic 50/100 pass, `ke eval smoke`, docs/evaluation/EVAL-010_SMOKE.md; real-data half waits for a session on Louis's PC, REV-009) | SESSION_LOG 2026-10-28 EVAL-010 |
 
-**Next unblocked:** M1 tail per IMPLEMENTATION_PLAN §4a: UI-002 (import from the browser, with `ke import` wired) and UI-003 (chat browser). Then Milestone 2 (ING-010, NRM-003, LNK-001, YTB-001/002, SOC-001/002, REL-002, RET-001). The M1 gate also needs a Windows test run on Louis's PC, in the same session as the real-data runs.
+**Next unblocked:** UI-003 (chat, branch and image browser), then Milestone 2 (ING-010, NRM-003, LNK-001, YTB-001/002, SOC-001/002, REL-002, RET-001). The M1 gate also needs a Windows test run on Louis's PC, in the same session as the real-data runs.
 
 **Needs Louis (logged, skipped, not waited on):**
 - Real-data checkpoint: REV-009 (#143) and the real half of EVAL-010 (#39) need a read-only session on your PC: `ke inspect` on a few conversations and `ke eval smoke raw --limit 50` / `--limit 100`. Synthetic runs pass.
-- Wiring `ke import` to `import_source` means retiring `tests/unit/test_cli.py::test_import_is_an_honest_placeholder`, which asserts the placeholder. Changing an existing test needs your OK (guardrail). Until then, imports run through `import_source(...)` in Python.
 - AGENTS.md guardrail 1 still says the owner approves the gold set. Since 00:13 you asked to stay out of tagging, and ADR-0009 and OPEN_DECISIONS now say an independent blind Claude session reviews it. Agents can't edit AGENTS.md themselves, so that one line needs your edit (or your OK in a session that can).
