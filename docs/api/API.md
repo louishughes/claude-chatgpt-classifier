@@ -10,7 +10,7 @@ ke api                          # http://127.0.0.1:8766/api/v1/docs (Ctrl+C to s
 ## Rules for every endpoint
 
 - **Versioned.** Everything is under `/api/v1`. The OpenAPI document is at `/api/v1/openapi.json`, and its `info.version` is the package version (`CHANGELOG.md`). A breaking change gets `/api/v2`; `v1` keeps working.
-- **This computer only.** The server listens on 127.0.0.1 and nothing else. A request whose `Host` header isn't a loopback name (`127.0.0.1`, `localhost`, `[::1]`) is refused with `host_not_local`, which stops a web page elsewhere reaching the API through a DNS trick. No CORS headers are sent, so other sites' scripts can't read answers. There is no login: anyone who can run programs as you on this computer can already read your workspace. Accounts come with PROD-002.
+- **This computer only.** The server listens on 127.0.0.1 and nothing else. A request whose `Host` header isn't a loopback name (`127.0.0.1`, `localhost`, `[::1]`) is refused with `host_not_local`, which stops a web page elsewhere reaching the API through a DNS trick. No CORS headers are sent, so other sites' scripts can't read answers. Until you add an account there is no login: anyone who can run programs as you on this computer can already read your workspace. Adding an account turns checking on (see *Accounts and roles* below).
 - **One error shape.** Every failure is:
 
   ```json
@@ -38,6 +38,10 @@ ke api                          # http://127.0.0.1:8766/api/v1/docs (Ctrl+C to s
 | `invalid_transition` | 409 | A decision the review workflow doesn't allow: deciding twice, supporting a confirmed record, a reject without a reason, an alias clash, a suggestion becoming the user's decision without acceptance. Nothing is changed. |
 | `no_database` | 503 | Nothing has been imported into this workspace yet. |
 | `schema_mismatch` | 503 | The database is older than the code (run `ke db upgrade`) or from a newer version (OPS-007). |
+| `unauthenticated` | 401 | Accounts exist and the request had no token, an unknown or revoked one, or the account is disabled. |
+| `not_a_member` | 403 | The token's account has no role in this workspace. |
+| `forbidden` | 403 | The account's role doesn't include what this endpoint needs. |
+| `identity_mismatch` | 403 | A `reviewer` or `proposer` in the body isn't the caller's own account name. |
 | `internal_error` | 500 | An unexpected failure. Nothing about it is returned. |
 
 ## Endpoints (API-001)
@@ -107,6 +111,35 @@ Each of these first brings the word and meaning indexes up to date (cheap when n
 **Where exports go.** A destination is a **name** (letters, digits, `-`, `_`; at most 64), never a path, so `../x`, `/etc`, drive paths and `a/b` are refused before anything is touched. A destination that is a link to somewhere else is refused too. One export per destination runs at a time. To write into a vault elsewhere on your computer, use `ke docs vault --vault <folder>`.
 
 **Your files are safe in it.** The export is DOC-006's `sync_vault`: it writes only files listed in its own manifest. A file of yours where it wants to write is counted as `occupied` and left alone; a note you edited above the marker line is counted as a `conflict` and kept; anything below the marker line is carried into every new version.
+
+## Accounts and roles (PROD-002)
+
+While the workspace has no accounts, the API works as above for the one person on this computer. **Adding the first account turns checking on** for every endpoint except `/health`:
+
+```bash
+ke access add louis                 # a person; add --service for a program
+ke access grant louis owner         # viewer, editor, reviewer or owner (in workspace "default")
+ke access token louis               # prints a new token once; only its SHA-256 is stored
+curl -H "Authorization: Bearer ke_..." http://127.0.0.1:8766/api/v1/access/me
+ke access revoke louis              # revoke all of louis's tokens
+ke access disable louis             # no more logins at all
+ke access list                      # accounts and roles, never tokens
+ke access log                       # the authorisation log, newest first
+```
+
+| Role | read | import | export | propose | review |
+|---|---|---|---|---|---|
+| viewer | yes | | | | |
+| editor | yes | yes | yes | yes | |
+| reviewer | yes | | | yes | yes |
+| owner | yes | yes | yes | yes | yes |
+
+- Every endpoint needs exactly one of these; the whole table is `ROUTE_PERMISSIONS` in `api/access.py`, and a test checks every route is in it. Once accounts exist, a route missing from it is refused.
+- **Service accounts** (programs) may be viewers or editors only: a program can import and read, but confirming or rejecting knowledge is a person's job.
+- **Your own name only.** A `reviewer` or `proposer` in a request body must be the caller's account name (`identity_mismatch` otherwise), so the "can't review your own proposal" rule can't be dodged.
+- **The authorisation log** (`authz_events`) keeps every refusal, every allowed change and every membership change, with the method and route but never the query text. Its rows can't be edited or deleted.
+- `GET /api/v1/access/me` answers who you are, your role and what it allows.
+- The API serves the `default` workspace, the one imports write to. Several workspaces in one database, each scoped separately, is PROD-003.
 
 ## Swapping parts in tests
 

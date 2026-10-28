@@ -2417,3 +2417,42 @@ ci                                        5/5 ok, 1250 passed, 7 skipped
 Fix attempts: 0.
 
 **Next exact task:** PROD-001 (PostgreSQL proof of concept): M5 is complete once API-004/005 merge.
+
+### 10:47 — PROD-001: the same engine on PostgreSQL
+
+- `infrastructure/dialects.py`: the only SQL that differed was the "refuse this change" triggers. On PostgreSQL each becomes one shared function `ke_refuse_change()` plus a row trigger that calls it with the same message; on SQLite nothing changes. A trigger it doesn't recognise raises, so a new migration can't lose its guard by accident. The nine migrations with triggers now call `run_triggers(...)`.
+- `run_import(..., database_url=...)` writes rows to PostgreSQL; the archive, lock and search index stay in the workspace. Search needed no port: its FTS5 index was already a cache rebuilt from whatever database the session reads.
+- `devtools/postgres.py` starts a throwaway server for the tests (127.0.0.1 only, temporary folder, removed afterwards), or uses `KE_TEST_POSTGRES_URL`. It skips without binaries, and as root, because PostgreSQL won't start as root.
+- `evaluation/backend_bench.py`: 200 synthetic conversations, 9,609 rows. First import 7.3 s SQLite vs 18.9 s PostgreSQL, repeat 4.9 vs 11.0 s, searches equal. Same rows, same 120 hits.
+- Gaps written down in `docs/operations/POSTGRES_POC.md`: the CLI, UI, API, purge, backup and `ke db upgrade` still open the SQLite file.
+
+**Teach-back (`infrastructure/dialects.py`):** The database rules that refuse edits to history were written as SQLite triggers, and PostgreSQL writes triggers differently. This module rewrites each one into PostgreSQL's form with the same message, and leaves SQLite untouched. If it meets a trigger it doesn't understand it stops, so no protection quietly disappears.
+
+Checks:
+```
+tests/integration/test_postgres_backend.py   16 passed (non-root user, PostgreSQL 16, 23 s)
+backend_bench --conversations 200            rows_equal true, hits 120/120
+```
+Fix attempts: 0.
+
+**Next exact task:** PROD-002.
+
+### 10:58 — PROD-002: accounts, roles and who did what
+
+- `access/policy.py`: four roles (viewer, editor, reviewer, owner) as fixed sets of six permissions, in one table. A **service account** (a program) may only be a viewer or editor, so automation can import and read but never confirm or reject knowledge.
+- `access/accounts.py` + migration 0029: accounts, tokens (only a SHA-256 is stored; the token is shown once), one role per account per workspace, and `authz_events`, an append-only log of every refusal, every allowed change and every membership change. It records the method and route, never the query text, because a search can be private words.
+- `api/access.py`: runs before every endpoint. No accounts means single-user mode, exactly as before (all earlier API tests pass unchanged). The first account turns checking on: 401 without a valid token, 403 `not_a_member`, 403 `forbidden`. The whole policy is `ROUTE_PERMISSIONS`, one line per endpoint; a test compares it with the OpenAPI routes, and once checking is on an unlisted route is refused.
+- A body's `reviewer`/`proposer` must be the caller (`identity_mismatch`), so "you can't review your own proposal" can't be dodged by typing someone else's name.
+- `ke access add|token|revoke|disable|grant|remove|list|log`.
+- One FastAPI detail: a route inside an included router only knows its own path (`/sources`), so the check adds `/api/v1` back before the table lookup.
+- The API serves the `default` workspace; several workspaces in one database is PROD-003.
+
+**Teach-back (`api/access.py`):** Before any endpoint runs, this checks who is calling and whether their role in the workspace allows that endpoint, using one table that lists every endpoint. Until I create an account nothing changes; after that every request needs a token, and an account from another workspace is refused everywhere. Refusals and changes go into a log nobody can edit, and nobody can act under someone else's name.
+
+Checks:
+```
+tests/integration/test_api_access.py   8 passed
+```
+Fix attempts: 1 (the route lookup missed the router prefix; a result-type bug in `members`).
+
+**Next exact task:** PROD-003 (tenant isolation through retrieval and exports).

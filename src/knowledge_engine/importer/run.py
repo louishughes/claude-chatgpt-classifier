@@ -49,6 +49,7 @@ from knowledge_engine.importer.lock import import_lock
 from knowledge_engine.importer.media import MediaDelta, MediaLibrary, record_occurrences
 from knowledge_engine.importer.report import ImportReport
 from knowledge_engine.infrastructure.db import SessionFactory, create_sqlite_engine, database_path
+from knowledge_engine.infrastructure.dialects import create_postgres_engine
 from knowledge_engine.infrastructure.migrations import upgrade_to_head
 from knowledge_engine.infrastructure.upgrade import require_current
 from knowledge_engine.infrastructure.workspace import WorkspaceRepo
@@ -73,12 +74,17 @@ def run_import(
     settings: Settings,
     full_export: bool = True,
     limit: int | None = None,
+    database_url: str | None = None,
 ) -> ImportReport:
     """Import one source and return its report. See ``importer.import_source``.
 
     ``limit`` imports only the first N conversations, for the batch smoke
     test (EVAL-010). A limited run is never a full export, so it marks
     nothing ``not_seen``.
+
+    ``database_url`` (PROD-001 proof of concept) stores the records in a
+    PostgreSQL database instead of the workspace's SQLite file. The
+    archive, the lock and the search index stay in the workspace folder.
     """
     if limit is not None:
         full_export = False
@@ -93,7 +99,11 @@ def run_import(
     # The whole import holds the workspace lock: "running means crashed" and
     # "not touched by this import means not seen" both assume it's alone.
     with import_lock(settings.workspace_root, timeout_s=settings.limits.import_lock_timeout_s):
-        engine = create_sqlite_engine(database_path(settings))
+        engine = (
+            create_postgres_engine(database_url)
+            if database_url
+            else create_sqlite_engine(database_path(settings))
+        )
         try:
             # A new workspace gets its schema here. An existing database from
             # an older version is left alone: `ke db upgrade` backs it up

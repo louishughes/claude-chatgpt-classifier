@@ -10,6 +10,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
+from knowledge_engine.infrastructure.dialects import run_triggers
 from knowledge_engine.segmentation.overrides import APPEND_ONLY_TRIGGERS
 
 revision: str = "0021_segment_overrides"
@@ -36,8 +37,7 @@ def upgrade() -> None:
         batch_op.create_index(
             batch_op.f("ix_segment_overrides_conversation_id"), ["conversation_id"], unique=False
         )
-    for statement in APPEND_ONLY_TRIGGERS:
-        op.execute(statement)
+    run_triggers(APPEND_ONLY_TRIGGERS)
 
 
 def downgrade() -> None:

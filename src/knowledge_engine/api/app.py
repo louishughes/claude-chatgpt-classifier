@@ -20,6 +20,8 @@ Rules every endpoint gets for free:
   elsewhere reaching the API through a DNS trick. ``ke api`` refuses to
   listen on anything but a loopback address. No CORS headers are sent, so
   another site's scripts can't read the answers.
+* **Accounts.** Once an account exists, every endpoint but ``/health``
+  needs a token and a role (PROD-002, ``api/access.py``).
 * **Schema check.** An endpoint that opens the database refuses
   (``schema_mismatch``, 503) when the database is older or newer than the
   code, exactly as imports do (OPS-007).
@@ -36,14 +38,14 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from urllib.parse import urlsplit
 
-from fastapi import FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from starlette.exceptions import HTTPException
 
 from knowledge_engine import __version__
-from knowledge_engine.api import documents, imports, knowledge, retrieval
+from knowledge_engine.api import access, documents, imports, knowledge, retrieval
 from knowledge_engine.api.deps import (
     ApiError,
     ErrorBody,
@@ -132,9 +134,12 @@ def create_app(settings: Settings) -> FastAPI:
         docs_url=f"{PREFIX}/docs",
         redoc_url=None,
         responses={503: {"model": ErrorBody}},
+        # Runs before every endpoint: accounts, roles and the log (PROD-002).
+        dependencies=[Depends(access.check_access)],
     )
     app.state.settings = settings
     _add_error_handlers(app)
+    app.include_router(access.router, prefix=PREFIX)
     app.include_router(imports.router, prefix=PREFIX)
     app.include_router(knowledge.router, prefix=PREFIX)
     app.include_router(retrieval.router, prefix=PREFIX)

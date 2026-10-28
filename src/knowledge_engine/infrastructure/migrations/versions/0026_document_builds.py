@@ -11,6 +11,7 @@ import sqlalchemy as sa
 from alembic import op
 
 from knowledge_engine.documents.dependencies import APPEND_ONLY_TRIGGERS
+from knowledge_engine.infrastructure.dialects import run_triggers
 
 revision: str = "0026_document_builds"
 down_revision: str | None = "0025_decision_events"
@@ -51,8 +52,7 @@ def upgrade() -> None:
         batch_op.create_index(
             batch_op.f("ix_document_dependencies_dep_id"), ["dep_id"], unique=False
         )
-    for statement in APPEND_ONLY_TRIGGERS:
-        op.execute(statement)
+    run_triggers(APPEND_ONLY_TRIGGERS)
 
 
 def downgrade() -> None:

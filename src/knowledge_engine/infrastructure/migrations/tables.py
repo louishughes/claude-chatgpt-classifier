@@ -16,6 +16,7 @@ import importlib
 from sqlalchemy import MetaData
 
 TABLE_MODULES = (
+    "knowledge_engine.access.accounts",
     "knowledge_engine.classification.store",
     "knowledge_engine.documents.dependencies",
     "knowledge_engine.extraction.runner",
