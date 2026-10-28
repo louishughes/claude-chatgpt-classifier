@@ -164,7 +164,10 @@ def test_a_long_chat_is_split_never_clipped_and_merged(tmp_path: Path) -> None:
         for request in provider.submitted:
             assert re.search(r"^Part \d+ of \d+ of a longer chat\.", request.input_text)
         assert outcome.digest is not None
-        assert len(outcome.digest.summary) == min(4, len(provider.submitted))
+        # Every part is represented, and the sentence they share is said once
+        # (NOTE-030: identical lines join, keeping each part's citation).
+        [line] = outcome.digest.summary
+        assert len(line.message_ids) == min(4, len(provider.submitted))
         # One topic text, cited in every part, is kept once.
         assert len(outcome.digest.topics) == 1
         json.dumps(outcome.digest.model_dump(mode="json"))  # storable as-is
