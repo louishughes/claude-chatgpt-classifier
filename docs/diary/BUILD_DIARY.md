@@ -3489,3 +3489,15 @@ Talking points:
 - "The first honest score was a fail, and the failure pointed at one bug."
 - "A test that fails before the fix and passes after is the proof the fix does what I say."
 - "Whether a sibling counts as a fork is a definition, so the owner decides it, not the code."
+
+### 19:40 UTC — EVAL-012 passes: 0.80 → 0.95
+
+Louis handed the open decisions over with "use your best judgement and true to the spec", so the fork rule stands as the key wrote it: a chat forks from its direct parent only. The fix merged (PR #319), and a session on Louis's PC re-scored the engine against the **same** key. It checked the key's hash before and after scoring, and nothing had changed.
+
+Precision went from 0.80 to **0.952**, so the gate line passes now. One wrong fork remains. Recall is still 0.41, because the engine doesn't suggest "related" or "same project" links between these chats yet. That's the next gap to close, and it isn't a precision problem.
+
+One snag: the re-score needed a fresh import. The detectors never delete links they proposed before, so the old workspace still held the sibling links. On top of that, `ke.toml` overrides `KE_WORKSPACE_ROOT`, so the session pointed a copy of the config at the fresh workspace instead.
+
+Talking points:
+- "Same answer key, same hash, one bug fixed: precision went from 0.80 to 0.95."
+- "Precision says the links it does suggest are right. Recall says it's still missing most of the 'related' links, and I report both."
