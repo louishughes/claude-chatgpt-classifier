@@ -588,6 +588,33 @@ def _gold_schema(settings: Settings, args: argparse.Namespace) -> CommandResult:
     return CommandResult("gold", data=gold_schema(), message="golden set schema (gold-v1)")
 
 
+def _logs(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Search the structured run log by ID (OPS-001); reads only.
+
+    Log events hold IDs, versions, counts and timings only, so they are
+    safe to print.
+    """
+    from knowledge_engine.infrastructure.logs import search, totals
+
+    match = {
+        name: value
+        for name, value in (
+            ("stage_key", args.stage_key),
+            ("job_id", args.job_id),
+            ("segment_id", args.segment_id),
+            ("event", args.event),
+        )
+        if value
+    }
+    events = search(settings.workspace_root / "logs", **match)
+    lines = [json.dumps(e, sort_keys=True) for e in events[-args.limit :]]
+    return CommandResult(
+        "logs",
+        data={"events": events[-args.limit :], "count": len(events), "totals": totals(events)},
+        message="\n".join(lines) if lines else "no matching events",
+    )
+
+
 def _taxonomy_report(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Taxonomy health and review activity (TAX-008); reads only."""
     from dataclasses import asdict
@@ -1062,6 +1089,13 @@ def build_parser() -> argparse.ArgumentParser:
     gold_commands.add_parser("schema", help="print the golden set JSON Schema").set_defaults(
         handler=_gold_schema
     )
+    logs = commands.add_parser("logs", help="search the run log by ID (no private text)")
+    logs.add_argument("--stage-key", help="one stage key's whole lineage")
+    logs.add_argument("--job-id", help="one job's events")
+    logs.add_argument("--segment-id", help="one segment's events")
+    logs.add_argument("--event", help="one event name, e.g. model.repair")
+    logs.add_argument("--limit", type=int, default=200, help="newest events to show")
+    logs.set_defaults(handler=_logs)
     taxonomy = commands.add_parser("taxonomy", help="the shared vocabulary")
     taxonomy_commands = taxonomy.add_subparsers(dest="taxonomy_command", required=True)
     tax_report = taxonomy_commands.add_parser(

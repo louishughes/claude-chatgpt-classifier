@@ -39,6 +39,7 @@ from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, T
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.logs import EventLog, null_log
 from knowledge_engine.providers.base import (
     BatchHandle,
     ModelRequest,
@@ -129,6 +130,17 @@ class ModelStageRunner:
     session: Session
     provider: StructuredModelProvider
     egress: EgressPolicy
+    log: EventLog = field(default_factory=null_log)
+
+    def _event(self, event: str, request: ModelRequest, **fields: int | str | None) -> None:
+        self.log.emit(
+            event,
+            stage_key=request.request_id,
+            stage_id=request.stage_id,
+            provider_id=self.provider.identity.provider_id,
+            prompt_version=request.prompt_version,
+            **fields,
+        )
 
     def _send(self, requests: Sequence[ModelRequest]) -> BatchHandle:
         # The one place requests leave for a provider: the switch is checked
@@ -154,6 +166,7 @@ class ModelStageRunner:
             if cached is not None:
                 report.outputs[request.request_id] = cached
                 report.cached.append(request.request_id)
+                self._event("model.cached", request)
                 continue
             row = self.session.get(ModelRequestRow, request.request_id)
             if row is None:
@@ -178,6 +191,12 @@ class ModelStageRunner:
                     )
                 )
                 report.submitted.append(request.request_id)
+                self._event(
+                    "model.submitted",
+                    request,
+                    characters=request.characters,
+                    batch_id=",".join(handle.batch_ids),
+                )
             self.session.flush()
         return report
 
@@ -214,6 +233,9 @@ class ModelStageRunner:
             elif result.state is ResultState.OK and result.output is not None:
                 self._store(original, row, result.output, result.served_model, result.session_ref)
                 report.outputs[original.request_id] = result.output
+                self._event(
+                    "model.stored", original, attempts=row.attempts, model=result.served_model
+                )
             elif row.attempts == 1:
                 row.last_error = result.error
                 repairs.append(original)
@@ -222,6 +244,7 @@ class ModelStageRunner:
                 row.last_error = result.error
                 row.updated_at = _utc_now()
                 report.review_required.append(original.request_id)
+                self._event("model.review_required", original, attempts=row.attempts)
         if repairs:
             repair_requests = [self._repair(r, rows[r.request_id].last_error) for r in repairs]
             repair_handle = self._send(repair_requests)
@@ -233,6 +256,7 @@ class ModelStageRunner:
                 row.characters += len(row.last_error or "") + request.characters
                 row.updated_at = _utc_now()
                 report.repairs.append(request.request_id)
+                self._event("model.repair", request, attempts=2, characters=row.characters)
         self.session.flush()
         return report
 
