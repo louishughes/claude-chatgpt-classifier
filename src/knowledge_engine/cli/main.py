@@ -1673,12 +1673,17 @@ def _taxonomy_bootstrap(settings: Settings, args: argparse.Namespace) -> Command
 
 
 def _taxonomy_refresh(settings: Settings, args: argparse.Namespace) -> CommandResult:
-    """NOTE-014: what the vocabulary doesn't cover yet, and a refresh pack for it."""
+    """NOTE-014: file new topic candidates, count what the vocabulary doesn't cover, pack it.
+
+    Every run files the queued chats' unmatched digest topics as proposals
+    (NOTE-007); ``--out`` also writes a refresh pack for a proposer session.
+    """
     from dataclasses import asdict
 
     from sqlalchemy.orm import Session
 
     from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.rendering.transcript import load_conversation
     from knowledge_engine.segmentation.inventory import corpus_inventory
     from knowledge_engine.taxonomy import refresh
     from knowledge_engine.taxonomy.bootstrap import pack_sha256
@@ -1701,8 +1706,19 @@ def _taxonomy_refresh(settings: Settings, args: argparse.Namespace) -> CommandRe
     engine = create_sqlite_engine(db)
     try:
         with Session(engine) as session:
+            # NOTE-007: the queued chats' digest topics that match no term
+            # become proposals for a reviewer (never labels).
+            current = refresh.latest_version(session)
+            proposed = []
+            if current is not None:
+                queued = sorted(refresh.queued_chats(session, current))
+                proposed = refresh.collect_topics(
+                    session, current, (load_conversation(session, cid) for cid in queued)
+                )
+                session.commit()
             status = refresh.refresh_status(session)
             counts = {k: v for k, v in asdict(status).items() if k != "last_pack_at"}
+            counts["topics_proposed"] = len(proposed)
             counts["last_pack_at"] = (
                 status.last_pack_at.isoformat() if status.last_pack_at else None
             )
@@ -1710,7 +1726,8 @@ def _taxonomy_refresh(settings: Settings, args: argparse.Namespace) -> CommandRe
                 f"{status.unlabelled_chats} of {status.chats} chats have no label under "
                 f"{status.version}, {status.review_chats} wait for review, "
                 f"{status.new_chats} are new since the last pack; "
-                f"{status.candidates} proposal(s) wait for a reviewer"
+                f"{status.candidates} proposal(s) wait for a reviewer "
+                f"({len(proposed)} new from chat topics)"
             )
             if out is None:
                 return CommandResult(command, data=counts, message=words)
@@ -3984,7 +4001,7 @@ def build_parser() -> argparse.ArgumentParser:
     # NOTE-014: keep the vocabulary up to date as new chats arrive.
     tax_refresh = taxonomy_commands.add_parser(
         "refresh",
-        help="count chats the vocabulary doesn't cover; with --out, a pack of only those",
+        help="file new topic candidates and count uncovered chats; --out writes a pack of them",
     )
     tax_refresh.add_argument("--out", type=Path, help="write a refresh pack (private folder)")
     tax_refresh.add_argument("--taxonomy", help="the version to refresh (default: newest)")

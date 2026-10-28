@@ -512,6 +512,27 @@ class RefreshStatus:
     last_pack_at: datetime | None
 
 
+def _labelled_chats(session: Session, version: str) -> set[str]:
+    """Chats with at least one labelled segment under ``version``."""
+    return set(
+        session.scalars(
+            select(ClassificationRow.conversation_id).where(
+                ClassificationRow.segment_id.in_(_labelled_segments(session, version))
+            )
+        )
+    )
+
+
+def queued_chats(session: Session, snapshot: TaxonomySnapshot) -> set[str]:
+    """Chats with no label, a segment waiting for review, or new since the last pack.
+
+    The chat-level version of ``queue``: quick, because it needs no segmenting.
+    """
+    every = set(session.scalars(select(ConversationRow.conversation_id)))
+    review = {row.conversation_id for row in review_queue(session, snapshot.version)}
+    return (every - _labelled_chats(session, snapshot.version)) | review | _new_chats(session)
+
+
 def refresh_status(session: Session) -> RefreshStatus:
     """Count what the current vocabulary doesn't cover yet. Reads only, no segmenting."""
     chats = int(session.scalar(select(func.count()).select_from(ConversationRow)) or 0)
@@ -528,21 +549,67 @@ def refresh_status(session: Session) -> RefreshStatus:
     snapshot = latest_version(session)
     if snapshot is None:
         return RefreshStatus(None, chats, chats, 0, new, candidates, None)
-    labelled_segments = _labelled_segments(session, snapshot.version)
-    labelled_chats = set(
-        session.scalars(
-            select(ClassificationRow.conversation_id).where(
-                ClassificationRow.segment_id.in_(labelled_segments)
-            )
-        )
-    )
     review = {row.conversation_id for row in review_queue(session, snapshot.version)}
     return RefreshStatus(
         snapshot.version,
         chats,
-        chats - len(labelled_chats),
+        chats - len(_labelled_chats(session, snapshot.version)),
         len(review),
         new,
         candidates,
         pack.created_at if pack else None,
     )
+
+
+# ---------------------------------------------------------------- topic candidates (NOTE-007)
+
+TOPIC_PROPOSER = "note-007-keywords"
+
+
+def collect_topics(
+    session: Session,
+    snapshot: TaxonomySnapshot,
+    conversations: Iterable[StoredConversation],
+    *,
+    proposer: str = TOPIC_PROPOSER,
+) -> list[str]:
+    """File the queued chats' unmatched digest topics as TAX-004 ``add`` proposals.
+
+    A digest (NOTE-002) lists each chat's main topics in its own words.
+    NOTE-007 checks each against the published topic terms; one that
+    matches nothing is a candidate for the next version. A topic is skipped
+    when a reviewer already rejected it or an approved term already has
+    that label (approved after this version was published), so the same
+    suggestion doesn't come back every round. Chats without a digest
+    yet have no topics to offer. Nothing becomes a term until a separate
+    reviewer approves it; the caller commits.
+
+    Returns:
+        The new proposal IDs.
+    """
+    from dataclasses import replace
+
+    from knowledge_engine.digest.stage import stored_digest
+    from knowledge_engine.documents.keywords import ChatInput, keyword_candidates, propose_topics
+    from knowledge_engine.taxonomy.bootstrap import _known, _labels_in
+    from knowledge_engine.taxonomy.registry import normalise_alias
+
+    chats = []
+    for conversation in conversations:
+        digest = stored_digest(session, conversation)
+        if digest is not None and digest.topics:
+            topics = tuple(item.text for item in digest.topics)
+            chats.append(
+                ChatInput(conversation.conversation_id, conversation.title or "", (), topics)
+            )
+    if not chats:
+        return []
+    settled = set(_known(session, Dimension.TOPIC)) | _labels_in(
+        session, Dimension.TOPIC, "rejected"
+    )
+    results = keyword_candidates(chats, resolver=AliasResolver(snapshot)).values()
+    fresh = [
+        replace(r, topics=tuple(t for t in r.topics if normalise_alias(t.text) not in settled))
+        for r in results
+    ]
+    return propose_topics(session, fresh, proposer=proposer)

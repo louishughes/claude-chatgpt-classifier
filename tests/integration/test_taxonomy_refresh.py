@@ -405,3 +405,41 @@ def test_dashboard_shows_what_the_vocabulary_does_not_cover(world: World) -> Non
     assert "tax-1" in text
     assert "2 chats with no label yet" in text
     assert "2 new since the last refresh" in text
+
+
+def test_unmatched_digest_topics_of_queued_chats_become_proposals_once(
+    world: World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """NOTE-007 wiring: a digest topic no term names is filed once; known ones aren't."""
+    from types import SimpleNamespace
+
+    import knowledge_engine.digest.stage as stage
+    from knowledge_engine.taxonomy.refresh import TOPIC_PROPOSER, collect_topics, queued_chats
+    from knowledge_engine.taxonomy.review import proposals, reject
+
+    # Stand-in digests: real ones come from a Claude session (NOTE-004).
+    topics = {"c-bees-1": ["Beekeeping", "Gardening"], "c-bees-2": ["beekeeping", "Swarms"]}
+    world.import_second()
+    natives = {v: k for k, v in world.chats().items()}
+
+    def digest(_session: Session, chat: StoredConversation) -> Any:
+        words = topics.get(natives.get(chat.conversation_id, ""), [])
+        return SimpleNamespace(topics=tuple(SimpleNamespace(text=w) for w in words))
+
+    monkeypatch.setattr(stage, "stored_digest", digest)
+    session = world.session
+    queued = queued_chats(session, world.tax1)
+    assert queued == {world.chats()[n] for n in SECOND}  # only the uncovered chats
+
+    def collect() -> list[str]:
+        chats = [load_conversation(session, cid) for cid in sorted(queued)]
+        return collect_topics(session, world.tax1, chats)
+
+    filed = collect()
+    labels = {json.loads(p.payload_json)["label"].lower() for p in proposals(session)}
+    assert len(filed) == 2 and labels == {"beekeeping", "swarms"}  # "Gardening" is a term
+    assert {p.proposer for p in proposals(session)} == {TOPIC_PROPOSER}
+    assert collect() == []  # already waiting
+    swarms = next(p for p in proposals(session) if "warm" in p.payload_json)
+    reject(session, swarms.proposal_id, reviewer="reviewer-session-b", note="part of beekeeping")
+    assert collect() == []  # a rejected topic isn't filed again
