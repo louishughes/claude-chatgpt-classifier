@@ -34,6 +34,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 from knowledge_engine.domain.ids import link_occurrence_id, link_target_id
 from knowledge_engine.infrastructure.db import Base
 from knowledge_engine.links.extract import CITATION_METADATA, MESSAGE_TEXT, FoundLink
+from knowledge_engine.links.youtube import parse_youtube, record_mention
 
 _ORIGINS = f"'{MESSAGE_TEXT}','{CITATION_METADATA}'"
 
@@ -103,7 +104,8 @@ def record_links(
         import_id: The running batch.
 
     Returns:
-        ``new_targets``, ``new_occurrences`` and ``seen_occurrences`` counts.
+        ``new_targets``, ``new_occurrences``, ``seen_occurrences`` and
+        ``new_youtube_mentions`` counts.
     """
     counts: Counter[str] = Counter()
     for revision_id, actor, link in mentions:
@@ -122,21 +124,30 @@ def record_links(
             counts["new_targets"] += 1
         key = link_occurrence_id(revision_id, link.span.start, link.span.end, link.origin)
         counts["seen_occurrences"] += 1
-        if session.get(LinkOccurrenceRow, key) is not None:
-            continue
-        session.add(
-            LinkOccurrenceRow(
-                occurrence_id=key,
-                revision_id=revision_id,
-                conversation_id=conversation_id,
-                target_id=target_key,
-                origin=link.origin,
-                start=link.span.start,
-                end=link.span.end,
-                original_text=link.original,
-                actor=actor,
-                first_import_id=import_id,
+        if session.get(LinkOccurrenceRow, key) is None:
+            session.add(
+                LinkOccurrenceRow(
+                    occurrence_id=key,
+                    revision_id=revision_id,
+                    conversation_id=conversation_id,
+                    target_id=target_key,
+                    origin=link.origin,
+                    start=link.span.start,
+                    end=link.span.end,
+                    original_text=link.original,
+                    actor=actor,
+                    first_import_id=import_id,
+                )
             )
-        )
-        counts["new_occurrences"] += 1
+            session.flush()
+            counts["new_occurrences"] += 1
+        # Checked for old occurrences too, so a workspace imported before
+        # YTB-001 gains its video records on the next import.
+        video = parse_youtube(link.original)
+        if video is not None:
+            target = session.get(LinkTargetRow, target_key)
+            if target is not None:
+                target.kind = "youtube_video"
+            if record_mention(session, key, video, import_id=import_id):
+                counts["new_youtube_mentions"] += 1
     return counts

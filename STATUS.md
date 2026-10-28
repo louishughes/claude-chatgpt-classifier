@@ -44,9 +44,10 @@ Live ticket status for the build. The original ticket list is `docs/TICKETS.csv`
 | NRM-003 Canonical source offset and quote hashing | VERIFIED (slice T1: half-open code-point spans, ke-quote-v1 hash, cite/verify, UTF-16/UTF-8 converters; Hypothesis round trip) | SESSION_LOG 2026-10-28 NRM-003 |
 | ING-010 Transcript adapter with timestamps | VERIFIED (slice T1: VTT/SRT/text cues, exact ms or None, <v> speakers only, out-of-order/reversed/unreadable timing kept and warned, sha256 + source_url + language; nothing fetched) | SESSION_LOG 2026-10-28 ING-010 |
 | LNK-001 URL occurrence extraction and link registry | VERIFIED (slice L1: link_targets + link_occurrences, migration 0009; exact code-point spans after trimming prose/Markdown/angle brackets; citation metadata by list position; canonical URL keeps the query, drops the fragment; never fetched; reimport adds 0) | SESSION_LOG 2026-10-28 LNK-001 |
+| YTB-001 YouTube canonicaliser and video registry | VERIFIED (slice Y1: watch/youtu.be/shorts/live/embed/v/mobile/music/nocookie forms, exact-host check against lookalikes, t/start/#t, list, ab_channel; youtube_videos + youtube_mentions keyed by link occurrence, migration 0010; transcript_status starts not_requested) | SESSION_LOG 2026-10-28 YTB-001 |
 | EVAL-010 Batch smoke test (50/100) | IN_PROGRESS (synthetic 50/100 pass, `ke eval smoke`, docs/evaluation/EVAL-010_SMOKE.md; real-data half waits for a session on Louis's PC, REV-009) | SESSION_LOG 2026-10-28 EVAL-010 |
 
-**Next unblocked:** Milestone 2 in plan order: YTB-001/002, SOC-001/002, REL-002, RET-001, UI-004. The M1 gate still needs the real-data runs and a Windows test run on Louis's PC (one session).
+**Next unblocked:** Milestone 2 in plan order: YTB-002, SOC-001/002, REL-002, RET-001, UI-004. The M1 gate still needs the real-data runs and a Windows test run on Louis's PC (one session).
 
 **Needs Louis (logged, skipped, not waited on):**
 - Real-data checkpoint: REV-009 (#143) and the real half of EVAL-010 (#39) need a read-only session on your PC: `ke inspect` on a few conversations and `ke eval smoke raw --limit 50` / `--limit 100`. Synthetic runs pass.

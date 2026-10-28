@@ -913,3 +913,19 @@ pytest -q               # 623 passed, 6 skipped
 Fix attempts: 1 (the trailing-underscore case above).
 
 **Next exact task:** YTB-001 + YTB-002 (YouTube video identity, transcript status and user-supplied transcripts).
+
+### 00:45 — YTB-001: one record per YouTube video
+**What:** any link to a YouTube video, in any of its forms (watch, youtu.be, shorts, live, embed, mobile, music), now also creates one record for that video, keyed by its 11-character ID. Every link to it becomes a mention that keeps its own timestamp, playlist or channel hint. A test links one video 12 different ways and gets exactly 1 video with 12 mentions. Re-importing adds nothing. Every video starts with transcript status "not requested". Nothing is fetched. 26 new tests, 649 in total.
+**Lookalikes:** the host has to really be YouTube. "youtube.com.example.net" and "notyoutube.com" stay ordinary web links. A channel page or playlist page isn't a video, so it isn't made into one.
+**Also:** a workspace imported before this change gets its video records on its next import, because the YouTube check runs on existing link mentions too.
+**Teach-back (`links/youtube.py`):** "Every YouTube link is turned into the video it points at, however it was written, and checked against the real YouTube hosts so lookalike domains don't count. One video gets one record, and each link to it is a mention that remembers its own timestamp or playlist. Getting a transcript is a separate, opt-in step that starts as 'not requested'."
+**Talking points:**
+- "A video linked 12 different ways is one video with 12 mentions."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 104 source files
+pytest -q               # 649 passed, 6 skipped
+```
+Fix attempts: 0.
+
+**Next exact task:** YTB-002 (transcript status, policy gate and user-supplied transcripts).
