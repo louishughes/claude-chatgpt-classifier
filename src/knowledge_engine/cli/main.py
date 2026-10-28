@@ -740,6 +740,96 @@ def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _state(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """What holds now or on a date, with the events behind it (REC-006); no text."""
+    from datetime import UTC, datetime
+
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.reconciliation.projection import project
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "state", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+
+    def moment(text: str | None) -> datetime | None:
+        if text is None:
+            return None
+        parsed = datetime.fromisoformat(text)
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+
+    try:
+        as_of_moment, known_at = moment(args.as_of), moment(args.known_at)
+    except ValueError:
+        return CommandResult(
+            "state",
+            ExitCode.USAGE,
+            message="dates are ISO 8601, e.g. 2026-03-01",
+            error_code="bad_date",
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            found = project(
+                session,
+                as_of=as_of_moment.timestamp() if as_of_moment else None,
+                known_at=known_at,
+                project_id=args.project,
+                conversation_id=args.conversation,
+            )
+    finally:
+        engine.dispose()
+    return CommandResult(
+        "state",
+        data={
+            "entries": [{**asdict(e), "status": e.status.value} for e in found.entries],
+            "proposals": [asdict(p) for p in found.proposals],
+            "unresolved_conflicts": list(found.unresolved_conflicts),
+        },
+        message=f"{len(found.entries)} stated record(s); conflicts stay open, not decided by date",
+    )
+
+
+def _walk(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Records connected to one record, each step with its origin (REC-007); no text."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.reconciliation.graph import Direction, describe, walk
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "walk", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            try:
+                steps = walk(
+                    session,
+                    args.record,
+                    kinds=args.kind or None,
+                    depth=args.depth,
+                    direction=Direction(args.direction),
+                    include_closed=args.include_closed,
+                )
+            except KeyError:
+                return CommandResult(
+                    "walk", ExitCode.ERROR, message="no such record", error_code="unknown_record"
+                )
+    finally:
+        engine.dispose()
+    return CommandResult(
+        "walk",
+        data={"steps": [describe(s) for s in steps]},
+        message=f"{len(steps) - 1} connected record(s)",
+    )
+
+
 def _timeline(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Show decision events, oldest first; with --build, derive new ones first (REC-004/005)."""
     from sqlalchemy.orm import Session
@@ -1418,6 +1508,21 @@ def build_parser() -> argparse.ArgumentParser:
     commands.add_parser(
         "reconcile", help="propose repeated claims, record links and conflicts"
     ).set_defaults(handler=_reconcile)
+    state = commands.add_parser("state", help="what holds now or on a date (no text shown)")
+    state.add_argument("--as-of", help="only what the chats said by this date (ISO 8601)")
+    state.add_argument("--known-at", help="as it was understood at this date (ISO 8601)")
+    state.add_argument("--project", help="only this project ID")
+    state.add_argument("--conversation", help="only this conv_ ID")
+    state.set_defaults(handler=_state)
+    walk_cmd = commands.add_parser("walk", help="records connected to one record (no text shown)")
+    walk_cmd.add_argument("record", help="the krec_ ID to start from")
+    walk_cmd.add_argument("--kind", action="append", help="edge kind to follow (repeatable)")
+    walk_cmd.add_argument("--depth", type=int, default=2, help="most steps away (default 2)")
+    walk_cmd.add_argument("--direction", choices=["out", "in", "both"], default="both")
+    walk_cmd.add_argument(
+        "--include-closed", action="store_true", help="also follow rejected or closed edges"
+    )
+    walk_cmd.set_defaults(handler=_walk)
     timeline_cmd = commands.add_parser("timeline", help="how decisions moved (no text shown)")
     timeline_cmd.add_argument("--record", help="only events touching this krec_ ID")
     timeline_cmd.add_argument(
