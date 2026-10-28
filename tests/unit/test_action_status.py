@@ -91,6 +91,21 @@ def test_explicit_words_drop_it() -> None:
     assert action_status(ROOF, later).status is ActionStatus.OPEN
 
 
+def test_a_question_neither_reports_nor_drops() -> None:
+    for text in (
+        "Is the shed roof done?",
+        "Did the shed roof get fixed?",
+        "Should I skip it? The shed roof can wait a bit.",
+    ):
+        found = action_status(ROOF, [_message(2, Role.USER, text)])
+        assert found.status is ActionStatus.OPEN, text
+
+
+def test_a_negated_drop_keeps_it_open() -> None:
+    later = [_message(2, Role.USER, "Don't forget it, the shed roof matters.")]
+    assert action_status(ROOF, later).status is ActionStatus.OPEN
+
+
 def test_the_last_deciding_words_win() -> None:
     later = [
         _message(2, Role.USER, "Forget about the roof."),

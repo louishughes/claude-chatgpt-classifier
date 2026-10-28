@@ -6,12 +6,13 @@ in the same chat, by rules a person can read:
 
 * **Status** (``action_status``): ``open`` unless the user later says so.
   - ``reported_done``: a later user sentence says it is done ("done",
-    "finished", "did it", "sorted", "fixed"), is not negated ("not done
-    yet", "haven't finished"), is not a condition ("after the roof is
-    fixed"), and shares a content word with the action.
+    "finished", "did it", "sorted", "fixed"), is not a question, is not
+    negated ("not done yet", "haven't finished"), is not a condition
+    ("after the roof is fixed"), and shares a content word with the action.
   - ``dropped``: a later user sentence explicitly lets it go ("not doing",
-    "skip it", "forget it"), sharing a content word with the action, or,
-    with no words of its own ("Forget it."), in the very next user message.
+    "skip it", "forget it"), is neither negated ("don't forget it") nor
+    asked, and shares a content word with the action, or, with no words
+    of its own ("Forget it."), is the very next user message.
   An assistant saying "done" never changes a status; it can't speak for
   the user. No evidence means ``open``, never ``done``.
 * **Dependencies** (``propose_dependencies``): when one user sentence names
@@ -105,10 +106,16 @@ def action_status(
     for position, message in enumerate(users):
         for span in sentences(message.text):
             said = span.of(message.text)
+            # "Is the roof done?" asks; it reports nothing and drops nothing.
+            if said.rstrip().endswith("?"):
+                continue
             words = _subject(said)
             mine = len(subject & words)
             shared = mine > 0 and all(len(r & words) < mine for r in rivals)
             if _DROPPED.search(said):
+                # "Don't forget it" keeps the action; the cue's own "not" doesn't count.
+                if _NOT.search(_DROPPED.sub("", said)):
+                    continue
                 bare = not _subject(said)
                 if shared or (bare and position == 0):
                     found = StatusFinding(ActionStatus.DROPPED, quote(message, span))
