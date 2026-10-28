@@ -3305,6 +3305,24 @@ Checks:
 ```
 tests/integration/test_rich_note_card.py   1 passed (fails on the old code: '48' was in '48, Celeste')
 tests/integration/test_rich_note.py, test_note_checks.py   unchanged, pass
+
+### 16:05 — NOTE-019: "Want me to make another?" doesn't mean the chat is open
+
+**What:** The first real score of rich notes found the digest got the chat's status right in 12 of 15 chats. The three misses were image chats that ended on the assistant saying "Want me to make a version in portrait?". The model called them open. The user had their picture; nothing was unresolved.
+
+Two changes:
+
+- **The instruction:** the digest prompt now says to decide status by how the chat ends. It's a new prompt version (`digest-v2`), which gives every request a new key, so digests written under the old wording are asked for again instead of being silently reused.
+- **A code check:** `digest/ending.py` reads the chat's last turns with plain rules: the user's last message is a short thank-you or "done" → settled; the assistant delivered something (text before its closing offer, or an image) and ends on an offer → settled; the user's last message asks something nobody answered → open. If no rule fits, the model's reading stands. When a rule disagrees with the model, the rule wins, the new status cites the message that decided it, and a flag records what the model said. A correction is never silent.
+
+**Decision:** an offer with nothing delivered ("Want me to start?") is *not* treated as settled. It might be the assistant asking a clarifying question, so no rule applies and the model decides.
+
+**Teach-back (`digest/ending.py`):** It looks at the last couple of messages in a chat and asks three simple questions: did the user say thanks or done, did the assistant hand over a result and then just offer more, or did the user ask something that never got an answer. The first two mean the chat is settled and the third means it's open. If the model's digest disagrees, the code uses its own answer and leaves a note for a reviewer saying what changed.
+
+Checks:
+```
+tests/integration/test_digest_ending.py   5 passed (offer after a result, unanswered question, "thanks, done"; no rule keeps the model's answer; a bare offer isn't settled)
+digest stage and dry-run tests            10 passed, unchanged
 ```
 Fix attempts: 0.
 
@@ -3313,3 +3331,34 @@ Talking points:
 - "An empty row that says 'not stated' still reads like a fact, so the card leaves it out."
 
 **Next exact task:** none in this thread; the remaining NOTE tickets are with the rich-notes threads.
+
+- "A model mistook politeness for unfinished business. A ten-line rule fixed it, and the rule flags every change it makes."
+- "Changing a prompt changes its version, so old cached answers can't sneak back in."
+
+**Next exact task:** NOTE-017 (one ordered digest for multi-part chats).
+
+### 16:20 — NOTE-017: a long chat's digest reads in order, as one chat
+
+**What:** A chat too long for one request is digested in parts. In the first real score, 4 of 15 notes came from long chats, and 6 of the 9 unsupported claims were in those 4. The merged summary jumped around ("part 3's opening, then part 1's"), and sentences still said "In this part, the user…". Two causes, both mine:
+
+- `merge_answers` picked summary sentences round-robin (each part's first, then each part's second) and **kept them in that order**. Picking round-robin is right, because every part gets represented in the four sentences allowed. Now the picked sentences are **put back in chat order** before they're used.
+- The prompt itself said "if the chat is partial, describe only that part", which invited "this part" wording. It now says to describe the part as sentences about the chat, in order (prompt `digest-v3`, so older digests are asked for again). Whatever wording still slips through is rewritten in code: "In this part, the user picks cedar" becomes "The user picks cedar", and "this part" becomes "the chat".
+
+The NOTE-011 code rubric gets a seventh check, **part_wording**, as the ticket asked. It fails a note whose generated lines (summary, card cells, insights, tensions, next steps, topics) still say "this part" or "part 2 of 3". Quotes and records are the chat's own words, so they aren't checked.
+
+**Decision:** I made the merge deterministic rather than sending a second "merge these parts" request to a Claude session. The ticket allowed either. Code is free, repeatable and testable, and the problem was ordering and wording, not missing understanding.
+
+**Teach-back (`merge_answers`):** A long chat is digested in pieces, and this function joins the pieces' answers into one. It chooses summary sentences fairly from every piece, then puts them back in the order the chat happened, and rewrites leftovers like "in this part" so the summary talks about the whole chat. The start of the chat gives the purpose and the end gives the outcome and status.
+
+Checks:
+```
+tests/integration/test_digest_parts.py   2 passed (a 3+ part chat: summary in chat order, no part wording, note passes; "this part" fails only part_wording)
+note checks, digest stage, ending, dry run, contract   33 passed, unchanged
+```
+Fix attempts: 1 (my test's regex was case-sensitive after the rewrite capitalised "Step").
+
+Talking points:
+- "Choosing fairly and showing in order are two different steps. I'd merged them into one, and the summary read backwards."
+- "The prompt was causing the bug: it told the model to talk about 'this part'."
+
+**Next exact task:** NOTE-016 (drop boilerplate and assistant-drafted text before extraction).
