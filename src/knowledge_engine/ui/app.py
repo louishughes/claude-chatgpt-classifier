@@ -25,7 +25,7 @@ import ipaddress
 import re
 import secrets
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
 from socketserver import ThreadingMixIn
@@ -175,9 +175,12 @@ def _route(
     if path.startswith("/jobs/"):
         job = ctx.jobs.get(path.removeprefix("/jobs/"))
         if job is not None:
-            if job.state == "done" and job.import_id:
-                return Page("303 See Other", "", {}, location=f"/imports/{job.import_id}")
-            return Page("200 OK", "job.html", {"job": job})
+            # The import runs on another thread: read the job once, so the
+            # redirect check and the page agree even if it finishes in between.
+            seen = replace(job)
+            if seen.state == "done" and seen.import_id:
+                return Page("303 See Other", "", {}, location=f"/imports/{seen.import_id}")
+            return Page("200 OK", "job.html", {"job": seen})
     if path == "/chats":
         return _chats(settings, query)
     if path.startswith("/chats/"):

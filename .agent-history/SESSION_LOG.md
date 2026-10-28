@@ -948,3 +948,6 @@ documents/categories.py (category_shares: domain terms by share of labelled mess
 
 ## 2026-10-28 15:30 NOTE-011 code checks (#283)
 evaluation/note_checks.py (check_note: citations_real, claims_cited, decisions_user_held, tensions_next_steps (warn), empty_sections, budget; reads the rendered Markdown), `ke docs rubric [chats] [--all]`. Tests: tests/integration/test_note_checks.py (7).
+
+## 2026-10-28 16:20 UI job page race (CI flake)
+ui/app.py: /jobs/<id> reads the job once (dataclasses.replace) so the redirect check and template agree; a finish between the two reads showed "didn't finish" with error None (Windows 3.13 CI on #296).

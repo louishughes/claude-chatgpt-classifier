@@ -2937,3 +2937,9 @@ tests/integration/test_note_checks.py   7 passed (the real note passes; each bre
 Fix attempts: 2 (my FakeProvider digest left out the required intent; the table-cell pipe escape).
 
 **Next exact task:** keywords into the note (NOTE-007 wiring), then NOTE-008.
+
+### 16:20 — Windows flake: the import progress page could say "didn't finish" for a finished import
+
+CI on Windows 3.13 failed `test_import_from_the_browser_runs_and_shows_the_report` with "The import didn't finish" and no reason. The progress page read the background job's state twice: once to decide whether to redirect to the report, and again in the template. If the import finished between the two reads, the first said "still running", the second said "not running", and the template's only other branch is the failure message. Now the page takes one copy of the job and both decisions use it. No new test: the race depends on thread timing, and the existing test is the one that caught it.
+
+Fix attempts: 1.
