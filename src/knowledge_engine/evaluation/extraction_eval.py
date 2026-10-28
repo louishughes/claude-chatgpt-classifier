@@ -139,6 +139,7 @@ class ExtractionReport:
     key: AnswerKey | None = None
     truncation_count: int | None = None
     recall_by_band: dict[str, TypeScore] = field(default_factory=dict)
+    count_as: dict[str, list[str]] = field(default_factory=dict)
 
     @property
     def anchor_validity(self) -> float:
@@ -175,6 +176,13 @@ class ExtractionReport:
             "",
             *self.key.lines(),
             f"- Evaluator: `{self.eval_version}`; gold schema `{self.gold_schema}`",
+            "- Type matching: "
+            + (
+                "; ".join(
+                    f"key `{k}` also matched by `{', '.join(v)}`" for k, v in self.count_as.items()
+                )
+                or "strict (types must be equal)"
+            ),
             *(f"- {name}: `{value}`" for name, value in sorted(self.versions.items())),
             f"- Produced records: {self.produced}; in conversations not annotated for "
             f"records (unscored): {self.unscored}",
@@ -316,13 +324,42 @@ class Matching:
     scored_ids: set[str] = field(default_factory=set)
 
 
-def match_extraction(gold: GoldSet, produced: Sequence[ScoredRecord]) -> Matching:
+TypeEquivalents = Mapping[RecordType, frozenset[RecordType]]
+
+
+def parse_count_as(pairs: Sequence[str]) -> dict[RecordType, frozenset[RecordType]]:
+    """``["idea=proposal"]`` -> {IDEA: {PROPOSAL}}: a key type and what also counts for it.
+
+    Raises:
+        ValueError: A pair isn't ``key_type=produced_type`` with known types.
+    """
+    found: dict[RecordType, set[RecordType]] = defaultdict(set)
+    for pair in pairs:
+        key_type, sep, produced_type = pair.partition("=")
+        if not sep:
+            raise ValueError(f"expected KEY_TYPE=PRODUCED_TYPE, got {pair!r}")
+        found[RecordType(key_type.strip())].add(RecordType(produced_type.strip()))
+    return {k: frozenset(v) for k, v in found.items()}
+
+
+def match_extraction(
+    gold: GoldSet,
+    produced: Sequence[ScoredRecord],
+    *,
+    count_as: TypeEquivalents | None = None,
+) -> Matching:
     """Pair produced records with the answer key. Rejected records are ignored.
 
     Args:
         gold: The answer keys.
         produced: Stored records (``scored_records``).
+        count_as: Extra produced types that may answer a key type, e.g. an
+            engine ``proposal`` for a key ``idea`` (both mean "the assistant
+            suggested it"). Empty by default: types must match exactly. The
+            report prints whatever was used, so a mapped score is never
+            mistaken for a strict one.
     """
+    extra_types = count_as or {}
     live = [item for item in produced if item.record.trust is not Trust.REJECTED]
     found = Matching()
     for conversation in gold.conversations:
@@ -338,7 +375,10 @@ def match_extraction(gold: GoldSet, produced: Sequence[ScoredRecord]) -> Matchin
             candidates = [
                 item
                 for item in unmatched
-                if item.record.record_type is expected.record_type
+                if (
+                    item.record.record_type is expected.record_type
+                    or item.record.record_type in extra_types.get(expected.record_type, ())
+                )
                 and _quotes(item, native, expected.message_id)
             ]
             if not candidates:
@@ -363,6 +403,7 @@ def evaluate_extraction(
     key: AnswerKey | None = None,
     lengths: Mapping[str, int] | None = None,
     truncation_count: int | None = None,
+    count_as: TypeEquivalents | None = None,
 ) -> ExtractionReport:
     """Score produced records against the golden set.
 
@@ -377,9 +418,10 @@ def evaluate_extraction(
             chat-length band (LEG-005).
         truncation_count: Messages dropped from the extractors' input
             (``segmenter.truncation_count``); must be 0. None: not measured.
+        count_as: See ``match_extraction``; recorded on the report.
     """
     live = [item for item in produced if item.record.trust is not Trust.REJECTED]
-    found = match_extraction(gold, live)
+    found = match_extraction(gold, live, count_as=count_as)
     by_type: dict[str, TypeScore] = defaultdict(TypeScore)
     by_band: dict[str, TypeScore] = defaultdict(TypeScore)
     agreement: dict[str, Agreement] = defaultdict(Agreement)
@@ -433,4 +475,5 @@ def evaluate_extraction(
         key=key or key_from_gold(gold),
         truncation_count=truncation_count,
         recall_by_band=dict(by_band),
+        count_as={k.value: sorted(t.value for t in v) for k, v in sorted((count_as or {}).items())},
     )
