@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from knowledge_engine.domain.enums import Role
 from knowledge_engine.extraction.model_knowledge import (
+    PROMPT_VERSION,
     check_candidates,
     is_preamble,
     knowledge_extractor,
@@ -171,7 +172,7 @@ def test_model_records_pass_the_evidence_gate(
 
     stored = [load(session, rid) for rid in session.scalars(select(KnowledgeRecordRow.record_id))]
     model_made = [
-        r for r in stored if r.provenance and r.provenance.prompt_version == "knowledge-v1"
+        r for r in stored if r.provenance and r.provenance.prompt_version == PROMPT_VERSION
     ]
     kinds = {(r.record_type, r.actor) for r in model_made}
     assert (RecordType.DECISION, Role.USER) not in kinds
