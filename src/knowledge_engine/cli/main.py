@@ -2455,6 +2455,10 @@ def _inspect(settings: Settings, args: argparse.Namespace) -> CommandResult:
                 )
             conversation = load_conversation(session, conversation_id)
             data = inspect_summary(conversation)
+            if args.redact and data.get("native_conversation_id"):
+                # Reports and gate checklists quote 8-character prefixes of
+                # the export's own IDs, never the full ID (OPS-009).
+                data["native_conversation_id"] = str(data["native_conversation_id"])[:8]
             if args.note is not None:
                 path, broken = write_transcript(
                     session, conversation, args.note, settings.workspace_root / "archive"
@@ -2695,9 +2699,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     report.set_defaults(handler=_imports_report)
 
-    inspect = commands.add_parser("inspect", help="browse stored conversations (read-only)")
+    inspect = commands.add_parser(
+        "inspect",
+        help="browse stored conversations (read-only)",
+        description=(
+            "Counts only, never text or titles. The export's own conversation ID is printed "
+            "in full, because this is a local debugging tool; use --redact for anything "
+            "that goes into a report, issue or checklist."
+        ),
+    )
     inspect.add_argument(
         "conversation", nargs="?", help="a conv_ ID or the export's conversation ID"
+    )
+    inspect.add_argument(
+        "--redact",
+        action="store_true",
+        help="print only the first 8 characters of the export's conversation ID",
     )
     inspect.add_argument(
         "--note", type=Path, metavar="VAULT", help="also write a source transcript note here"
