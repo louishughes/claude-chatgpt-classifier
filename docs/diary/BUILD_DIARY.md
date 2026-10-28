@@ -3411,3 +3411,36 @@ Talking points:
 **Wired in (16:15).** Once NOTE-015's `ke extract run` (#313) had merged, `_extract` started passing each segment's messages through `workspace_cleaner(session).clean(...)`. A fifth test runs the command on the same chats and checks that no request file sent to the model carries the profile or the letter, while the real question still goes. That test fails without the two-line change.
 
 **Next exact task:** PRs for NOTE-019 + NOTE-017 and NOTE-016 once #312 merges, then the NOTE-007 keyword wiring.
+
+### 16:35 — NOTE-023 (#322): what the chat's ending leaves open becomes an open question
+
+The PC re-score (#320) found 0 of 9 open questions. The digest only listed questions someone asked out loud, and a chat that stops on an unsent letter or "I'll let you know" says nothing.
+
+**What changed.**
+- `digest/ending.py` now knows three more endings, and each makes the chat **open**:
+  - the assistant's last message holds a draft (the NOTE-016 letter and prose-fence rule);
+  - the user promises to report back ("I'll try it tonight and let you know");
+  - the user puts a choice off ("I'll decide later").
+- `ending_questions` adds the open question an ending leaves when the model didn't list one. For an unanswered question it uses the user's own words; for the other endings it says it in plain words. It cites the closing message and is flagged for review.
+- The digest instructions name the same endings (prompt **digest-v4**, so no cached digest is reused).
+
+**Challenge:** the new tests turned up two bugs in my NOTE-019 rules:
+- "Thanks. And how many coats...?" was read as a sign-off, because the thank-you rule let any text follow "thanks". A message with a question mark is no longer a sign-off.
+- The status citation (last 8 words) failed on a letter, because its last words run over line breaks. It now quotes them exactly as written.
+
+**Decision:** the model extractor's half (knowledge-v2 instructions) waits on Louis. One existing test matches the literal "knowledge-v1", and tests aren't changed without his OK, so I asked on a decision card.
+
+**Teach-back (`digest/ending.py` `ending_questions`):** It looks at how the chat ends: a question nobody answered, a letter the assistant drafted that nobody said was sent, or the user saying they'll report back or decide later. If the model's digest has no open question about that ending, it adds one, quotes the last message as evidence, and flags it so a reviewer can see the code added it. A plain "thanks, done" adds nothing.
+
+Checks:
+```
+tests/integration/test_digest_open_endings.py   5 passed (question, draft and report-back each give one cited open question; thanks gives none; no duplicate on a second pass)
+tests/integration/test_digest_ending.py         5 passed, unchanged
+```
+Fix attempts: 1 (the sign-off rule, the multi-line citation and the report-back wording).
+
+Talking points:
+- "An unsent letter is unfinished business even if nobody asks a question."
+- "The code only adds an open question when the model missed one, and it always says so."
+
+**Next exact task:** the extractor half of NOTE-023 once Louis answers, then the PRs in order.

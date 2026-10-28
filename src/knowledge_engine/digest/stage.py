@@ -47,7 +47,7 @@ from knowledge_engine.digest.contract import (
     DigestItemAnswer,
     resolve_digest,
 )
-from knowledge_engine.digest.ending import settle_status
+from knowledge_engine.digest.ending import ending_questions, settle_status
 from knowledge_engine.domain.enums import Role
 from knowledge_engine.extraction.text import ExtractionMessage, exchanges_of
 from knowledge_engine.orchestration.stage_keys import stage_key
@@ -60,9 +60,10 @@ STAGE_ID = "digest.conversation.v1"
 STAGE_VERSION = "note-003-v1"
 # v2 (NOTE-019): the status rule for chats that end on an assistant offer.
 # v3 (NOTE-017): a part of a long chat is described as the chat, never as
-# "this part". A new version gives every request a new key, so digests
+# "this part". v4 (NOTE-023): the endings that leave a question open.
+# A new version gives every request a new key, so digests
 # written under an older wording are asked for again, not silently reused.
-PROMPT_VERSION = "digest-v3"
+PROMPT_VERSION = "digest-v4"
 
 INSTRUCTIONS = """\
 You write a short, accurate digest of one chat between a user and an AI \
@@ -88,7 +89,12 @@ explore or other), with one line in your own words.
 - topics: the main subjects, as short noun phrases.
 - insights: non-obvious points worth remembering. tensions: trade-offs or \
 conflicts that came up. These are your reading of the chat.
-- open_questions: questions asked in the chat that were left unanswered.
+- open_questions: questions asked in the chat that were left unanswered, \
+and what the ending leaves open: the user's last question with no answer, \
+a letter or draft the assistant wrote that the user never said was sent, \
+a promise to report back, or a choice put off until later. Cite the \
+closing messages. A thank-you or "done" leaves nothing open, and neither \
+does an assistant's offer of more after the user got what they asked for.
 - next_steps: sensible follow-ups. They are your suggestions, not things \
 the user said they would do.
 
@@ -283,9 +289,10 @@ def stored_digest(
 
 
 def _checked(answer: DigestAnswer, conversation: StoredConversation) -> ConversationDigest:
-    """Check every quote against the chat, then the status against how it ended."""
+    """Check every quote against the chat, then the status and open questions against its end."""
     messages = chat_messages(conversation)
-    return settle_status(resolve_digest(answer, messages), messages, conversation)
+    digest = settle_status(resolve_digest(answer, messages), messages, conversation)
+    return ending_questions(digest, messages, conversation)
 
 
 # Words that only make sense inside one part of a split chat (NOTE-017).
