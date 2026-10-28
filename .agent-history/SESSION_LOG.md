@@ -736,3 +736,9 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - reconciliation/equivalence.py (find_candidates, compare, propose_equivalences, review, equivalence_groups, pairs); migration 0022_record_equivalences; `ke duplicates detect/list/review`.
 - Tests: test_segment_overrides.py (8), test_record_equivalence.py (5). Full suite 1034 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: REC-002.
+
+## 2026-10-28 06:50 REC-002 (#85) + REC-003 (#86)
+- reconciliation/relations.py (Predicate, allowed, place, find_links, store_link, propose_links, review_link, links_of); migration 0023_record_links.
+- reconciliation/conflicts.py (ConflictKind, overlap, compare, find_conflicts, detect_conflicts, review_conflict, conflicts); migration 0024_record_conflicts; equivalence: public `differences`, stance words excluded from content words; `ke reconcile`.
+- Tests: test_record_links.py (5), test_record_conflicts.py (5). Full suite 1044 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: REC-004.

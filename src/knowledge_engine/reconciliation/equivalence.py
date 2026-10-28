@@ -64,6 +64,13 @@ _STOP = frozenset(
     "our so that the their them then there these they this to us was we we'll were will with "
     "you your should would could can just also use using".split()
 )
+# How someone feels about a thing, not the thing itself. Left out of the
+# content words so "I prefer tabs" and "I hate tabs" are about the same
+# thing; the for/against is the record's polarity, compared separately.
+_STANCE = frozenset(
+    "prefer prefers preferred like likes love loves hate hates dislike dislikes want wants "
+    "avoid avoids rather really always ideally".split()
+)
 _NEGATIONS = frozenset(
     "no not never none nothing without don't doesn't didn't won't can't shouldn't isn't "
     "aren't dont doesnt didnt wont cant shouldnt isnt arent".split()
@@ -186,7 +193,7 @@ def content_words(text: str) -> frozenset[str]:
     return frozenset(
         w
         for w in _tokens(text)
-        if w not in _STOP and w not in _NEGATIONS and not _NUMBER.fullmatch(w)
+        if w not in _STOP and w not in _STANCE and w not in _NEGATIONS and not _NUMBER.fullmatch(w)
     )
 
 
@@ -205,7 +212,8 @@ def _comparable_key(record: KnowledgeRecord) -> tuple[object, ...] | None:
     )
 
 
-def _differences(a: KnowledgeRecord, b: KnowledgeRecord) -> tuple[str, ...]:
+def differences(a: KnowledgeRecord, b: KnowledgeRecord) -> tuple[str, ...]:
+    """What differs between two assertions although their words match."""
     found = []
     if bool(_NEGATIONS & set(_tokens(a.assertion))) != bool(_NEGATIONS & set(_tokens(b.assertion))):
         found.append("negation")
@@ -231,15 +239,15 @@ def compare(
     score = len(words_a & words_b) / len(words_a | words_b)
     if score < threshold:
         return None
-    differences = _differences(a, b)
-    if differences:
+    differences_found = differences(a, b)
+    if differences_found:
         basis = Basis.NEAR_MISS
     elif words_a == words_b:
         basis = Basis.EXACT
     else:
         basis = Basis.SIMILAR
     first, second = sorted((a, b), key=lambda r: r.record_id)
-    return Candidate(first.record_id, second.record_id, basis, round(score, 4), differences)
+    return Candidate(first.record_id, second.record_id, basis, round(score, 4), differences_found)
 
 
 def find_candidates(
