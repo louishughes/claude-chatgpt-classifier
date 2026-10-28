@@ -3370,7 +3370,44 @@ note checks, digest stage, ending, dry run, contract   33 passed, unchanged
 Fix attempts: 1 (my test's regex was case-sensitive after the rewrite capitalised "Step").
 
 Talking points:
+
+
 - "Choosing fairly and showing in order are two different steps. I'd merged them into one, and the summary read backwards."
 - "The prompt was causing the bug: it told the model to talk about 'this part'."
 
 **Next exact task:** NOTE-016 (drop boilerplate and assistant-drafted text before extraction).
+
+
+### 16:40 — NOTE-016: a pasted profile and an assistant's draft letter aren't the user's words
+
+**What:** The first real score found two kinds of text read as if the user had said them in the chat. A custom-instruction profile pasted at the top of many chats ("I prefer British spelling. Answers must be short…") became a requirement in 10 of 15 notes. And when the assistant drafted a letter for the user, its lines ("I will send the lease by Friday", "you should check the boiler") became actions, suggestions and requirements, some twice.
+
+`extraction/clean.py` adds a **Cleaner** that hides three things from the extractors:
+
+1. a paragraph that appears in more than 5 chats (or 1% of them): boilerplate, counted across every chat in the workspace;
+2. a user message that is a pasted setup prompt ("You are…", "Act as…"), using the same rule the model extractor already had;
+3. inside an assistant message, drafted content: a letter or email from "Dear…" or "Subject:" to the sign-off and name, or a fenced block of prose. A fence with a programming language stays, because code is an artefact, not a draft.
+
+The rich note also stops showing an unanswered suggestion's extraction trust ("supported", which only meant the quote checked out). It now says "not taken up".
+
+**Challenge:** extraction evidence is stored as character positions in the original message plus a fingerprint, so deleting text would shift every later quote and break the evidence checks. The cleaner replaces hidden characters with spaces, keeping line breaks. The text keeps its exact length, and every sentence the extractors still see is at the same position as in the archive. The test checks exactly that.
+
+**Decision:** the cleaner is something callers use explicitly (`cleaner.clean(messages)`), not a change inside the shared message loader. Evaluation gates and benchmarks keep reading the same text they were scored on, and the new `ke extract run` (NOTE-015, another thread) is where it gets switched on.
+
+**Teach-back (`extraction/clean.py`):** Before the rule extractors read a chat, the cleaner blanks out text that isn't really the conversation: a paragraph pasted into lots of chats, a setup prompt, or a letter the assistant wrote for the user. It blanks with spaces rather than deleting, so every remaining sentence stays at the same position and its quote still matches the original message exactly. The stored chat is never changed. Only what the extractors see is.
+
+Checks:
+```
+tests/integration/test_extraction_clean.py   4 passed (baseline: profile and letter do produce records; cleaned: none; offsets unchanged; untaken suggestion says "not taken up", and that test fails without the fix)
+rich note, note checks, model knowledge      23 passed, unchanged
+```
+Fix attempts: 0.
+
+Talking points:
+- "A profile pasted into 50 chats is one paragraph of setup, not 50 requirements."
+- "I blank text out with spaces instead of deleting it, so every quote still points at the right characters."
+- "'Supported' meant 'the quote is real'. It never meant 'the user agreed', so the note doesn't use that word for suggestions any more."
+
+**Wired in (16:15).** Once NOTE-015's `ke extract run` (#313) had merged, `_extract` started passing each segment's messages through `workspace_cleaner(session).clean(...)`. A fifth test runs the command on the same chats and checks that no request file sent to the model carries the profile or the letter, while the real question still goes. That test fails without the two-line change.
+
+**Next exact task:** PRs for NOTE-019 + NOTE-017 and NOTE-016 once #312 merges, then the NOTE-007 keyword wiring.

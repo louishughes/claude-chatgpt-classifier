@@ -1388,6 +1388,7 @@ def _extract(settings: Settings, args: argparse.Namespace) -> CommandResult:
     from sqlalchemy import select
     from sqlalchemy.orm import Session
 
+    from knowledge_engine.extraction.clean import workspace_cleaner
     from knowledge_engine.extraction.model_knowledge import knowledge_extractor
     from knowledge_engine.extraction.runner import run
     from knowledge_engine.extraction.text import segment_extraction_messages
@@ -1440,11 +1441,14 @@ def _extract(settings: Settings, args: argparse.Namespace) -> CommandResult:
                 ids = sorted({cid for cid in found if cid is not None})
             provider = FileBatchProvider(settings.model_batch_root, args.run_id, settings.egress)
             extractor = knowledge_extractor(ModelStageRunner(session, provider, settings.egress))
+            # NOTE-016: pasted profiles, setup prompts and assistant drafts are
+            # blanked (same lengths, so evidence offsets still hold).
+            cleaner = workspace_cleaner(session)
             segments = []
             for conversation_id in ids:
                 chat = load_conversation(session, conversation_id)
                 segments += [
-                    (seg.segment_id, segment_extraction_messages(chat, seg))
+                    (seg.segment_id, cleaner.clean(segment_extraction_messages(chat, seg)))
                     for seg in load_segments(session, chat)
                 ]
             report = run(session, segments, [extractor])
