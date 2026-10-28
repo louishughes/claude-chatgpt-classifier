@@ -37,8 +37,9 @@ Live ticket status for the build. The full ticket list is `docs/TICKETS.csv` (ke
 | ING-007 Source integrity reconciliation | VERIFIED (slice I6: raw-JSON counts vs stored counts, fidelity summary, integrity_mismatch warning) | SESSION_LOG 2026-10-27 ING-007 |
 | IMP-005 Import audit report | VERIFIED (slice I6: summary block, stored in the ledger, `ke imports report [latest|ID]` JSON and text) | SESSION_LOG 2026-10-27 IMP-005 |
 | MED-004 Vault media embeds and missing markers | VERIFIED (slice R2: verified copies at _attachments/<2hex>/<sha>.<ext>, warning markers with pointer + reason, check_embeds link checker) | SESSION_LOG 2026-10-28 MED-004 |
+| BRW-001 Source browser and transcript notes | VERIFIED (slice R3: transcript from stored records, labelled branches, per-message anchors, image embeds; `ke inspect [ID] [--note VAULT]` counts only) | SESSION_LOG 2026-10-28 BRW-001 |
 
-**Next unblocked:** slice R3 (BRW-001 source-link browsing, `ke inspect`), then E (EVAL-010). `ke import` itself still waits on Louis (retiring the placeholder test). Order and module layout follow docs/plans/M1_CONSOLIDATION.md (adopted).
+**Next unblocked:** slice E (EVAL-010 M1 evaluation on fixtures), then REV-009 real-data checkpoint (needs a session on Louis's PC), then Milestone 2 (ING-010, NRM-003, LNK-001, YTB-001/002, SOC-001/002, REL-002, RET-001). `ke import` itself still waits on Louis (retiring the placeholder test).
 
 **Needs Louis (logged, skipped, not waited on):**
 - Wiring `ke import` to `import_source` means retiring `tests/unit/test_cli.py::test_import_is_an_honest_placeholder`, which asserts the placeholder. Changing an existing test needs your OK (guardrail). Until then, imports run through `import_source(...)` in Python.

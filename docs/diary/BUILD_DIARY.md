@@ -768,3 +768,22 @@ pytest -q               # 531 passed, 6 skipped (7 new)
 Finish line: link checker passes for all 5 available images (reference and copy modes); `asset_problems` renders 4 markers naming pointer and reason; no raw path in the note. Fix attempts: 0.
 
 **Next exact task:** slice R3 (BRW-001: browse a conversation from its source links; `ke inspect`).
+
+### 00:08 — BRW-001: read back what the archive holds
+**What:** A conversation can now be turned back into a readable "source transcript" note, built from the database rather than the export. It shows the active path numbered message by message, then every alternate branch labelled as an edit or a regeneration and where it branches off. Each message carries an anchor made from its permanent ID, and images appear as embeds or missing markers. `ke inspect` lists stored conversations, and `ke inspect <id>` shows one conversation's structure as counts only. Add `--note VAULT` to write the transcript. 19 new tests, 550 in total.
+**Checked on every fixture:** every stored message appears exactly once, every anchor resolves to a real message ID, every image embed resolves in the vault, and inactive branch messages never appear in the active path section.
+**Key decisions and why:**
+- **Built from the database.** The note shows what the archive actually holds, including the newest version of an edited message (older versions stay in the database).
+- **Counts-only inspect.** `ke inspect` never prints titles or message text, and it doesn't print the note's file name either (which contains the title), so it's safe to run against the real data at the REV-009 checkpoint.
+- **A known gap.** When a message's parent is missing from the export, the database keeps the message but not the dangling parent ID. The import report already warns about it (`graph_missing_parent`), and the note still shows the message, as its own starting point.
+**Teach-back (`rendering/transcript.py`):** "The transcript is rebuilt from the database: the active path first, then each alternate branch, labelled as an edit or a regeneration, never stitched in. Every message gets an anchor made from its permanent ID, so links to it survive re-imports. Images appear in place, or a marker says why they can't."
+**Talking points:**
+- "I can read back exactly what the archive holds, with branches kept separate and every message linkable."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 81 source files
+pytest -q               # 550 passed, 6 skipped (19 new)
+```
+Finish line: all 14 fixtures render with every message reachable and anchored, labelled branches, and 0 broken embeds. Fix attempts: 1 (my new tests compared the full active path instead of its messages, and expected a "Detached" label the stored form can't know about; the code was right, the tests were corrected before commit).
+
+**Next exact task:** slice E (EVAL-010: M1 evaluation).

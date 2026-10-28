@@ -92,7 +92,7 @@ def _text_value(value: Any, *, nested: bool = False) -> str:
         # Brackets keep a dict inside a dict readable: a=(b=1, c=2), d=3.
         return (f"({text})" if nested else text) if text else "-"
     if isinstance(value, list):
-        return ", ".join(_text_value(v) for v in value) or "-"
+        return ", ".join(_text_value(v, nested=True) for v in value) or "-"
     return str(value)
 
 
@@ -224,6 +224,74 @@ def _imports_report(settings: Settings, args: argparse.Namespace) -> CommandResu
     return CommandResult("imports report", data=data, message=f"Import report ({batch.status})")
 
 
+def _inspect(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Show stored conversations as counts only; optionally write a transcript note."""
+    from sqlalchemy import func, select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.importer.records import ConversationRow, MessageNodeRow
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.rendering.transcript import (
+        find_conversation,
+        inspect_summary,
+        load_conversation,
+        write_transcript,
+    )
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "inspect", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            if args.conversation is None:
+                rows = session.execute(
+                    select(
+                        ConversationRow.conversation_id,
+                        ConversationRow.presence,
+                        func.count(MessageNodeRow.node_key),
+                    )
+                    .outerjoin(
+                        MessageNodeRow,
+                        MessageNodeRow.conversation_id == ConversationRow.conversation_id,
+                    )
+                    .group_by(ConversationRow.conversation_id)
+                    .order_by(ConversationRow.conversation_id)
+                ).all()
+                # IDs and counts only: titles are private.
+                listing = [
+                    {"conversation_id": cid, "presence": presence, "nodes": nodes}
+                    for cid, presence, nodes in rows
+                ]
+                return CommandResult(
+                    "inspect",
+                    data={"conversations": listing, "count": len(listing)},
+                    message="Stored conversations (IDs and counts only)",
+                )
+            conversation_id = find_conversation(session, args.conversation)
+            if conversation_id is None:
+                return CommandResult(
+                    "inspect",
+                    ExitCode.ERROR,
+                    message="no such conversation",
+                    error_code="not_found",
+                )
+            conversation = load_conversation(session, conversation_id)
+            data = inspect_summary(conversation)
+            if args.note is not None:
+                path, broken = write_transcript(
+                    session, conversation, args.note, settings.workspace_root / "archive"
+                )
+                # The file name holds the (private) title, so it isn't printed.
+                data["note"] = f"{path.parent.as_posix()}/… ({path.stem.rsplit('(', 1)[-1]}.md"
+                data["broken_embeds"] = len(broken)
+    finally:
+        engine.dispose()
+    return CommandResult("inspect", data=data, message="Conversation structure (counts only)")
+
+
 def _not_built(name: str, ticket: str) -> Callable[[Settings, argparse.Namespace], CommandResult]:
     def handler(_settings: Settings, _args: argparse.Namespace) -> CommandResult:
         return CommandResult(
@@ -277,6 +345,15 @@ def build_parser() -> argparse.ArgumentParser:
         "which", nargs="?", default="latest", help="`latest` (default) or an import ID"
     )
     report.set_defaults(handler=_imports_report)
+
+    inspect = commands.add_parser("inspect", help="browse stored conversations (read-only)")
+    inspect.add_argument(
+        "conversation", nargs="?", help="a conv_ ID or the export's conversation ID"
+    )
+    inspect.add_argument(
+        "--note", type=Path, metavar="VAULT", help="also write a source transcript note here"
+    )
+    inspect.set_defaults(handler=_inspect)
 
     importer = commands.add_parser("import", help="import an export (not built yet)")
     importer.add_argument("source", type=Path, help="export ZIP or folder")

@@ -544,3 +544,9 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - rendering/media.py: MediaRef, attachment_path (OD-14), media_block (embed or warning marker with REASONS), load_media_refs, blob_sources, export_attachments (hash-verified temp+rename), check_embeds, media_counts.
 - Tests: test_media_embeds.py (7). Full suite 531 passed, 6 skipped.
 - Next: slice R3 (BRW-001).
+
+## 2026-10-28 00:08 BRW-001 (slice R3)
+- rendering/transcript.py: StoredConversation, find_conversation, load_conversation (graph from stored nodes/edges, newest revision per node), transcript_model (active path, labelled alternates, leftovers, anchors node-<hex>), inspect_summary (counts only), write_transcript (+ attachments + link check). CLI `ke inspect [ID] [--note VAULT]`; list items in text output bracketed.
+- Known gap: dangling parent IDs aren't stored (edge skipped); reported at import as graph_missing_parent.
+- Tests: test_source_browser.py (19). Full suite 550 passed, 6 skipped.
+- Next: slice E (EVAL-010).
