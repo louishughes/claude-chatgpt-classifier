@@ -952,11 +952,20 @@ documents/categories.py (category_shares: domain terms by share of labelled mess
 ## 2026-10-28 15:30 NOTE-011 code checks (#283)
 evaluation/note_checks.py (check_note: citations_real, claims_cited, decisions_user_held, tensions_next_steps (warn), empty_sections, budget; reads the rendered Markdown), `ke docs rubric [chats] [--all]`. Tests: tests/integration/test_note_checks.py (7).
 
+## 2026-10-28 17:30 NOTE-018 (#309)
+documents/categories.py suggested_category (best primary domain candidate from review_required rows, weighed by segment messages; only when no settled share); rich note card "unclassified; suggested: X (waiting for review)" and a category-section line, front matter unchanged; classification/review_session.py review_flagged (review queue -> request files -> record_review per flagged field, reviewer "session:<ref>"; unsure or rule-breaking answers record nothing); store.flagged_fields made public; `ke classify review --taxonomy --run-id`. ui/notes.py notes_index rows carry "suggested". Tests: tests/integration/test_note_suggested_review.py (4).
+
+## 2026-10-28 16:45 NOTE-012 (#284)
+ui/notes.py (note_view: rich note built in memory with the newest taxonomy and stored digest; note_html: escaped converter for the note's own shapes, citations -> #node anchors; notes_index: chats by category with status and open questions), /notes page, chat page two-column layout, sidebar link. Tests: tests/integration/test_ui_notes.py (5).
+
 ## 2026-10-28 17:00 NOTE-015 (#306) + NOTE-020 (#311)
 `ke extract run` (request files, knowledge_extractor, runner.run; egress checked first); runner keeps ledger rows on PendingAnswer (they were rolled back, so file-batch answers were never collected); `ke digest run --taxonomy` (default newest) passed to write_rich_note. Tests: tests/integration/test_extract_run.py (4).
 
 ## 2026-10-28 16:10 NOTE-009 (#281)
 extraction/preamble.py (looks_like_preamble, shared by NOTE-005 and the detectors); relationships/detect.py skips a leading setup prompt in copied openings and setup-prompt paragraphs in quotes; relationships/related.py leaves them out of similarity profiles. Tests: tests/integration/test_note_related.py (3).
+
+## 2026-10-28 18:00 EVAL-014 (#317)
+evaluation/answer_key.py convert_answer_key (per-chat spike key -> GoldSet; read only; idea/requirement/preference/artefact/open_question 1:1, decision by state, fact/task/fact_about_owner/problem_fix/unclear unmapped; v2 placed by message_id, v1 by number + quote check; unverified excluded; segments counted not converted); `ke gold convert --key --out --name`, refuses output inside the key folder. Tests: tests/integration/test_answer_key_convert.py (2), fixtures tests/fixtures/answer_key/.
 
 
 ## 2026-10-28 15:20 NOTE-014 (#299)

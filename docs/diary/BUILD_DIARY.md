@@ -2963,6 +2963,48 @@ Fix attempts: 2 (my FakeProvider digest left out the required intent; the table-
 
 **Next exact task:** keywords into the note (NOTE-007 wiring), then NOTE-008.
 
+### 17:30 — NOTE-018: a suggested category instead of "unclassified", and a reviewer session
+
+The first real score found four notes saying "unclassified": the classifier answered every segment of those chats, but each answer was unsure, so all of them went to review and none became a label. A reader got nothing from that.
+
+Now, when a chat has no settled category, the note shows the classifier's best candidate beside the word: "unclassified; suggested: Home and garden › Raised beds (waiting for review)", and the category section names the segments it came from. Candidates are weighed like settled labels, by the messages in their segments. It is never a label: the front-matter `category` stays unclassified until a review settles it.
+
+**`ke classify review --taxonomy tax-1 --run-id review-1`** sends the review queue to a separate reviewer session through request files. Each request carries the segment, the first answer and what was wrong with it, under the same rules as the classifier. A clean answer is stored with `record_review`, naming the session (`session:<ref>`), for each flagged field; reviews already outrank machine labels, so the category settles. An answer that is unsure too, or breaks a rule, records nothing and the segment waits for a person. A reviewed segment leaves the queue, so a second run asks for nothing.
+
+**Teach-back (`review_session.py`):** It takes every segment the classifier was unsure about and asks a second Claude session to label it, showing it the first answer and what was wrong. If that answer is clean, it's saved as a review with the session's name on it, and reviews beat machine labels, so the chat gets its category. If the second session is unsure too, nothing is saved and a person decides.
+
+Checks:
+```
+tests/integration/test_note_suggested_review.py   4 passed (all-review chat: suggestion shown, label unset; reviewer files settle it, named reviewer, no repeat requests; unsure reviewer records nothing; the Notes page shows the suggestion under "unclassified")
+tests/integration/test_note_categories.py         unchanged, pass
+```
+Fix attempts: 0.
+
+The Notes page (NOTE-012) shows the suggestion too, beside the chat under "unclassified", never as its group.
+
+**Next exact task:** on the PC, `ke classify review --taxonomy tax-1 --run-id review-1` for the 18 review_required segments, answered by a separate session.
+
+### 16:45 — NOTE-012: the knowledge note beside the chat, and a Notes page
+
+The dashboard's chat page now has two columns on a wide screen: the chat's rich note on the left (it stays in view while you scroll) and the transcript on the right. On a phone they stack. Every `m3` in the note is a link to message 3 on the same page, which is highlighted when you land on it. A new **Notes** page (sidebar, under Chats) lists every chat grouped by category, with its status and how many open questions the digest found.
+
+- `ui/notes.py` builds the note in memory, the same way `ke docs rubric` does: the newest published taxonomy, the stored digest, nothing written.
+- The Markdown-to-HTML step only knows the shapes our own notes use (headings, bullets, callouts, the card table, bold, italics, wikilinks). Every character of text is HTML-escaped first, so chat text can't become markup; the test chat contains a `<script>` tag to prove it.
+- A link to another chat's note goes to that chat's page; any other link is shown as plain words.
+- If a note can't be built, the page says so and still shows the transcript.
+
+A small trap I hit: the page template's sidebar already uses a variable called `groups`, so the first Notes page rendered four empty tables. The categories are now passed as `categories`.
+
+**Teach-back (`note_html`):** It turns one of our rich notes into HTML for the dashboard. It escapes all the text first and only recognises the few shapes our own notes use, so nothing from a chat can sneak in as markup. Citations become links to the message's spot on the same page, so you can check every claim with one click.
+
+Checks:
+```
+tests/integration/test_ui_notes.py   5 passed (summary, card and decisions shown; every m-number opens the message it names; no script tag survives; Notes page grouping; converter shapes)
+```
+Fix attempts: 1 (the `groups` name clash; a whole-transcript link was counted as a citation).
+
+**Next exact task:** merge the open PRs on green, then the NOTE-007 keyword section in the note.
+
 ### 15:25 — NOTE-010 (part 1): `ke docs check` now checks a note is readable, not just linked
 
 **What:** The rich-note plan (§7 of the gap analysis) promised that a note fits on a screen or two, that an empty section is one plain sentence, and that hashes and run IDs stay out of the front matter. Until now only `ke docs rubric` checked the first two, and only by rebuilding notes from the database. NOTE-010 wants the vault check itself to catch them, on the files Obsidian actually opens. `evaluation/readability.py` adds three rules to `ke docs check`:
@@ -3078,6 +3120,24 @@ tests/integration/test_conversation_relationships.py, test_related_conversations
 Fix attempts: 1 (the first test run showed the copied-opening detector also needed the filter).
 
 **Next exact task:** NOTE-012 dashboard chat view.
+
+### 18:00 — EVAL-014: scoring against the per-chat answer key
+
+`ke gold score` couldn't read the real answer key (v1 or v2): the key is one JSON file per chat in the classification spike's shape, and the scorer wants one combined golden-set file. **`ke gold convert --key <folder>`** now reads the folder and writes a golden set to the workspace (git-ignored). It never writes to the key folder, it refuses an output path inside that folder, and it never overwrites a file.
+
+It converts only what maps exactly. Ideas, requirements, preferences, artefacts and open questions map one to one. A decision maps by its state: accepted or superseded becomes the user's decision at the message where they decided, rejected becomes a rejection, and proposed becomes a proposal by whoever made it. `fact`, `task`, `fact_about_owner`, `problem_fix` and an `unclear` decision are counted as unmapped and left out. Unverified items are also left out and counted. The spike's segment labels aren't taxonomy IDs, so segments are counted, not converted.
+
+The numbering trap from REV-010 is handled. A v2 item is placed by its native `message_id`, and if its number disagrees, that's counted. A v1 item has only a number, so its quote must be found in the numbered message, otherwise it's skipped. An off-by-one then shows up in the counts instead of moving an item to the wrong message.
+
+**Teach-back (`answer_key.py`):** It turns the answer key, written one file per chat, into the single file the scorer reads, and it only ever reads the key. Each item is pinned to its exact message by ID, or its quote must be found in the message its number points at. Anything with no exact equivalent in the engine is counted and left out, never guessed.
+
+Checks:
+```
+tests/integration/test_answer_key_convert.py   2 passed (synthetic key: 5 records placed, 3 unmapped, 1 unverified, 1 v1-style skip, 1 number mismatch, key folder hash unchanged, the output loads and `ke gold score` reads it; output inside the key folder refused)
+```
+Fix attempts: 1 (the repo guard wants a SYNTHETIC marker in every fixture folder).
+
+**Next exact task:** on the PC, run `ke gold convert --key private/answer-key/v2`, then score. Check that v1's and v2's hashes are unchanged (the hashes are recorded in OPEN_DECISIONS).
 
 ### 15:25 — #288: the "import didn't finish" page that lied
 

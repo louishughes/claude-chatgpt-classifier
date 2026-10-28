@@ -339,7 +339,7 @@ def review_queue(session: Session, taxonomy_version: str) -> list[Classification
         if row.segment_id in seen:
             continue
         seen.add(row.segment_id)
-        flagged = _flagged_fields(row)
+        flagged = flagged_fields(row)
         decided = {
             f
             for f in flagged
@@ -351,7 +351,8 @@ def review_queue(session: Session, taxonomy_version: str) -> list[Classification
     return queue
 
 
-def _flagged_fields(row: ClassificationRow) -> set[str]:
+def flagged_fields(row: ClassificationRow) -> set[str]:
+    """The fields a ``review_required`` row asks a reviewer to decide."""
     # The problem strings start with the field name ("topic: 2 primaries",
     # "projects.proj_x: ..."); a general flag ("flagged: ...") means all.
     fields = set()
