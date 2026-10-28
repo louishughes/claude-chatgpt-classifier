@@ -2496,6 +2496,41 @@ Fix attempts: 1 (the test read `items` where search answers `hits`).
 
 **Next exact task:** fix the `[m:id]` evidence parsing, then PROD-004.
 
+### 12:55 — OPS-009: peak memory on Windows, and ID prefixes in `inspect`
+
+- `ke eval smoke` reported `peak_memory_mb: null` on Windows. Now it asks Windows for the process's `PeakWorkingSetSize` through `ctypes` (no new dependency). A platform with neither that nor the POSIX `resource` module reports `"unavailable_on_platform"`, so a missing number always says why.
+- `ke inspect` keeps printing the export's full conversation ID, because it's a local debugging tool; its help now says so. `--redact` prints the 8-character prefix instead, and the G1 checklist uses it, matching every other report.
+
+**Teach-back (`_peak_memory_mb`):** It reports the most memory the smoke test's process used. On Linux and Mac it asks the operating system's resource counters; on Windows it asks the same question through a Windows system call. If neither is available it says "unavailable on this platform" rather than leaving a blank.
+
+Checks:
+```
+tests/integration/test_redact_and_memory.py   3 passed
+tests/integration/test_source_browser.py, smoke tests   34 passed (unchanged)
+```
+Fix attempts: 0. The Windows branch is exercised on the Windows CI runners (the test expects a positive number there).
+
+**Next exact task:** REV-011 (#186).
+
+### 12:40 — PERF-001: why a re-import was twice as slow as an import
+
+- **Measured first.** `evaluation/import_timing.py` builds a synthetic export shaped like mine (1,100 per-chat files, 900 images the chats don't use), imports it twice and times each phase with cProfile.
+- **Cause.** Every source file is archived on every run. For bytes already stored, the archive still wrote a temporary copy and fsynced it, hashed the stored copy, threw the temporary copy away, and then the ledger hashed the stored copy again. On Windows every new file is also scanned by the antivirus, so a re-import paid for 1,100 pointless writes.
+- **Fix.** Known bytes are hashed once from the source and the stored copy is checked once. Nothing is written. New bytes are stored exactly as before. The raw-unchanged proof and the check of every reused stored copy are untouched.
+- Linux numbers: re-import 7.47 s → 5.79 s, its fsync time 0.89 s → 0; the re-import is now quicker than the import. The Windows run of the same command goes in EVAL-010_SMOKE.md.
+
+**Teach-back (`BlobStore.put_file`):** It stores a copy of an input file under the fingerprint of its bytes. If that fingerprint is already in the store, it checks that the stored copy still matches and writes nothing, because the evidence is already there. Only new bytes are written, through a temporary file that is made safe on disk before it takes its real name.
+
+Checks:
+```
+tests/unit/test_archive_reuse.py   5 passed (would fail on the old code: a temporary file was made)
+tests/unit/test_archive_store.py  21 passed (unchanged)
+import/archive/media/purge tests  170 passed, 19 skipped
+```
+Fix attempts: 0.
+
+**Next exact task:** Windows timing on Louis's PC, then OPS-009 (#201).
+
 ### 11:24 — Citations written as `[m:id]` now count
 
 The paid run's 53 "evidence outside the segment" flags were our bug. Requests show each message as `[m:ID] user:`, the model cited `[m:ID]` back, and the check compared that whole string with bare IDs. `providers/base.py` now has `MessageRef`, a string type whose validator turns `[m:abc]` or `m:abc` into `abc` and leaves everything else alone, so a real citation outside the segment is still caught. Classification evidence and extraction quotes both use it. The prompt, schema and stage keys are unchanged, so the saved answers still replay from the cache and can be re-checked for free.
@@ -2600,3 +2635,35 @@ tests/integration/test_digest_stage.py   7 passed (FakeProvider, no network)
 Fix attempts: 1 (my new test expected a repair to finish in the same run; it arrives on the next one, as with any batch answer).
 
 **Next exact task:** NOTE-004 (runbook and synthetic dry run), then NOTE-005.
+
+### 13:20 — NOTE-001 (#273): the rich-note layout, built from what the engine already stores
+
+Louis approved all eight recommendations at 12:50 ("Go ahead with the recommendations and verifications"), so the gap analysis now records them as decisions. The build thread opened issues #273 to #285 for NOTE-001 to 013 and we split the work: this thread owns NOTE-001, the real-corpus taxonomy (NOTE-006), the real-chat scoring half of NOTE-011 and the ladder run (NOTE-013). The build thread takes the digest, the extractor and the code checks.
+
+What NOTE-001 adds:
+
+- `documents/rich_note.py`: a second note template beside the DOC-003 one. The summary box and a knowledge card come first. Records are sorted into the sections people think in (decisions, suggestions, action items, open questions, requirements and preferences), and who holds a record decides where it goes: an assistant's task is a suggestion, not your action item. The generated sections (insights, tensions, next steps) and the keywords section say plainly that the digest hasn't run yet, rather than guessing.
+- Citations are `[m12]`: a link to message 12, numbered the way the transcript numbers it, or `[alt]` for a message on another branch. They are listed in transcript order. Quotes sit in a folded "Evidence" box, at most two per item, each re-checked against the archive and cut at a word boundary.
+- A suggestion the user answered says "taken up (see Decisions)". The stored proposal status lagged behind the decision, so the link is made through the shared evidence span.
+- The chat's category, subcategory, activity, topics and project are rolled up from segment labels, weighted by how many messages each segment holds. They go in the card and in slim front matter. Hashes and record IDs go into a JSON sidecar in `Knowledge/.meta/`, out of the reader's way.
+- Related chats link to the other chat's *knowledge note*, not its transcript, so the vault becomes a web of notes.
+- `rendering/markdown.py` gets a `Callout` block. `ke docs chat --template v2` writes the new note; v1 stays the default until the digest lands. The CLI now prints `...` instead of the `…` character that showed as a box on the Windows console.
+
+Checked on three real chats into a scratch folder (not committed): 2 to 4 KB each. The old v2 notes for the same chats were 44 to 81 KB. They are still thin, because the meaning has to come from the digest (NOTE-002/003), but the layout is ready for it.
+
+One deviation from the ticket's finish line: I didn't add a byte-for-byte golden Markdown file. A snapshot generated from my own output would only freeze whatever I wrote, and every later layout change would mean editing a test. So the 10 tests check the behaviour instead: section order, placement, citation numbering, folded evidence, empty states, card cells, related links, the size budget, sidecar and link resolution, and the CLI.
+
+**Teach-back (`documents/rich_note.py`):** It builds the readable page for one chat from what the engine has already stored: a summary box and a card at the top, then decisions, suggestions, actions and questions, each in its own section. Every claim ends with a short link like m12 that jumps to that exact message, and the quote that proves it sits in a folded box underneath. Anything the engine hasn't worked out yet says so in one sentence instead of being made up.
+
+Checks:
+```
+tests/integration/test_rich_note.py   10 passed
+full suite (API tests excluded: fastapi isn't installed in this PC's venv)   1284 passed, 22 skipped
+```
+Fix attempts: 2 (a result-type slip when reading titles; my first test wrongly expected an accepted suggestion to stay out of Decisions).
+
+Talking points:
+- "The note answers 'what happened in this chat?' on the first screen, and every claim is one click from the exact message."
+- "Evidence is folded away, not deleted: open the box and the quote is there, re-checked against the archive."
+
+**Next exact task:** NOTE-006, the first taxonomy discovered from the real chats.

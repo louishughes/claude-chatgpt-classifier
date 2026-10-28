@@ -149,14 +149,63 @@ def _render_all(settings: Settings, vault: Path) -> tuple[int, int]:
     return notes, broken
 
 
-def _peak_memory_mb() -> float | None:
-    # Peak resident memory of this process. The resource module is POSIX
-    # only; on Windows the figure is left out rather than guessed.
-    if sys.platform == "win32":
-        return None
-    import resource
+UNAVAILABLE = "unavailable_on_platform"
 
+
+def _peak_memory_mb() -> float | str:
+    # Peak resident memory of this process, in MiB. POSIX has the resource
+    # module; Windows has GetProcessMemoryInfo, reached through ctypes so no
+    # new dependency is needed (OPS-009). Anything else says so plainly.
+    if sys.platform == "win32":
+        return _windows_peak_mb()
+    try:
+        import resource
+    except ImportError:
+        return UNAVAILABLE
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     # Linux reports KiB, macOS bytes.
     divisor = 1024 * 1024 if sys.platform == "darwin" else 1024
     return round(peak / divisor, 1)
+
+
+def _windows_peak_mb() -> float | str:
+    import ctypes
+    from ctypes import wintypes
+
+    class Counters(ctypes.Structure):
+        # PROCESS_MEMORY_COUNTERS, from psapi.h.
+        _fields_ = [  # noqa: RUF012 - ctypes needs a class attribute
+            ("cb", wintypes.DWORD),
+            ("PageFaultCount", wintypes.DWORD),
+            ("PeakWorkingSetSize", ctypes.c_size_t),
+            ("WorkingSetSize", ctypes.c_size_t),
+            ("QuotaPeakPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaPeakNonPagedPoolUsage", ctypes.c_size_t),
+            ("QuotaNonPagedPoolUsage", ctypes.c_size_t),
+            ("PagefileUsage", ctypes.c_size_t),
+            ("PeakPagefileUsage", ctypes.c_size_t),
+        ]
+
+    try:
+        windll = ctypes.WinDLL  # type: ignore[attr-defined,unused-ignore]
+        psapi, kernel32 = windll("psapi"), windll("kernel32")
+        kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+        # Without argtypes ctypes passes the process pseudo-handle (-1 as an
+        # unsigned 64-bit value) as a C int, which overflows on 64-bit Windows.
+        psapi.GetProcessMemoryInfo.argtypes = [
+            wintypes.HANDLE,
+            ctypes.POINTER(Counters),
+            wintypes.DWORD,
+        ]
+        psapi.GetProcessMemoryInfo.restype = wintypes.BOOL
+        counters = Counters()
+        counters.cb = ctypes.sizeof(Counters)
+        ok = psapi.GetProcessMemoryInfo(
+            kernel32.GetCurrentProcess(), ctypes.byref(counters), counters.cb
+        )
+    except (AttributeError, OSError, ctypes.ArgumentError):
+        return UNAVAILABLE
+    if not ok:
+        return UNAVAILABLE
+    return round(int(counters.PeakWorkingSetSize) / (1024 * 1024), 1)
