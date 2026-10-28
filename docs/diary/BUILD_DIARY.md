@@ -2937,3 +2937,33 @@ tests/integration/test_note_checks.py   7 passed (the real note passes; each bre
 Fix attempts: 2 (my FakeProvider digest left out the required intent; the table-cell pipe escape).
 
 **Next exact task:** keywords into the note (NOTE-007 wiring), then NOTE-008.
+
+### 15:25 — NOTE-010 (part 1): `ke docs check` now checks a note is readable, not just linked
+
+**What:** The rich-note plan (§7 of the gap analysis) promised that a note fits on a screen or two, that an empty section is one plain sentence, and that hashes and run IDs stay out of the front matter. Until now only `ke docs rubric` checked the first two, and only by rebuilding notes from the database. NOTE-010 wants the vault check itself to catch them, on the files Obsidian actually opens. `evaluation/readability.py` adds three rules to `ke docs check`:
+
+- **budget**: a rich note's body (the part above the vault's "write below this line" marker, so your own notes never count) stays under the budget for its chat's length, read from its own `messages` property;
+- **empty_evidence**: an evidence box (`> [!quote]`) in a section with no item in it fails, in any note;
+- **properties**: front matter holds plain values and flat lists Dataview can filter on; no nested maps, and no hashes or bookkeeping like `content_hash` (those go in the `.meta` sidecar).
+
+Older notes (DOC-003 knowledge notes, the masters) were never written to that standard, so they are counted as "not checked" rather than failed. The summary line now says how many rich notes were within budget.
+
+**Challenge:** the new test writes a rich note, with a fake digest, for every chat in every fixture export (24 exports), then runs the vault check. It failed straight away, and not on readability: the link checker said six citations were broken. They were the `[m4]` links inside the knowledge card table, where the alias pipe has to be written `\|` so it doesn't end the table cell. Obsidian reads that fine; the checker read the backslash as part of the link target. It's the same mistake the NOTE-011 checks hit earlier today, in a different file. The note was right, so the checker was fixed.
+
+**Also:** I'd claimed NOTE-012 (the dashboard) first, then found another thread already had it up as a PR. I dropped my half-built copy rather than open a duplicate.
+
+**Teach-back (`evaluation/readability.py`, `check_note`):** It reads one note file, front matter and body, and checks three promises: the note isn't longer than its chat deserves, no section shows an evidence box without anything for it to back up, and the front matter only holds simple values a reader or Dataview would use. Only notes whose `generator` says they use the new layout get the length and front-matter checks, because older notes never made those promises. It never opens the database, so it works on any vault folder.
+
+Checks:
+```
+tests/unit/test_readability.py                6 passed
+tests/integration/test_note_readability.py   25 passed (24 fixture exports, every rich note clean; CLI reports budget and empty-evidence problems)
+```
+Fix attempts: 2 (the table-cell pipe in the link checker; one fixture ships its export as a ZIP).
+
+Talking points:
+- "My vault checker now fails a note that's too long for its chat, not just one with a broken link."
+- "The first real run caught a bug in the checker, not the notes. Same bug I'd fixed in another checker that morning, which says the pipe-in-a-table rule deserves one shared helper."
+- "Two agents claimed the same ticket. The fix was simple: check the open PRs before starting, and back off when someone's ahead."
+
+**Next exact task:** NOTE-010 part 2, the topic and project masters in the readable layout.

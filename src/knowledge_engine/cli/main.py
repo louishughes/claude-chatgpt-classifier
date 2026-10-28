@@ -2111,20 +2111,32 @@ def _docs_check(settings: Settings, args: argparse.Namespace) -> CommandResult:
         "broken_links": [list(b) for b in check.broken_links],
         "broken_embeds": [list(b) for b in check.broken_embeds],
         "bad_frontmatter": check.bad_frontmatter,
+        # NOTE-010: notes written to the rich-note layout, and what's wrong with any note.
+        "readable_notes": check.readable,
+        "readability": [
+            {"note": p.note, "check": p.check, "detail": p.detail} for p in check.readability
+        ],
     }
     if not check.clean:
         broken = len(check.broken_links) + len(check.broken_embeds) + len(check.bad_frontmatter)
+        problems = broken + len(check.readability)
         return CommandResult(
             "docs check",
             ExitCode.ERROR,
             data=data,
-            message=f"{broken} problem(s) in {check.notes} notes",
-            error_code="broken_links",
+            message=(
+                f"{problems} problem(s) in {check.notes} notes "
+                f"({broken} link or header, {len(check.readability)} readability)"
+            ),
+            error_code="broken_links" if broken else "readability",
         )
     return CommandResult(
         "docs check",
         data=data,
-        message=f"{check.notes} notes: {check.links} links and {check.embeds} embeds all resolve",
+        message=(
+            f"{check.notes} notes: {check.links} links and {check.embeds} embeds all resolve; "
+            f"{check.readable} rich note(s) within budget"
+        ),
     )
 
 
@@ -3684,7 +3696,9 @@ def build_parser() -> argparse.ArgumentParser:
     docs_vault.add_argument("--taxonomy", help="taxonomy version for labels and topic notes")
     docs_vault.set_defaults(handler=_docs)
     docs_check = docs_commands.add_parser(
-        "check", help="check every link, embed and note header in a vault (changes nothing)"
+        "check",
+        help="check every link, embed and note header, and each note's length and empty "
+        "sections, in a vault (changes nothing)",
     )
     docs_check.add_argument("--vault", type=Path, required=True, help="the vault folder")
     docs_check.set_defaults(handler=_docs_check)
