@@ -672,7 +672,9 @@ def rich_conversation_note(
     }
     suggested: list[Block] = []
     for it in sorted_.suggestions:
-        status = _PROPOSAL_STATUS.get(it.item.status, it.item.status)
+        # A suggestion's standing is whether the user took it up, never its
+        # extraction trust: "supported" only meant the quote checked out (NOTE-016).
+        status = _PROPOSAL_STATUS.get(it.item.status, "not taken up")
         spans = {(r.revision_id, r.start, r.end) for r in it.record.evidence}
         verdicts = {answered[s] for s in spans if s in answered}
         if len(verdicts) == 1:
