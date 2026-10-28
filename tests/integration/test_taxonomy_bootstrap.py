@@ -168,12 +168,13 @@ def test_categories_first_then_subcategories_after_review(session: Session) -> N
     )
     assert set(apply_review(session, own).refused) == {r["proposal_id"] for r in sheet}
 
-    # A separate reviewer approves two and rejects one, with reasons.
+    # A separate reviewer approves two (renaming one) and rejects one, with reasons.
     decisions = tuple(
         Decision(
             proposal_id=r["proposal_id"],
             verdict="reject" if r["label"] == "Advice" else "approve",
             note="too vague to be useful" if r["label"] == "Advice" else "clear and supported",
+            label="Home" if r["label"] == "Home and garden" else None,
         )
         for r in sheet
     )
@@ -185,7 +186,7 @@ def test_categories_first_then_subcategories_after_review(session: Session) -> N
     assert len(again.proposed) == 3 and again.waiting_for_parent == 0
     children = review_sheet(session)
     assert {(r["label"], r["parent"]) for r in children} == {
-        ("Raised beds", "Home and garden"),
+        ("Raised beds", "Home"),
         ("Bread", "Cooking"),
         ("Cakes", "Cooking"),
     }
@@ -206,7 +207,7 @@ def test_categories_first_then_subcategories_after_review(session: Session) -> N
     assert "Advice: too vague to be useful" in page
     snapshot = TaxonomyRegistry(session).publish("tax-1", author="owner")
     assert {t.label for t in snapshot.terms} == {
-        "Home and garden",
+        "Home",
         "Raised beds",
         "Cooking",
         "Bread",

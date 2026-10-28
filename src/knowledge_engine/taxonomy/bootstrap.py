@@ -250,6 +250,25 @@ def _approved(session: Session, dimension: Dimension) -> dict[str, str]:
     return dict(rows.tuples().all())
 
 
+def _known(session: Session, dimension: Dimension) -> dict[str, str]:
+    """Normalised label -> approved term ID, by alias or by proposed label.
+
+    A reviewer may approve a term under a new label, so the label it was
+    proposed under still finds it.
+    """
+    found = _approved(session, dimension)
+    for row in session.scalars(
+        select(TaxonomyProposalRow).where(
+            TaxonomyProposalRow.status == "approved",
+            TaxonomyProposalRow.operation == Operation.ADD.value,
+        )
+    ):
+        payload = json.loads(row.payload_json)
+        if payload.get("dimension") == dimension.value and row.result_id:
+            found.setdefault(normalise_alias(payload["label"]), row.result_id)
+    return found
+
+
 def _labels_in(session: Session, dimension: Dimension, status: str) -> set[str]:
     """Normalised labels of ``add`` proposals in one status, for one dimension."""
     found = set()
@@ -274,7 +293,9 @@ def _file(
     parent_id: str | None = None,
 ) -> None:
     norm = normalise_alias(term.label)
-    if norm in _approved(session, dimension):
+    # An approved proposal counts as known even when the reviewer changed its
+    # label, so re-running the plan doesn't file the old label again.
+    if norm in _known(session, dimension):
         filed.already_known.append(term.label)
         return
     if norm in _labels_in(session, dimension, OPEN):
@@ -324,7 +345,7 @@ def file_plan(session: Session, plan: Plan, pack: dict[str, Any]) -> Filed:
     for name, dimension in PLAN_DIMENSIONS.items():
         for term in getattr(plan, name):
             _file(session, term, dimension, plan, filed)
-    domain = _approved(session, Dimension.DOMAIN)
+    domain = _known(session, Dimension.DOMAIN)
     for category in plan.categories:
         parent = domain.get(normalise_alias(category.label))
         for child in category.children:
