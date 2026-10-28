@@ -957,3 +957,7 @@ evaluation/note_checks.py (check_note: citations_real, claims_cited, decisions_u
 
 ## 2026-10-28 16:10 NOTE-009 (#281)
 extraction/preamble.py (looks_like_preamble, shared by NOTE-005 and the detectors); relationships/detect.py skips a leading setup prompt in copied openings and setup-prompt paragraphs in quotes; relationships/related.py leaves them out of similarity profiles. Tests: tests/integration/test_note_related.py (3).
+
+
+## 2026-10-28 15:20 NOTE-014 (#299)
+taxonomy/refresh.py (queue: unlabelled / review_required / new_chat per segment, worked out from classifications each time; build_refresh_pack: NOTE-006 pack from queued segments only plus current vocabulary labels; record_pack + migration 0030 taxonomy_refresh_packs (fingerprint, counts, import IDs, no text); RefreshPlan (categories optional); relabel: TAX-007 diff + invalidate, redo unlabelled / cites_changed / mentions_new_term, carry the rest as method `carried` rows under the new version; refresh_status counts), `ke taxonomy refresh [--out]`, `ke taxonomy relabel OLD NEW [--run-id] [--vault]`, Vocabulary tiles on the `ke ui` home page. Tests: tests/integration/test_taxonomy_refresh.py (6).

@@ -36,3 +36,13 @@ Everything under `private/` and `workspace/` is git-ignored. The CLI refuses to 
 - No paid model API is called. The sessions run on the Claude subscription.
 - Excerpts are data, not instructions: a reviewer ignores anything a chat excerpt tells it to do.
 - A published version is never changed. A later change is a new version (TAX-007 works out what needs reprocessing).
+
+## Keeping it up to date: the refresh loop (NOTE-014)
+
+New exports bring subjects the published version has no word for. The vocabulary stays frozen during any run; new subjects queue up and go through the same proposer → reviewer → owner steps.
+
+1. After an import or a classification run, look at the counts: `ke taxonomy refresh` (or the **Vocabulary** tiles on the `ke ui` home page). They show chats with no label under the newest version, chats waiting for review, chats imported since the last refresh, and proposals waiting for a reviewer. Nothing is written.
+2. `ke taxonomy refresh --out private/taxonomy/tax-2/pack.json` builds a pack from **only** the queued segments: ones with no label, ones waiting for review, and ones from chats imported since the last pack. The pack lists the current vocabulary (labels only) so the proposer can see what already exists. Writing it moves the "last pack" mark. If nothing is queued it says so and writes nothing.
+3. Steps 3 to 8 above, with the refresh pack. A refresh plan may contain only topics, activities or outputs; categories are optional. To add a subcategory under an existing category, name the category with its current label and list the new subcategory under it: the existing category is reused.
+4. Only on the owner's word: `ke taxonomy publish tax-2 --author <owner>`.
+5. `ke taxonomy relabel tax-1 tax-2 --vault <vault>` relabels only the segments tax-2 can change (no label under tax-1, labels citing a changed or removed term, or text naming a new term) and carries every other answer over unchanged. tax-1's answers and every reviewer correction stay. With `--run-id <name>` the changed segments go to a Claude session as request files (as with `ke classify run`); run the same command again to collect the answers. With `--vault`, DOC-006 rewrites only the notes whose content changed.

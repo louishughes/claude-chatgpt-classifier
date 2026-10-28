@@ -19,6 +19,16 @@
   <li><strong>{{ status.not_seen }}</strong> not seen lately (kept)</li>
   <li><strong>{{ status.imports }}</strong> imports</li>
 </ul>
+{% if vocabulary.version %}
+<h2>Vocabulary</h2>
+<p class="muted">Labels come from the published vocabulary <strong>{{ vocabulary.version }}</strong>. New subjects wait here until a proposer and a reviewer have looked at them and you publish the next version (<code>ke taxonomy refresh</code>).</p>
+<ul class="tiles">
+  <li><strong>{{ vocabulary.unlabelled_chats }}</strong> chats with no label yet</li>
+  <li><strong>{{ vocabulary.review_chats }}</strong> chats waiting for review</li>
+  <li><strong>{{ vocabulary.new_chats }}</strong> new since the last refresh</li>
+  <li><strong>{{ vocabulary.candidates }}</strong> vocabulary proposals waiting for a reviewer</li>
+</ul>
+{% endif %}
 <form method="get" action="/search" class="search">
   <label for="q">Search every message</label>
   <input id="q" name="q" type="text" placeholder="e.g. garden plan">
