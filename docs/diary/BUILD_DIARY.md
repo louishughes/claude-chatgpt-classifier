@@ -1253,3 +1253,24 @@ Fix attempts: 2.
 2. I had hand-written the fixture folder, which the fixture suite rejects. I added it to the generator instead.
 
 **Next exact task:** CLS-004 (classification persistence and review) + CLS-005 (order-independence diagnostic).
+
+### 06:45 — CLS-004 + CLS-005: corrections that stick, and labels that don't depend on order
+**What:** saving classifications and reviewers' corrections, and a check that processing order can't change a label.
+- **Store (CLS-004).** Migration 0018 adds three append-only tables:
+  - `classifications`: one row per stage key. Saving the same work again changes nothing; a `pending` row is completed once its answer arrives.
+  - `classification_labels`: one row per label, so "segments about project X" is a query.
+  - `classification_reviews`: a reviewer's choice per segment and field, where the newest wins and older choices stay as history.
+
+  A review belongs to the segment, not to a run, so re-running the classifier can't overwrite it. `effective_labels` shows the reviewer's choice over the machine's. If a later taxonomy version drops a reviewed ID, the field shows `stale_review` rather than being silently kept or lost. `review_queue` lists flagged rows until every flagged field has a decision.
+- **Order check (CLS-005).** `order_experiment` classifies the same segments in three orders (given, reversed, seeded shuffle) under one pinned version. It compares state and the sorted (field, ID, rank) labels, and ignores confidence decimals. Any segment that differs between orders becomes a review item. The keyword classifier is stable on the fixture, and a deliberately order-dependent stand-in gets flagged.
+
+**Teach-back (`classification/store.py`):** "The machine's answers and a person's corrections are stored in separate tables, and corrections belong to the segment, not to a run. Re-running the classifier adds machine rows but never touches a correction, so the person's choice stays in force. If the vocabulary later drops an ID the person chose, I mark that choice stale instead of hiding it."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 167 source files
+pytest -q               # 887 passed, 6 skipped
+migration drift         # 0
+```
+Fix attempts: 0. Only lint fixes were needed: import order in env.py and the docstring's closing punctuation.
+
+**Next exact task:** EXT-001 (typed knowledge record contract) + EXT-002 (evidence validator).
