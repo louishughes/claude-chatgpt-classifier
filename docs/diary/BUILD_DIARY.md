@@ -2010,6 +2010,7 @@ ke eval gate            # BLOCKED: 3 BLOCKED, 2 REVIEW, 8 PASS (0 FAIL)
 Fix attempts: 1 (my drifting fake first answered "needs review" only once, and the retry hid it; it now never labels the first segment it sees).
 
 **Next exact task:** check UI-005 (#175) against STATUS and close it if done; then M5.
+
 ### 08:10 UTC — EVAL-001: the real 40-chat answer key, made and checked by two separate Claude sessions
 **What:** I built the real golden set (`golden-v1`) on Louis's PC. It covers 40 chats picked by the seeded sampler, with 398 records that must be found and 64 that must never be claimed. It lives only in the git-ignored workspace. What's committed is the review record, `docs/reviews/GOLD_REAL_V1_REVIEW.md`, which holds counts and the file's hash, but no chat IDs, titles or text.
 
