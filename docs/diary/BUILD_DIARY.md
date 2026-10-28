@@ -2069,3 +2069,27 @@ pytest -q               # 1166 passed, 7 skipped
 Fix attempts: 0.
 
 **Next exact task:** ING-008 + ING-009.
+
+### 16:40 — ING-008 + ING-009: notes, text, Word and PDF as located blocks
+**ING-008** (`ingestion/documents.py`) reads Markdown and plain text into **blocks**: frontmatter, headings (`#` style and underlined), paragraphs, lists, quotes, fenced code, tables and rules. Each block keeps its exact character range in the decoded text, its line numbers, the headings above it, and a short locator like `L12-L15`, so `text[start:end]` is the block exactly as written. The tests check this with CRLF line endings and emoji.
+- Frontmatter is parsed as YAML when it can be. Otherwise the raw text is kept and a warning code says why.
+- Decoding tries UTF-8 (with or without a BOM), UTF-16 by its BOM, then Windows-1252, then Latin-1. Each fallback is reported, and no character is ever replaced.
+- Image references are listed and never opened.
+
+**ING-009** (`ingestion/structured.py`) puts Word and PDF behind one small `DocumentConverter` seam, so the rest of the engine always gets the same blocks.
+- **Docling** is used if installed. It isn't installed here and isn't exercised by the tests; that path is clearly marked.
+- The **built-in DOCX reader** (standard library only) reads paragraphs (`p12`), Word heading styles and tables (`table1/r1c1-r2c2`). It lists embedded images as references, and gives warning codes for what it skips: footnotes, endnotes, comments, headers, footers, text boxes, and images it can't describe. A DOCX is a ZIP, so member count and unpacked size are capped, and XML that declares a DOCTYPE is refused.
+- A **PDF** with no converter is not read: it gets its hash, size and page count, no blocks, and `pdf_text_not_extracted`.
+
+`ke file read PATH [--blocks]` shows a file's outline, block kinds and warnings, and only reads the file. Documents are parsed but not yet stored as sources; that waits for a ticket that needs them.
+
+**Teach-back (`ingestion/documents.py`):** "It reads a note or text file into blocks such as headings, paragraphs and lists, and each block remembers exactly which characters and lines it came from. Odd encodings or broken frontmatter are reported with a warning instead of being guessed at. Word and PDF go through one swappable converter, and whatever it can't read is listed rather than hidden."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 165 source files
+pytest -q               # 1173 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 1 (my first paragraph/underlined-heading loop was tangled; rewrote it as one loop that turns a paragraph into a heading when an `===`/`---` line follows).
+
+**Next exact task:** OPS-003 (local backups and verified restore).
