@@ -56,6 +56,10 @@ class Predicted:
         messages: Its native message IDs.
         labels: Field -> (primary, secondaries).
         review: True if it was sent to review.
+        input_messages: The message IDs the classifier was actually given
+            (None if unknown); any segment message missing here was
+            truncated (LEG-005).
+        chat_chars: The whole conversation's length, for length bands.
     """
 
     segment_id: str
@@ -63,6 +67,40 @@ class Predicted:
     messages: tuple[str, ...]
     labels: Mapping[str, tuple[str | None, tuple[str, ...]]]
     review: bool = False
+    input_messages: tuple[str, ...] | None = None
+    chat_chars: int | None = None
+
+
+# Chat-length bands (characters in the whole conversation), so a model that
+# does well on short chats can't hide failing on long ones (LEG-005).
+LENGTH_BANDS = (
+    (4_000, "short (<4k chars)"),
+    (16_000, "medium (4k-16k)"),
+    (64_000, "long (16k-64k)"),
+)
+LONGEST_BAND = "very long (64k+)"
+UNKNOWN_BAND = "unknown length"
+
+
+def length_band(chars: int | None) -> str:
+    """The length band of a conversation of ``chars`` characters."""
+    if chars is None:
+        return UNKNOWN_BAND
+    return next((name for limit, name in LENGTH_BANDS if chars < limit), LONGEST_BAND)
+
+
+@dataclass
+class BandScore:
+    """Primary-label accuracy within one chat-length band."""
+
+    segments: int = 0
+    checked: int = 0
+    right: int = 0
+
+    @property
+    def accuracy(self) -> float:
+        """Share of primary labels right in this band."""
+        return _ratio(self.right, self.checked)
 
 
 @dataclass
@@ -114,6 +152,8 @@ class ClassificationReport:
     ambiguous_flagged: int
     ambiguous_missed: int
     key: AnswerKey | None = None
+    truncation_count: int | None = None
+    by_band: dict[str, BandScore] = field(default_factory=dict)
 
     @property
     def project_accuracy(self) -> float:
@@ -150,6 +190,15 @@ class ClassificationReport:
                 f"| {name} | {score.segments} | {score.precision:.3f} | {score.recall:.3f} | "
                 f"{score.micro_f1:.3f} | {score.macro_f1:.3f} | {score.primary_accuracy:.3f} |"
             )
+        lines += [
+            "",
+            f"- Truncated messages: {truncation_text(self.truncation_count)}",
+            "",
+            "| Chat length | Segments | Primary labels checked | Primary acc. |",
+            "|---|---|---|---|",
+        ]
+        for band, b in sorted(self.by_band.items(), key=lambda kv: band_order(kv[0])):
+            lines.append(f"| {band} | {b.segments} | {b.checked} | {b.accuracy:.3f} |")
         for name, score in sorted(self.fields.items()):
             lines += ["", f"## Confusion: {name} (gold primary -> predicted primary)", ""]
             lines += ["| Gold | Predicted | Count |", "|---|---|---|"]
@@ -161,6 +210,19 @@ class ClassificationReport:
 
 def _ratio(top: float, bottom: float) -> float:
     return round(top / bottom, 6) if bottom else 0.0
+
+
+def truncation_text(count: int | None) -> str:
+    """How a report prints the truncation count (LEG-005)."""
+    if count is None:
+        return "not measured"
+    return f"{count} (must be 0)"
+
+
+def band_order(name: str) -> int:
+    """Sort key: shortest band first."""
+    names = [n for _, n in LENGTH_BANDS] + [LONGEST_BAND, UNKNOWN_BAND]
+    return names.index(name) if name in names else len(names)
 
 
 def evaluate_classification(
@@ -184,6 +246,7 @@ def evaluate_classification(
         for message in item.messages:
             by_message[(item.native_conversation_id, message)] = item
     scores: dict[str, FieldScore] = defaultdict(FieldScore)
+    bands: dict[str, BandScore] = defaultdict(BandScore)
     per_label: dict[str, dict[str, Counter[str]]] = defaultdict(lambda: defaultdict(Counter))
     total = unmatched = flagged = missed = 0
     for conversation in gold.conversations:
@@ -197,6 +260,8 @@ def evaluate_classification(
                 flagged += int(match.review)
                 missed += int(not match.review)
                 continue
+            band = bands[length_band(match.chat_chars)]
+            band.segments += 1
             for name in FIELDS:
                 want = segment.labels.get(name)
                 got_primary, got_secondary = match.labels.get(name, (None, ()))
@@ -211,6 +276,8 @@ def evaluate_classification(
                 score.false_pos += len(got_set - want_set)
                 score.false_neg += len(want_set - got_set)
                 score.primary_right += int(want_primary == got_primary)
+                band.checked += 1
+                band.right += int(want_primary == got_primary)
                 row = score.confusion.setdefault(str(want_primary), {})
                 row[str(got_primary)] = row.get(str(got_primary), 0) + 1
                 for label in want_set | got_set:
@@ -233,7 +300,16 @@ def evaluate_classification(
         ambiguous_flagged=flagged,
         ambiguous_missed=missed,
         key=key or key_from_gold(gold),
+        truncation_count=_truncated(predicted),
+        by_band=dict(bands),
     )
+
+
+def _truncated(predicted: Sequence[Predicted]) -> int | None:
+    known = [p for p in predicted if p.input_messages is not None]
+    if not known:
+        return None
+    return sum(len(set(p.messages) - set(p.input_messages or ())) for p in known)
 
 
 def stability(runs: Sequence[Sequence[Predicted]]) -> float:
@@ -257,7 +333,12 @@ def predicted_from(
 ) -> list[Predicted]:
     """Turn classifier results into evaluator input (labels per field)."""
     found = []
+    lengths: dict[str, int] = {}
     for (conversation, segment), result in zip(items, results, strict=True):
+        chars = lengths.setdefault(
+            conversation.conversation_id,
+            sum(len(node.text) for node in conversation.messages.values()),
+        )
         labels: dict[str, tuple[str | None, tuple[str, ...]]] = {}
         if result.answer is not None:
             grouped: dict[str, list[tuple[str, str]]] = defaultdict(list)
@@ -276,6 +357,8 @@ def predicted_from(
                 messages=segment.messages,
                 labels=labels,
                 review=result.state == REVIEW_REQUIRED,
+                input_messages=result.message_ids,
+                chat_chars=chars,
             )
         )
     return found

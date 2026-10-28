@@ -52,7 +52,7 @@ from knowledge_engine.extraction.records import (
     Scope,
 )
 from knowledge_engine.extraction.store import add_candidates, gate
-from knowledge_engine.extraction.text import ExtractionMessage, quote
+from knowledge_engine.extraction.text import ExtractionMessage, exchanges_of, quote
 from knowledge_engine.graph.offsets import find_quote
 from knowledge_engine.infrastructure.db import Base
 from knowledge_engine.infrastructure.logs import EventLog, null_log
@@ -60,6 +60,7 @@ from knowledge_engine.orchestration.limits import Deadline
 from knowledge_engine.orchestration.stage_keys import stage_key
 from knowledge_engine.providers.base import ModelRequest
 from knowledge_engine.providers.ledger import ModelStageRunner
+from knowledge_engine.segmentation.segmenter import SegmenterSettings, split_parts
 
 RUNNER_VERSION = "ext-008-v1"
 MAX_ATTEMPTS = 3
@@ -316,9 +317,10 @@ class ModelExtractor:
     instructions: str
     runner: ModelStageRunner
     taxonomy_version: str | None = None
+    max_characters: int = SegmenterSettings().max_characters
 
     def request(self, messages: Sequence[ExtractionMessage]) -> ModelRequest:
-        """The request for one segment, keyed like the run."""
+        """The request for one segment (or one part of it), keyed like the run."""
         text = "\n\n".join(f"[m:{m.native_id}] {m.role.value}:\n{m.text}" for m in messages)
         key, _ = run_key(self, messages)
         return ModelRequest(
@@ -334,19 +336,41 @@ class ModelExtractor:
     def extract(
         self, messages: Sequence[ExtractionMessage], *, segment_id: str
     ) -> list[CandidateRecord]:
-        """Ask (or read the cache), then turn quotes into exact evidence."""
-        request = self.request(messages)
-        first = self.runner.submit([request])
-        answer = first.outputs.get(request.request_id)
-        if answer is None:
-            later = self.runner.collect([request])
-            answer = later.outputs.get(request.request_id)
-            if answer is None:
-                if request.request_id in later.review_required + first.review_required:
-                    raise ValueError("model answer failed validation twice")
-                raise PendingAnswer(request.request_id)
-        assert isinstance(answer, ModelAnswer)
-        return _from_model(answer, messages, segment_id)
+        """Ask (or read the cache), then turn quotes into exact evidence.
+
+        The model sees the whole segment. A segment over ``max_characters``
+        is never clipped: it is split into overlapping parts at exchange
+        boundaries (the segmenter's own rule), one request each, and the
+        records of all parts are merged (LEG-005).
+        """
+        by_id = {m.native_id: m for m in messages}
+        parts = split_parts(exchanges_of(messages), self.max_characters)
+        requests = [self.request([by_id[i] for i in part.messages]) for part in parts]
+        first = self.runner.submit(requests)
+        outputs = dict(first.outputs)
+        failed = set(first.review_required)
+        if len(outputs) < len(requests):
+            later = self.runner.collect(requests)
+            outputs.update(later.outputs)
+            failed |= set(later.review_required)
+        if failed:
+            raise ValueError("model answer failed validation twice")
+        missing = [r.request_id for r in requests if r.request_id not in outputs]
+        if missing:
+            raise PendingAnswer(missing[0])
+        found: list[CandidateRecord] = []
+        seen: set[str] = set()
+        for part, request in zip(parts, requests, strict=True):
+            answer = outputs[request.request_id]
+            assert isinstance(answer, ModelAnswer)
+            part_messages = [by_id[i] for i in part.messages]
+            for record in _from_model(answer, part_messages, segment_id):
+                # The exchange two parts share can yield the same record twice.
+                fingerprint = record.model_dump_json()
+                if fingerprint not in seen:
+                    seen.add(fingerprint)
+                    found.append(record)
+        return found
 
 
 def _from_model(

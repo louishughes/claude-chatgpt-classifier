@@ -24,6 +24,12 @@
 | projects | 1 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
 | topic | 6 | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 |
 
+- Truncated messages: 0 (must be 0)
+
+| Chat length | Segments | Primary labels checked | Primary acc. |
+|---|---|---|---|
+| short (<4k chars) | 6 | 7 | 1.000 |
+
 ## Confusion: projects (gold primary -> predicted primary)
 
 | Gold | Predicted | Count |

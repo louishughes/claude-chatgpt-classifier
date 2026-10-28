@@ -1,0 +1,12 @@
+{
+  "fixture_format_version": 1,
+  "case": "late_rejection",
+  "synthetic": true,
+  "layout": "official",
+  "proves": "LEG-005: a long single-topic chat (over the 24,000-character segment budget) ends with an assistant suggestion and the user's short 'No.'. Nothing may be clipped, and the 'No.' must come out as the user's rejection of that suggestion.",
+  "expected": {
+    "conversations": 1,
+    "proposal": "c0000050-0000-4000-8000-000000000001-a30",
+    "rejection": "c0000050-0000-4000-8000-000000000001-u31"
+  }
+}

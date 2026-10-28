@@ -1506,6 +1506,44 @@ def without_children(native: JsonDict) -> JsonDict:
     return copy
 
 
+def _long_chat_cases() -> list[Case]:
+    """LEG-005: a short "no" late in a long chat still rejects the suggestion."""
+    filler = (
+        "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush "
+        "on a thin coat of varnish and let it dry before the next one. "
+    ) * 8
+    exchanges = [
+        (f"Synthetic question {n}: what is the next step for the shed varnish?", filler)
+        for n in range(30)
+    ]
+    exchanges += [
+        (
+            "Synthetic question: what colour should the shed door be?",
+            "Synthetic answer: I suggest painting the shed door bright red.",
+        ),
+        ("No. Synthetic.", "Synthetic answer: understood, the shed door stays as it is."),
+    ]
+    chat = _chat(
+        "c0000050-0000-4000-8000-000000000001", "Synthetic long varnish chat", 70, exchanges
+    )
+    c = chat.conversation_id
+    return [
+        Case(
+            "late_rejection",
+            "LEG-005: a long single-topic chat (over the 24,000-character segment budget) ends "
+            "with an assistant suggestion and the user's short 'No.'. Nothing may be "
+            "clipped, and the 'No.' must come out as the user's rejection of that suggestion.",
+            "official",
+            [chat.native()],
+            expected={
+                "conversations": 1,
+                "proposal": f"{c}-a30",
+                "rejection": f"{c}-u31",
+            },
+        )
+    ]
+
+
 def all_cases() -> list[Case]:
     """Return every fixed fixture case, in a stable order."""
     return [
@@ -1521,6 +1559,7 @@ def all_cases() -> list[Case]:
         *_classification_cases(),
         *_extraction_cases(),
         *_action_entity_cases(),
+        *_long_chat_cases(),
     ]
 
 

@@ -13,7 +13,7 @@ Talking points:
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 
 from knowledge_engine.domain.enums import Role
@@ -59,6 +59,20 @@ def segment_extraction_messages(
             role = Role.UNKNOWN
         found.append(ExtractionMessage(native, revision, role, node.text))
     return found
+
+
+def exchanges_of(messages: Sequence[ExtractionMessage]) -> list[list[ExtractionMessage]]:
+    """Group messages into exchanges: each user message starts a new one.
+
+    The unit model stages split on (LEG-005), like the segmenter: a
+    question always stays with its answer.
+    """
+    groups: list[list[ExtractionMessage]] = []
+    for message in messages:
+        if not groups or message.role is Role.USER:
+            groups.append([])
+        groups[-1].append(message)
+    return groups
 
 
 def sentences(text: str) -> Iterator[Span]:
