@@ -50,6 +50,8 @@ class ImportReport:
             identity is ``review_required`` (never merged automatically).
         links: LNK-001's counts: ``new_targets``, ``new_occurrences`` and
             ``seen_occurrences`` (every URL mention in current revisions).
+        accounts: SOC-001/002's counts: ``new_accounts``, ``new_mentions``
+            and ``ambiguous_mentions``.
     """
 
     import_id: str
@@ -71,6 +73,7 @@ class ImportReport:
     duplicate_assets: int = 0
     integrity: Mapping[str, Any] = field(default_factory=dict)
     links: Mapping[str, int] = field(default_factory=dict)
+    accounts: Mapping[str, int] = field(default_factory=dict)
     extra: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -93,6 +96,7 @@ class ImportReport:
             "asset_occurrences": dict(sorted(self.asset_occurrences.items())),
             "integrity": dict(self.integrity),
             "links": dict(sorted(self.links.items())),
+            "accounts": dict(sorted(self.accounts.items())),
             "summary": self.summary(),
         }
 

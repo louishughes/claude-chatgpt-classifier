@@ -52,6 +52,7 @@ from knowledge_engine.infrastructure.workspace import WorkspaceRepo
 from knowledge_engine.ingestion.inventory import tree_signature
 from knowledge_engine.ingestion.registry import default_adapters
 from knowledge_engine.ingestion.source import NativeConversation, SourceListing, select_adapter
+from knowledge_engine.links.social_store import record_accounts
 from knowledge_engine.links.store import record_links
 from knowledge_engine.settings import Settings
 
@@ -171,6 +172,7 @@ def _run(
     candidates: Counter[str] = Counter()
     media = MediaDelta()
     link_counts: Counter[str] = Counter()
+    account_counts: Counter[str] = Counter()
     tally = IntegrityTally()
     file_ids: set[str] = set()
     # Native ID -> content hash of the first conversation this import saw
@@ -271,6 +273,14 @@ def _run(
                         import_id=import_id,
                     )
                 )
+                account_counts.update(
+                    record_accounts(
+                        session,
+                        delta.accounts,
+                        conversation_id=delta.conversation_id,
+                        import_id=import_id,
+                    )
+                )
 
     warnings.update(media.warnings)
     integrity = tally.to_dict(
@@ -308,6 +318,7 @@ def _run(
         warnings=dict(warnings),
         changed_revisions=tuple(sorted(changed)),
         links=dict(sorted(link_counts.items())),
+        accounts=dict(sorted(account_counts.items())),
         new_branches=new_branches,
         raw_observations=raw_observations,
         candidate_matches=dict(candidates),

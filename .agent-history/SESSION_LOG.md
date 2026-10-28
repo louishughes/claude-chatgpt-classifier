@@ -601,3 +601,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - Issues created: REV-010 #185, REV-011 #186, REV-012 #187 (under #134).
 - Full suite 672 passed, 6 skipped. ruff, mypy, git_guard OK.
 - Next: SOC-001/002.
+
+## 2026-10-28 01:20 SOC-001 + SOC-002 (#48, #49)
+- links/social.py (detection), links/social_store.py (SocialAccountRow, AccountAliasRow, AccountMentionRow, record_accounts), ids account_mention_id, migration 0012, importer delta/run/report wiring (report.accounts), CLI `ke accounts`.
+- Tests: test_social_detection.py (25), test_social_registry.py (2). Full suite 699 passed, 6 skipped. ruff, mypy, git_guard OK; no migration drift.
+- Next: REL-002.
