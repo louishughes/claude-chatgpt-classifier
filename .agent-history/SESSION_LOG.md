@@ -768,3 +768,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - retrieval/citations.py (Citation, Rejected, Problem, citation_id, resolve, cite_message, quote, audit, ContextMessage, EvidenceBundle, Hydrated, hydrate); retrieval/answers.py (Sentence, GroundedAnswer, Evidence, Writer, ExtractiveWriter, ModelWriter, AnswerDraft, answer, to_json, MIN_SIMILARITY); HybridHit gains optional `similarity`; `ke ask`. No migration.
 - Tests: test_citations_and_answers.py (8). Full suite 1103 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: RET-008.
+
+## 2026-10-28 09:30 RET-008 (#97)
+- evaluation/retrieval_bench.py (CHATS, QUERIES, THRESHOLDS, BenchReport, MethodScore, run_benchmark, check, to_markdown, write_export); `ke eval retrieval [--out]`; docs/evaluation/RET-008_BENCHMARK.md generated.
+- Tests: test_retrieval_bench.py (3). Full suite 1106 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: DOC-001.
