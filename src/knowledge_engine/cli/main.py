@@ -531,6 +531,35 @@ def _corpus(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _taxonomy_report(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Taxonomy health and review activity (TAX-008); reads only."""
+    from dataclasses import asdict
+
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.taxonomy.governance import governance_report
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "taxonomy", ExitCode.ERROR, message="no database yet", error_code="no_database"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            report = governance_report(session)
+    finally:
+        engine.dispose()
+    kinds = report.kinds()
+    summary = ", ".join(f"{n} {kind}" for kind, n in sorted(kinds.items())) or "no issues"
+    return CommandResult(
+        "taxonomy",
+        data=asdict(report),
+        message=f"{summary}; {sum(report.open_proposals.values())} open proposal(s)",
+    )
+
+
 def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Search message text (RET-001). Brings the search index up to date first."""
     from sqlalchemy import select
@@ -963,6 +992,12 @@ def build_parser() -> argparse.ArgumentParser:
     corpus.add_argument("--sample", type=int, default=0, help="how many segments to sample")
     corpus.add_argument("--seed", default="nrm-006", help="same seed, same sample")
     corpus.set_defaults(handler=_corpus)
+    taxonomy = commands.add_parser("taxonomy", help="the shared vocabulary")
+    taxonomy_commands = taxonomy.add_subparsers(dest="taxonomy_command", required=True)
+    tax_report = taxonomy_commands.add_parser(
+        "report", help="duplicates, parent loops, orphans and review activity (read-only)"
+    )
+    tax_report.set_defaults(handler=_taxonomy_report)
 
     search = commands.add_parser("search", help="find messages by words, phrase or exact text")
     search.add_argument("query", help="what to look for")
