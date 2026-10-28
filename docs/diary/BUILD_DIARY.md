@@ -2785,6 +2785,27 @@ Talking points:
 
 **Next exact task:** NOTE-006, the first taxonomy discovered from the real chats.
 
+### 14:10 — NOTE-005: a model reads for decisions, suggestions, actions and questions
+
+The rule extractors only catch fixed phrasings, and on the real chats they found 16 actions and no questions. This adds a model-backed extractor through the existing `ModelExtractor` (stage runner, cache, one repair, egress switch), with the EXT-001 contract and its acceptance rules unchanged.
+
+- `extraction/model_knowledge.py`: `knowledge_extractor(runner)` asks for four types only: decision (or rejection), proposal, action, question.
+- Three checks run in code on whatever the model returns:
+  1. A user decision, rejection, action, preference or requirement must quote the user. If only the assistant was quoted, it goes back to being the assistant's proposal, flagged for review.
+  2. Several proposals from one actor quoting only the same message (a bulleted list of options) become one proposal: "Options suggested: A; B; C".
+  3. A long user message that opens like a pasted setup prompt ("You are...", "Act as...", "From now on...", at least 200 characters) can't be the source of a commitment. "You are right." is not a setup prompt.
+- Records then go through the EXT-007 gate and the EXT-002 evidence check like any other.
+
+**Teach-back (`check_candidates`):** After the model reads a chunk of chat and lists what it thinks was decided, suggested, promised or asked, this function checks who actually said it. A "decision" backed only by the assistant's words is turned back into the assistant's suggestion, a bulleted list of options becomes one suggestion, and anything resting only on a pasted "You are a..." prompt is dropped. So the model can't make me the owner of something the assistant said.
+
+Checks:
+```
+tests/integration/test_model_knowledge.py   6 passed (FakeProvider, no network)
+```
+Fix attempts: 1 (my new gate test quoted an assistant message from another part of a split segment).
+
+**Next exact task:** NOTE-007 (keyword and topic candidates).
+
 ### 13:55 — NOTE-004: digests from a Claude session, end to end
 
 - `ke digest run [IDs | --all] --run-id R [--vault V]`: the first run writes the digest requests into `private/model-batches/R/` and says how many are waiting; a Claude session fills the response files; running it again collects, checks every quote and writes the rich notes. All chats go in one submit, so the requests are packed into as few files as fit, not one file per chat.
@@ -2893,3 +2914,26 @@ tests/integration/test_note_categories.py   2 passed (two-subject chat: 67% prim
 Fix attempts: 1 (my synthetic user turns were under 40 characters, so the segmenter treated them as short replies and never split the chat).
 
 **Next exact task:** NOTE-009 (related chats with reasons).
+
+### 15:30 — NOTE-011 (code half): checking that a rich note is honest
+
+Before anyone scores whether a note is *good*, a program can check it isn't making things up. `evaluation/note_checks.py` reads the rendered Markdown, the way a reader would, and compares it with the stored chat:
+
+- **citations_real**: every `[m12]` link points at a message of this chat, and the number is the one the transcript shows (`alt` off the active path).
+- **claims_cited**: every summary sentence, the Purpose and Outcome cells, and every item under Decisions, Suggestions, Action items, Open questions, Requirements, Insights, Tensions and Next steps cites a message.
+- **decisions_user_held**: every decision and "ruled out" record is held by the user and quotes the user.
+- **tensions_next_steps**: a next step that repeats something ruled out, or restates a tension, is a warning (word overlap, so it can't be a hard fail).
+- **empty_sections** and **budget**: no evidence box under an empty section; the body under its length budget.
+- `ke docs rubric [chats] [--all]` builds each chat's note in memory (with its stored digest), runs the checks, and prints counts per check and the problems (IDs only, no chat text). It writes nothing.
+
+The first run of the checks on the engine's own note found something: a citation inside the knowledge card's table writes its pipe as `\|`, which my link pattern read as part of the anchor. The note was right (that's how Obsidian tables need it); the pattern was fixed.
+
+**Teach-back (`check_note`):** It takes a finished note and the chat it came from and checks six things a program can judge: every message number points at the right message, every claim has a number, every decision is the user's own words, no next step repeats a rejected idea, empty sections stay empty, and the note isn't too long. It reads the Markdown rather than the renderer's internals, so a renderer bug shows up too. It doesn't judge whether the summary is right; that's the independent reference set on the PC.
+
+Checks:
+```
+tests/integration/test_note_checks.py   7 passed (the real note passes; each break caught by exactly one check)
+```
+Fix attempts: 2 (my FakeProvider digest left out the required intent; the table-cell pipe escape).
+
+**Next exact task:** keywords into the note (NOTE-007 wiring), then NOTE-008.

@@ -928,6 +928,9 @@ ingestion/web.py (allowlist, SSRF checks per hop, pinned connection, size/type c
 ## 2026-10-28 11:58 INT-002 (#131)
 links/youtube_captions.py (Data API v3 captions.list/download, OAuth token from env, statuses, spacing, ASR flag), ProviderAnswer.detail into provenance, settings.youtube_access_token, `ke transcript fetch`. Tests: test_youtube_captions.py (11, no network). Docs: docs/operations/YOUTUBE_CAPTIONS.md.
 
+## 2026-10-28 14:10 NOTE-005 (#277)
+extraction/model_knowledge.py (knowledge_extractor over ModelExtractor; check_candidates: user commitments need user quotes, one list = one proposal, pasted preambles give no commitments). Tests: tests/integration/test_model_knowledge.py (6).
+
 ## 2026-10-28 12:20 INT-003 (#132)
 importer/watch.py (FolderWatcher: debounce, metadata + content fingerprints, failure recorded once, vault stage), `ke watch`. Tests: test_watch_folder.py (7). Docs: docs/operations/WATCHED_FOLDERS.md.
 
@@ -942,3 +945,6 @@ digest/stage.py (DigestStage via ModelStageRunner: active path + fork lines, unt
 
 ## 2026-10-28 15:55 NOTE-008 (#280)
 documents/categories.py (category_shares: domain terms by share of labelled messages, primary/secondary/side subject, segments, classifier evidence, reviewer verdict per segment; waiting_candidates: open add proposals citing the chat), rich_note Category section uses them. Tests: tests/integration/test_note_categories.py (2).
+
+## 2026-10-28 15:30 NOTE-011 code checks (#283)
+evaluation/note_checks.py (check_note: citations_real, claims_cited, decisions_user_held, tensions_next_steps (warn), empty_sections, budget; reads the rendered Markdown), `ke docs rubric [chats] [--all]`. Tests: tests/integration/test_note_checks.py (7).
