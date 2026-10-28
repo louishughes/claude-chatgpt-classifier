@@ -1009,3 +1009,24 @@ pytest -q               # 699 passed, 6 skipped
 Fix attempts: 1 (a test line was too long for ruff).
 
 **Next exact task:** REL-002.
+
+### 01:45 — REL-002: links between separate chats
+**What:** a new `relationships` package. It stores links between conversations and proposes them from exact evidence only. There are four detectors:
+- **Copied node IDs:** two chats contain the same message node, as when ChatGPT copies messages into a new chat. The newer chat is proposed as `forked_from` the older one.
+- **Copied opening:** two chats start with the same two or more messages, word for word, including a user message. The newer chat is proposed as `forked_from` the earlier chat it shares the longest opening with, so a prompt reused across many chats doesn't link every pair.
+- **Chat links:** a message links to `chatgpt.com/c/<id>` and that chat is in the archive, giving `references`. Share links can't be mapped to a chat, so they are only counted.
+- **Pasted paragraphs:** a user message contains a whole paragraph (100+ characters) that first appeared in an earlier chat, giving `quotes`.
+
+Everything starts as a **candidate**. `ke related review <id> accept|reject` records a decision. The history only grows: the database refuses to update or delete it. A rejected link is never proposed again, and reviewing never flips the direction.
+
+**Decisions:** comparing openings uses the text, not the stored content hash, because that hash includes the time and a copy always has a new time. With no times, which chat came first is unknown, so the link becomes `related_to` with direction unknown. Both are logged in OPEN_DECISIONS.
+**Cost:** detection runs only when an import changed something. It took 2.7 s over 1,000 generated chats. The generated batch gave 50 copied-opening candidates, because its generator reuses a small set of phrases, so real data may produce fewer.
+**Teach-back (`relationships/detect.py`):** "After an import, the detectors look for proof that two chats are connected: the same message IDs, the same opening messages, a link to the other chat, or a pasted paragraph. Each one becomes a candidate with its evidence as IDs, never copied text. A person accepts or rejects it, and that decision is kept forever and never undone by a re-run."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 119 source files
+pytest -q               # 729 passed, 6 skipped
+```
+Fix attempts: 1 (the new fixture manifests lacked the conversation count the fixture tests check).
+
+**Next exact task:** RET-001.

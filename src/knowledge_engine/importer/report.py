@@ -52,6 +52,8 @@ class ImportReport:
             ``seen_occurrences`` (every URL mention in current revisions).
         accounts: SOC-001/002's counts: ``new_accounts``, ``new_mentions``
             and ``ambiguous_mentions``.
+        relationships: REL-002's new candidate links between conversations,
+            by detector, plus ``unresolved_share_links``.
     """
 
     import_id: str
@@ -74,6 +76,7 @@ class ImportReport:
     integrity: Mapping[str, Any] = field(default_factory=dict)
     links: Mapping[str, int] = field(default_factory=dict)
     accounts: Mapping[str, int] = field(default_factory=dict)
+    relationships: Mapping[str, int] = field(default_factory=dict)
     extra: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -97,6 +100,7 @@ class ImportReport:
             "integrity": dict(self.integrity),
             "links": dict(sorted(self.links.items())),
             "accounts": dict(sorted(self.accounts.items())),
+            "relationships": dict(sorted(self.relationships.items())),
             "summary": self.summary(),
         }
 

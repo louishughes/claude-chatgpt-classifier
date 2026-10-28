@@ -1,0 +1,338 @@
+[
+  {
+    "title": "Synthetic garden shed",
+    "create_time": 1707091200.0,
+    "update_time": 1707091560.0,
+    "mapping": {
+      "c0000008-0000-4000-8000-000000000006-root": {
+        "id": "c0000008-0000-4000-8000-000000000006-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000008-0000-4000-8000-000000000006-sys"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000006-sys": {
+        "id": "c0000008-0000-4000-8000-000000000006-sys",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000006-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707091260.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000006-root",
+        "children": [
+          "c0000008-0000-4000-8000-000000000006-u0"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000006-u0": {
+        "id": "c0000008-0000-4000-8000-000000000006-u0",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000006-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707091320.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: hello"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000006-sys",
+        "children": [
+          "c0000008-0000-4000-8000-000000000006-a0"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000006-a0": {
+        "id": "c0000008-0000-4000-8000-000000000006-a0",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000006-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707091380.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: hi, what are you building?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000006-u0",
+        "children": [
+          "c0000008-0000-4000-8000-000000000006-u1"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000006-u1": {
+        "id": "c0000008-0000-4000-8000-000000000006-u1",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000006-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707091440.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: a shed for bikes."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000006-a0",
+        "children": [
+          "c0000008-0000-4000-8000-000000000006-a1"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000006-a1": {
+        "id": "c0000008-0000-4000-8000-000000000006-a1",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000006-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707091500.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: a 6x4 footprint fits two bikes."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000006-u1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000008-0000-4000-8000-000000000006-a1",
+    "plugin_ids": null,
+    "conversation_id": "c0000008-0000-4000-8000-000000000006",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000008-0000-4000-8000-000000000006"
+  },
+  {
+    "title": "Synthetic garden shed",
+    "create_time": 1707177600.0,
+    "update_time": 1707177960.0,
+    "mapping": {
+      "c0000008-0000-4000-8000-000000000007-root": {
+        "id": "c0000008-0000-4000-8000-000000000007-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000008-0000-4000-8000-000000000007-sys"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000007-sys": {
+        "id": "c0000008-0000-4000-8000-000000000007-sys",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000007-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707177660.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000007-root",
+        "children": [
+          "c0000008-0000-4000-8000-000000000007-u0"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000007-u0": {
+        "id": "c0000008-0000-4000-8000-000000000007-u0",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000007-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707177720.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: hello"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000007-sys",
+        "children": [
+          "c0000008-0000-4000-8000-000000000007-a0"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000007-a0": {
+        "id": "c0000008-0000-4000-8000-000000000007-a0",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000007-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707177780.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: hello! How can I help?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000007-u0",
+        "children": [
+          "c0000008-0000-4000-8000-000000000007-u1"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000007-u1": {
+        "id": "c0000008-0000-4000-8000-000000000007-u1",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000007-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707177840.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: a shed for tools."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000007-a0",
+        "children": [
+          "c0000008-0000-4000-8000-000000000007-a1"
+        ]
+      },
+      "c0000008-0000-4000-8000-000000000007-a1": {
+        "id": "c0000008-0000-4000-8000-000000000007-a1",
+        "message": {
+          "id": "c0000008-0000-4000-8000-000000000007-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707177900.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: wall racks keep tools off the floor."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000008-0000-4000-8000-000000000007-u1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000008-0000-4000-8000-000000000007-a1",
+    "plugin_ids": null,
+    "conversation_id": "c0000008-0000-4000-8000-000000000007",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000008-0000-4000-8000-000000000007"
+  }
+]

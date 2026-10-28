@@ -963,6 +963,107 @@ def _legacy_cases() -> list[Case]:
     ]
 
 
+def _relationship_cases() -> list[Case]:
+    """REL-002: links between conversations, and look-alikes that aren't links."""
+    base = "c0000008-0000-4000-8000-00000000000"
+    plan_q = "Synthetic: help me plan a garden shed."
+    plan_a = "Synthetic: start with the base, then the frame."
+    base_q = "Synthetic: what goes under the floor?"
+    base_a = (
+        "Synthetic: a shed base needs a level gravel pad, treated timber bearers set on "
+        "blocks, and a damp-proof membrane before the floor goes down, or the floor rots."
+    )
+    original = _chat(f"{base}1", "Synthetic shed plan", 30, [(plan_q, plan_a), (base_q, base_a)])
+    # A manual fork: the same two opening messages, then a different question.
+    fork = _chat(
+        f"{base}2",
+        "Synthetic shed plan (copy)",
+        31,
+        [(plan_q, plan_a), ("Synthetic: what about the roof?", "Synthetic: felt or shingles.")],
+    )
+    pointer = _chat(
+        f"{base}3",
+        "Synthetic follow-up",
+        32,
+        [
+            (
+                f"Synthetic: carry on from https://chatgpt.com/c/{base}1 please, and see "
+                "https://chatgpt.com/share/synthetic-share-0001 too.",
+                "Synthetic: carrying on.",
+            )
+        ],
+    )
+    quoting = _chat(
+        f"{base}4",
+        "Synthetic second opinion",
+        33,
+        [(f"{base_a}\n\nSynthetic: is this right?", "Synthetic: mostly, yes.")],
+    )
+    # Messages copied with their node IDs, as a native "branch in new chat" would.
+    copied = ConversationBuilder(f"{base}5", "Synthetic branched chat", BASE_EPOCH + 86_400 * 34)
+    node = copied.add(f"{base}5-sys", copied.root, "system", [""])
+    for suffix, role, text in (
+        ("u0", "user", plan_q),
+        ("a0", "assistant", plan_a),
+        ("u1", "user", base_q),
+        ("a1", "assistant", base_a),
+    ):
+        node = copied.add(f"{base}1-{suffix}", node, role, [text])
+    copied.add(f"{base}5-u2", node, "user", ["Synthetic: and the walls?"])
+    # Same topic, same title, same greeting, different words: not related.
+    alike_a = _chat(
+        f"{base}6",
+        "Synthetic garden shed",
+        35,
+        [
+            ("Synthetic: hello", "Synthetic: hi, what are you building?"),
+            ("Synthetic: a shed for bikes.", "Synthetic: a 6x4 footprint fits two bikes."),
+        ],
+    )
+    alike_b = _chat(
+        f"{base}7",
+        "Synthetic garden shed",
+        36,
+        [
+            ("Synthetic: hello", "Synthetic: hello! How can I help?"),
+            ("Synthetic: a shed for tools.", "Synthetic: wall racks keep tools off the floor."),
+        ],
+    )
+    return [
+        Case(
+            "copied_prefix",
+            "REL-002: a copied opening, copied node IDs, a chatgpt.com link and a pasted "
+            "paragraph each give one candidate link; a share link stays unresolved.",
+            "official",
+            [
+                original.native(),
+                fork.native(),
+                pointer.native(),
+                quoting.native(),
+                copied.native(),
+            ],
+            expected={
+                "conversations": 5,
+                "relationships": [
+                    [f"{base}2", "forked_from", f"{base}1", "structural", "prefix-v1"],
+                    [f"{base}3", "references", f"{base}1", "native", "chatgpt-url-v1"],
+                    [f"{base}4", "quotes", f"{base}1", "lexical", "quote-v1"],
+                    [f"{base}5", "forked_from", f"{base}1", "native", "native-node-v1"],
+                ],
+                "review_state": "candidate",
+                "unresolved_share_links": 1,
+            },
+        ),
+        Case(
+            "similar_unrelated",
+            "REL-002: same title, topic and greeting but different conversations: no link.",
+            "official",
+            [alike_a.native(), alike_b.native()],
+            expected={"conversations": 2, "relationships": []},
+        ),
+    ]
+
+
 def without_children(native: JsonDict) -> JsonDict:
     """Return a copy of a native conversation with every ``children`` list removed."""
     copy: JsonDict = json.loads(json.dumps(native))
@@ -980,6 +1081,7 @@ def all_cases() -> list[Case]:
         *_reexport_cases(),
         *_identity_cases(),
         *_legacy_cases(),
+        *_relationship_cases(),
     ]
 
 

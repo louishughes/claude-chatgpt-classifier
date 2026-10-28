@@ -54,6 +54,7 @@ from knowledge_engine.ingestion.registry import default_adapters
 from knowledge_engine.ingestion.source import NativeConversation, SourceListing, select_adapter
 from knowledge_engine.links.social_store import record_accounts
 from knowledge_engine.links.store import record_links
+from knowledge_engine.relationships.detect import detect_relationships
 from knowledge_engine.settings import Settings
 
 DEFAULT_WORKSPACE_NAME = "default"
@@ -308,6 +309,14 @@ def _run(
         status = ImportBatchStatus.PARTIAL
     else:
         status = ImportBatchStatus.SUCCEEDED
+    relationship_counts: Counter[str] = Counter()
+    if changed:
+        # Whole-workspace and idempotent; skipped when nothing changed, so
+        # an identical re-import does no extra work.
+        with factory.transaction() as session:
+            relationship_counts = detect_relationships(
+                session, workspace_id=workspace_id, import_id=import_id
+            )
     report = ImportReport(
         import_id=import_id,
         status=status,
@@ -319,6 +328,7 @@ def _run(
         changed_revisions=tuple(sorted(changed)),
         links=dict(sorted(link_counts.items())),
         accounts=dict(sorted(account_counts.items())),
+        relationships=dict(sorted(relationship_counts.items())),
         new_branches=new_branches,
         raw_observations=raw_observations,
         candidate_matches=dict(candidates),

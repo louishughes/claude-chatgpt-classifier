@@ -1,0 +1,11 @@
+{
+  "fixture_format_version": 1,
+  "case": "similar_unrelated",
+  "synthetic": true,
+  "layout": "official",
+  "proves": "REL-002: same title, topic and greeting but different conversations: no link.",
+  "expected": {
+    "conversations": 2,
+    "relationships": []
+  }
+}
