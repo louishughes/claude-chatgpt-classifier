@@ -784,6 +784,56 @@ def _file_read(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _backup(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Create, verify or restore a local backup (OPS-003). Never overwrites anything."""
+    from knowledge_engine.infrastructure.backup import (
+        BackupError,
+        check_to_dict,
+        create_backup,
+        restore_backup,
+        verify_backup,
+    )
+
+    command = f"backup {args.backup_command}"
+    try:
+        if args.backup_command == "create":
+            manifest = create_backup(settings, args.to)
+            data = {
+                "folder": manifest["folder"],
+                "files": len(manifest["files"]),
+                "rows": sum(manifest["tables"].values()),
+                "schema_revision": manifest["schema_revision"],
+            }
+            return CommandResult(
+                command,
+                data=data,
+                message=f"backup {manifest['folder']}: {data['files']} file(s), "
+                f"{data['rows']} row(s); search indexes are rebuilt with `ke index`",
+            )
+        if args.backup_command == "verify":
+            check = verify_backup(args.folder)
+        else:
+            check = restore_backup(args.folder, args.to)
+    except BackupError as error:
+        return CommandResult(command, ExitCode.ERROR, message=str(error), error_code="refused")
+    data = check_to_dict(check)
+    if not check.ok:
+        return CommandResult(
+            command,
+            ExitCode.ERROR,
+            data=data,
+            message="MISMATCH: "
+            + "; ".join(f"{len(v)} {k}" for k, v in data.items() if isinstance(v, list) and v),
+            error_code="mismatch",
+        )
+    done = "restored and checked" if args.backup_command == "restore" else "verified"
+    return CommandResult(
+        command,
+        data=data,
+        message=f"{done}: {check.files} file(s) and {check.rows} row(s) match the manifest",
+    )
+
+
 def _gold_schema(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """The golden-set JSON Schema (EVAL-001)."""
     from knowledge_engine.evaluation.gold import gold_schema
@@ -2453,6 +2503,24 @@ def build_parser() -> argparse.ArgumentParser:
     gold_commands.add_parser("schema", help="print the golden set JSON Schema").set_defaults(
         handler=_gold_schema
     )
+    backup = commands.add_parser("backup", help="back up, verify and restore the workspace")
+    backup_commands = backup.add_subparsers(dest="backup_command", required=True)
+    backup_create = backup_commands.add_parser(
+        "create", help="write a new backup folder (database and original files)"
+    )
+    backup_create.add_argument("--to", type=Path, required=True, help="where backups are kept")
+    backup_create.set_defaults(handler=_backup)
+    backup_verify = backup_commands.add_parser(
+        "verify", help="re-check every file and row count in a backup"
+    )
+    backup_verify.add_argument("folder", type=Path, help="the backup folder")
+    backup_verify.set_defaults(handler=_backup)
+    backup_restore = backup_commands.add_parser(
+        "restore", help="restore a backup into an empty folder and check it"
+    )
+    backup_restore.add_argument("folder", type=Path, help="the backup folder")
+    backup_restore.add_argument("--to", type=Path, required=True, help="an empty folder")
+    backup_restore.set_defaults(handler=_backup)
     file_parser = commands.add_parser("file", help="read a note, text, Word or PDF file")
     file_commands = file_parser.add_subparsers(dest="file_command", required=True)
     file_read = file_commands.add_parser(

@@ -840,3 +840,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - ingestion/documents.py (DOCUMENT_PARSER_VERSION, BlockKind, Block, AssetReference, ParsedDocument, decode_text, parse_markdown, parse_text, TextBuilder); ingestion/structured.py (DocumentConverter, BuiltinDocx, PdfWithoutConverter, DoclingConverter (optional, untested), default_converters, read_document, UnsafeDocumentError); `ke file read PATH [--blocks]`. No migration; nothing stored yet.
 - Tests: test_documents.py (12). Full suite 1173 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: OPS-003.
+
+## 2026-10-28 17:10 OPS-003 (#121)
+- infrastructure/backup.py (BACKUP_VERSION, BackupError, Check, create_backup, verify_backup, restore_backup, check_against, check_to_dict); `ke backup create --to`, `ke backup verify`, `ke backup restore --to`. No migration.
+- Tests: test_backup.py (4). Full suite 1177 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: OPS-004.
