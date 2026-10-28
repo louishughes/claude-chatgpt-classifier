@@ -69,3 +69,19 @@ On Louis's PC a `--limit 50` import took 410 s and the re-import 856 s. Doubling
 A re-import is now faster than the first import, and does no writes to the archive. The Windows run of the same command is recorded below when it is done; the Linux container has no antivirus, so it understates the gain there.
 
 Still per-run by design: hashing each source file once (needed to know whether it changed) and the before/after tree fingerprint (the `raw_unchanged` proof).
+
+## Link, YouTube and social counts (EVAL-010c, Gate G2)
+
+`ke eval links [--limit 100]` counts what the M2 registries stored for the first N chats (by native ID, the same batch `ke eval semantic --limit` takes). It reads only, makes no model calls and prints no URL, handle or text:
+
+- `links`: occurrences, chats with links, distinct targets by kind, occurrences by origin (message text or citation metadata);
+- `youtube`: mentions, distinct videos, mentions with a timestamp or a playlist, transcript status per video;
+- `social`: mentions by resolution (`resolved`, `ambiguous`, `rejected`), distinct accounts by platform and identity status, and how many distinct bare @names were left ambiguous instead of being guessed.
+
+```
+ke --json eval links --limit 100
+```
+
+Two URL forms of one video (`youtu.be/…` and `watch?v=…&t=42`) are two link targets but one video: the link registry keeps each URL as written, and the video registry deduplicates by video ID.
+
+**Real 100 chats:** not run yet. It runs on Louis's PC against the imported workspace, and the counts go here.

@@ -979,3 +979,6 @@ documents/rich_note.py: card "Tools and names" keeps only names with a letter; w
 
 ## 2026-10-28 19:35 NOTE-026 (#329)
 documents/rich_note.py _topics_line: digest topics grouped by the messages they cite, each group written once with one link per message. Tests: tests/integration/test_note_topic_citations.py (1, fails on the old code).
+
+## 2026-10-28 21:20 EVAL-010c (#334)
+evaluation/link_counts.py link_counts + `ke eval links --limit N`: counts-only report of link occurrences/targets, YouTube mentions/videos, social mentions/accounts/ambiguous @names for the first N chats by native ID; read-only, no model calls, no URL/handle/text. Docs: EVAL-010_SMOKE.md section. Tests: tests/integration/test_eval_links.py (1).
