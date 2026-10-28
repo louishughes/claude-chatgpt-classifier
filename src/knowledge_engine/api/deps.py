@@ -57,10 +57,39 @@ class ErrorBody(BaseModel):
 # app.dependency_overrides[get_settings] = lambda: test_settings, and so on.
 
 
+WORKSPACE_HEADER = "X-KE-Workspace"
+_tenants_guard = threading.Lock()
+
+
 def get_settings(request: Request) -> Settings:
-    """The workspace settings the app was created with."""
-    settings: Settings = request.app.state.settings
-    return settings
+    """The settings of the workspace this request is about.
+
+    One person's engine: the settings the app was created with. With
+    ``tenants_root`` set (PROD-003), the ``X-KE-Workspace`` header names a
+    tenant and the request gets that tenant's own folder; every other
+    dependency (database, indexes, jobs, exports) is built from it.
+
+    Raises:
+        ApiError: 400 ``workspace_required`` without the header; 401
+            ``unauthenticated`` for a name that isn't a created workspace
+            (the same answer as a bad token, so names can't be probed).
+    """
+    from knowledge_engine.access.tenants import tenant_exists, tenant_settings
+
+    base: Settings = request.app.state.settings
+    if base.tenants_root is None:
+        return base
+    name = request.headers.get(WORKSPACE_HEADER, "").strip()
+    if not name:
+        raise ApiError(400, "workspace_required", f"send the {WORKSPACE_HEADER} header")
+    if not tenant_exists(base, name):
+        raise ApiError(401, "unauthenticated", "unknown workspace or token")
+    # One Settings object per tenant, so per-workspace job lists stay put.
+    with _tenants_guard:
+        known: dict[str, Settings] = request.app.state.tenants
+        if name not in known:
+            known[name] = tenant_settings(base, name)
+        return known[name]
 
 
 def get_sessions(settings: Annotated[Settings, Depends(get_settings)]) -> Iterator[SessionFactory]:
@@ -97,13 +126,21 @@ _jobs_guard = threading.Lock()
 
 
 def get_jobs(request: Request, settings: Annotated[Settings, Depends(get_settings)]) -> ImportJobs:
-    """The app's background imports for this workspace (one list per app).
+    """The app's background imports for this workspace (one list per workspace).
 
     It is kept on the app, so ``GET /jobs/{id}`` finds a job that an earlier
-    ``POST /imports`` started. A new list is made if the settings changed
-    (a test overriding them).
+    ``POST /imports`` started. A new list is made for new settings (another
+    tenant, or a test overriding them).
     """
     with _jobs_guard:
+        if request.app.state.settings.tenants_root is not None:
+            # One list per tenant: a job started in one workspace can't be
+            # looked up from another.
+            lists: dict[str, ImportJobs] = request.app.state.tenant_jobs
+            key = str(settings.workspace_root)
+            if key not in lists:
+                lists[key] = ImportJobs(settings)
+            return lists[key]
         current = getattr(request.app.state, "jobs", None)
         if current is None or current[0] is not settings:
             current = (settings, ImportJobs(settings))

@@ -135,8 +135,14 @@ _export_guard = threading.Lock()
 def get_export_jobs(
     request: Request, settings: Annotated[Settings, Depends(get_settings)]
 ) -> ExportJobs:
-    """The app's export jobs for this workspace (one list per app)."""
+    """The app's export jobs for this workspace (one list per workspace)."""
     with _export_guard:
+        if request.app.state.settings.tenants_root is not None:
+            lists: dict[str, ExportJobs] = request.app.state.tenant_export_jobs
+            key = str(settings.workspace_root)
+            if key not in lists:
+                lists[key] = ExportJobs(settings)
+            return lists[key]
         current = getattr(request.app.state, "export_jobs", None)
         if current is None or current[0] is not settings:
             current = (settings, ExportJobs(settings))

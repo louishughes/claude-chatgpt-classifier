@@ -42,6 +42,8 @@ ke api                          # http://127.0.0.1:8766/api/v1/docs (Ctrl+C to s
 | `not_a_member` | 403 | The token's account has no role in this workspace. |
 | `forbidden` | 403 | The account's role doesn't include what this endpoint needs. |
 | `identity_mismatch` | 403 | A `reviewer` or `proposer` in the body isn't the caller's own account name. |
+| `workspace_required` | 400 | Several workspaces are served and the request had no `X-KE-Workspace` header. |
+| `source_outside_inbox` | 403 | Several workspaces: `POST /imports` named a file outside that workspace's inbox. |
 | `internal_error` | 500 | An unexpected failure. Nothing about it is returned. |
 
 ## Endpoints (API-001)
@@ -139,7 +141,22 @@ ke access log                       # the authorisation log, newest first
 - **Your own name only.** A `reviewer` or `proposer` in a request body must be the caller's account name (`identity_mismatch` otherwise), so the "can't review your own proposal" rule can't be dodged.
 - **The authorisation log** (`authz_events`) keeps every refusal, every allowed change and every membership change, with the method and route but never the query text. Its rows can't be edited or deleted.
 - `GET /api/v1/access/me` answers who you are, your role and what it allows.
-- The API serves the `default` workspace, the one imports write to. Several workspaces in one database, each scoped separately, is PROD-003.
+- One person's engine serves its one workspace. For several people, see the next section.
+
+## Several workspaces (PROD-003)
+
+Set `tenants_root` (in `ke.toml`, or `KE_TENANTS_ROOT`) and `ke api` serves several separate workspaces, each in its own folder (ADR-0011):
+
+```bash
+ke tenant add family --owner louis   # makes the folders and an owner; prints the owner's token once
+ke tenant list
+curl -H "Authorization: Bearer ke_..." -H "X-KE-Workspace: family" http://127.0.0.1:8766/api/v1/sources
+```
+
+- Every request but `/health` needs `X-KE-Workspace`. It picks `<tenants_root>/workspaces/<name>/`, and the whole request (database, search indexes, jobs, documents, exports) uses only that folder. There is no filter to forget: the other workspaces' files are never opened.
+- Accounts are per workspace, so a token from another workspace is unknown here (401, the same answer as an unknown workspace name). A workspace without accounts lets nobody in.
+- `POST /imports` takes a name inside `<tenants_root>/inbox/<name>/` (e.g. `{"source": "export.zip"}`). Anything that resolves outside it is refused (`source_outside_inbox`).
+- To manage a workspace's accounts, point the CLI at its folder: `KE_WORKSPACE_ROOT=<tenants_root>/workspaces/<name> ke access ...`.
 
 ## Swapping parts in tests
 
