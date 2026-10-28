@@ -638,3 +638,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - Tests: test_segments.py (7), test_segmenter.py (6). Full suite 803 passed, 6 skipped. ruff, mypy, git_guard OK.
 - Segments are computed, not stored yet (storage comes with classification persistence). LEG-005 stays open for the extraction and length-band parts.
 - Next: TAX-001/002.
+
+## 2026-10-28 03:50 TAX-001 + TAX-002 (#56, #57)
+- taxonomy/registry.py (Dimension, TermStatus, normalise_alias, TaxonomyTermRow, TaxonomyAliasRow, TaxonomyVersionRow, TaxonomyProposalRow, ProjectRow, ProjectAliasRow, TaxonomySnapshot, TaxonomyRegistry.add_term/add_alias/add_project/publish/snapshot/versions), migration 0015.
+- Tests: test_taxonomy_registry.py (8). Full suite 811 passed, 6 skipped. ruff, mypy, git_guard OK; no migration drift.
+- Next: TAX-003/004.

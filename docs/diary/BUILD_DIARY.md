@@ -1132,3 +1132,21 @@ pytest -q               # 803 passed, 6 skipped
 Fix attempts: 0. The 1,000 generated chats: full coverage, zero truncation, 2.5 s.
 
 **Next exact task:** TAX-001 + TAX-002 (taxonomy registry and published snapshots).
+
+### 03:50 — TAX-001 + TAX-002: the vocabulary, and frozen versions of it
+**What:** the tables for the governed vocabulary, plus the one way classification will read it.
+- **Terms by dimension.** Following OD-17, a term belongs to one dimension: domain, purpose, topic, knowledge type or output. Terms go two levels deep at most. A term starts as *proposed*. **Projects** have their own registry.
+- **IDs never come from labels.** IDs are random (`term_…`, `proj_…`), so renaming "Unreal" to "Unreal Engine" keeps every label that points at it. A merged term must name what it merged into, and the database checks that.
+- **Aliases are unique after normalising.** "Game development", "GAME-development" and "game  development" are the same spelling. One spelling can't mean two terms in a dimension, or two projects.
+- **Publishing freezes a version.** `publish("tax-1")` copies the *approved* terms and projects into a version row with a SHA-256. `snapshot("tax-1")` reads only that copy, never the live tables. Approving something afterwards doesn't change tax-1, a version name can't be reused, and an edited snapshot is refused.
+- **Unapproved terms can't be used.** Asking a snapshot for a proposed, retired or merged term raises an error, which is what the ticket's acceptance criterion requires.
+
+**Teach-back (`taxonomy/registry.py`):** "Every category has a permanent random ID, and its names are aliases that can't collide. When the vocabulary is ready, I publish a frozen, fingerprinted copy of just the approved terms. Classification only ever reads that copy, so a half-decided term can't sneak into a run."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 140 source files
+pytest -q               # 811 passed, 6 skipped
+```
+Fix attempts: 2. An alias row was flushed before its term, which broke the foreign key. Then one of my own new tests used an example that wasn't actually a collision.
+
+**Next exact task:** TAX-003 (alias matching) + TAX-004 (proposal review and publish).
