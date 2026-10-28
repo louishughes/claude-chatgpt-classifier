@@ -3022,6 +3022,46 @@ Talking points:
 
 **Next exact task:** NOTE-007 wiring (keyword candidates into the note's Keywords and topics section) once #296 merges.
 
+### 17:00 — NOTE-015 and NOTE-020: running the extractor for real, and labels in digest notes
+
+The first real score (`docs/evaluation/NOTE-011_REAL.md`) found decisions and open questions nearly empty, because the model-backed extractor (NOTE-005) had no way to run outside tests. **`ke extract run`** now works the same way as `ke digest run` and `ke classify run`: the first run writes request files for a Claude session to answer, and the next run collects the answers, applies NOTE-005's three attribution checks and the evidence gate, and stores the records. Segments already done are skipped, so a third run asks for nothing.
+
+Building it found a real bug in the extraction runner. When an answer hadn't arrived yet, the runner rolled back everything the segment's attempt had written, including the ledger row that says "this request was sent, in batch file 1". So the next run sent the same requests again in new files and never read the answers. A pending answer now keeps the ledger rows; nothing else is in that savepoint yet, because the records come from the answer.
+
+**NOTE-020:** `ke digest run --vault` wrote notes with no taxonomy, so they showed no labels. It now uses `--taxonomy`, or the newest published version by default.
+
+**Teach-back (`_extract`, the `ke extract run` command):** It sends every segment of the chosen chats to the model-backed extractor through request files, which a Claude session on the subscription answers. Running it again collects the answers, checks who really said what, and stores the records with their quotes. Work already done is skipped, so repeating it costs nothing.
+
+Checks:
+```
+tests/integration/test_extract_run.py   4 passed (egress off writes nothing; requests -> answers -> records -> nothing new; digest notes under the newest or given version)
+tests/integration/test_digest_dry_run.py, test_model_knowledge.py, test_extraction_gate_runner.py   unchanged, pass
+```
+Fix attempts: 2 (the runner rollback; egress is checked before running, because the runner counts a refused request as a failed attempt).
+
+**Next exact task:** NOTE-018, a suggested category instead of "unclassified".
+
+### 16:10 — NOTE-009: related chats, and a pasted prompt is not a link
+
+The rich note already had a "Related chats" section (from REL-003/REL-004 and NOTE-001): same-project, same-topic and shared-entity links, each naming the other chat's *knowledge note* with a "Why:" reason. What it lacked was a guard against the most common false link in a real archive: many chats open with the same pasted setup prompt ("You are a careful assistant..."). Before this change that prompt alone made two unrelated chats look like a copied opening (`forked_from`), a quoted paragraph (`quotes`), and similar text (`related_to`).
+
+- `extraction/preamble.py` holds one test, `looks_like_preamble`: a user message of 200+ characters that starts like a setup prompt. NOTE-005 already had it privately; it moved to a module with no imports so the relationship detectors can use it without an import cycle.
+- The copied-opening detector skips a setup prompt at the very start; the quote detector ignores setup-prompt paragraphs; the related-chat profile leaves them out of the text it compares.
+- Detector names stay the same (`prefix-v1`, `quote-v1`, `related-v1`) because the evaluation fixtures expect them and evaluation criteria don't change without Louis.
+
+Not done: the issue mentions a one-sentence model-written reason per link. The deterministic reasons ("both chats are labelled with project X", "both chats name the same named thing") are already there and cite evidence; a model sentence can come with the digest stage later if the scoring says the reasons read badly.
+
+**Teach-back (`looks_like_preamble`):** Lots of chats start with the same pasted instructions, so two chats sharing that text says nothing about them being related. This function spots such a prompt: a long user message that opens with words like "You are" or "Act as". The link detectors skip it, so links only come from what the chats are actually about.
+
+Checks:
+```
+tests/integration/test_note_related.py   3 passed (each of the three filters, removed on its own, makes the shared-prompt test fail)
+tests/integration/test_conversation_relationships.py, test_related_conversations.py   unchanged, pass
+```
+Fix attempts: 1 (the first test run showed the copied-opening detector also needed the filter).
+
+**Next exact task:** NOTE-012 dashboard chat view.
+
 ### 15:25 — #288: the "import didn't finish" page that lied
 
 I was sent to build the integration tickets (INT-001..003), but they were already merged, so I took the one open integration-test problem nobody had claimed: a browser-import test that failed once on Windows + Python 3.12 and passed on the re-run.
@@ -3053,3 +3093,35 @@ Fix attempts: 1.
 - "I turned a once-in-a-while timing bug into a test that fails every time on the broken code."
 
 **Next exact task:** watch three Windows CI runs pass, then close #288.
+
+### 15:45 UTC — EVAL-012: a scorer for links between chats (and a slice that was already done)
+
+This thread was started to build the web API and product tickets. They were already finished: API-001 to 005, OPS-007 and PROD-001 to 004 were merged earlier today (PRs #254 to #266). I re-ran their tests (109 passed, 15 skipped because the PostgreSQL tests need a live server) and handed the slice back. The coordinator then gave me EVAL-012 and REV-010.
+
+Both touch the reference set, which Louis's guardrail says agents can't change without his explicit OK. So I asked him on a decision card and built only the part that changes no answer key: the scorer.
+
+The problem: the release gate's "relationship precision" line has always said BLOCKED, because nothing said which proposed links ("chat B forked from chat A") are right. `evaluation/relationship_key.py` adds:
+
+- a **separate key format** (`relkey-v1`), not a change to the existing golden set: a closed list of chats, every true link between them, and a quote proving each one. The writer must declare it never saw the engine's output;
+- a **scorer** that gives each proposal one verdict: correct, wrong direction, wrong kind, or a made-up link;
+- a **code check** of every quote against the archive before any scoring, reporting problems by IDs and numbers only;
+- `ke eval relationships --key <file>`, plus `docs/evaluation/RELATIONSHIP_KEY_GUIDE.md` for the session that will write the real key.
+
+The gate line stays BLOCKED until a real key exists. The test fixture shows why kinds matter: a chat that says "carry on from <link>" is a `continues` to a person, while the URL detector calls it `references`, so on a hand-written test key the engine scores 0.75.
+
+**Teach-back (`score`):** It takes the answer key's list of chats and true links, and checks each link the engine proposed against it. A proposal is right only if the key has the same link in the same direction; otherwise it's marked backwards, the wrong kind, or invented, and a link to a chat the key doesn't cover isn't judged at all. Precision is the share that were right, and it has to reach 90%.
+
+Checks:
+```
+tests/unit/test_relationship_key.py           9 passed
+tests/integration/test_relationship_scoring.py 3 passed (fixture: 0.75 with a disagreeing key, 1.0 with an agreeing one, a bad quote stops scoring)
+python -m knowledge_engine.devtools.ci        tests 1423 passed, 22 skipped; types fixed after one run
+```
+Fix attempts: 1 (mypy wanted the version constant typed as a Literal).
+
+**Waiting on Louis:** approval for REV-010 (answer key v2, run on his PC) and for writing the real relationship key.
+
+Talking points:
+- "Precision for links needs a closed world: the key lists every chat it covers, so a link it doesn't contain really is wrong."
+- "A link pointing the wrong way and a link of the wrong kind need different fixes, so they're counted separately from invented ones."
+- "The answer key is written by a session that never saw the engine's output, and code checks every quote before a single point is scored."

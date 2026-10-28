@@ -8,7 +8,9 @@ Four detectors, each using only exact evidence:
 * **copied prefix** (structural): two conversations open with the same
   messages, word for word, in the same order (at least two, including a user
   message; OD-12). The newer one is proposed as ``forked_from`` the earlier
-  conversation it shares the longest opening with;
+  conversation it shares the longest opening with. A pasted setup prompt
+  ("You are...") at the very start is skipped first (NOTE-009): many
+  unrelated chats open with the same one;
 * **ChatGPT URLs** (native): a message links to ``chatgpt.com/c/<id>`` and
   ``<id>`` is a conversation in the archive: ``references``. Share links
   (``/share/<id>``) use a different ID that the export doesn't map to a
@@ -16,7 +18,8 @@ Four detectors, each using only exact evidence:
 * **verbatim quotes** (lexical): a user message contains a whole paragraph
   (100+ characters) that first appeared in an earlier, different
   conversation: ``quotes``. A paragraph found in more than five
-  conversations is treated as boilerplate and ignored.
+  conversations is treated as boilerplate and ignored, and so is a pasted
+  setup prompt ("You are...", NOTE-009), however few chats share it.
 
 Everything is proposed as a ``candidate``. Similar wording, the same title
 or the same topic is never evidence here: that is REL-003's job, and even
@@ -45,6 +48,7 @@ from urllib.parse import urlsplit
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from knowledge_engine.extraction.preamble import looks_like_preamble
 from knowledge_engine.graph.nodes import NodeFlag
 from knowledge_engine.importer.records import ConversationRow, MessageNodeRow, MessageRevisionRow
 from knowledge_engine.links.store import LinkOccurrenceRow, LinkTargetRow
@@ -247,12 +251,16 @@ def _load(session: Session, workspace_id: str) -> Iterator[_Chat]:
             text = _normal(node.text)
             if not text:
                 continue
+            if not chat.opening and looks_like_preamble(node.role, node.text):
+                continue  # chats that open with one pasted setup prompt are not copies
             chat.opening.append((node.role, _key(node.role, text)))
             chat.opening_revisions.append(stored.revisions[native_id])
         for native_id, node in stored.messages.items():
             revision = stored.revisions.get(native_id)
             if revision is None or node.role not in _SPOKEN:
                 continue
+            if looks_like_preamble(node.role, node.text):
+                continue  # a pasted setup prompt is shared boilerplate, not a quote
             for paragraph in re.split(r"\n\s*\n", node.text):
                 text = _normal(paragraph)
                 if len(text) < MIN_QUOTE_CHARS:
