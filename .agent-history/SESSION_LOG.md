@@ -952,6 +952,9 @@ documents/categories.py (category_shares: domain terms by share of labelled mess
 ## 2026-10-28 15:30 NOTE-011 code checks (#283)
 evaluation/note_checks.py (check_note: citations_real, claims_cited, decisions_user_held, tensions_next_steps (warn), empty_sections, budget; reads the rendered Markdown), `ke docs rubric [chats] [--all]`. Tests: tests/integration/test_note_checks.py (7).
 
+## 2026-10-28 17:00 NOTE-015 (#306) + NOTE-020 (#311)
+`ke extract run` (request files, knowledge_extractor, runner.run; egress checked first); runner keeps ledger rows on PendingAnswer (they were rolled back, so file-batch answers were never collected); `ke digest run --taxonomy` (default newest) passed to write_rich_note. Tests: tests/integration/test_extract_run.py (4).
+
 ## 2026-10-28 16:10 NOTE-009 (#281)
 extraction/preamble.py (looks_like_preamble, shared by NOTE-005 and the detectors); relationships/detect.py skips a leading setup prompt in copied openings and setup-prompt paragraphs in quotes; relationships/related.py leaves them out of similarity profiles. Tests: tests/integration/test_note_related.py (3).
 
