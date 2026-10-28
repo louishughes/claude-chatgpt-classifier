@@ -1,0 +1,18 @@
+{
+  "fixture_format_version": 1,
+  "case": "engine_switch",
+  "synthetic": true,
+  "layout": "official",
+  "proves": "REC-005: one chat decides on Unity and then only wonders about Godot (a hypothetical, which must not replace the decision); another decides on Unity and later explicitly switches to Godot instead (which may).",
+  "expected": {
+    "conversations": 2,
+    "kept": {
+      "decision": "c0000060-0000-4000-8000-000000000001-u0",
+      "hypothetical": "c0000060-0000-4000-8000-000000000001-u1"
+    },
+    "replaced": {
+      "decision": "c0000060-0000-4000-8000-000000000002-u0",
+      "switch": "c0000060-0000-4000-8000-000000000002-u1"
+    }
+  }
+}

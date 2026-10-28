@@ -742,3 +742,9 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - reconciliation/conflicts.py (ConflictKind, overlap, compare, find_conflicts, detect_conflicts, review_conflict, conflicts); migration 0024_record_conflicts; equivalence: public `differences`, stance words excluded from content words; `ke reconcile`.
 - Tests: test_record_links.py (5), test_record_conflicts.py (5). Full suite 1044 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: REC-004.
+
+## 2026-10-28 07:20 REC-004 (#87) + REC-005 (#88)
+- reconciliation/timeline.py (Transition, DecisionEventRow, check, record_event, revoke, revoked, build_events, timeline); migration 0025_decision_events.
+- reconciliation/supersession.py (Outcome, Verdict, stored_quotes, evaluate, find_verdicts, reconcile); synthetic fixture engine_switch (appended; existing fixtures byte-identical); `ke timeline [--record] [--build]`.
+- Tests: test_decision_timeline.py (6). Full suite 1060 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: REC-006.

@@ -1570,3 +1570,38 @@ migration drift         # 0
 Fix attempts: 1. The fixture expectation first counted a reference from another fixture, and was corrected to the one in actions_entities.
 
 **Next exact task:** REC-004 (decision transitions and event timeline).
+
+### 07:20 — REC-004 + REC-005: a decision's history, and when a newer one really replaces it
+**REC-004.** Every step in a decision's life is now an event: proposed, accepted, rejected, clarified, revised, superseded, contradicted.
+- The events table is append-only (database triggers). A wrong event is withdrawn by adding a `revokes` event, so the history shows the mistake and the correction.
+- `build_events` adds the events that need no judgement:
+  - a proposal for every assistant suggestion;
+  - an acceptance or rejection when a decision cites the very same suggestion sentence;
+  - a contradiction for every unresolved conflict.
+- `record_event` refuses events between the wrong record types. It also refuses a "replaces" that points forward in time.
+
+**REC-005.** A later decision replaces an earlier one only if all seven tests pass:
+1. same kind and person;
+2. overlapping scope;
+3. same subject;
+4. strictly later;
+5. firmly accepted and evidence-checked;
+6. not hypothetical ("what if", "maybe", a question mark);
+7. explicit replacement words ("instead", "switch to", "change of plan").
+
+The user's own quoted words are read from the stored messages for tests 6 and 7. If any test from 4 on fails, the pair goes to review with the failed tests named.
+- New fixture `engine_switch`. One chat decides on Unity, then only wonders about Godot: the wondering produces no decision at all. Even a hand-made Godot "decision" that a careless reviewer supported is refused as hypothetical. Another chat says "change of plan, I've decided to use Godot instead of Unity": that replaces its own chat's Unity decision, and not the other chat's.
+- Note: `ke reconcile`'s output was left exactly as it was (its test asserts the whole output); supersession and events run with `ke timeline --build`.
+
+**Teach-back (`reconciliation/supersession.py`):** "A newer decision only replaces an older one when it's the same kind of decision by the same person, in the same project or chat, about the same thing, firmly decided, and later. On top of that, my own words must say I'm replacing something, like 'instead' or 'change of plan', and must not be a 'what if' or a question. If any of that fails, nothing is replaced; the pair goes to a reviewer with the failed checks listed."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 136 source files
+pytest -q               # 1060 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 2, both in the new test's setup:
+- the hand-made quote needed the project's own quote fingerprint;
+- the hypothetical's verdict fails only on "hypothetical", because "switched to" already counts as intent.
+
+**Next exact task:** REC-006 (current-state and as-of projector), then REC-007.

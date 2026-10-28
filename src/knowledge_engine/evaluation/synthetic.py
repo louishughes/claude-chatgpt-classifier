@@ -1544,6 +1544,57 @@ def _long_chat_cases() -> list[Case]:
     ]
 
 
+def _supersession_cases() -> list[Case]:
+    """REC-005: a hypothetical switch never replaces a decision; an explicit one may."""
+    asked = _chat(
+        "c0000060-0000-4000-8000-000000000001",
+        "Synthetic engine musing",
+        80,
+        [
+            (
+                "Synthetic note: I've decided to use Unity for the game engine.",
+                "Synthetic answer: noted, Unity for the game engine.",
+            ),
+            (
+                "Synthetic question: what if we switched to Godot for the game engine?",
+                "Synthetic answer: Godot is lighter, but it depends on what you need.",
+            ),
+        ],
+    )
+    switched = _chat(
+        "c0000060-0000-4000-8000-000000000002",
+        "Synthetic engine switch",
+        81,
+        [
+            (
+                "Synthetic note: I've decided to use Unity for the game engine.",
+                "Synthetic answer: noted, Unity for the game engine.",
+            ),
+            (
+                "Synthetic note: change of plan, I've decided to use Godot instead of Unity "
+                "for the game engine.",
+                "Synthetic answer: understood, Godot from now on.",
+            ),
+        ],
+    )
+    a, b = asked.conversation_id, switched.conversation_id
+    return [
+        Case(
+            "engine_switch",
+            "REC-005: one chat decides on Unity and then only wonders about Godot (a "
+            "hypothetical, which must not replace the decision); another decides on Unity and "
+            "later explicitly switches to Godot instead (which may).",
+            "official",
+            [asked.native(), switched.native()],
+            expected={
+                "conversations": 2,
+                "kept": {"decision": f"{a}-u0", "hypothetical": f"{a}-u1"},
+                "replaced": {"decision": f"{b}-u0", "switch": f"{b}-u1"},
+            },
+        )
+    ]
+
+
 def all_cases() -> list[Case]:
     """Return every fixed fixture case, in a stable order."""
     return [
@@ -1560,6 +1611,7 @@ def all_cases() -> list[Case]:
         *_extraction_cases(),
         *_action_entity_cases(),
         *_long_chat_cases(),
+        *_supersession_cases(),
     ]
 
 

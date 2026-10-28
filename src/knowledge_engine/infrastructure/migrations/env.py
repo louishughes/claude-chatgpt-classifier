@@ -30,6 +30,7 @@ from knowledge_engine.providers import ledger as _model_ledger  # noqa: F401
 from knowledge_engine.reconciliation import conflicts as _record_conflicts  # noqa: F401
 from knowledge_engine.reconciliation import equivalence as _equivalence  # noqa: F401
 from knowledge_engine.reconciliation import relations as _record_links  # noqa: F401
+from knowledge_engine.reconciliation import timeline as _decision_events  # noqa: F401
 from knowledge_engine.relationships import store as _relationships  # noqa: F401
 from knowledge_engine.segmentation import overrides as _segment_overrides  # noqa: F401
 from knowledge_engine.taxonomy import changes as _taxonomy_changes  # noqa: F401
