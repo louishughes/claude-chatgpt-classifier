@@ -668,3 +668,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - classification/scoring.py (Weights, Signals, KeywordScorer, corpus_frequencies, rank, Ranking, as_answer); classification/classifier.py (SegmentClassifier, SegmentClassification, segment_messages); synthetic fixture case mixed_projects.
 - Tests: test_segment_classifier.py (7). Full suite 880 passed, 6 skipped; ruff, mypy OK; drift 0.
 - Next: CLS-004 + CLS-005.
+
+## 2026-10-28 06:45 CLS-004 + CLS-005 (#67, #68)
+- classification/store.py (ClassificationRow, ClassificationLabelRow, ClassificationReviewRow, save, record_review, effective_labels, review_queue, FieldLabels, ReviewInputError); migration 0018_classifications; classification/drift.py (order_experiment, canonical, DriftReport, Unstable).
+- Tests: test_classification_store.py (7). Full suite 887 passed, 6 skipped; ruff, mypy OK; drift 0.
+- Next: EXT-001 + EXT-002.
