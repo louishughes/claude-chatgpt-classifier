@@ -2147,3 +2147,38 @@ Fix attempts: 1 (vault image copies survived the purge; the purge now removes th
 Record fix: the times on this diary's entries since 00:35 had drifted hours ahead of the real clock, because I estimated them instead of reading the clock. Each is now the PR's merge time from `git log`.
 
 **Next exact task:** OPS-005 (CI with no real credentials).
+
+### 09:03 — OPS-005: one command for every check, with no keys anywhere
+**OPS-005** (`devtools/ci.py`, `.github/workflows/ci.yml`) makes CI one command I can also run myself.
+- `python -m knowledge_engine.devtools.ci` runs lint, format, strict types, the git guard and the whole test suite.
+- `--nightly` runs the bounded semantic checks: the release gate, the variance check and the ZIP-to-vault run. They use synthetic fixtures and the fake model, one pass each, no retries.
+- Every step runs with API keys removed from its environment. A check that secretly needed a real model would fail here, instead of passing on a machine that happens to have a key.
+- The GitHub workflow runs those two commands and nothing else, on Linux and Windows with Python 3.12 and 3.13, plus a nightly schedule. It uses no secrets.
+
+While doing this I found the schema-drift test only compared two of the 25 table modules, because only those were imported in that test. There is now one list of table modules (`migrations/tables.py`). Alembic uses it, and a new test checks every table against the migrations. A second new test checks that every module defining a table is on the list.
+
+Acceptance check, "CI reproducible with no real provider credentials": I ran it locally with a fake `ANTHROPIC_API_KEY` set in the shell (it is stripped). All 5 checks passed and all 3 nightly checks passed.
+
+**Owner decisions this morning** (Louis, 08:54 UTC, "Do a and b"):
+- **a)** One EVAL-011 smoke run with a real paid model is approved as a single exception: synthetic chats, as small as the ticket allows, with a hard cost cap. Its cost will be written here. The no-paid-API rule stays for everything else.
+- **b)** The 13 parked tickets (API, product and integrations) are unparked and will be built after M5 and M6. Their labels are removed.
+
+**Teach-back (`devtools/ci.py`):** "CI is one command that I can run on my own machine too, so a green build means the same thing in both places. It strips every API key before running anything, so no check can lean on a paid model. The nightly part runs the evaluations once on fake data with a fake model, so it can't run away."
+```
+ci (lint, format, types, guard, tests)   # 5/5 ok; pytest 1186 passed, 7 skipped
+ci --nightly (gate, variance, e2e)       # 3/3 ok
+```
+Fix attempts: 0.
+
+**Next exact task:** the real-provider adapter for the one approved EVAL-011 run, then OPS-006.
+
+### 09:14 — OPS-005: first CI run found Windows and non-root problems
+
+The first GitHub Actions run of #251 failed on all four jobs. Locally every test passed because this container runs as root, and none of the earlier runs were on Windows.
+
+- **Purge on Windows (product bug).** Windows won't delete a read-only file, and stored evidence is read-only. Purge, and the importer's removal of a purged file stored again, now go through `archive.remove_stored`, which puts the write bit back first.
+- **Fixture ZIP bytes (product bug).** The EVAL-006 fixture builder didn't pin the ZIP's "made on" byte, so Windows built different bytes. It is now pinned, as `synthetic.py` already did.
+- **Two tests that only ran in one setup.** The backup tamper test wrote to a read-only file. It now makes it writable first, as a tamperer would; its assertions are unchanged. The installed-`ke` test looked next to `python.exe`, but Windows puts scripts in `Scripts\\`; it now asks `sysconfig`. Neither assertion changed.
+
+Checks: the full suite as a non-root user, 1186 passed, 7 skipped. Purge, backup, end-to-end and CLI tests pass as root. Windows is proved by CI.
+Fix attempts: 1.

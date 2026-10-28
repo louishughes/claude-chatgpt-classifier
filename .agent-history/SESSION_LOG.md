@@ -852,3 +852,12 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - Tests: test_purge.py (4). Full suite 1181 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Record fix: entry times in this log and the build diary from 00:35 on 2026-10-28 had drifted hours ahead of the clock (they were estimates, not readings). They are now each PR's merge time from `git log`.
 - Next: OPS-005.
+
+## 2026-10-28 09:03 OPS-005 (#123); owner unparked 13 tickets and approved one paid smoke run
+- devtools/ci.py (CHECKS, NIGHTLY, clean_environment, run, main); .github/workflows/ci.yml (only runs the two ci commands; no secrets); infrastructure/migrations/tables.py (TABLE_MODULES, all_tables) now feeds env.py.
+- Tests: test_ci.py (3), test_schema_drift.py (2). `ci` with a fake key in the shell: 5/5 ok, 1186 passed, 7 skipped; `ci --nightly`: gate, variance, e2e ok.
+- Owner (08:54 UTC, "Do a and b"): one EVAL-011 paid smoke run approved (synthetic, cost cap, cost to be logged); API-001..005, PROD-001..004, OPS-007, INT-001..003 unparked (labels removed). Recorded in IMPLEMENTATION_PLAN and OPEN_DECISIONS.
+- Next: real-provider adapter for the approved EVAL-011 run, then OPS-006.
+
+## 2026-10-28 09:14 OPS-005 CI fixes
+First CI run: read-only deletes on Windows (purge), OS byte in the e2e fixture ZIP, two tests that assumed root or a Unix layout. Fixed in #251; non-root full suite green locally.

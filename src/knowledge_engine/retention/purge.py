@@ -66,6 +66,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from knowledge_engine.importer.archive import remove_stored
 from knowledge_engine.infrastructure.db import database_path
 from knowledge_engine.retention.tombstones import TombstoneKind, conversation_key
 from knowledge_engine.settings import Settings
@@ -735,7 +736,7 @@ def run_purge(
             for path in plan.files:
                 target = (root / path).resolve()
                 if root in target.parents:  # never touch anything outside the workspace
-                    target.unlink(missing_ok=True)
+                    remove_stored(target)
             for index in (root / "index").glob("*.db*"):
                 index.unlink()  # rebuilt from the database, now without the chats
             # Rewrites the whole file, so deleted rows don't linger in free pages.

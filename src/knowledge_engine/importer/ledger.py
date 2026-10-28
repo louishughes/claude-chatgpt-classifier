@@ -46,7 +46,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from knowledge_engine.domain.enums import ImportBatchStatus, check_transition
 from knowledge_engine.domain.ids import snapshot_id
-from knowledge_engine.importer.archive import BlobStore, StorageMode, StoredBlob
+from knowledge_engine.importer.archive import BlobStore, StorageMode, StoredBlob, remove_stored
 from knowledge_engine.infrastructure.db import Base
 from knowledge_engine.retention.tombstones import TombstoneKind, is_purged
 
@@ -262,7 +262,7 @@ class ImportLedger:
             # This file was purged (OPS-004): the copy just stored goes again,
             # so re-importing the same export can't restore what was deleted.
             if blob.mode == "copy":
-                blob.location.unlink(missing_ok=True)
+                remove_stored(blob.location)
             self._link(batch, relative_path, snapshot.snapshot_id)
             return snapshot, False
         created = snapshot is None

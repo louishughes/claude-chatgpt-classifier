@@ -50,6 +50,8 @@ def test_backup_verify_restore_round_trip(settings: Settings, tmp_path: Path) ->
 def test_tampering_is_found_and_blocks_restore(settings: Settings, tmp_path: Path) -> None:
     folder = tmp_path / "backups" / create_backup(settings, tmp_path / "backups")["folder"]
     blob = next(p for p in (folder / "archive").rglob("*") if p.is_file())
+    # Archive copies are read-only (as in the store); the tamperer undoes that first.
+    blob.chmod(0o644)
     blob.write_bytes(blob.read_bytes() + b"x")
     with sqlite3.connect(folder / "knowledge.db") as connection:
         connection.execute("DELETE FROM link_occurrences")

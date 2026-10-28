@@ -10,34 +10,11 @@ from __future__ import annotations
 from alembic import context
 from sqlalchemy import Engine
 
-# Import every module that defines tables, so autogenerate and the drift test
-# see the full schema.
-from knowledge_engine.classification import store as _classifications  # noqa: F401
-from knowledge_engine.documents import dependencies as _document_builds  # noqa: F401
-from knowledge_engine.extraction import runner as _extraction_runs  # noqa: F401
-from knowledge_engine.extraction import store as _knowledge_records  # noqa: F401
-from knowledge_engine.importer import corrections as _corrections  # noqa: F401
-from knowledge_engine.importer import identity as _identity  # noqa: F401
-from knowledge_engine.importer import ledger as _ledger  # noqa: F401
-from knowledge_engine.importer import media as _media  # noqa: F401
-from knowledge_engine.importer import records as _records  # noqa: F401
-from knowledge_engine.infrastructure import jobs as _jobs  # noqa: F401
-from knowledge_engine.infrastructure import workspace as _workspace  # noqa: F401
-from knowledge_engine.infrastructure.db import Base
-from knowledge_engine.links import social_store as _social  # noqa: F401
-from knowledge_engine.links import store as _links  # noqa: F401
-from knowledge_engine.links import video_transcripts as _video_transcripts  # noqa: F401
-from knowledge_engine.links import youtube as _youtube  # noqa: F401
-from knowledge_engine.providers import ledger as _model_ledger  # noqa: F401
-from knowledge_engine.reconciliation import conflicts as _record_conflicts  # noqa: F401
-from knowledge_engine.reconciliation import equivalence as _equivalence  # noqa: F401
-from knowledge_engine.reconciliation import relations as _record_links  # noqa: F401
-from knowledge_engine.reconciliation import timeline as _decision_events  # noqa: F401
-from knowledge_engine.relationships import store as _relationships  # noqa: F401
-from knowledge_engine.retention import tombstones as _purge_log  # noqa: F401
-from knowledge_engine.segmentation import overrides as _segment_overrides  # noqa: F401
-from knowledge_engine.taxonomy import changes as _taxonomy_changes  # noqa: F401
-from knowledge_engine.taxonomy import registry as _taxonomy  # noqa: F401
+from knowledge_engine.infrastructure.migrations.tables import all_tables
+
+# Every table module is imported, so autogenerate and the drift check see
+# the full schema.
+target_metadata = all_tables()
 
 engine = context.config.attributes.get("engine")
 if not isinstance(engine, Engine):
@@ -46,7 +23,7 @@ if not isinstance(engine, Engine):
 with engine.connect() as connection:
     context.configure(
         connection=connection,
-        target_metadata=Base.metadata,
+        target_metadata=target_metadata,
         # SQLite can't ALTER most things in place; batch mode copies the table
         # instead, so future column changes still work.
         render_as_batch=True,
