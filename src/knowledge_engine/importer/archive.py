@@ -38,6 +38,8 @@ StorageMode = Literal["copy", "reference"]
 
 # 1 MiB chunks keep memory flat however big the file is.
 _CHUNK = 1024 * 1024
+# Files up to this size are read once into memory instead of twice.
+_IN_MEMORY = 16 * 1024 * 1024
 
 
 class BlobStoreError(Exception):
@@ -180,8 +182,23 @@ class BlobStore:
         if self._max_bytes is not None and size > self._max_bytes:
             raise BlobTooLargeError(f"file is {size} bytes, limit is {self._max_bytes}")
 
+        if size <= _IN_MEMORY:
+            # One read: hash the bytes, and write them only if they're new.
+            return self._store_new_or_check(source.read_bytes())
+        # Big file: hash it first, so a re-import of bytes already stored
+        # reads the file once and writes nothing (PERF-001).
+        sha, _ = hash_file(source, max_bytes=self._max_bytes)
+        target = self.path_for(sha)
+        if target.exists():
+            self._check(target, sha)
+            return StoredBlob(sha, size, "copy", target)
         with source.open("rb") as handle:
-            return self._store(iter(lambda: handle.read(_CHUNK), b""))
+            blob = self._store(iter(lambda: handle.read(_CHUNK), b""))
+        if blob.sha256 != sha:
+            # The file changed between the two reads; keep what was stored
+            # under its own hash, but don't pretend it's the file we hashed.
+            raise BlobCorruptError(f"file changed while it was read ({sha[:12]})")
+        return blob
 
     def put_bytes(self, data: bytes) -> StoredBlob:
         """Store some bytes (e.g. a ZIP member), unless already stored.
@@ -199,6 +216,17 @@ class BlobStore:
         """
         if self._max_bytes is not None and len(data) > self._max_bytes:
             raise BlobTooLargeError(f"data is {len(data)} bytes, limit is {self._max_bytes}")
+        return self._store_new_or_check(data)
+
+    def _store_new_or_check(self, data: bytes) -> StoredBlob:
+        # Bytes already stored are checked once and never written again:
+        # writing and fsyncing a throwaway copy of every unchanged file was
+        # what made a re-import slower than the first import (PERF-001).
+        sha = sha256_hex(data)
+        target = self.path_for(sha)
+        if target.exists():
+            self._check(target, sha)
+            return StoredBlob(sha, len(data), "copy", target)
         return self._store(iter((data,)))
 
     def _store(self, chunks: Iterator[bytes]) -> StoredBlob:

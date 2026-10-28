@@ -278,7 +278,11 @@ class ImportLedger:
             self._session.add(snapshot)
         else:
             # Reused: check the copy the ledger points at, not just the new one.
-            self._archive.verify(stored_blob(snapshot))
+            # When that is the very file the archive just hashed, it was
+            # checked a moment ago; reading it a third time added nothing.
+            stored = stored_blob(snapshot)
+            if stored.location != blob.location:
+                self._archive.verify(stored)
         self._link(batch, relative_path, snapshot.snapshot_id)
         return snapshot, created
 
