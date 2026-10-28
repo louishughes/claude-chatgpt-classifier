@@ -59,7 +59,12 @@ from sqlalchemy.orm import Session
 
 from knowledge_engine.classification.store import effective_labels
 from knowledge_engine.digest.contract import ConversationDigest, DigestItem
-from knowledge_engine.documents.categories import category_shares, waiting_candidates
+from knowledge_engine.documents.categories import (
+    Suggestion,
+    category_shares,
+    suggested_category,
+    waiting_candidates,
+)
 from knowledge_engine.documents.model import DocItem, DocumentKind, build_document
 from knowledge_engine.documents.notes import _branches, _images, _links, knowledge_path
 from knowledge_engine.documents.render import transcript_stem
@@ -443,10 +448,20 @@ def chat_labels(
 
 
 def _category_lines(
-    session: Session, chat: StoredConversation, taxonomy: TaxonomySnapshot, citer: Citer
+    session: Session,
+    chat: StoredConversation,
+    taxonomy: TaxonomySnapshot,
+    citer: Citer,
+    suggestion: Suggestion | None,
 ) -> list[str]:
     """One line per domain term (NOTE-008), then the candidates waiting for review."""
     lines = []
+    if suggestion is not None:
+        segments = ", ".join(str(n) for n in suggestion.segments)
+        lines.append(
+            f"Suggested, waiting for review (not a label): **{escape_text(suggestion.label)}**, "
+            f"the classifier's best candidate from segment(s) {segments}."
+        )
     for share in category_shares(session, chat, taxonomy):
         segments = ", ".join(str(n) for n in share.segments)
         cites = " ".join(citer.native(n) for n in share.evidence if n in chat.node_keys)
@@ -574,28 +589,45 @@ def rich_conversation_note(
 
     category = labels.category or "unclassified"
     where = category if labels.subcategory is None else f"{category} › {labels.subcategory}"
-    names = sorted(
-        {" ".join(i.record.entity.name.split()) for i in sorted_.references if i.record.entity}
+    # Shown beside "unclassified", never in its place: the front-matter
+    # category stays unset until a reviewer settles it (NOTE-018).
+    suggestion = (
+        suggested_category(session, chat, taxonomy)
+        if taxonomy is not None and labels.category is None
+        else None
     )
+    shown = (
+        where
+        if suggestion is None
+        else (f"{where}; suggested: {suggestion.label} (waiting for review)")
+    )
+    # A "name" made only of digits and punctuation ("48" from "playing 48
+    # levels") is a number the entity cue caught, not a tool or a title.
+    spelled = {
+        " ".join(i.record.entity.name.split()) for i in sorted_.references if i.record.entity
+    }
+    names = sorted(n for n in spelled if any(ch.isalpha() for ch in n))
     made = _artefact_names(session, sorted_.artefacts)
 
     def card_cell(item: DigestItem | None, missing: str) -> str:
         return _cell(_digest_line(item, citer)) if item else missing
 
-    pending = "not written yet" if digest is None else "not stated"
-    card = [
-        "| | |",
-        "|---|---|",
-        f"| **Purpose** | {card_cell(digest.purpose if digest else None, pending)} |",
-        f"| **Outcome** | {card_cell(digest.outcome if digest else None, pending)} |",
-    ]
+    card = ["| | |", "|---|---|"]
+    if digest is None:
+        card += ["| **Purpose** | not written yet |", "| **Outcome** | not written yet |"]
+    else:
+        # A digest that found no purpose or outcome leaves the row out: an
+        # empty "not stated" row reads as a claim about the chat (NOTE-024).
+        for title, item in (("Purpose", digest.purpose), ("Outcome", digest.outcome)):
+            if item is not None:
+                card.append(f"| **{title}** | {card_cell(item, '')} |")
     if digest is not None:
         status = digest.status.value if digest.status else "unknown"
         intent = digest.intent.value if digest.intent else "unknown"
         card.append(f"| **Status** | {status} |")
         card.append(f"| **Intent** | {intent}: {card_cell(digest.intent_item, 'unknown')} |")
     card += [
-        f"| **Category** | {_cell(escape_text(where))} |",
+        f"| **Category** | {_cell(escape_text(shown))} |",
         f"| **Project** | {_cell(escape_text(labels.project or 'none matched'))} |",
         "| **Tools and names** | "
         + (_cell(", ".join(escape_text(n) for n in names)) or "none recorded")
@@ -701,7 +733,7 @@ def rich_conversation_note(
         )
     tag_lines = [classified]
     if taxonomy is not None:
-        tag_lines += _category_lines(session, chat, taxonomy, citer)
+        tag_lines += _category_lines(session, chat, taxonomy, citer, suggestion)
     if labels.tags:
         tag_lines.append("Topics: " + ", ".join(escape_text(t) for t in labels.tags))
     for facet, values in (labels.facets or {}).items():

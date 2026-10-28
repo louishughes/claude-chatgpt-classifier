@@ -805,6 +805,70 @@ def _gold_template(settings: Settings, args: argparse.Namespace) -> CommandResul
     )
 
 
+def _gold_convert(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Turn a per-chat answer key folder into one golden set file (EVAL-014); counts only.
+
+    The key folder is only read. The output must be outside it, and an
+    existing file is never overwritten.
+    """
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.evaluation.answer_key import convert_answer_key
+    from knowledge_engine.evaluation.gold import write_gold
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+
+    name = "gold convert"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    key = args.key.resolve()
+    if not key.is_dir() or not any(key.glob("*.json")):
+        return CommandResult(
+            name,
+            ExitCode.USAGE,
+            message="no key files (*.json) in that folder",
+            error_code="missing",
+        )
+    out = (args.out or settings.workspace_root / "gold" / f"{args.name}.json").resolve()
+    if out.is_relative_to(key):
+        return CommandResult(
+            name,
+            ExitCode.USAGE,
+            message="the output must be outside the answer key folder",
+            error_code="inside_key",
+        )
+    if out.exists():
+        return CommandResult(
+            name, ExitCode.USAGE, message=f"already exists: {out.name}", error_code="exists"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            gold, report = convert_answer_key(
+                session,
+                key,
+                name=args.name,
+                taxonomy_version=args.taxonomy,
+                annotator=args.annotator,
+            )
+    finally:
+        engine.dispose()
+    write_gold(gold, out)
+    data = {**report.as_dict(), "file": out.name}
+    unmapped = sum(report.unmapped.values())
+    skipped = sum(report.skipped.values())
+    return CommandResult(
+        name,
+        data=data,
+        message=(
+            f"{report.records} records from {report.found} of {report.files} chats; "
+            f"{unmapped} unmapped, {skipped} skipped, {report.unverified} unverified left out"
+        ),
+    )
+
+
 def _gold_score(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Score this workspace's records against a private answer key; numbers only."""
     from sqlalchemy.orm import Session
@@ -1150,6 +1214,8 @@ def _classify(settings: Settings, args: argparse.Namespace) -> CommandResult:
     against the pinned version (CLS-001) and stores the results (CLS-004).
     The vocabulary is fixed for the whole run: one ``--taxonomy`` version.
     """
+    if args.classify_command == "review":
+        return _classify_review(settings, args)
     from collections import Counter
 
     from sqlalchemy import select
@@ -1238,6 +1304,73 @@ def _classify(settings: Settings, args: argparse.Namespace) -> CommandResult:
         message=(
             f"{data['done']} done, {data['pending']} waiting for answers, "
             f"{data['review_required']} need review ({len(ids)} chats, {len(results)} segments)"
+        ),
+    )
+
+
+def _classify_review(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Send segments waiting for review to a reviewer session (NOTE-018).
+
+    Same request files as ``classify run``, in their own ``--run-id`` folder
+    so a different session answers them. Clean answers are stored as
+    reviews naming that session; the rest stay in the queue for a person.
+    """
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.classification.review_session import review_flagged
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.providers.file_batch import FileBatchProvider
+    from knowledge_engine.providers.ledger import ModelStageRunner
+    from knowledge_engine.settings import EgressDisabledError
+    from knowledge_engine.taxonomy.registry import TaxonomyRegistry
+
+    name = "classify review"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            try:
+                snapshot = TaxonomyRegistry(session).snapshot(args.taxonomy)
+            except (KeyError, ValueError):
+                return CommandResult(
+                    name,
+                    ExitCode.USAGE,
+                    message="no such published taxonomy version",
+                    error_code="no_taxonomy",
+                )
+            provider = FileBatchProvider(settings.model_batch_root, args.run_id, settings.egress)
+            runner = ModelStageRunner(session, provider, settings.egress)
+            try:
+                report = review_flagged(session, snapshot, runner, provider.identity.provider_id)
+            except EgressDisabledError:
+                return CommandResult(
+                    name,
+                    ExitCode.USAGE,
+                    message="text_llm is off: turn it on in [egress] to write request files",
+                    error_code="egress_off",
+                )
+            session.commit()
+    finally:
+        engine.dispose()
+    data = {
+        "queued": report.queued,
+        "reviewed": report.reviewed,
+        "unsure": report.unsure,
+        "pending": report.pending,
+        "failed": report.failed,
+        "missing": report.missing,
+        "taxonomy": args.taxonomy,
+    }
+    return CommandResult(
+        name,
+        data=data,
+        message=(
+            f"{report.reviewed} reviewed, {report.pending} waiting for answers, "
+            f"{report.unsure + report.failed} left for a person ({report.queued} queued)"
         ),
     )
 
@@ -2439,20 +2572,32 @@ def _docs_check(settings: Settings, args: argparse.Namespace) -> CommandResult:
         "broken_links": [list(b) for b in check.broken_links],
         "broken_embeds": [list(b) for b in check.broken_embeds],
         "bad_frontmatter": check.bad_frontmatter,
+        # NOTE-010: notes written to the rich-note layout, and what's wrong with any note.
+        "readable_notes": check.readable,
+        "readability": [
+            {"note": p.note, "check": p.check, "detail": p.detail} for p in check.readability
+        ],
     }
     if not check.clean:
         broken = len(check.broken_links) + len(check.broken_embeds) + len(check.bad_frontmatter)
+        problems = broken + len(check.readability)
         return CommandResult(
             "docs check",
             ExitCode.ERROR,
             data=data,
-            message=f"{broken} problem(s) in {check.notes} notes",
-            error_code="broken_links",
+            message=(
+                f"{problems} problem(s) in {check.notes} notes "
+                f"({broken} link or header, {len(check.readability)} readability)"
+            ),
+            error_code="broken_links" if broken else "readability",
         )
     return CommandResult(
         "docs check",
         data=data,
-        message=f"{check.notes} notes: {check.links} links and {check.embeds} embeds all resolve",
+        message=(
+            f"{check.notes} notes: {check.links} links and {check.embeds} embeds all resolve; "
+            f"{check.readable} rich note(s) within budget"
+        ),
     )
 
 
@@ -2660,9 +2805,19 @@ def _docs_note(settings: Settings, session: Any, args: argparse.Namespace) -> Co
                 error_code="no_taxonomy",
             )
         try:
-            path = write_topic_master(
-                session, args.topic, snapshot, args.vault, mode=Mode(args.mode)
-            )
+            if args.template == "v2":
+                # The readable layout (NOTE-010); v1 (DOC-005) stays the default.
+                from knowledge_engine.documents.readable_master import (
+                    write_readable_topic_master,
+                )
+
+                path = write_readable_topic_master(
+                    session, args.topic, snapshot, args.vault, mode=Mode(args.mode)
+                )
+            else:
+                path = write_topic_master(
+                    session, args.topic, snapshot, args.vault, mode=Mode(args.mode)
+                )
         except TopicNotFound as error:
             return CommandResult(command, ExitCode.USAGE, message=str(error), error_code="no_topic")
     return CommandResult(
@@ -2689,7 +2844,19 @@ def _docs(settings: Settings, args: argparse.Namespace) -> CommandResult:
             if args.docs_command == "project":
                 from knowledge_engine.documents.render import Mode, write_project_master
 
-                path = write_project_master(session, args.project, args.vault, mode=Mode(args.mode))
+                if args.template == "v2":
+                    # The readable layout (NOTE-010); v1 (DOC-004) stays the default.
+                    from knowledge_engine.documents.readable_master import (
+                        write_readable_project_master,
+                    )
+
+                    path = write_readable_project_master(
+                        session, args.project, args.vault, mode=Mode(args.mode)
+                    )
+                else:
+                    path = write_project_master(
+                        session, args.project, args.vault, mode=Mode(args.mode)
+                    )
                 return CommandResult(
                     "docs project",
                     data={"note": path.as_posix(), "mode": args.mode},
@@ -3805,6 +3972,17 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-rules", action="store_true", help="don't run the rule extractors first"
     )
     score.set_defaults(handler=_gold_score)
+    convert = gold_commands.add_parser(
+        "convert", help="turn a per-chat answer key folder into one golden set (reads it only)"
+    )
+    convert.add_argument("--key", type=Path, required=True, help="the per-chat key folder")
+    convert.add_argument("--name", default="answer-key-v2", help="the golden set's name")
+    convert.add_argument("--out", type=Path, help="where to write it (default: workspace gold/)")
+    convert.add_argument("--taxonomy", default="none", help="recorded on the set (no labels)")
+    convert.add_argument(
+        "--annotator", default="answer-key", help="who wrote the key, as scores credit it"
+    )
+    convert.set_defaults(handler=_gold_convert)
     gold_commands.add_parser("schema", help="print the golden set JSON Schema").set_defaults(
         handler=_gold_schema
     )
@@ -3922,6 +4100,15 @@ def build_parser() -> argparse.ArgumentParser:
     classify_run.add_argument("--all", action="store_true", help="every imported chat")
     classify_run.add_argument("--taxonomy", required=True, help="the published version, e.g. tax-1")
     classify_run.add_argument("--run-id", required=True, help="the batch folder name, e.g. gold-40")
+    classify_review = classify_commands.add_parser(
+        "review", help="send segments waiting for review to a reviewer session"
+    )
+    classify_review.add_argument(
+        "--taxonomy", required=True, help="the published version, e.g. tax-1"
+    )
+    classify_review.add_argument(
+        "--run-id", required=True, help="the batch folder name, e.g. review-1"
+    )
     classify.set_defaults(handler=_classify)
     extract = commands.add_parser(
         "extract", help="find decisions, suggestions and questions through request files"
@@ -4089,6 +4276,12 @@ def build_parser() -> argparse.ArgumentParser:
     docs_project.add_argument(
         "--mode", choices=["current", "history", "all"], default="all", help="default: all"
     )
+    docs_project.add_argument(
+        "--template",
+        choices=("v1", "v2"),
+        default="v1",
+        help="v1: the DOC-004 master; v2: the readable layout (summary first, one line per item)",
+    )
     docs_project.set_defaults(handler=_docs)
     docs_chat = docs_commands.add_parser(
         "chat", help="write a chat's knowledge note (labels, quotes, branches, images, links)"
@@ -4112,6 +4305,12 @@ def build_parser() -> argparse.ArgumentParser:
     docs_topic.add_argument(
         "--mode", choices=["current", "history", "all"], default="all", help="default: all"
     )
+    docs_topic.add_argument(
+        "--template",
+        choices=("v1", "v2"),
+        default="v1",
+        help="v1: the DOC-005 master; v2: the readable layout (summary first, one line per item)",
+    )
     docs_topic.set_defaults(handler=_docs)
     docs_vault = docs_commands.add_parser(
         "vault",
@@ -4121,7 +4320,9 @@ def build_parser() -> argparse.ArgumentParser:
     docs_vault.add_argument("--taxonomy", help="taxonomy version for labels and topic notes")
     docs_vault.set_defaults(handler=_docs)
     docs_check = docs_commands.add_parser(
-        "check", help="check every link, embed and note header in a vault (changes nothing)"
+        "check",
+        help="check every link, embed and note header, and each note's length and empty "
+        "sections, in a vault (changes nothing)",
     )
     docs_check.add_argument("--vault", type=Path, required=True, help="the vault folder")
     docs_check.set_defaults(handler=_docs_check)

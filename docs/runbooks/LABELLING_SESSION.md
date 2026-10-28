@@ -48,3 +48,11 @@ The digest is the readable summary of one chat: summary sentences, purpose, outc
 6. **Later notes.** `ke docs chat <id> --template v2` uses a digest already collected, with model access off. Nothing is asked again unless the chat's text or the digest's versions change.
 
 The answering session writes digests only. It doesn't score them: scoring (NOTE-011) is done by a different session against a reference set it didn't write.
+
+## Reviewing unsure classifications (NOTE-018)
+
+A classification the classifier was unsure about, or that broke a rule, is `review_required` and is never used as a label. Until it is reviewed, the chat's note says "unclassified; suggested: X (waiting for review)".
+
+1. **Write the requests.** `ke classify review --taxonomy tax-1 --run-id review-1`. One request per segment in the review queue, carrying the segment, the first answer and its problems.
+2. **Answer them in a different session** from the one that classified, the same way as above.
+3. **Collect.** Run the same command again. A clean answer is stored as a review naming the answering session (`session:<session_ref>`), and the chat's category settles. An answer that is unsure too, or breaks a rule, records nothing: that segment stays in the queue for a person. (There is no screen for reviewing classifications yet; a person's review is stored with `record_review`, as in CLS-004.)

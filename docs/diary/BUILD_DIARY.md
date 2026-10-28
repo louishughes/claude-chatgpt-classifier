@@ -2963,6 +2963,107 @@ Fix attempts: 2 (my FakeProvider digest left out the required intent; the table-
 
 **Next exact task:** keywords into the note (NOTE-007 wiring), then NOTE-008.
 
+### 17:30 — NOTE-018: a suggested category instead of "unclassified", and a reviewer session
+
+The first real score found four notes saying "unclassified": the classifier answered every segment of those chats, but each answer was unsure, so all of them went to review and none became a label. A reader got nothing from that.
+
+Now, when a chat has no settled category, the note shows the classifier's best candidate beside the word: "unclassified; suggested: Home and garden › Raised beds (waiting for review)", and the category section names the segments it came from. Candidates are weighed like settled labels, by the messages in their segments. It is never a label: the front-matter `category` stays unclassified until a review settles it.
+
+**`ke classify review --taxonomy tax-1 --run-id review-1`** sends the review queue to a separate reviewer session through request files. Each request carries the segment, the first answer and what was wrong with it, under the same rules as the classifier. A clean answer is stored with `record_review`, naming the session (`session:<ref>`), for each flagged field; reviews already outrank machine labels, so the category settles. An answer that is unsure too, or breaks a rule, records nothing and the segment waits for a person. A reviewed segment leaves the queue, so a second run asks for nothing.
+
+**Teach-back (`review_session.py`):** It takes every segment the classifier was unsure about and asks a second Claude session to label it, showing it the first answer and what was wrong. If that answer is clean, it's saved as a review with the session's name on it, and reviews beat machine labels, so the chat gets its category. If the second session is unsure too, nothing is saved and a person decides.
+
+Checks:
+```
+tests/integration/test_note_suggested_review.py   4 passed (all-review chat: suggestion shown, label unset; reviewer files settle it, named reviewer, no repeat requests; unsure reviewer records nothing; the Notes page shows the suggestion under "unclassified")
+tests/integration/test_note_categories.py         unchanged, pass
+```
+Fix attempts: 0.
+
+The Notes page (NOTE-012) shows the suggestion too, beside the chat under "unclassified", never as its group.
+
+**Next exact task:** on the PC, `ke classify review --taxonomy tax-1 --run-id review-1` for the 18 review_required segments, answered by a separate session.
+
+### 16:45 — NOTE-012: the knowledge note beside the chat, and a Notes page
+
+The dashboard's chat page now has two columns on a wide screen: the chat's rich note on the left (it stays in view while you scroll) and the transcript on the right. On a phone they stack. Every `m3` in the note is a link to message 3 on the same page, which is highlighted when you land on it. A new **Notes** page (sidebar, under Chats) lists every chat grouped by category, with its status and how many open questions the digest found.
+
+- `ui/notes.py` builds the note in memory, the same way `ke docs rubric` does: the newest published taxonomy, the stored digest, nothing written.
+- The Markdown-to-HTML step only knows the shapes our own notes use (headings, bullets, callouts, the card table, bold, italics, wikilinks). Every character of text is HTML-escaped first, so chat text can't become markup; the test chat contains a `<script>` tag to prove it.
+- A link to another chat's note goes to that chat's page; any other link is shown as plain words.
+- If a note can't be built, the page says so and still shows the transcript.
+
+A small trap I hit: the page template's sidebar already uses a variable called `groups`, so the first Notes page rendered four empty tables. The categories are now passed as `categories`.
+
+**Teach-back (`note_html`):** It turns one of our rich notes into HTML for the dashboard. It escapes all the text first and only recognises the few shapes our own notes use, so nothing from a chat can sneak in as markup. Citations become links to the message's spot on the same page, so you can check every claim with one click.
+
+Checks:
+```
+tests/integration/test_ui_notes.py   5 passed (summary, card and decisions shown; every m-number opens the message it names; no script tag survives; Notes page grouping; converter shapes)
+```
+Fix attempts: 1 (the `groups` name clash; a whole-transcript link was counted as a citation).
+
+**Next exact task:** merge the open PRs on green, then the NOTE-007 keyword section in the note.
+
+### 15:25 — NOTE-010 (part 1): `ke docs check` now checks a note is readable, not just linked
+
+**What:** The rich-note plan (§7 of the gap analysis) promised that a note fits on a screen or two, that an empty section is one plain sentence, and that hashes and run IDs stay out of the front matter. Until now only `ke docs rubric` checked the first two, and only by rebuilding notes from the database. NOTE-010 wants the vault check itself to catch them, on the files Obsidian actually opens. `evaluation/readability.py` adds three rules to `ke docs check`:
+
+- **budget**: a rich note's body (the part above the vault's "write below this line" marker, so your own notes never count) stays under the budget for its chat's length, read from its own `messages` property;
+- **empty_evidence**: an evidence box (`> [!quote]`) in a section with no item in it fails, in any note;
+- **properties**: front matter holds plain values and flat lists Dataview can filter on; no nested maps, and no hashes or bookkeeping like `content_hash` (those go in the `.meta` sidecar).
+
+Older notes (DOC-003 knowledge notes, the masters) were never written to that standard, so they are counted as "not checked" rather than failed. The summary line now says how many rich notes were within budget.
+
+**Challenge:** the new test writes a rich note, with a fake digest, for every chat in every fixture export (24 exports), then runs the vault check. It failed straight away, and not on readability: the link checker said six citations were broken. They were the `[m4]` links inside the knowledge card table, where the alias pipe has to be written `\|` so it doesn't end the table cell. Obsidian reads that fine; the checker read the backslash as part of the link target. It's the same mistake the NOTE-011 checks hit earlier today, in a different file. The note was right, so the checker was fixed.
+
+**Also:** I'd claimed NOTE-012 (the dashboard) first, then found another thread already had it up as a PR. I dropped my half-built copy rather than open a duplicate.
+
+**Teach-back (`evaluation/readability.py`, `check_note`):** It reads one note file, front matter and body, and checks three promises: the note isn't longer than its chat deserves, no section shows an evidence box without anything for it to back up, and the front matter only holds simple values a reader or Dataview would use. Only notes whose `generator` says they use the new layout get the length and front-matter checks, because older notes never made those promises. It never opens the database, so it works on any vault folder.
+
+Checks:
+```
+tests/unit/test_readability.py                6 passed
+tests/integration/test_note_readability.py   25 passed (24 fixture exports, every rich note clean; CLI reports budget and empty-evidence problems)
+```
+Fix attempts: 2 (the table-cell pipe in the link checker; one fixture ships its export as a ZIP).
+
+Talking points:
+- "My vault checker now fails a note that's too long for its chat, not just one with a broken link."
+- "The first real run caught a bug in the checker, not the notes. Same bug I'd fixed in another checker that morning, which says the pipe-in-a-table rule deserves one shared helper."
+- "Two agents claimed the same ticket. The fix was simple: check the open PRs before starting, and back off when someone's ahead."
+
+### 15:45 — NOTE-010 (part 2): topic and project masters you can read
+
+The topic and project masters (DOC-004/005) were complete but hard going: every record printed as its claim, then a list of status, sources, record ID and event IDs, then its quotes in full. `documents/readable_master.py` renders the same document in the chat-note style, chosen with `ke docs topic|project --template v2` (the old layout stays the default, so nothing that uses it changes):
+
+- a **summary** box first, in the engine's own words ("3 items from 2 chats: 1 current, 2 replaced"), with the topic's definition;
+- **one line per item**: the claim in bold, its kind and who holds it, and short citations;
+- a citation is `[c2·m12]`, message 12 of chat 2. A master spans many chats, so the chats are numbered once in a **Chats** list at the end, which keeps every link short;
+- quotes **folded** under the item, at most two, each re-checked against the archive;
+- the DOC-004 rule still holds: a replaced choice says what replaced it, now in words ("Replaced by "…" (c2·m4)") instead of a record ID;
+- **How these connect** and the **Decision timeline** name items by their words and place too;
+- IDs and hashes go to a `.meta/` JSON sidecar; the front matter is flat counts and labels Dataview can filter on.
+
+Masters get their own budget in `ke docs check` (a base plus so much per item and per chat), since a topic grows with the archive.
+
+**Decision:** the place in brackets after a claim ("(c1·m2)") was added after I read the first rendered master. Two chats had made the same decision in the same words, so "How these connect" showed two identical lines. The place tells them apart without bringing record IDs back.
+
+**Teach-back (`documents/readable_master.py`):** It takes a topic's or project's list of knowledge items, already sorted into current, replaced, in conflict and suggestions, and writes it as a note a person can skim: a short summary, then one line per item with links to the exact messages. Each chat gets a number, so a link reads "c2·m12" instead of a long title. Anything only a program needs, like record IDs, goes in a separate file next to the note.
+
+Checks:
+```
+tests/integration/test_readable_masters.py   5 passed (summary first; every replaced line names its replacement; no IDs in the note; every c·m number is the transcript's; vault check clean; CLI v2)
+python -m knowledge_engine.devtools.ci       lint, format, types, guard ok; 1448 passed, 22 skipped
+```
+Fix attempts: 2 (a query result needed `.all()` before `dict()`; my test unpacked `write_transcript`'s return value wrongly).
+
+Talking points:
+- "A master note now reads like a briefing: summary, then one line per decision, with a link to the exact message."
+- "Old decisions are still labelled, just in words instead of IDs."
+
+**Next exact task:** NOTE-007 wiring (keyword candidates into the note's Keywords and topics section) once #296 merges.
+
 ### 15:55 — Step 4: tax-1 published, 40 real chats classified and digested, and the notes scored by a separate session
 
 Louis approved tax-1 and asked me to run the publish ("I need you to run it"); this PC's safety check had blocked my first try.
@@ -3036,6 +3137,24 @@ Fix attempts: 1 (the test's "left out" check matched the Related chats subtitle)
 
 **Next exact task:** on the PC, re-render the 40 gold notes and re-score them (rich-notes thread).
 
+### 18:00 — EVAL-014: scoring against the per-chat answer key
+
+`ke gold score` couldn't read the real answer key (v1 or v2): the key is one JSON file per chat in the classification spike's shape, and the scorer wants one combined golden-set file. **`ke gold convert --key <folder>`** now reads the folder and writes a golden set to the workspace (git-ignored). It never writes to the key folder, it refuses an output path inside that folder, and it never overwrites a file.
+
+It converts only what maps exactly. Ideas, requirements, preferences, artefacts and open questions map one to one. A decision maps by its state: accepted or superseded becomes the user's decision at the message where they decided, rejected becomes a rejection, and proposed becomes a proposal by whoever made it. `fact`, `task`, `fact_about_owner`, `problem_fix` and an `unclear` decision are counted as unmapped and left out. Unverified items are also left out and counted. The spike's segment labels aren't taxonomy IDs, so segments are counted, not converted.
+
+The numbering trap from REV-010 is handled. A v2 item is placed by its native `message_id`, and if its number disagrees, that's counted. A v1 item has only a number, so its quote must be found in the numbered message, otherwise it's skipped. An off-by-one then shows up in the counts instead of moving an item to the wrong message.
+
+**Teach-back (`answer_key.py`):** It turns the answer key, written one file per chat, into the single file the scorer reads, and it only ever reads the key. Each item is pinned to its exact message by ID, or its quote must be found in the message its number points at. Anything with no exact equivalent in the engine is counted and left out, never guessed.
+
+Checks:
+```
+tests/integration/test_answer_key_convert.py   2 passed (synthetic key: 5 records placed, 3 unmapped, 1 unverified, 1 v1-style skip, 1 number mismatch, key folder hash unchanged, the output loads and `ke gold score` reads it; output inside the key folder refused)
+```
+Fix attempts: 1 (the repo guard wants a SYNTHETIC marker in every fixture folder).
+
+**Next exact task:** on the PC, run `ke gold convert --key private/answer-key/v2`, then score. Check that v1's and v2's hashes are unchanged (the hashes are recorded in OPEN_DECISIONS).
+
 ### 15:25 — #288: the "import didn't finish" page that lied
 
 I was sent to build the integration tickets (INT-001..003), but they were already merged, so I took the one open integration-test problem nobody had claimed: a browser-import test that failed once on Windows + Python 3.12 and passed on the re-run.
@@ -3099,6 +3218,16 @@ Talking points:
 - "Precision for links needs a closed world: the key lists every chat it covers, so a link it doesn't contain really is wrong."
 - "A link pointing the wrong way and a link of the wrong kind need different fixes, so they're counted separately from invented ones."
 - "The answer key is written by a session that never saw the engine's output, and code checks every quote before a single point is scored."
+### 16:45 — NOTE-005 real run and re-score: decisions found went from 5 to 12 out of 22
+
+- `ke extract run` landed on main (#313). Its real run on the 40 gold chats was 85 requests, answered by 5 fresh Claude sessions on the subscription with every quote checked in code, and stored 94 records.
+- The 40 notes were re-rendered and the code rubric passes 35 of 40 (size only).
+- A new scorer session that hadn't seen the first scoring compared them with the same 15 references, which were left unchanged. Decision recall went from 23% to 55%. Open questions stayed at almost zero. The "from the chat" sections are still noisy: 42 lines of pasted custom instructions, left over from the older rule extractor.
+- The report is in `docs/evaluation/NOTE-011_REAL.md` (counts only). The next fixes are to retire rule records once a model extraction exists, take open questions from how a chat ends, add a digest merge step for long chats, and reclassify the 4 unclassified chats.
+
+Talking points:
+- "Same answer key, new scorer: the AI extractor more than doubled how many of my real decisions the notes catch."
+- "The score also showed exactly what's still wrong, which is old rule-based records cluttering the notes, so the next fix is specific."
 
 ### 16:05 UTC — REV-010: answer key v2, written beside v1
 
@@ -3146,3 +3275,27 @@ Talking points:
 - "Adding a word changes no existing ID, so 'what's stale' isn't enough: the loop also asks which old chats *mention* the new word."
 
 **Next exact task:** run the refresh loop on the real archive on the PC after the next export (proposer and reviewer sessions named in the diary).
+
+### 16:21 UTC — NOTE-024: two small honesty fixes on the knowledge card
+
+The re-score of the real notes (NOTE-011) found two things on the knowledge card that read wrong:
+
+- **"48" listed as a tool.** The entity extractor records a name only after a cue like "playing", and its title pattern accepts numbers so titles like "Factorio 2" work. So "playing 48 levels a night" produced a game called "48". The card now leaves out any name with no letters in it. The record stays stored; it just isn't shown as a name.
+- **"not stated" next to a digest.** When a chat's digest has no purpose or no outcome, the card wrote "not stated", which reads like a claim about the chat. The other notes thread pointed out that the wording only appears in that case, so the fix is to leave the empty row out. Without any digest, both rows still say "not written yet", because that is true and tells you the step hasn't run.
+
+Before writing the fix, I checked who held which ticket. NOTE-018 (#309) already had a PR from the rich-notes thread, and NOTE-022 (#321) was built there too, so I took only this one.
+
+**Teach-back (`rich_conversation_note`, the card):** The card is the short table at the top of each chat note. It now shows only names that contain a letter, so a number the extractor caught by accident doesn't appear as a tool. It shows Purpose and Outcome only when the digest actually found them, so it never states something about the chat that nobody checked.
+
+Checks:
+```
+tests/integration/test_rich_note_card.py   1 passed (fails on the old code: '48' was in '48, Celeste')
+tests/integration/test_rich_note.py, test_note_checks.py   unchanged, pass
+```
+Fix attempts: 0.
+
+Talking points:
+- "A number is not a name: the card checks for a letter before listing something as a tool."
+- "An empty row that says 'not stated' still reads like a fact, so the card leaves it out."
+
+**Next exact task:** none in this thread; the remaining NOTE tickets are with the rich-notes threads.
