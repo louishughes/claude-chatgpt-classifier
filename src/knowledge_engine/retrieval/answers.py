@@ -54,7 +54,12 @@ from sqlalchemy.orm import Session
 from knowledge_engine.extraction.records import KnowledgeRecord
 from knowledge_engine.extraction.store import KnowledgeRecordRow
 from knowledge_engine.orchestration.stage_keys import stage_key
-from knowledge_engine.providers.base import ModelRequest, ResultState, StructuredModelProvider
+from knowledge_engine.providers.base import (
+    ModelRequest,
+    ResultState,
+    StructuredModelProvider,
+    quote_untrusted,
+)
 from knowledge_engine.reconciliation.projection import Status
 from knowledge_engine.retrieval.citations import (
     Citation,
@@ -241,7 +246,7 @@ class ModelWriter:
         }
         for i, one in enumerate(numbered, 1):
             if one.citation_id in texts:
-                lines.append(f"[{i}] {one.actor}: {texts[one.citation_id]}")
+                lines.append(f"[{i}] {one.actor}: {quote_untrusted(texts[one.citation_id])}")
         input_text = "\n".join(lines)
         identity = self._provider.identity
         if identity.sends_data:

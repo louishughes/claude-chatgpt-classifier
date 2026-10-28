@@ -48,7 +48,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
 from knowledge_engine.orchestration.stage_keys import stage_key
-from knowledge_engine.providers.base import ModelRequest
+from knowledge_engine.providers.base import ModelRequest, quote_untrusted
 from knowledge_engine.taxonomy.registry import Dimension, TaxonomySnapshot
 
 STAGE_ID = "classify.segment.v1"
@@ -161,7 +161,9 @@ def instructions(snapshot: TaxonomySnapshot) -> str:
 
 def segment_input(messages: Sequence[SegmentMessageText]) -> str:
     """The segment as data: each message tagged with its ID and role."""
-    return "\n\n".join(f"[m:{m.message_id}] {m.role or 'unknown'}:\n{m.text}" for m in messages)
+    return "\n\n".join(
+        f"[m:{m.message_id}] {m.role or 'unknown'}:\n{quote_untrusted(m.text)}" for m in messages
+    )
 
 
 def classification_request(
