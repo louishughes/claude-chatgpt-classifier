@@ -18,7 +18,7 @@
 | end_to_end.vault | EVAL-006 | **PASS** | 13 notes, 35 links, 0 broken; 0 golden difference(s) | ZIP to vault: every link resolves; shape matches the golden | synthetic | `ke eval e2e` |
 | variance.order_and_repeats | EVAL-008 | **PASS** | 3 orders, 0 difference(s), 0 new request(s) on repeat | same answers in 3 shuffled orders and on pinned repeats; differences go to review | synthetic | `ke eval variance` |
 | retrieval.recall_at_10 | RET-008 | **PASS** | hybrid Recall@10 0.971 | Recall@10 >= 0.90 | synthetic | `ke eval retrieval` |
-| relationships.precision | REL-002 | **BLOCKED** | not run | directional relationship precision >= 0.90 | real | `-` |
+| relationships.precision | REL-002 | **BLOCKED** | not run | directional relationship precision >= 0.90 | real | `ke eval relationships --key <key> (on the owner's PC)` |
 | quality.real_golden_set | EVAL-013 | **BLOCKED** | not run | the extraction thresholds above, on the private golden set | real | `ke gold score --gold <key> --reviewer ai_session (on the owner's PC)` |
 | provider.real_smoke | EVAL-011 | **BLOCKED** | not run | pinned real-provider batch smoke under a cost cap | real | `ke eval semantic --provider ... (parked)` |
 
@@ -33,6 +33,6 @@
 
 ## Blocked
 
-- `relationships.precision` (REL-002): no labelled relationship answer key yet (EVAL-012, #240)
+- `relationships.precision` (REL-002): the private key relkey-v1 (30 chats, 49 links, independent session) is on the owner's PC; scored there, numbers only (docs/evaluation/EVAL-012_REAL.md)
 - `quality.real_golden_set` (EVAL-013): the private key golden-v1 (extraction only, AI-reviewed) is on the owner's PC; scored there, numbers only
 - `provider.real_smoke` (EVAL-011): parked by the owner: no paid model calls
