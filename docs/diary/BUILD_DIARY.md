@@ -2496,6 +2496,37 @@ Fix attempts: 1 (the test read `items` where search answers `hits`).
 
 **Next exact task:** fix the `[m:id]` evidence parsing, then PROD-004.
 
+### 12:30 — Why the chat notes feel thin: the old rich notes against today's pipeline
+
+Louis said the dashboard is interesting but the chat analysis is very weak, and asked for the full rich notes the old attempts made, with better formatting. Before building anything, I compared the old material with what the engine produces now. Write-up: `docs/plans/RICH_NOTES_GAP_ANALYSIS.md`.
+
+What I did:
+
+- Read the two old attempts on `P:\` (read-only): the v1 word-frequency pre-pass and its vocabulary, the v1 prompts, skill contract and runbook, a v1 smoke note, and the whole v2 smoke-50 run (967 files, 50 notes).
+- Generated today's knowledge notes for the same two chats from the real workspace, into a scratch folder outside Git.
+- Measured instead of guessing: note sizes, evidence blocks, filler blocks, record counts by type.
+
+What I found:
+
+- **v1 had good content in the wrong place.** A 17-message chat gave a sharp four-sentence summary and 14 typed, quoted knowledge objects, but almost all of it sat in YAML front matter where nobody reads it. Its vocabulary auto-promoted any word seen in three notes, so words like "new" and "red" became terms.
+- **v2 had the right sections and drowned them.** All 50 notes share 15 sections (summary, knowledge card, category and subcategory analysis, decisions, insights, tensions, next steps...), but they hold 3,094 evidence blocks and 165 "not applicable" blocks; the median note is 76 KB. In 22 of 50 notes "key decisions" were just every user message, including a pasted role-play prompt. Every note called itself "certified" while its own data said "review required".
+- **Today's engine is the reverse.** The plumbing is far better than either attempt (branches, images, links, exact quotes, provenance), but the meaning is missing: no taxonomy has been published on the real chats, so nothing has a category; the rule extractors found 0 decisions in 85 real segments; the same 17-message chat now gets a note with 0 knowledge records and a line of counts.
+
+Decisions and proposal (Louis decides; nothing is approved yet):
+
+- A note template that puts the readable content first: summary, knowledge card, decisions, suggestions not taken up, open questions, generated insights, tensions and next steps (clearly labelled as generated), category analysis, keyword and topic candidates, related chats. Evidence becomes a short `[m12]` link to the transcript with the quote in a collapsed block, and hashes move to a sidecar file.
+- 13 proposed `NOTE-` tickets. The core new piece is a per-chat "conversation digest" step that runs through the existing file-batch provider, answered by a Claude session on the subscription, never a paid API, and scored by a separate session that never sees the output.
+- Eight decisions listed for Louis, including priority over the parked product work, who approves the first taxonomy, and approving a new quality rubric for notes.
+
+Challenges: `gh` isn't on this PC's PATH, and the `ke.exe` launcher was locked by the running `ke ui`, so I ran the CLI as `python -m knowledge_engine.cli.main`. Keeping private chat text out of the write-up meant describing the old notes by shape and numbers and using placeholders in the template.
+
+Talking points:
+
+- "My first two attempts had the right sections but the wrong trust model: the pipeline graded itself and stamped its own notes 'certified'."
+- "The rebuild got the hard plumbing right first. Now the meaning goes on top, with every sentence cited to a message."
+- "Frequency isn't a category: the old vocabulary auto-promoted words like 'new' and 'red'."
+- "Evidence should be one click away, not 3,000 copies of a hash in the reader's face."
+
 ### 12:55 — OPS-009: peak memory on Windows, and ID prefixes in `inspect`
 
 - `ke eval smoke` reported `peak_memory_mb: null` on Windows. Now it asks Windows for the process's `PeakWorkingSetSize` through `ctypes` (no new dependency). A platform with neither that nor the POSIX `resource` module reports `"unavailable_on_platform"`, so a missing number always says why.
