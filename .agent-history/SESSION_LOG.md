@@ -937,11 +937,17 @@ importer/watch.py (FolderWatcher: debounce, metadata + content fingerprints, fai
 ## 2026-10-28 13:05 NOTE-002 (#274)
 digest/contract.py (DigestAnswer extra=forbid, cited items, FIELD_PROVENANCE, resolve_digest drops an item on any bad quote and flags it). Tests: tests/unit/test_digest_contract.py (11).
 
+## 2026-10-28 14:55 NOTE-007 (#279)
+documents/keywords.py (keyword_candidates: must/should/optional with reasons, TF-IDF 1-3-grams, corpus calibration, typo canonicalisation, alias match, setup-text and general-title exclusions; propose_topics files unmatched digest topics as TAX-004 add proposals once). Tests: tests/unit/test_keyword_candidates.py (8).
+
 ## 2026-10-28 13:30 NOTE-003 (#275)
 digest/stage.py (DigestStage via ModelStageRunner: active path + fork lines, untrusted quoting, split_parts without clipping, merge_answers, stage key over text and versions). Tests: tests/integration/test_digest_stage.py (7).
 
 ## 2026-10-28 13:55 NOTE-004 (#276)
 `ke digest run` (FileBatchProvider + DigestStage.run_all, --vault writes notes), stored_digest, rich_note digest wiring, docs chat v2 uses a stored digest, runbook section. Tests: tests/integration/test_digest_dry_run.py (3); test_rich_note.py unchanged.
+
+## 2026-10-28 15:55 NOTE-008 (#280)
+documents/categories.py (category_shares: domain terms by share of labelled messages, primary/secondary/side subject, segments, classifier evidence, reviewer verdict per segment; waiting_candidates: open add proposals citing the chat), rich_note Category section uses them. Tests: tests/integration/test_note_categories.py (2).
 
 ## 2026-10-28 15:30 NOTE-011 code checks (#283)
 evaluation/note_checks.py (check_note: citations_real, claims_cited, decisions_user_held, tensions_next_steps (warn), empty_sections, budget; reads the rendered Markdown), `ke docs rubric [chats] [--all]`. Tests: tests/integration/test_note_checks.py (7).

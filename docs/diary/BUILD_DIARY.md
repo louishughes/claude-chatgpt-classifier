@@ -2806,6 +2806,30 @@ Fix attempts: 1 (my new gate test quoted an assistant message from another part 
 
 **Next exact task:** NOTE-007 (keyword and topic candidates).
 
+### 14:55 — NOTE-007: keyword and topic candidates, with reasons, no model
+
+The old v1 pre-pass had the right idea: per chat, keywords in three tiers, each with a reason. This ports it and adds the fixes the gap analysis asked for.
+
+- `documents/keywords.py`: `keyword_candidates(chats, resolver=None)` gives every chat:
+  - **must**: title words, named things (capitalised phrases not at the start of a sentence), and approved taxonomy terms found in the text;
+  - **should**: the top 20 repeated 1-3 word phrases by TF-IDF; **optional**: the next ones, up to 50 in all;
+  - **excluded**, each with a reason: title words too general ("help"), phrases in more than 65% of chats (once there are 5 or more), and words that only a pasted setup prompt uses ("role-play wording, not a subject").
+- Spelling: a word one typing slip away from a word used at least three times as often is read as that word, and the spelling seen is kept under `variants`. With a published taxonomy, an approved alias ("UE5") shows as its term.
+- A shorter phrase that is only ever said inside a longer one ("global" in "lumen global illumination") isn't listed on its own.
+- Digest topics are matched to approved topic terms; `propose_topics` files each unmatched topic once as a TAX-004 `add` proposal. Nothing becomes a label without a reviewer.
+- Speed on synthetic worst-case text (every phrase unique): about 0.09 s per chat of 3,600 words, so the whole corpus is a minute or two.
+- Not yet in the note: the Keywords section is wired when NOTE-003/004 (#292) has merged, to avoid editing `rich_note.py` in two open PRs.
+
+**Teach-back (`keyword_candidates`):** It reads every chat in the batch and counts the one-to-three-word phrases in each, after fixing obvious typos against the more common spelling. Title words and named things are "must", the phrases this chat repeats that other chats rarely use are "should" and "optional", and anything left out, like a vague title word or the wording of a pasted role-play prompt, is listed with the reason. There is no model in it, so the same chats always give the same keywords.
+
+Checks:
+```
+tests/unit/test_keyword_candidates.py   8 passed (misspelt entity, pasted preamble, excluded title word, common phrase, order-independence, topic matching, proposals filed once)
+```
+Fix attempts: 1 (my test's "common phrase" was said once per chat, so it never ranked; and the setup exclusions were cut alphabetically instead of by count).
+
+**Next exact task:** merge the open PRs on full green, then wire keywords into the note and start NOTE-011's code checks.
+
 ### 13:55 — NOTE-004: digests from a Claude session, end to end
 
 - `ke digest run [IDs | --all] --run-id R [--vault V]`: the first run writes the digest requests into `private/model-batches/R/` and says how many are waiting; a Claude session fills the response files; running it again collects, checks every quote and writes the rich notes. All chats go in one submit, so the requests are packed into as few files as fit, not one file per chat.
@@ -2862,6 +2886,7 @@ Talking points:
 
 **Next exact task:** Louis looks at the screenshots and says what to change; possible follow-ups are a light/dark switch and a chart on the segment-labels page.
 
+
 ### 13:50 — CI: why main kept going red on Windows + Python 3.12 only
 
 Louis was getting a stream of "Run failed" emails. I read every failing run on main and on the PR branches.
@@ -2893,6 +2918,27 @@ Talking points:
 - "A test that only failed on one OS and one Python version turned out to be a clock-resolution bug: Python 3.12 on Windows only ticks every 16 ms."
 - "I couldn't run Windows, so I faked a coarse clock in a test plugin to reproduce it deterministically before fixing it."
 - "When I couldn't reproduce the second flake, I didn't guess. I made CI print the full error so the next failure explains itself."
+
+### 15:55 — NOTE-008: the category section says how much of the chat, and who decided
+
+The classifier labels segments, because one chat can be about two things. The note used to show only the single rolled-up category. Now the Category and subcategory section lists every category the chat's segments got:
+
+- each with its **share of the chat** in messages ("primary, 67% of labelled messages"); the largest is the primary, the rest secondaries, and a label only ever given as a segment's side label is a "side subject" with no share;
+- which segments it came from and the messages the classifier cited, as `[m12]` links;
+- the **reviewer verdict** per segment: classifier only, reviewer agreed, reviewer changed it, set by a reviewer, or reviewed under an older vocabulary;
+- **candidates waiting for review**: open taxonomy proposals whose evidence points at this chat, shown as candidates and never as labels.
+
+The classifier stores no free-text reason, so the "why" is its cited messages; I didn't invent a sentence.
+
+**Teach-back (`category_shares`):** It goes through a chat's segments in order and, for each one, looks up its main category under the published vocabulary, counting the segment's messages towards that category. The category with the most messages is the chat's primary and the others are secondaries, each with its percentage, the messages the classifier pointed to, and whether a person checked it. A proposed new category is listed separately as waiting, so it can never be mistaken for a real label.
+
+Checks:
+```
+tests/integration/test_note_categories.py   2 passed (two-subject chat: 67% primary, 33% secondary; candidates shown only as candidates)
+```
+Fix attempts: 1 (my synthetic user turns were under 40 characters, so the segmenter treated them as short replies and never split the chat).
+
+**Next exact task:** NOTE-009 (related chats with reasons).
 
 ### 15:30 — NOTE-011 (code half): checking that a rich note is honest
 
@@ -2933,3 +2979,35 @@ Talking points:
 - "Every label the classifier gives has to be a term from the published list, checked in code, so it can't make up categories."
 
 **Next exact task:** run the NOTE-005 extractor on the 40 chats, re-render, re-score against the same references.
+
+### 15:25 — #288: the "import didn't finish" page that lied
+
+I was sent to build the integration tickets (INT-001..003), but they were already merged, so I took the one open integration-test problem nobody had claimed: a browser-import test that failed once on Windows + Python 3.12 and passed on the re-run.
+
+**Reading the failure properly.** The issue guessed the import itself had failed (a file still open, a read-only archive file). The CI log said otherwise: the page *did* contain the word "Importing" but had no auto-refresh tag. "Importing" is in the page title on every job page, so that check proved nothing. What actually happened is a race between two threads:
+
+1. The page code asks "is the job done?" and gets "running".
+2. In that instant, the background import finishes and sets the state to "done".
+3. The template asks again, gets "done", so it leaves out the refresh tag and draws the "The import didn't finish" branch, with an empty error.
+
+So a real user could, once in a while, see a failure page (that never refreshes) for an import that succeeded. Windows schedules threads differently, which is why it showed up there first.
+
+**Fix.** The job page reads the state once and hands that single value to the template (`ui/app.py`, `ui/templates/job.html`). One read, one decision.
+
+**Teach-back (the `/jobs/<id>` page in `ui/app.py`):** When you start an import in the browser, it runs on a separate thread and this page tells you how it's going. The page now looks at the job's state once and uses that one answer both to decide whether to send you to the report and to draw the page. Before, it looked twice, and if the import finished in between, the two answers disagreed and the page showed a failure that hadn't happened.
+
+**Proving it without waiting for luck.** A new test uses a stand-in job whose state flips from "running" to "done" the moment it's read a second time. That makes the unlucky timing happen every run. It failed on the old code and passes on the new. No existing test was changed.
+
+Checks:
+```
+tests/integration/test_ui.py -k mid_request   old code: 1 failed; fixed code: 1 passed
+tests/integration/test_ui.py + test_api_imports.py   52 passed
+```
+Fix attempts: 1.
+
+**Talking points:**
+- "A flaky test isn't noise: this one was a real race condition a user could hit."
+- "I read the CI log instead of trusting the first guess, and the evidence pointed somewhere else."
+- "I turned a once-in-a-while timing bug into a test that fails every time on the broken code."
+
+**Next exact task:** watch three Windows CI runs pass, then close #288.
