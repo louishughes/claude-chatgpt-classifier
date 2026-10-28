@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% from "macros.html" import where, empty %}
+{% block title %}Ask · Knowledge Engine{% endblock %}
+{% block main %}
+<header class="page-head">
+  <p class="eyebrow">Your archive</p>
+  <h1>Ask your chats</h1>
+  <p class="lede">An answer built only from your own messages. Every sentence cites the message it comes from, or the page says it can't find the answer.</p>
+</header>
+<form method="get" action="/ask" class="search">
+  <label for="q">Your question</label>
+  <input id="q" name="q" type="text" value="{{ q }}" maxlength="1000">
+  <button type="submit">Ask</button>
+</form>
+{% if problem %}
+{{ empty(problem) }}
+{% elif result %}
+<section class="answer" aria-label="Answer">
+  <p class="eyebrow">{{ result.status_words }}</p>
+  {% for s in result.sentences %}
+  <p class="sentence">{{ s.text }}{% for chip in s.chips %} {% if chip.place %}<a class="chip" href="/chats/{{ chip.place.conversation_id }}#{{ chip.place.anchor }}">[{{ chip.number }}]</a>{% else %}<span class="chip muted">[{{ chip.number }}]</span>{% endif %}{% endfor %}</p>
+  {% endfor %}
+  {% if result.status == "unknown" %}<p class="next muted">Try other words, or search for a word you remember with Search.</p>{% endif %}
+</section>
+{% if result.sources %}
+<section aria-label="Sources">
+  <h2>Sources</h2>
+  <ol class="sources">
+  {% for source in result.sources %}
+    <li value="{{ source.number }}">{{ where(source.place) }}</li>
+  {% endfor %}
+  </ol>
+</section>
+{% endif %}
+<section class="muted" aria-label="How it looked">
+  <h2>How it looked</h2>
+  <p>Route: <strong>{{ result.route }}</strong>{% if result.route != result.planned %} (planned {{ result.planned }}, which found nothing, so it searched messages instead){% endif %}. {{ result.reasons | join("; ") }}.</p>
+  <p>Written by {{ result.writer }}{% if result.writer and result.writer.startswith("extractive") %}: sentences copied from your messages, no AI model called{% endif %}.</p>
+</section>
+{% endif %}
+{% endblock %}

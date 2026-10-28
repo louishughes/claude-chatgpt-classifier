@@ -40,7 +40,7 @@ from knowledge_engine import __version__
 from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
 from knowledge_engine.settings import Settings
 from knowledge_engine.taxonomy.refresh import refresh_status
-from knowledge_engine.ui import data, evaluation, notes, registries, review
+from knowledge_engine.ui import ask, data, evaluation, notes, registries, review
 from knowledge_engine.ui.jobs import ImportJobs
 
 StartResponse = Callable[[str, list[tuple[str, str]]], Any]
@@ -194,6 +194,8 @@ def _route(
         conversation_id = path.removeprefix("/chats/")
         if _IMPORT_ID_RE.fullmatch(conversation_id):
             return _chat(settings, conversation_id)
+    if path == "/ask":
+        return _ask(settings, query)
     if path == "/search":
         return _search(settings, query)
     if path == "/links":
@@ -445,6 +447,23 @@ def _search(settings: Settings, query: dict[str, list[str]]) -> Page:
 
     values["hits"] = _read(settings, run) or []
     return Page("200 OK", "search.html", values)
+
+
+def _ask(settings: Settings, query: dict[str, list[str]]) -> Page:
+    question = query.get("q", [""])[0][: ask.MAX_QUESTION]
+    values: dict[str, Any] = {"q": question, "result": None, "problem": None}
+    if not question.strip():
+        return Page("200 OK", "ask.html", values)
+    try:
+        values["result"] = _read(settings, lambda s: ask.ask_view(s, settings, question))
+    except ask.StaleMeaningIndex:
+        values["problem"] = (
+            "The meaning index was built by a different embedder. "
+            "Run ke similar --rebuild once, then ask again."
+        )
+    if values["result"] is None and values["problem"] is None:
+        values["problem"] = "Nothing imported yet, so there is nothing to answer from."
+    return Page("200 OK", "ask.html", values)
 
 
 def _media(settings: Settings, sha: str, start_response: StartResponse) -> Iterable[bytes]:
