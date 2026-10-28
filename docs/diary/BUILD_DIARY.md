@@ -1930,3 +1930,30 @@ ke eval temporal        # PASS: 29 of 31 as expected, 0 false supersessions, his
 Fix attempts: 2 (target = first word after the marker misread "replace the shed game's pixel font"; then the phrase head, with articles skipped).
 
 **Next exact task:** EVAL-006.
+
+### 14:10 — EVAL-006: a ZIP all the way to Obsidian, then click every link
+**EVAL-006** (`evaluation/end_to_end.py`, `ke eval e2e`) runs one pinned path through the whole engine with no model and no network: import a ZIP, classify under a small published taxonomy, run the rule extractors, reconcile, build the vault, and search. The input is `tests/fixtures/e2e/export.zip`: the existing synthetic ZIP plus two new synthetic chats about a garden shed. Between them they carry a decision, a preference, a requirement, YouTube and GitHub links, the same image used again, and a follow-up that changes the roof. A builder makes the ZIP and a test checks it rebuilds byte for byte.
+
+Then it reads the vault the way Obsidian does:
+- every YAML header parses;
+- every `[[link]]`, `[[note#^anchor]]`, `[[note#Heading]]`, same-note `[[#^anchor]]` and `![[embed]]` resolves (escaped links and links in code are skipped; a name two notes share counts as broken, since Obsidian would have to guess);
+- every chat has its source note, and every knowledge note links to it (sources before knowledge, BRW-001);
+- the search hit lands on a note that exists.
+
+The **golden** (`tests/fixtures/e2e/vault_golden.json`) is the vault's shape, not its words: each note's path, kind and link, embed and anchor counts. Conversation and account IDs are random per workspace, so they appear as `conv-*` and `acct-*`. Two runs give the same golden. Result: 13 notes, 35 links, 4 embeds, all resolve, golden matches.
+
+The checker is also a user command: `ke docs check --vault PATH` checks any vault and changes nothing. This is the Gate G4 link check.
+
+Limits: no project or topic master is in this vault, because machine topic labels aren't approved by a person. The acceptance "sounds good, let's do that" of the timber frame isn't captured by the rule extractor (3 records). Both are recorded in the golden rather than fixed here.
+
+**Teach-back (`evaluation/end_to_end.py`):** "It takes a small fake ChatGPT export and runs it through every step until it's an Obsidian vault, with no AI and no internet. Then it opens every note and follows every link, picture and anchor, and fails if any of them points nowhere. It also compares the vault's layout with a saved copy, so any change in what gets written shows up in review."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 160 source files
+pytest -q               # 1155 passed, 7 skipped
+migration drift         # 0
+ke eval e2e             # PASS: 13 notes, 35 links and 4 embeds all resolve; matches the golden
+```
+Fix attempts: 2 (a taxonomy alias equal to its own label collides with the label; a root-level note was listed twice by name and path, which counted as ambiguous).
+
+**Next exact task:** EVAL-007.

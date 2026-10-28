@@ -1,0 +1,90 @@
+{
+ "version": "eval-006-v1",
+ "notes": {
+  "Accounts/Account (acct-*).md": {
+   "kind": "social_account",
+   "links": 3,
+   "embeds": 0,
+   "anchors": 0
+  },
+  "Accounts/Account registry.md": {
+   "kind": "account_registry",
+   "links": 1,
+   "embeds": 0,
+   "anchors": 0
+  },
+  "Knowledge/Synthetic branched chat knowledge (conv-*).md": {
+   "kind": "conversation_knowledge",
+   "links": 5,
+   "embeds": 0,
+   "anchors": 0
+  },
+  "Knowledge/Synthetic garden shed follow-up knowledge (conv-*).md": {
+   "kind": "conversation_knowledge",
+   "links": 7,
+   "embeds": 1,
+   "anchors": 1
+  },
+  "Knowledge/Synthetic garden shed plan knowledge (conv-*).md": {
+   "kind": "conversation_knowledge",
+   "links": 10,
+   "embeds": 0,
+   "anchors": 2
+  },
+  "Knowledge/Synthetic image chat knowledge (conv-*).md": {
+   "kind": "conversation_knowledge",
+   "links": 3,
+   "embeds": 1,
+   "anchors": 0
+  },
+  "Knowledge/Synthetic plain chat knowledge (conv-*).md": {
+   "kind": "conversation_knowledge",
+   "links": 2,
+   "embeds": 0,
+   "anchors": 0
+  },
+  "Sources/Synthetic branched chat (conv-*).md": {
+   "kind": "source_transcript",
+   "links": 0,
+   "embeds": 0,
+   "anchors": 4
+  },
+  "Sources/Synthetic garden shed follow-up (conv-*).md": {
+   "kind": "source_transcript",
+   "links": 0,
+   "embeds": 1,
+   "anchors": 2
+  },
+  "Sources/Synthetic garden shed plan (conv-*).md": {
+   "kind": "source_transcript",
+   "links": 0,
+   "embeds": 0,
+   "anchors": 4
+  },
+  "Sources/Synthetic image chat (conv-*).md": {
+   "kind": "source_transcript",
+   "links": 0,
+   "embeds": 1,
+   "anchors": 3
+  },
+  "Sources/Synthetic plain chat (conv-*).md": {
+   "kind": "source_transcript",
+   "links": 0,
+   "embeds": 0,
+   "anchors": 5
+  },
+  "Videos/YouTube aBcDeFgHiJk (video).md": {
+   "kind": "video",
+   "links": 4,
+   "embeds": 0,
+   "anchors": 0
+  }
+ },
+ "kinds": {
+  "account_registry": 1,
+  "conversation_knowledge": 5,
+  "social_account": 1,
+  "source_transcript": 5,
+  "video": 1
+ }
+}

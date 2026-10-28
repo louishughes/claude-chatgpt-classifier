@@ -808,3 +808,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - evaluation/import_fidelity.py (census, ExportFidelity, FidelityReport, evaluate_export, evaluate_fixtures, verdict, to_dict, to_markdown); evaluation/temporal_bench.py (CASES, run_pairs, run_pipeline, TemporalReport, run_benchmark, to_dict, to_markdown); reconciliation/supersession.py v2 target test; `ke eval fidelity`, `ke eval temporal`; reports docs/evaluation/EVAL-002_FIDELITY.md, EVAL-005_TEMPORAL.md. Filed #237 (stray conversations file read by no adapter).
 - Tests: test_import_fidelity.py (8), test_temporal_bench.py (3). Full suite 1150 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: EVAL-006.
+
+## 2026-10-28 14:10 EVAL-006 (#110)
+- evaluation/end_to_end.py (check_vault, LinkCheck, NoteShape, golden_key, vault_golden, golden_diff, run_end_to_end, EndToEndReport, to_dict, build_fixture, E2E_FIXTURE, E2E_GOLDEN); fixtures tests/fixtures/e2e/export.zip + vault_golden.json; `ke eval e2e [--update-golden]`, `ke docs check --vault`. No migration.
+- Tests: test_end_to_end.py (5). Full suite 1155 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: EVAL-007.

@@ -20,3 +20,5 @@ Each case folder holds:
 **Assumption to verify (EVAL-010b / ING-011):** the split-wrapper field names other than `conversation` and `title` are inferred from the audit's description of `raw/`, not copied from a real file.
 
 Larger batches (50, 100, 1,000 conversations) are generated on demand with `write_generated(out_dir, count, seed)`; they are not committed.
+
+`e2e/` is the EVAL-006 end-to-end input and golden. `export.zip` is `chatgpt/export_zip`'s ZIP plus two synthetic chats (a decision, a preference, a requirement, YouTube and GitHub links, the same image again, and a follow-up that changes the decision), built by `build_fixture` in `src/knowledge_engine/evaluation/end_to_end.py`; a test rebuilds it and compares the bytes. `vault_golden.json` is the vault's expected shape (each note's path, kind, link, embed and anchor counts, with workspace-random IDs replaced by `*`). After a deliberate change to what the vault holds, run `ke eval e2e --update-golden`, read the diff, and commit it.
