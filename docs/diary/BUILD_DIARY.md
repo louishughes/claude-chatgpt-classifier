@@ -929,3 +929,21 @@ pytest -q               # 649 passed, 6 skipped
 Fix attempts: 0.
 
 **Next exact task:** YTB-002 (transcript status, policy gate and user-supplied transcripts).
+
+### 00:49 — YTB-002: video transcripts, behind the network switch
+**What:** each linked video now has a transcript status, and there are two ways to give it a transcript.
+- **You supply it:** `ke transcript add <video> <file>` attaches a VTT, SRT or text file you have. The file is read with the transcript reader (ING-010), its bytes go into the archive, and it's stored, never edited, with its cues and a note of where it came from. Attaching the same file again changes nothing.
+- **A provider fetches it:** only if the `transcript_fetch` network switch is on, and it's off by default. With it off, the provider isn't even called; the request is recorded as "permission required" with the reason. With it on, temporary problems (rate limits) get at most 3 tries, and "unavailable" is a final answer with its reason. A transcript you already have is never fetched again or downgraded.
+
+No provider is built in: getting transcripts from the internet needs an authorised source (INT-002). Transcript text only ever comes from a file; nothing is generated. 6 new tests, 655 in total. `ke transcript status <video>` shows where things stand.
+**Teach-back (`links/video_transcripts.py`):** "A video's transcript either comes from a file I supply, stored unchanged with where it came from, or from a provider, and a provider is only asked if the network switch is on. With the switch off, the request is recorded as 'permission required' and nothing leaves my computer. Temporary failures get three tries; a 'not available' answer is recorded as final."
+**Talking points:**
+- "The policy gate is tested: with the switch off, a fake provider counts zero calls."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 107 source files
+pytest -q               # 655 passed, 6 skipped
+```
+Fix attempts: 0.
+
+**Next exact task:** SOC-001 + SOC-002 (social account mentions and registry).

@@ -589,3 +589,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - links/youtube.py (parse_youtube, YouTubeRef, YouTubeVideoRow, YouTubeMentionRow, record_mention), domain TranscriptStatus enum, record_links marks youtube targets and records mentions (also for existing occurrences), migration 0010_youtube.
 - Tests: test_youtube_urls.py (25), test_youtube_registry.py (1). Full suite 649 passed, 6 skipped. ruff, mypy, git_guard OK; no migration drift.
 - Next: YTB-002.
+
+## 2026-10-28 00:49 YTB-002 (slice Y2)
+- links/video_transcripts.py (TranscriptAcquisitionRow, TranscriptSnapshotRow, TranscriptCueRow, ProviderAnswer, TranscriptProvider protocol, attach_user_transcript, request_transcript with egress gate and bounded retries, video_status), ids transcript_snapshot_id/transcript_acquisition_id, migration 0011, CLI `ke transcript add|status`.
+- Tests: test_video_transcripts.py (6, fake provider call counts). Full suite 655 passed, 6 skipped. ruff, mypy, git_guard OK; no migration drift.
+- Next: SOC-001/002.

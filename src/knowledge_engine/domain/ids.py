@@ -60,6 +60,8 @@ PREFIXES = {
     "asset_occurrence": "occ",
     "link_target": "link",
     "link_occurrence": "lnkocc",
+    "transcript_snapshot": "trn",
+    "transcript_acquisition": "tacq",
     "social_account": "acct",
     "relationship": "rel",
 }
@@ -347,6 +349,41 @@ def youtube_video_id(video_id: str) -> str:
     if not _YOUTUBE_ID_RE.fullmatch(video_id):
         raise ValueError("YouTube video IDs are 11 characters of A-Z a-z 0-9 _ -")
     return video_id
+
+
+def transcript_snapshot_id(video: str, file_sha256: str) -> str:
+    """ID of one transcript file attached to one video (YTB-002).
+
+    The same file attached to the same video again gets the same ID, so it
+    is stored once.
+
+    Args:
+        video: The 11-character YouTube video ID.
+        file_sha256: The transcript file's SHA-256.
+
+    Returns:
+        A ``trn_`` ID.
+    """
+    return _stable_id(
+        "transcript_snapshot",
+        youtube_video_id(video),
+        _require_sha256(file_sha256, "file_sha256"),
+    )
+
+
+def transcript_acquisition_id(video: str, method: str) -> str:
+    """ID of the effort to get one video's transcript by one method (YTB-002).
+
+    Args:
+        video: The 11-character YouTube video ID.
+        method: ``user_supplied`` or ``provider:<name>``.
+
+    Returns:
+        A ``tacq_`` ID.
+    """
+    return _stable_id(
+        "transcript_acquisition", youtube_video_id(video), _require_native(method, "method")
+    )
 
 
 def social_account_id(

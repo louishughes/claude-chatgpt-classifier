@@ -263,6 +263,147 @@ def _import(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _transcript_add(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Attach a user-supplied transcript to a linked video (YTB-002)."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.ingestion.transcripts import TranscriptFormat, TranscriptTooLargeError
+    from knowledge_engine.links.video_transcripts import (
+        UnknownVideoError,
+        attach_user_transcript,
+        read_file,
+    )
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "transcript add", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    if not args.file.is_file():
+        return CommandResult(
+            "transcript add",
+            ExitCode.ERROR,
+            message="that file doesn't exist",
+            error_code="not_found",
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session, session.begin():
+            try:
+                snapshot = attach_user_transcript(
+                    session,
+                    settings,
+                    args.video,
+                    read_file(args.file, settings),
+                    format=None if args.format == "auto" else TranscriptFormat(args.format),
+                    language=args.language,
+                    source_url=args.source_url,
+                    note=args.note,
+                )
+            except UnknownVideoError:
+                return CommandResult(
+                    "transcript add",
+                    ExitCode.ERROR,
+                    message="that video isn't linked in any imported chat",
+                    error_code="unknown_video",
+                )
+            except TranscriptTooLargeError:
+                return CommandResult(
+                    "transcript add",
+                    ExitCode.ERROR,
+                    message="the file is over the size limit",
+                    error_code="too_large",
+                )
+            data = _transcript_data(session, snapshot.transcript_id)
+    finally:
+        engine.dispose()
+    return CommandResult("transcript add", data=data, message="Transcript attached")
+
+
+def _transcript_status(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Show a video's transcript status and attached transcripts (counts only)."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.links.video_transcripts import (
+        TranscriptAcquisitionRow,
+        TranscriptSnapshotRow,
+    )
+    from knowledge_engine.links.youtube import YouTubeVideoRow
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "transcript status", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            video = session.get(YouTubeVideoRow, args.video)
+            if video is None:
+                return CommandResult(
+                    "transcript status",
+                    ExitCode.ERROR,
+                    message="that video isn't linked in any imported chat",
+                    error_code="unknown_video",
+                )
+            acquisitions = session.scalars(
+                select(TranscriptAcquisitionRow)
+                .where(TranscriptAcquisitionRow.video_id == args.video)
+                .order_by(TranscriptAcquisitionRow.method)
+            ).all()
+            snapshots = session.scalars(
+                select(TranscriptSnapshotRow.transcript_id).where(
+                    TranscriptSnapshotRow.video_id == args.video
+                )
+            ).all()
+            data = {
+                "video_id": video.video_id,
+                "transcript_status": video.transcript_status,
+                "acquisitions": [
+                    {
+                        "method": a.method,
+                        "status": a.status,
+                        "attempts": a.attempts,
+                        "reason": a.last_error,
+                    }
+                    for a in acquisitions
+                ],
+                "transcripts": [_transcript_data(session, t) for t in snapshots],
+            }
+    finally:
+        engine.dispose()
+    return CommandResult("transcript status", data=data, message="Transcript status")
+
+
+def _transcript_data(session: Any, transcript_id: str) -> dict[str, Any]:
+    from sqlalchemy import func, select
+
+    from knowledge_engine.links.video_transcripts import TranscriptCueRow, TranscriptSnapshotRow
+
+    snapshot = session.get(TranscriptSnapshotRow, transcript_id)
+    cues = session.scalar(
+        select(func.count()).where(TranscriptCueRow.transcript_id == transcript_id)
+    )
+    timed = session.scalar(
+        select(func.count()).where(
+            TranscriptCueRow.transcript_id == transcript_id, TranscriptCueRow.start_ms.is_not(None)
+        )
+    )
+    return {
+        "transcript_id": transcript_id,
+        "video_id": snapshot.video_id,
+        "format": snapshot.format,
+        "language": snapshot.language,
+        "file_sha256": snapshot.file_sha256,
+        "cues": int(cues or 0),
+        "timed_cues": int(timed or 0),
+        "warnings": json.loads(snapshot.warnings_json),
+    }
+
+
 def _ui(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Run the local web interface until Ctrl+C. Listens on 127.0.0.1 only."""
     import webbrowser
@@ -480,6 +621,24 @@ def build_parser() -> argparse.ArgumentParser:
     smoke.add_argument("--seed", type=int, default=1, help="seed for --synthetic (default 1)")
     smoke.add_argument("--limit", type=int, metavar="N", help="import only the first N")
     smoke.set_defaults(handler=_eval_smoke)
+
+    transcript = commands.add_parser("transcript", help="YouTube video transcripts")
+    transcript_commands = transcript.add_subparsers(
+        dest="transcript_command", metavar="ACTION", parser_class=_Parser
+    )
+    attach = transcript_commands.add_parser(
+        "add", help="attach a transcript file you have (VTT, SRT or text) to a linked video"
+    )
+    attach.add_argument("video", help="the 11-character YouTube video ID")
+    attach.add_argument("file", type=Path, help="the transcript file (only read)")
+    attach.add_argument("--format", choices=["auto", "vtt", "srt", "text"], default="auto")
+    attach.add_argument("--language", help="language tag, e.g. en")
+    attach.add_argument("--source-url", help="where the file came from")
+    attach.add_argument("--note", help="a short note on where it came from")
+    attach.set_defaults(handler=_transcript_add)
+    status_cmd = transcript_commands.add_parser("status", help="a video's transcript status")
+    status_cmd.add_argument("video", help="the 11-character YouTube video ID")
+    status_cmd.set_defaults(handler=_transcript_status)
 
     ui = commands.add_parser("ui", help="open the local web interface (this computer only)")
     ui.add_argument("--port", type=int, default=8765, help="port on 127.0.0.1 (default 8765)")
