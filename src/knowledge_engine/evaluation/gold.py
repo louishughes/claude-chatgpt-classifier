@@ -106,6 +106,9 @@ class GoldRecord(_Strict):
     acceptance: Acceptance | None = None
     attributed_to: str | None = None
     strength: Strength | None = None
+    # Words copied exactly from the cited message (REV-011). Optional so keys
+    # written before the rule stay valid; not scored, it is for reviewers.
+    quote: str | None = Field(default=None, min_length=1)
 
 
 class GoldForbidden(_Strict):
@@ -115,6 +118,7 @@ class GoldForbidden(_Strict):
     actor: Role
     message_id: str = Field(min_length=1)
     reason: str = Field(min_length=1)
+    quote: str | None = Field(default=None, min_length=1)  # see GoldRecord.quote
 
 
 class GoldConversation(_Strict):
