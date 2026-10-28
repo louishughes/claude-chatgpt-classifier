@@ -1654,3 +1654,27 @@ migration drift         # 0
 Fix attempts: 0.
 
 **Next exact task:** RET-004 (hybrid rank fusion), then RET-005/006.
+
+### 08:40 — RET-004 + RET-005: one ranked list, and the right search for each question
+**RET-004.** `retrieval/hybrid.py` runs up to three channels and fuses their rankings with reciprocal rank fusion (each item scores 1/(60 + rank) per channel, summed):
+- the word index; the meaning index (optional); and stored knowledge records whose assertion shares words with the query.
+- One hit per message: several matching versions of a message collapse into one hit that lists them. Records are keyed by `krec_` ID. Ties break on the key, so the order is stable.
+- Exact terms are looked up character for character and pinned first. The test proves why: twelve near-identical "deploy error" messages push the `ERR-4012` message out of the top 3 without pinning.
+- The workspace is checked before and again after fusion.
+
+**RET-005.** `retrieval/planner.py` chooses a route by plain rules and says why:
+- "What game engine did I decide on?" goes to the REC-006 records: current first, the replaced Unity decision still listed last as superseded.
+- Quoted text, or codes on their own, go to the exact search; other questions go to the combined search with any codes pinned.
+- If a decision question matches no record, it falls back to the combined search and reports `fallback`.
+- 16 question-type fixtures pin the routes. New command `ke find`.
+
+**Teach-back (`retrieval/hybrid.py`):** "It asks the word search, the meaning search and the decision records for their rankings, and adds up a small score for every place each item came, so things two searches agree on rise to the top. Each message appears once, however many versions or searches matched it, and ties are settled by ID so the list never shuffles. Anything that contains the exact code or quote you typed is pinned to the top first, so it can't get buried under vaguely similar messages."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 142 source files
+pytest -q               # 1095 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 0 (two expectations in the new unit test corrected while writing it: RRF arithmetic and a two-letter code).
+
+**Next exact task:** RET-006 (source context hydrator and citation resolver), then RET-007.

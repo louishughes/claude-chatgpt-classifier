@@ -758,3 +758,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - retrieval/embeddings.py (EmbeddingIdentity, Embedder, embed, stem, LocalHashEmbedder, FakeEmbedder, cosine, normalise); retrieval/semantic.py (SemanticIndex, StaleIndexError, SyncReport, SemanticHit, sync_semantic, semantic_index_path); lexical.passages made public; `ke similar`; OD-18 added (embedding model, default local).
 - Tests: test_semantic_search.py (6). Full suite 1070 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: RET-004.
+
+## 2026-10-28 08:40 RET-004 (#93) + RET-005 (#94)
+- retrieval/hybrid.py (Channel, fuse, Fused, HybridHit, HybridResult, HybridRetriever, query_words); retrieval/planner.py (Route, Plan, plan, codes, RecordAnswer, RouteResult, structured_answers, run_plan); `ke find`. No migration.
+- Tests: tests/unit/test_rank_fusion_and_routes.py (19), tests/integration/test_hybrid_and_routes.py (6). Full suite 1095 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: RET-006.
