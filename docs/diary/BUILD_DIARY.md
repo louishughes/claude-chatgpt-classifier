@@ -816,3 +816,17 @@ Fix attempts: 0.
 **Talking points:**
 - "Evaluation doesn't need me: an independent, blind reviewer builds the reference, and code checks the evidence."
 - "Everything the CLI does has a plain browser screen, local-only."
+
+### 00:19 — Wayfinder check: is the build on track?
+**What:** Louis asked for a "wayfinder" check that everything is on track. I compared the real state of the project with the plan: all GitHub issues (#4–#175), every merged PR, `IMPLEMENTATION_PLAN.md`, `M1_CONSOLIDATION.md`, `REVIEW_ACTION_PLAN.md`, ADR-0009 and `OPEN_DECISIONS.md`. Then I ran the full test suite myself on `main` instead of trusting the logs: 555 passed, 6 skipped.
+**Verdict:** on track. All of M1's code slices are merged in plan order, one or two tickets per PR. Every closed M1 issue has a merged PR behind it, and every code PR has a teach-back in this diary. The two open M1 issues (EVAL-010's real-data half and the REV-009 checkpoint) are honestly open. There's no paid-API code in `src/`. The only test files touched after they were written just gained new tests, so no existing test was changed.
+**Problems found:**
+- **Windows.** The rule says merge once tests pass on Linux *and* Windows, but only the first PR (#3) was ever run on Windows. The 19 slice PRs since then have only been tested on Linux. One of them has Windows-only code (the import lock). A Windows run is now a condition for passing gate G1.
+- **Who checks the answer key.** At 00:13 Louis said he won't do any tagging or reviewing. The coordinator had already recorded that in `OPEN_DECISIONS.md`. I re-scoped REV-003 (#137) so an independent Claude session reviews the key. ADR-0009, the review action plan, `TEST_STRATEGY.md` and AGENTS.md guardrail 1 still say "the owner approves" or "human-labelled", so they need a matching edit before M3 starts.
+- **Stale tracker.** The M1 map still said PR #3 was "waiting on review". The direction-review map listed only 4 of its 9 tickets. The M3–M6 maps still said "planned, not committed", even though Louis put everything back in scope at 23:32. The new UI tickets weren't attached to any milestone. I fixed all of these on GitHub without touching code.
+- **Order.** The plan now puts the local web UI (UI-001) next, but the build thread's status still says M2. I've let it know.
+**Why it matters:** an agent that builds fast can drift without anyone noticing. A check like this costs half an hour and compares the plan, the tracker and the code against each other, instead of trusting any one of them.
+**Talking points:**
+- "I don't trust a green tick in a log. The progress check reran the tests itself."
+- "The biggest risk wasn't the code. It was a process rule (test on Windows before merging) that quietly stopped being followed."
+- "When I stepped back from reviewing, the plan had to change too: an independent AI reviewer, kept separate from the AI being scored."
