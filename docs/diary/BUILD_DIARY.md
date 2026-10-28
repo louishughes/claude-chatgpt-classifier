@@ -2456,3 +2456,22 @@ tests/integration/test_api_access.py   8 passed
 Fix attempts: 1 (the route lookup missed the router prefix; a result-type bug in `members`).
 
 **Next exact task:** PROD-003 (tenant isolation through retrieval and exports).
+
+### 11:06 — #255: why the smoke answers went to review
+
+Louis asked what the review said about the paid run. The honest answer was "we don't know": the report counted outcomes, not reasons. Now:
+
+- `classification/store.py`: `review_reason_kind()` turns each problem string into a kind (`model_unsure`, `invalid_answer`, ...). The model's own `review_reason` text is dropped, because in a real run it could quote a chat.
+- The smoke report has `classification.review_reasons`.
+- `replay_review_reasons()` and `ke eval review-reasons`: run the same classification over a saved scratch workspace with a call budget of zero and a provider that answers nothing. Every answer comes from the request ledger, so it costs nothing and needs no key. The test checks the replay gives the report's exact counts and leaves the database byte-identical.
+- Found on the way: the smoke run never stores classification rows (it only fills the ledger), so reading `classifications` would have shown nothing. That is why this replays instead.
+
+**Teach-back (`replay_review_reasons`):** It re-runs the classification on a finished smoke run, but it isn't allowed to call any model, so every answer has to come from what that run saved. Then it counts why each answer went to review, by kind only. That lets me explain a paid run afterwards without paying again.
+
+Checks:
+```
+tests/integration/test_review_reasons.py   10 passed
+```
+Fix attempts: 1 (the first version read the classifications table, which the smoke run doesn't fill).
+
+**Next exact task:** run `ke eval review-reasons` on the paid run's scratch folder on Louis's PC (no paid calls), then PROD-003.

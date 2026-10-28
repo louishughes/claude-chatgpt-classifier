@@ -65,3 +65,16 @@ ke --json eval semantic --synthetic 50 --provider anthropic --max-cost-usd 0.50
 - Every answer was valid JSON for the schema first time: no repairs, no timeouts, nothing capped.
 - **All 67 segments went to review, none to done.** That is the cautious outcome, not a failure: nothing unchecked was stored. The likely reason is that the smoke vocabulary has only three terms (Code, Images, Questions) and the generated chats don't fit them, so the model flagged itself unsure. This is **not confirmed**: the report counts outcomes but doesn't give the review reasons. Follow-up: give the report a count per kind of review reason (no text).
 - Stability 1.000 is again from the cache: the second pass reused the first pass's answers, so no second paid call was made. Real label stability would need a second, uncached paid run, which was not approved.
+
+### Review reasons (#255)
+
+The report now has `classification.review_reasons`: how many segments went to review for each kind of reason (`model_unsure` when the model flagged itself, `invalid_answer`, `evidence_outside_segment`, `several_primaries`, `listed_twice`, `secondary_without_primary`, `parts_disagree`, `other`). Kinds only: no IDs and none of the model's own words.
+
+An earlier run can be explained without paying again. Its scratch folder keeps every answer in the request ledger, and `ke eval review-reasons` classifies the same segments again with a call budget of zero, so every answer comes from that ledger:
+
+```
+KE_WORKSPACE_ROOT=<workspace>/smoke/semantic-synthetic-50-<stamp> ke --json eval review-reasons --limit 50
+```
+
+`not_saved` counts segments with no saved answer; it should be 0. Nothing is written.
+

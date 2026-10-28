@@ -897,3 +897,6 @@ infrastructure/dialects.py (SQLite triggers -> plpgsql ke_refuse_change), run_im
 
 ## 2026-10-28 10:58 PROD-002 (#127)
 access/policy.py, access/accounts.py, migration 0029_accounts, api/access.py (check_access on every route, ROUTE_PERMISSIONS, /access/me, identity_mismatch), `ke access`. Tests: test_api_access.py (8): cross-workspace account refused on every endpoint.
+
+## 2026-10-28 11:06 #255 review reasons
+classification/store.py review_reason_kind; semantic_smoke review_reasons + replay_review_reasons; `ke eval review-reasons` (zero-call replay). Tests: test_review_reasons.py (10).
