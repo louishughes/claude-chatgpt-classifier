@@ -22,6 +22,7 @@ Talking points:
 
 from __future__ import annotations
 
+import json
 import re
 import zipfile
 from collections.abc import Iterator
@@ -119,6 +120,16 @@ class ChatGPTExportAdapter:
         warnings: list[ImportWarning] = []
         if any(_shard_order(n)[0] == -1 for n in conv_names) and len(conv_names) > 1:
             warnings.append(ImportWarning("mixed_conversation_files"))
+        # A second JSON file with chats in it (say, a hand-merged re-export)
+        # is not read: which file is authoritative is the person's call. But
+        # the report must say it was left out (IMP-007, requirement C).
+        for name in names:
+            if name in conv_names or not _maybe_conversations(name):
+                continue
+            if reader.size(name) <= max_bytes and _holds_conversations(
+                reader.read(name, max_bytes)
+            ):
+                warnings.append(ImportWarning("unread_conversation_file", name))
 
         def stream() -> Iterator[NativeConversation]:
             for name, data in loaded:
@@ -151,6 +162,35 @@ def _conversations(name: str, data: bytes, archive: str | None) -> Iterator[Nati
             yield NativeConversation(
                 {}, locator, (*shared, ImportWarning("invalid_conversation_entry", name))
             )
+
+
+# Files an official export ships beside conversations.json. They never hold
+# chats, so they aren't even opened.
+_SIDE_FILES = frozenset(
+    {
+        "user.json",
+        "message_feedback.json",
+        "shared_conversations.json",
+        "model_comparisons.json",
+        "group_chats.json",
+        "shopping.json",
+    }
+)
+
+
+def _maybe_conversations(name: str) -> bool:
+    base = PurePosixPath(name).name.lower()
+    return base.endswith(".json") and base not in _SIDE_FILES
+
+
+def _holds_conversations(data: bytes) -> bool:
+    """True if the JSON holds at least one conversation object (one with a ``mapping``)."""
+    try:
+        value = json.loads(data)
+    except (ValueError, UnicodeDecodeError):
+        return False
+    items = value if isinstance(value, list) else [value]
+    return any(isinstance(item, dict) and isinstance(item.get("mapping"), dict) for item in items)
 
 
 def _is_conversations(name: str) -> bool:

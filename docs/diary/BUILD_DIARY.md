@@ -2527,3 +2527,20 @@ tests/integration/test_api_access.py, test_tenant_isolation.py   12 passed (unch
 Fix attempts: 1 (the test fixture keyed tokens by workspace instead of owner).
 
 **Next exact task:** open the queued PRs in order (PROD-001, PROD-002, #255, PROD-003, `[m:id]` fix, PROD-004), then INT-001.
+
+### 13:15 — IMP-007: a stray file of chats is now reported, not silently skipped
+
+- EVAL-002 found that an official export with a second JSON file of chats (say `stray.json` from a hand-merged re-export) lost those chats without a word in the report.
+- The official adapter now opens every other `.json` in the export (folder or ZIP) and, if it holds at least one conversation object (anything with a `mapping`), adds an `unread_conversation_file` warning. It still doesn't import the file: which one is authoritative is Louis's call. Known side files (`user.json`, `message_feedback.json`, `shared_conversations.json` and friends) aren't even opened.
+- The EVAL-002 reproduction's expected verdict changed from `silent_drop` to `warned`, as #237 asked; only that value changed in the existing test.
+
+**Teach-back (`_holds_conversations`):** When the importer skips a JSON file, it now looks inside to see whether the file has any chats in it. If it does, the import report says so with a counted warning, so nothing disappears quietly. It never imports that file on its own, because choosing which copy is right is the owner's decision.
+
+Checks:
+```
+tests/integration/test_unread_conversation_file.py   6 passed
+tests/integration/test_import_fidelity.py            8 passed (one expected value changed per #237)
+```
+Fix attempts: 0.
+
+**Next exact task:** merge the open PRs; then the next unblocked ticket.
