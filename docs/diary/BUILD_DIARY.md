@@ -1071,3 +1071,31 @@ pytest -q               # 766 passed, 6 skipped
 Fix attempts: 0. Screenshots of the search and video pages checked by eye.
 
 **Next exact task:** start M3. Read the M3 plan and LEG-002..005 (#190–#193) and REV-012 (#187) first.
+
+### 02:55 — FND-007 + FND-009: how the engine will ask a model, without paying for an API
+**What:** the start of Milestone 3, built the way ADR-0009 decided. There is no API client. A provider takes a batch of requests (`submit`) and later hands back whatever has arrived (`collect`): each answer is **ok**, **invalid** (with the reason) or **pending**.
+- **FakeProvider** and **ReplayProvider** support tests and repeatable re-runs. Neither makes a network call.
+- **FileBatchProvider** is the real one. It writes `private/model-batches/<run>/<batch>.request.jsonl` with a manifest. A Claude Code session on Louis's PC appends answers to `<batch>.response.jsonl`, and the engine reads them back.
+- **ModelStageRunner** is the only way a stage reaches a provider.
+  - It checks the cache first. The same stage key is answered with zero provider calls.
+  - It never re-sends a request that is already waiting.
+  - It stores only validated answers.
+  - An invalid answer gets one repair request that carries the error. A second failure becomes `review_required` for a person, and nothing loops.
+
+**Guards, each with a test:**
+- The `text_llm` switch is checked before anything is written or sent. The runner checks it for every provider, even the fake one.
+- A request file edited after writing is refused, by comparing it with the SHA-256 in its manifest.
+- A cut-off last line, a line for an unknown request or a second line for the same request is ignored, never guessed at.
+- An answer with an extra field or a label outside the list is refused.
+- Error messages name the field and the problem, never the answer's text.
+
+**Runbook:** `docs/runbooks/LABELLING_SESSION.md` explains how to run a labelling session: deny rules for the answer key, a fresh context per file, append-only answers.
+**Teach-back (`providers/ledger.py`):** "Every model question has a fingerprint, its stage key. Before asking, I look the fingerprint up, so the same question is never asked twice. When an answer comes back, code checks it against the schema: a good answer is stored for good, a bad one gets one retry with the error attached, and a second bad answer goes to a person."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 132 source files
+pytest -q               # 780 passed, 6 skipped
+```
+Fix attempts: 1 (a variable reused with two types).
+
+**Next exact task:** NRM-004 (topic segments), then the taxonomy tickets.

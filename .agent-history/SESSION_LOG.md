@@ -623,3 +623,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - ui/registries.py (places, list_links, link_page, list_videos, video_page, account_page), app routes /search /links /videos /accounts (+ detail pages), templates macros/links/link/videos/video/accounts/account/search, nav + home search box, `clock` filter. social_store.account_summaries/ambiguous_handles/account_mentions (CLI `ke accounts` now uses them).
 - Tests: test_ui_registries.py (9; follows every mention link to its anchor). Full suite 766 passed, 6 skipped. ruff, mypy, git_guard OK.
 - Next: M3.
+
+## 2026-10-28 02:55 FND-007 + FND-009 (#52, #53)
+- providers/base.py (ModelRequest, ProviderResult, BatchHandle, StructuredModelProvider protocol, validate_output, FakeProvider, ReplayProvider, read_response_lines), providers/file_batch.py (FileBatchProvider, ChangedRequestFileError), providers/ledger.py (ModelRequestRow, ModelOutputRow, ModelStageRunner, repair_id, usage), migration 0014, Settings.model_batch_root, docs/runbooks/LABELLING_SESSION.md.
+- Tests: test_providers.py (10), test_model_ledger.py (4). Full suite 780 passed, 6 skipped. ruff, mypy, git_guard OK; no migration drift.
+- Next: NRM-004.
