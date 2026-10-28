@@ -2952,6 +2952,8 @@ So a real user could, once in a while, see a failure page (that never refreshes)
 
 **Fix.** The job page reads the state once and hands that single value to the template (`ui/app.py`, `ui/templates/job.html`). One read, one decision.
 
+**Teach-back (the `/jobs/<id>` page in `ui/app.py`):** When you start an import in the browser, it runs on a separate thread and this page tells you how it's going. The page now looks at the job's state once and uses that one answer both to decide whether to send you to the report and to draw the page. Before, it looked twice, and if the import finished in between, the two answers disagreed and the page showed a failure that hadn't happened.
+
 **Proving it without waiting for luck.** A new test uses a stand-in job whose state flips from "running" to "done" the moment it's read a second time. That makes the unlucky timing happen every run. It failed on the old code and passes on the new. No existing test was changed.
 
 Checks:
