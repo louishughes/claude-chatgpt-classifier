@@ -880,3 +880,19 @@ pytest -q               # 589 passed, 6 skipped
 Fix attempts: 1 (the chat list counted the tree's empty root as a message; it now counts only nodes with a message, and a test checks the list matches the chat page).
 
 **Next exact task:** ING-010 + NRM-003 (Milestone 2).
+
+### 00:35 — NRM-003 + ING-010: exact positions, and transcripts with honest times
+**What (NRM-003):** one fixed way to point at exact words: a start and end position counted in characters, as Python counts them (an emoji is one character, a Windows line break is two), plus a fingerprint of the quoted words, so a citation can be checked before it's trusted. Converters handle the other ways tools count: browsers count UTF-16 units and files count bytes.
+**What (ING-010):** reads a transcript file (WebVTT subtitles, SRT subtitles, or pasted plain text) into cues. Each cue keeps the time the file gave it, to the millisecond, or no time at all. A speaker comes only from an explicit WebVTT voice tag; "Name: words" stays as words. Cues that are out of order, end before they start, or have unreadable timing are kept as they are and reported. The file's fingerprint, source URL and language travel with it. Nothing is downloaded. 16 new tests (7 offsets, 9 transcripts, including two random round trips), 605 in total.
+**Teach-back (`ingestion/transcripts.py`):** "A transcript file becomes a list of cues, each with the exact time the file gave it or no time at all, never a guessed one. A speaker name is only taken from an explicit subtitle tag, so a line like 'Bob: hi' isn't mistaken for a speaker. Anything odd, like cues out of order, is kept as written and reported as a warning instead of being fixed."
+**Talking points:**
+- "Citations are a position plus a fingerprint, so I can prove a quote still matches its source."
+- "Transcripts never get invented timing or invented speakers."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 94 source files
+pytest -q               # 605 passed, 6 skipped
+```
+Fix attempts: 1 (the parser turned non-breaking spaces into ordinary spaces; the random round trip caught it, and text is now kept exactly).
+
+**Next exact task:** LNK-001 (URL occurrences and link registry). The M1 gate run (Windows tests, real data, `ke ui` on Windows) is running on Louis's PC.

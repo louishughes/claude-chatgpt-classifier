@@ -573,3 +573,9 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - Visual check: headless Chromium screenshots of list, branches, images and missing markers; no console errors.
 - Tests: test_ui.py +20. Full suite 589 passed, 6 skipped. ruff, mypy, git_guard OK.
 - Next: ING-010 + NRM-003.
+
+## 2026-10-28 00:35 NRM-003 + ING-010 (slice T1)
+- graph/offsets.py (Span, quote_hash ke-quote-v1, cite, verify, find_all, UTF-16/UTF-8 converters). ingestion/transcripts.py (parse_transcript: VTT/SRT/text, Cue, TranscriptDocument, TranscriptWarning; exact ms or None; <v> speakers only; sha256/source_url/language; size limit).
+- Tests: test_offsets.py (7), test_transcripts.py (9). Full suite 605 passed, 6 skipped. ruff, mypy, git_guard OK.
+- M1 gate (Windows tests, REV-009 real data, ke ui on Windows) handed to the PC session at 00:34; results pending.
+- Next: LNK-001.
