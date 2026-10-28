@@ -2456,3 +2456,42 @@ tests/integration/test_api_access.py   8 passed
 Fix attempts: 1 (the route lookup missed the router prefix; a result-type bug in `members`).
 
 **Next exact task:** PROD-003 (tenant isolation through retrieval and exports).
+
+### 11:06 — #255: why the smoke answers went to review
+
+Louis asked what the review said about the paid run. The honest answer was "we don't know": the report counted outcomes, not reasons. Now:
+
+- `classification/store.py`: `review_reason_kind()` turns each problem string into a kind (`model_unsure`, `invalid_answer`, ...). The model's own `review_reason` text is dropped, because in a real run it could quote a chat.
+- The smoke report has `classification.review_reasons`.
+- `replay_review_reasons()` and `ke eval review-reasons`: run the same classification over a saved scratch workspace with a call budget of zero and a provider that answers nothing. Every answer comes from the request ledger, so it costs nothing and needs no key. The test checks the replay gives the report's exact counts and leaves the database byte-identical.
+- Found on the way: the smoke run never stores classification rows (it only fills the ledger), so reading `classifications` would have shown nothing. That is why this replays instead.
+
+**Teach-back (`replay_review_reasons`):** It re-runs the classification on a finished smoke run, but it isn't allowed to call any model, so every answer has to come from what that run saved. Then it counts why each answer went to review, by kind only. That lets me explain a paid run afterwards without paying again.
+
+Checks:
+```
+tests/integration/test_review_reasons.py   10 passed
+```
+Fix attempts: 1 (the first version read the classifications table, which the smoke run doesn't fill).
+
+**Next exact task:** run `ke eval review-reasons` on the paid run's scratch folder on Louis's PC (no paid calls), then PROD-003.
+
+### 11:17 — #255 result, and PROD-003: one folder per workspace
+
+**#255 on the real paid run** (Louis's PC, saved answers only, no calls): 67/67 in review. 53 `evidence_outside_segment`, 23 `model_unsure`. A shape check of the 249 evidence strings found every one written as `[m:<id>]`, copying the input's tag, and all 249 IDs are real messages. So the "outside the segment" flags are a parsing bug on our side, not the model citing the wrong messages. Fix next (normalise the tag before the check).
+
+**PROD-003.**
+- Decision (ADR-0011): separate workspaces are separate folders, not filtered rows. About 50 derived tables have no workspace column and the indexes are per-folder files, so a shared database would need a filter in every query forever. With folders there is nothing to forget.
+- `access/tenants.py`: `<tenants_root>/workspaces/<name>` and `<tenants_root>/inbox/<name>`; `create_tenant` makes both, migrates, and adds an owner with a token. `ke tenant add|list`.
+- `get_settings` reads `X-KE-Workspace` and returns that tenant's settings; everything else already derives from settings. Job lists became per workspace (the single-user shape is kept, so existing tests are unchanged). `check_access` never runs in single-user mode for a tenant: no accounts means nobody gets in. `POST /imports` resolves the source inside the tenant's inbox and refuses anything outside before touching the disk.
+- The adversarial test fingerprints every file in workspace a, lets Mallory try everything from b, and requires a to be byte-identical afterwards.
+
+**Teach-back (`access/tenants.py`):** When several people use one engine, each gets their own workspace folder with its own database and search files. A request names its workspace once and from then on only that folder is opened, so one person's chats can't show up in another's search, answers or exports. Imports only come from that workspace's own inbox folder, so nobody can import someone else's files.
+
+Checks:
+```
+tests/integration/test_tenant_isolation.py   4 passed
+```
+Fix attempts: 1 (the test read `items` where search answers `hits`).
+
+**Next exact task:** fix the `[m:id]` evidence parsing, then PROD-004.

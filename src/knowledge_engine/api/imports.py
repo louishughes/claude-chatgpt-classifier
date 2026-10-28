@@ -30,7 +30,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -114,9 +114,23 @@ def _job(job: ImportJob) -> Job:
 
 
 @router.post("/imports", status_code=202, response_model=Job, tags=["imports"])
-def start_import(body: ImportRequest, settings: SettingsDep, jobs: JobsDep) -> Job:
-    """Start importing an export in the background; answer with its job at once."""
+def start_import(
+    body: ImportRequest, settings: SettingsDep, jobs: JobsDep, request: Request
+) -> Job:
+    """Start importing an export in the background; answer with its job at once.
+
+    With several workspaces (PROD-003) ``source`` is a name inside that
+    workspace's inbox folder, and anything resolving outside it (``..``, an
+    absolute path, a link out) is refused before the disk is even checked:
+    otherwise one tenant could import another's files.
+    """
     source = Path(body.source.strip().strip('"')).expanduser()
+    base = request.app.state.settings
+    if base.tenants_root is not None:
+        inbox = (base.tenants_root / "inbox" / settings.workspace_root.name).resolve()
+        source = (inbox / source).resolve()
+        if not source.is_relative_to(inbox):
+            raise ApiError(403, "source_outside_inbox", "import only from your workspace's inbox")
     # Messages never repeat the path: it can name private things.
     if not source.exists():
         raise ApiError(400, "source_not_found", "that file or folder doesn't exist")

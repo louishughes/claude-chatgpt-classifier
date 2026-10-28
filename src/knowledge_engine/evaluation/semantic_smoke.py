@@ -55,10 +55,12 @@ from sqlalchemy.orm import Session
 from knowledge_engine.classification.classifier import (
     DONE,
     PENDING,
+    SegmentClassification,
     SegmentClassifier,
     segment_messages,
 )
 from knowledge_engine.classification.schema import STAGE_ID, output_model, segment_input
+from knowledge_engine.classification.store import review_reason_kind
 from knowledge_engine.evaluation.classification_eval import predicted_from, stability
 from knowledge_engine.extraction import actions, decisions, entities, preferences
 from knowledge_engine.extraction.runner import RuleExtractor, run
@@ -237,6 +239,8 @@ def run_semantic_smoke(
             "done": states[DONE],
             "review_required": states["review_required"],
             "capped": len(capped),
+            # Why answers went to review, by kind only (#255): no IDs, no model text.
+            "review_reasons": _reason_counts(final),
             "model_calls": budget.calls,
             "timeouts": unanswered["timeout"],
             "too_big": unanswered["too_big"],
@@ -265,6 +269,54 @@ def run_semantic_smoke(
         "checks": checks,
         "passed": all(checks.values()),
         "provider": _usage(provider),
+    }
+
+
+def _reason_counts(results: Sequence[SegmentClassification]) -> dict[str, int]:
+    # A segment with two kinds of problem counts once under each.
+    counts = Counter(
+        kind
+        for r in results
+        if r.state == "review_required"
+        for kind in {review_reason_kind(p) for p in r.problems}
+    )
+    return dict(sorted(counts.items()))
+
+
+def replay_review_reasons(
+    session: Session, limit: int | None = None, snapshot: TaxonomySnapshot | None = None
+) -> dict[str, Any]:
+    """Why an earlier smoke run's answers went to review, from its saved answers (#255).
+
+    The classification is run again over the same segments, but with a call
+    budget of zero and a provider that answers nothing: every answer comes
+    from the request ledger the earlier run filled, so this makes **no model
+    calls** and costs nothing. The caller should roll the session back.
+
+    Returns:
+        Segment counts by state (``not_saved`` for segments with no saved
+        answer) and ``review_reasons`` by kind. No IDs, no text.
+    """
+    snapshot = snapshot or smoke_taxonomy()
+    query = select(ConversationRow.conversation_id).order_by(ConversationRow.native_conversation_id)
+    if limit is not None:
+        query = query.limit(limit)
+    conversations = [load_conversation(session, c) for c in session.scalars(query).all()]
+    items = [(conv, seg) for conv in conversations for seg in load_segments(session, conv)]
+    runner = ModelStageRunner(
+        session,
+        LocalFakeProvider(lambda _request: None),
+        EgressPolicy(),
+        budget=RunBudget(Limits(max_model_calls_per_run=0)),
+    )
+    results = SegmentClassifier(snapshot, runner=runner).classify(items)
+    states = Counter(r.state for r in results)
+    return {
+        "segments": len(items),
+        "done": states[DONE],
+        "review_required": states["review_required"],
+        "not_saved": states[PENDING],
+        "review_reasons": _reason_counts(results),
     }
 
 

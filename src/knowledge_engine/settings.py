@@ -208,6 +208,10 @@ class Settings(BaseSettings):
             (ADR-0009). Git-ignored: they hold private conversation text.
         anthropic_api_key: Read from ``KE_ANTHROPIC_API_KEY`` or
             ``ANTHROPIC_API_KEY``. Masked whenever printed.
+        tenants_root: Unset for one person's engine. When set, ``ke api``
+            serves several separate workspaces from
+            ``<tenants_root>/workspaces/<name>``, each with its own folder,
+            database and indexes (PROD-003, ADR-0011).
     """
 
     model_config = SettingsConfigDict(
@@ -227,6 +231,7 @@ class Settings(BaseSettings):
         default=None,
         validation_alias=AliasChoices("KE_ANTHROPIC_API_KEY", "ANTHROPIC_API_KEY"),
     )
+    tenants_root: Path | None = None
 
     def account_for(self, source: Path) -> str:
         """Return the account label of the raw root holding ``source``, else ``default``."""
@@ -245,14 +250,21 @@ class Settings(BaseSettings):
 
         Paths are resolved first so ``raw/../raw/out`` cannot slip through.
         """
-        workspace = self.workspace_root.resolve()
+        written = [self.workspace_root.resolve()]
+        if self.tenants_root is not None:
+            written.append(self.tenants_root.resolve())  # tenant workspaces are written too
         for root in self.raw_roots:
             raw = root.path.resolve()
-            if workspace == raw or workspace.is_relative_to(raw) or raw.is_relative_to(workspace):
-                raise ValueError(
-                    "workspace_root and a raw root overlap; raw folders are read-only, "
-                    "so the workspace must live outside them"
-                )
+            for workspace in written:
+                if (
+                    workspace == raw
+                    or workspace.is_relative_to(raw)
+                    or raw.is_relative_to(workspace)
+                ):
+                    raise ValueError(
+                        "workspace_root and a raw root overlap; raw folders are read-only, "
+                        "so the workspace must live outside them"
+                    )
         return self
 
     @model_validator(mode="after")

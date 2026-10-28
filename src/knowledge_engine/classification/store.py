@@ -384,3 +384,25 @@ def _latest_review(session: Session, segment_id: str, field: str) -> Classificat
         )
         .order_by(ClassificationReviewRow.sequence.desc())
     )
+
+
+# Each problem string, reduced to a kind with no IDs and no model text, so a
+# report can say *why* answers went to review without quoting anything.
+_REASON_KINDS = (
+    ("answer failed validation", "invalid_answer"),
+    ("evidence outside the segment", "evidence_outside_segment"),
+    ("primaries", "several_primaries"),
+    ("listed twice", "listed_twice"),
+    ("secondary without a primary", "secondary_without_primary"),
+    ("got different primary labels", "parts_disagree"),
+)
+
+
+def review_reason_kind(problem: str) -> str:
+    """The kind of one problem string, e.g. ``model_unsure`` for a model's own flag."""
+    if problem.startswith("flagged:"):
+        return "model_unsure"
+    for marker, kind in _REASON_KINDS:
+        if marker in problem:
+            return kind
+    return "other"

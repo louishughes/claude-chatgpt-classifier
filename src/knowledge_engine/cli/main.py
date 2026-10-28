@@ -790,6 +790,36 @@ def _file_read(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _tenant(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Create and list separate workspaces for the API (PROD-003)."""
+    from knowledge_engine.access.accounts import AccessError
+    from knowledge_engine.access.tenants import (
+        TenantError,
+        create_tenant,
+        list_tenants,
+        tenant_inbox,
+    )
+
+    name = f"tenant {args.tenant_command}"
+    try:
+        if args.tenant_command == "list":
+            names = list_tenants(settings)
+            return CommandResult(
+                name, data={"workspaces": names}, message=f"{len(names)} workspace(s)"
+            )
+        token = create_tenant(settings, args.name, args.owner)
+    except (TenantError, AccessError) as error:
+        return CommandResult(name, ExitCode.USAGE, message=str(error), error_code="refused")
+    return CommandResult(
+        name,
+        data={"workspace": args.name, "owner": args.owner, "token": token},
+        message=(
+            f"created workspace {args.name}; put exports in {tenant_inbox(settings, args.name)}; "
+            f"{args.owner}'s API token (shown once, keep it secret)"
+        ),
+    )
+
+
 def _access(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Accounts, API tokens and workspace roles (PROD-002)."""
     from sqlalchemy.orm import Session
@@ -2384,6 +2414,38 @@ def _eval_smoke(settings: Settings, args: argparse.Namespace) -> CommandResult:
     return CommandResult("eval smoke", data=data, message="Smoke test passed")
 
 
+def _eval_review_reasons(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Why a smoke run's answers went to review, by kind (#255); no model calls.
+
+    Point ``KE_WORKSPACE_ROOT`` at the run's scratch folder
+    (``<workspace>/smoke/semantic-...``). Nothing is written.
+    """
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.evaluation.semantic_smoke import replay_review_reasons
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+
+    name = "eval review-reasons"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            data = replay_review_reasons(session, args.limit)
+            session.rollback()  # reading only: the replay's bookkeeping is thrown away
+    finally:
+        engine.dispose()
+    summary = ", ".join(f"{k} {n}" for k, n in data["review_reasons"].items()) or "none"
+    return CommandResult(
+        name,
+        data=data,
+        message=f"{data['review_required']} of {data['segments']} in review; reasons: {summary}",
+    )
+
+
 def _eval_semantic(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Run the EVAL-011 semantic smoke test on a scratch copy, never the real database."""
     import sqlite3
@@ -2579,6 +2641,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-cost-usd", type=float, default=0.0, help="hard cost cap for --provider anthropic"
     )
     semantic.set_defaults(handler=_eval_semantic)
+    reasons = eval_commands.add_parser(
+        "review-reasons",
+        help="why classifications went to review, counted by kind (no text, no model calls)",
+    )
+    reasons.add_argument("--limit", type=int, help="the run's conversation count (default all)")
+    reasons.set_defaults(handler=_eval_review_reasons)
 
     retrieval_bench = eval_commands.add_parser(
         "retrieval", help="the pinned retrieval benchmark: words vs meaning vs combined"
@@ -2751,6 +2819,16 @@ def build_parser() -> argparse.ArgumentParser:
     access_log = access_commands.add_parser("log", help="the authorisation log, newest first")
     access_log.add_argument("--limit", type=int, default=50)
     access.set_defaults(handler=_access)
+
+    tenant = commands.add_parser(
+        "tenant", help="separate workspaces served by `ke api` (needs tenants_root)"
+    )
+    tenant_commands = tenant.add_subparsers(dest="tenant_command", required=True)
+    tenant_add = tenant_commands.add_parser("add", help="create a workspace and its owner")
+    tenant_add.add_argument("name", help="letters, digits, '-' and '_'")
+    tenant_add.add_argument("--owner", required=True, help="the owner's account name")
+    tenant_commands.add_parser("list", help="created workspaces")
+    tenant.set_defaults(handler=_tenant)
 
     purge = commands.add_parser(
         "purge", help="delete whole conversations and everything made from them"
