@@ -788,3 +788,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - documents/vault.py (MARKER, MANIFEST, PlannedNote, plan_vault, split_manual, SyncReport, sync_vault); path helpers transcript_path, knowledge_path, project_path, topic_path; `ke docs vault`. No migration.
 - Tests: test_vault_sync.py (5). Full suite 1126 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: IMP-006.
+
+## 2026-10-28 11:40 IMP-006 (#103)
+- importer/corrections.py (OverrideKind, OverrideState, OverrideAnchorRow, APPEND_ONLY_TRIGGERS, anchor, Change, OverrideCheck, newest_revisions, check_overrides, segment_messages, node_revision); migration 0027_override_anchors; record_override and record_review anchor themselves (record_review gains optional conversation_id); ImportReport.corrections; `ke corrections`.
+- Tests: test_corrections_survive.py (3). Full suite 1129 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: REL-003.

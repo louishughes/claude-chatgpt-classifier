@@ -55,6 +55,9 @@ class ImportReport:
         relationships: REL-002's new candidate links between conversations,
             by detector, plus ``unresolved_share_links``.
         search_indexed: Message revisions added to the search index (RET-001).
+        corrections: IMP-006's standing of human corrections after this
+            import (``kept``, ``review_required``, ``unanchored``); empty
+            when nothing changed.
     """
 
     import_id: str
@@ -79,6 +82,7 @@ class ImportReport:
     accounts: Mapping[str, int] = field(default_factory=dict)
     relationships: Mapping[str, int] = field(default_factory=dict)
     search_indexed: int = 0
+    corrections: Mapping[str, int] = field(default_factory=dict)
     extra: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -104,6 +108,7 @@ class ImportReport:
             "accounts": dict(sorted(self.accounts.items())),
             "relationships": dict(sorted(self.relationships.items())),
             "search_indexed": self.search_indexed,
+            "corrections": dict(sorted(self.corrections.items())),
             "summary": self.summary(),
         }
 

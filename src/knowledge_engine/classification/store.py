@@ -211,11 +211,16 @@ def record_review(
     secondary: Sequence[str] = (),
     reviewer: str,
     note: str | None = None,
+    conversation_id: str | None = None,
 ) -> ClassificationReviewRow:
     """Record a reviewer's choice for one field of one segment.
 
     ``primary=None`` with no secondaries means "nothing in the vocabulary
     fits". Every ID must be approved in ``snapshot`` for that field.
+
+    The review is anchored to the segment's messages at their current
+    revisions (IMP-006), so a later re-import that changes them flags it.
+    ``conversation_id`` helps find a segment that was never classified.
 
     Raises:
         ReviewInputError: Unknown field, unapproved ID, or secondaries
@@ -245,6 +250,11 @@ def record_review(
     )
     session.add(row)
     session.flush()
+    from knowledge_engine.importer.corrections import OverrideKind, anchor, segment_messages
+
+    found = segment_messages(session, segment_id, conversation_id)
+    if found is not None:
+        anchor(session, OverrideKind.CLASSIFICATION, str(row.review_id), found[0], found[1])
     return row
 
 

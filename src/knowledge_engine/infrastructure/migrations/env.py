@@ -16,6 +16,7 @@ from knowledge_engine.classification import store as _classifications  # noqa: F
 from knowledge_engine.documents import dependencies as _document_builds  # noqa: F401
 from knowledge_engine.extraction import runner as _extraction_runs  # noqa: F401
 from knowledge_engine.extraction import store as _knowledge_records  # noqa: F401
+from knowledge_engine.importer import corrections as _corrections  # noqa: F401
 from knowledge_engine.importer import identity as _identity  # noqa: F401
 from knowledge_engine.importer import ledger as _ledger  # noqa: F401
 from knowledge_engine.importer import media as _media  # noqa: F401

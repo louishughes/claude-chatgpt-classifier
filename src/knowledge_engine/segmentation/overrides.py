@@ -175,6 +175,18 @@ def record_override(
     )
     session.add(row)
     session.flush()
+    # IMP-006: remember which version of the message this decision was made on.
+    from knowledge_engine.importer.corrections import OverrideKind, anchor, node_revision
+
+    found = node_revision(session, conversation.conversation_id, native_message_id)
+    if found is not None:
+        anchor(
+            session,
+            OverrideKind.SEGMENT,
+            str(row.override_id),
+            conversation.conversation_id,
+            [found],
+        )
     return row
 
 

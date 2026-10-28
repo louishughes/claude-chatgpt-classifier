@@ -36,6 +36,7 @@ from knowledge_engine.domain.ids import conversation_id
 from knowledge_engine.graph.conversation import BRANCH_CLASSIFIER_VERSION
 from knowledge_engine.graph.nodes import CANONICAL_HASH_VERSION
 from knowledge_engine.importer.archive import BlobStore
+from knowledge_engine.importer.corrections import check_overrides
 from knowledge_engine.importer.delta import (
     apply_conversation,
     mark_not_seen,
@@ -317,6 +318,7 @@ def _run(
         status = ImportBatchStatus.SUCCEEDED
     relationship_counts: Counter[str] = Counter()
     search_added = 0
+    correction_counts: Counter[str] = Counter()
     if changed:
         # Whole-workspace and idempotent; skipped when nothing changed, so
         # an identical re-import does no extra work.
@@ -334,6 +336,9 @@ def _run(
             # The index is a rebuildable cache: the import stands without it,
             # and the next search tries again.
             warnings["search_index_unavailable"] += 1
+        # IMP-006: which human corrections still stand on unchanged words.
+        with factory.transaction(write=False) as session:
+            correction_counts = Counter(c.state.value for c in check_overrides(session))
     report = ImportReport(
         import_id=import_id,
         status=status,
@@ -347,6 +352,7 @@ def _run(
         accounts=dict(sorted(account_counts.items())),
         relationships=dict(sorted(relationship_counts.items())),
         search_indexed=search_added,
+        corrections=dict(sorted(correction_counts.items())),
         new_branches=new_branches,
         raw_observations=raw_observations,
         candidate_matches=dict(candidates),

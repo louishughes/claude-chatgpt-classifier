@@ -1823,3 +1823,28 @@ migration drift         # 0
 Fix attempts: 0.
 
 **Next exact task:** IMP-006.
+
+### 11:40 — IMP-006: corrections remember which words they were made on
+`importer/corrections.py` ties every kind of human correction to logical message IDs plus the revision in force when the person decided:
+- **segment overrides** and **classification reviews** are anchored when recorded, in a new append-only `override_anchors` table (migration 0027). `record_override` and `record_review` write the anchors themselves; `record_review` gains an optional `conversation_id` for a segment never classified;
+- **record decisions** are anchored by their evidence revisions; **reviewed relationships** by the revision IDs in their evidence.
+
+`check_overrides` compares each anchor with the newest revision:
+- unchanged: `kept`, still in force;
+- revised: `review_required`, naming each changed message with the revision decided on and the new one;
+- nothing to compare (older decisions, evidence with no message): `unanchored`.
+
+Nothing is undone automatically. A split on a revised message still applies but is flagged. A revised segment gets a new ID, so its old label review isn't silently carried over; the unchanged part keeps its review. A message missing from a new export isn't a change. The import report gains `corrections` counts, and `ke corrections` lists flagged items by ID only.
+
+Proved on a synthetic two-chat re-export where one question was edited: exactly the four corrections touching it (split, the label review of its segment, the confirmed record, the relationship citing it) are flagged with both revisions; the five others stay kept; re-importing the same export changes nothing.
+
+**Teach-back (`importer/corrections.py`):** "When I correct something, it notes which version of each message I was looking at. After a re-import it checks those messages again: if they're the same, my correction stands; if one was edited, it's flagged with both versions so I can decide again. It never quietly drops or keeps a correction on words that changed."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 154 source files
+pytest -q               # 1129 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 0.
+
+**Next exact task:** REL-003.
