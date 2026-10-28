@@ -2904,6 +2904,73 @@ def _eval_smoke(settings: Settings, args: argparse.Namespace) -> CommandResult:
     return CommandResult("eval smoke", data=data, message="Smoke test passed")
 
 
+def _eval_relationships(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Score the workspace's relationship proposals against an answer key (EVAL-012).
+
+    The key's quotes are checked against the archive first; a key that
+    cites something the archive doesn't hold is not used to score.
+    Nothing is written to the workspace.
+    """
+    from pydantic import ValidationError
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.evaluation.relationship_key import (
+        check_evidence,
+        load_key,
+        proposals_from_db,
+        score,
+        to_dict,
+        to_markdown,
+    )
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+
+    name = "eval relationships"
+    try:
+        key = load_key(args.key)
+    except (OSError, ValidationError) as error:
+        return CommandResult(
+            name,
+            ExitCode.USAGE,
+            message=f"answer key not usable: {type(error).__name__}",
+            error_code="bad_key",
+        )
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            problems = check_evidence(session, key)
+            proposals = proposals_from_db(session)
+    finally:
+        engine.dispose()
+    if problems:
+        return CommandResult(
+            name,
+            ExitCode.ERROR,
+            data={"problems": problems},
+            message=f"{len(problems)} key evidence problem(s); fix the key before scoring",
+            error_code="key_evidence_invalid",
+        )
+    result = score(key, proposals)
+    if args.out is not None:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        args.out.write_text(to_markdown(key, result), encoding="utf-8")
+    data = to_dict(key, result)
+    measured = "n/a" if result.precision is None else f"{result.precision:.3f}"
+    if not result.passed:
+        return CommandResult(
+            name,
+            ExitCode.ERROR,
+            data=data,
+            message=f"FAIL: precision {measured}, below 0.90 (or nothing to score)",
+            error_code="below_threshold",
+        )
+    return CommandResult(name, data=data, message=f"PASS: precision {measured}")
+
+
 def _eval_review_reasons(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Why a smoke run's answers went to review, by kind (#255); no model calls.
 
@@ -3150,6 +3217,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     reasons.add_argument("--limit", type=int, help="the run's conversation count (default all)")
     reasons.set_defaults(handler=_eval_review_reasons)
+    relationships_eval = eval_commands.add_parser(
+        "relationships",
+        help="score proposed links between chats against an independent answer key",
+    )
+    relationships_eval.add_argument(
+        "--key", type=Path, required=True, help="relationship answer key (JSON, relkey-v1)"
+    )
+    relationships_eval.add_argument("--out", type=Path, help="write the Markdown report here")
+    relationships_eval.set_defaults(handler=_eval_relationships)
 
     retrieval_bench = eval_commands.add_parser(
         "retrieval", help="the pinned retrieval benchmark: words vs meaning vs combined"

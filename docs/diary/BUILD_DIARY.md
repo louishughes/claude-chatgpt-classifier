@@ -2937,3 +2937,35 @@ tests/integration/test_note_checks.py   7 passed (the real note passes; each bre
 Fix attempts: 2 (my FakeProvider digest left out the required intent; the table-cell pipe escape).
 
 **Next exact task:** keywords into the note (NOTE-007 wiring), then NOTE-008.
+
+### 15:45 UTC — EVAL-012: a scorer for links between chats (and a slice that was already done)
+
+This thread was started to build the web API and product tickets. They were already finished: API-001 to 005, OPS-007 and PROD-001 to 004 were merged earlier today (PRs #254 to #266). I re-ran their tests (109 passed, 15 skipped because the PostgreSQL tests need a live server) and handed the slice back. The coordinator then gave me EVAL-012 and REV-010.
+
+Both touch the reference set, which Louis's guardrail says agents can't change without his explicit OK. So I asked him on a decision card and built only the part that changes no answer key: the scorer.
+
+The problem: the release gate's "relationship precision" line has always said BLOCKED, because nothing said which proposed links ("chat B forked from chat A") are right. `evaluation/relationship_key.py` adds:
+
+- a **separate key format** (`relkey-v1`), not a change to the existing golden set: a closed list of chats, every true link between them, and a quote proving each one. The writer must declare it never saw the engine's output;
+- a **scorer** that gives each proposal one verdict: correct, wrong direction, wrong kind, or a made-up link;
+- a **code check** of every quote against the archive before any scoring, reporting problems by IDs and numbers only;
+- `ke eval relationships --key <file>`, plus `docs/evaluation/RELATIONSHIP_KEY_GUIDE.md` for the session that will write the real key.
+
+The gate line stays BLOCKED until a real key exists. The test fixture shows why kinds matter: a chat that says "carry on from <link>" is a `continues` to a person, while the URL detector calls it `references`, so on a hand-written test key the engine scores 0.75.
+
+**Teach-back (`score`):** It takes the answer key's list of chats and true links, and checks each link the engine proposed against it. A proposal is right only if the key has the same link in the same direction; otherwise it's marked backwards, the wrong kind, or invented, and a link to a chat the key doesn't cover isn't judged at all. Precision is the share that were right, and it has to reach 90%.
+
+Checks:
+```
+tests/unit/test_relationship_key.py           9 passed
+tests/integration/test_relationship_scoring.py 3 passed (fixture: 0.75 with a disagreeing key, 1.0 with an agreeing one, a bad quote stops scoring)
+python -m knowledge_engine.devtools.ci        tests 1423 passed, 22 skipped; types fixed after one run
+```
+Fix attempts: 1 (mypy wanted the version constant typed as a Literal).
+
+**Waiting on Louis:** approval for REV-010 (answer key v2, run on his PC) and for writing the real relationship key.
+
+Talking points:
+- "Precision for links needs a closed world: the key lists every chat it covers, so a link it doesn't contain really is wrong."
+- "A link pointing the wrong way and a link of the wrong kind need different fixes, so they're counted separately from invented ones."
+- "The answer key is written by a session that never saw the engine's output, and code checks every quote before a single point is scored."
