@@ -50,7 +50,7 @@ from __future__ import annotations
 import json
 from collections import Counter
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
@@ -75,6 +75,7 @@ from knowledge_engine.extraction.runner import DONE as RUN_DONE
 from knowledge_engine.extraction.runner import ExtractionRunRow
 from knowledge_engine.extraction.store import KnowledgeRecordRow
 from knowledge_engine.importer.records import ConversationRow
+from knowledge_engine.reconciliation.equivalence import Basis, find_candidates
 from knowledge_engine.relationships.view import RelatedLink, related_links
 from knowledge_engine.rendering.markdown import (
     Block,
@@ -214,6 +215,7 @@ class _Item:
 
     item: DocItem
     record: KnowledgeRecord
+    stated: int = 1  # how many records this line stands for (NOTE-027)
 
 
 _PROPOSAL_STATUS = {
@@ -239,6 +241,8 @@ def _item_blocks(session: Session, item: _Item, citer: Citer, note: str = "") ->
     line = f"**{escape_text(' '.join(item.item.assertion.split()))}**"
     if note:
         line += f" {note}."
+    if item.stated > 1:
+        line += f" Stated {item.stated} times."
     cites = _cites(item, citer)
     if cites:
         line += f" {cites}"
@@ -310,6 +314,76 @@ def _prefer_model(session: Session, items: Sequence[_Item]) -> tuple[list[_Item]
         ):
             continue
         kept.append(it)
+    return kept, len(items) - len(kept)
+
+
+def _collapse(items: Sequence[_Item], citer: Citer) -> tuple[list[_Item], int]:
+    """One line per claim stated more than once in this chat (NOTE-027).
+
+    Overlapping segments and a user repeating an ask give the same record
+    several times. Records REC-001 rates ``exact`` or ``similar`` (same type,
+    actor, polarity and projects), with the same status, share one line that
+    keeps every citation and quote. A ``near_miss`` ("port 8080" against
+    "port 8081") never shares a line, not even through a third record.
+
+    Only the note's display changes: the records and REC-001's review state
+    stay as they are, and nothing is joined outside this one chat.
+
+    Returns:
+        The lines to show, in the first record's place, and how many
+        records were folded into another line.
+    """
+    by_id = {it.record.record_id: it for it in items}
+    candidates = find_candidates([it.record for it in items])
+    apart = {frozenset((c.record_a, c.record_b)) for c in candidates if c.basis is Basis.NEAR_MISS}
+    groups: dict[str, set[str]] = {r: {r} for r in by_id}
+    home = {r: r for r in by_id}
+    for c in candidates:
+        a, b = home[c.record_a], home[c.record_b]
+        if c.basis is Basis.NEAR_MISS or a == b:
+            continue
+        if by_id[c.record_a].item.status != by_id[c.record_b].item.status:
+            continue
+        if any(frozenset((x, y)) in apart for x in groups[a] for y in groups[b]):
+            continue
+        groups[a] |= groups.pop(b)
+        for member in groups[a]:
+            home[member] = a
+    position = {
+        rev: i
+        for i, n in enumerate(citer.chat.graph.active_messages)
+        if (rev := citer.chat.revisions.get(n))
+    }
+
+    def first_cited(it: _Item) -> tuple[int, str]:
+        cited = [position[r] for r in it.item.revisions if r in position]
+        return (min(cited) if cited else len(position), it.record.record_id)
+
+    kept: list[_Item] = []
+    shown: set[str] = set()
+    for it in items:
+        group = home[it.record.record_id]
+        if group in shown:
+            continue  # folded into the line already placed
+        shown.add(group)
+        members = sorted((by_id[m] for m in groups[group]), key=first_cited)
+        lead = members[0]
+        if len(members) == 1:
+            kept.append(lead)
+            continue
+        revisions = tuple(dict.fromkeys(r for m in members for r in m.item.revisions))
+        evidence = tuple(
+            {
+                (e.revision_id, e.start, e.end): e for m in members for e in m.record.evidence
+            }.values()
+        )
+        kept.append(
+            _Item(
+                replace(lead.item, revisions=revisions),
+                lead.record.model_copy(update={"evidence": evidence}),
+                stated=len(members),
+            )
+        )
     return kept, len(items) - len(kept)
 
 
@@ -652,6 +726,7 @@ def rich_conversation_note(
     items, hidden = _prefer_model(
         session, _load_items(session, [i for s in document.sections for i in s.items])
     )
+    items, folded = _collapse(items, citer)
     sorted_ = _sort(items)
     labels = chat_labels(session, chat, taxonomy)
     links = related_links(session, [conversation_id])
@@ -855,6 +930,11 @@ def rich_conversation_note(
                 f" {hidden} rule-based record(s) left out: a model extraction covers "
                 "their segments."
                 if hidden
+                else ""
+            )
+            + (
+                f" {folded} repeated record(s) shown on the line of the claim they repeat."
+                if folded
                 else ""
             ),
             True,

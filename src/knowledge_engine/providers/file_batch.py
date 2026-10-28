@@ -15,6 +15,10 @@ Rules that make this safe to resume and impossible to fool:
 * **A changed request file is refused.** The manifest holds its SHA-256; if
   the file no longer matches, ``collect`` raises instead of trusting answers
   to questions that were never asked.
+* **A lost batch is asked again.** Each handle names its run, so a request
+  waiting in another run's folder is still found there; a request whose
+  batch files are gone comes back ``transient``, and the runner writes the
+  same ask into the current run (LEG-007).
 * **Responses are append-only.** The first complete line for a request wins;
   a cut-off last line or a line for an unknown request is ignored and
   counted, never guessed at.
@@ -50,6 +54,8 @@ from knowledge_engine.settings import Capability, EgressPolicy
 
 FILE_BATCH_VERSION = "file-batch-v1"
 DEFAULT_MAX_CHARACTERS = 100_000
+# The error of a request whose batch files are gone (LEG-007).
+MISSING_BATCH = "batch file missing"
 _RUN_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 # Put at the top of every request file, and repeated in each line, so a
@@ -100,6 +106,14 @@ class FileBatchProvider:
         """This run's folder."""
         return self.root / self.run_id
 
+    def _folder(self, run_id: str | None) -> Path:
+        # The run comes from the ledger, so it is checked before it names a folder.
+        if run_id is None or run_id == self.run_id:
+            return self.run_dir
+        if not _RUN_ID_RE.fullmatch(run_id):
+            raise ValueError("run_id must be letters, digits, '-' or '_'")
+        return self.root / run_id
+
     def submit(self, requests: Sequence[ModelRequest]) -> BatchHandle:
         """Write requests into one or more request files with manifests.
 
@@ -132,7 +146,9 @@ class FileBatchProvider:
             batch_id = f"batch-{number:05d}"
             self._write(batch_id, batch)
             batch_ids.append(batch_id)
-        return BatchHandle(tuple(batch_ids), tuple(r.request_id for r in requests))
+        return BatchHandle(
+            tuple(batch_ids), tuple(r.request_id for r in requests), run_id=self.run_id
+        )
 
     def _write(self, batch_id: str, batch: list[ModelRequest]) -> None:
         lines = [
@@ -182,14 +198,18 @@ class FileBatchProvider:
             requests: Request ID -> request, to validate against.
 
         Returns:
-            One result per request: ``ok``, ``invalid`` or ``pending``.
+            One result per request: ``ok``, ``invalid``, ``pending``, or
+            ``transient`` when the request is in none of the batch files
+            still on disk (they were deleted, LEG-007).
 
         Raises:
             ChangedRequestFileError: If a request file changed after writing.
         """
+        folder = self._folder(handle.run_id)
+        asked: set[str] = set()
         for batch_id in handle.batch_ids:
-            self._check_unchanged(batch_id)
-        files = [self.run_dir / f"{b}.response.jsonl" for b in handle.batch_ids]
+            asked |= self._asked(folder, batch_id)
+        files = [folder / f"{b}.response.jsonl" for b in handle.batch_ids]
         lines = read_response_lines(f for f in files if f.exists())
         wanted = set(handle.request_ids)
         self.unknown_lines = sum(1 for request_id in lines if request_id not in wanted)
@@ -197,7 +217,12 @@ class FileBatchProvider:
         for request_id in handle.request_ids:
             line = lines.get(request_id)
             if line is None:
-                results.append(ProviderResult(request_id, ResultState.PENDING))
+                lost = request_id not in asked
+                results.append(
+                    ProviderResult(request_id, ResultState.TRANSIENT, error=MISSING_BATCH)
+                    if lost
+                    else ProviderResult(request_id, ResultState.PENDING)
+                )
                 continue
             output: Any = line.get("output")
             results.append(
@@ -210,13 +235,17 @@ class FileBatchProvider:
             )
         return results
 
-    def _check_unchanged(self, batch_id: str) -> None:
-        manifest = json.loads(
-            (self.run_dir / f"{batch_id}.manifest.json").read_text(encoding="utf-8")
-        )
-        payload = (self.run_dir / f"{batch_id}.request.jsonl").read_bytes()
+    def _asked(self, folder: Path, batch_id: str) -> set[str]:
+        # The request IDs a batch still on disk holds; none if it is gone.
+        manifest_file = folder / f"{batch_id}.manifest.json"
+        request_file = folder / f"{batch_id}.request.jsonl"
+        if not manifest_file.exists() or not request_file.exists():
+            return set()
+        manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
+        payload = request_file.read_bytes()
         if hashlib.sha256(payload).hexdigest() != manifest["request_sha256"]:
             raise ChangedRequestFileError(f"{batch_id}: request file changed after it was written")
+        return {json.loads(line)["request_id"] for line in payload.decode("utf-8").splitlines()}
 
 
 def _text(value: Any) -> str | None:

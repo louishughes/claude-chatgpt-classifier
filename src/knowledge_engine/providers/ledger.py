@@ -24,7 +24,12 @@ Two tables:
    past ``provider_timeout_s`` each end as a recorded, bounded outcome
    (``review_required`` with a ``limit:``/``timeout`` error, or ``capped``
    and left for the next run).
-4. A *provider* failure (an error envelope even inside HTTP 200, a rate
+4. A request bigger than the provider takes in one go (the file batches'
+   ``max_characters``) is never sent: it is ``review_required`` with error
+   ``limit:provider_max_characters`` and the run carries on (LEG-006).
+5. Each row remembers the run its batches were written to, and is collected
+   from that run (LEG-007).
+6. A *provider* failure (an error envelope even inside HTTP 200, a rate
    limit, an overload) is not a model answer: the same ask is sent again,
    up to ``MAX_TRANSIENT_FAILURES`` tries, without touching ``last_error``,
    so a repair keeps its context (LEG-003).
@@ -73,6 +78,8 @@ REVIEW_REQUIRED = "review_required"
 # Errors recorded when an OPS-002 limit stops a request.
 LIMIT_TOKENS = "limit:max_input_tokens"
 LIMIT_CALLS = "limit:max_model_calls_per_run"
+LIMIT_PROVIDER = "limit:provider_max_characters"  # bigger than one provider batch (LEG-006)
+TOO_BIG = (LIMIT_TOKENS, LIMIT_PROVIDER)
 TIMEOUT = "timeout"
 # A request is sent at most this many times when the *provider* fails
 # (not the model): the first try and two retries (LEG-003).
@@ -100,6 +107,8 @@ class ModelRequestRow(Base):
     # The request ID currently waiting: the stage key, or its repair's ID.
     waiting_id: Mapped[str] = mapped_column(String(70))
     batch_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    # The run whose folder holds those batches; None on rows from before LEG-007.
+    run_id: Mapped[str | None] = mapped_column(String(64), default=None)
     characters: Mapped[int] = mapped_column(Integer, default=0)
     last_error: Mapped[str | None] = mapped_column(Text, default=None)
     # Provider failures (error envelope, rate limit, overload), kept apart
@@ -147,6 +156,8 @@ class StageReport:
         capped: Stage keys not sent because the run's call budget ran out;
             a later run picks them up.
         resent: Stage keys asked again after a provider failure (LEG-003).
+        too_big: Stage keys never sent because they are bigger than one
+            request may be (OPS-002, LEG-006); also in ``review_required``.
     """
 
     outputs: dict[str, BaseModel] = field(default_factory=dict)
@@ -157,6 +168,7 @@ class StageReport:
     review_required: list[str] = field(default_factory=list)
     capped: list[str] = field(default_factory=list)
     resent: list[str] = field(default_factory=list)
+    too_big: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -213,6 +225,9 @@ class ModelStageRunner:
                 report.pending.append(request.request_id)
             elif row.state == REVIEW_REQUIRED:
                 report.review_required.append(request.request_id)
+                if row.last_error in TOO_BIG:
+                    report.too_big.append(request.request_id)
+        fresh = self._within_provider(fresh, report)
         if self.budget is not None:
             fresh = self._within_limits(fresh, report)
         size = self.budget.limits.max_requests_per_batch if self.budget else len(fresh) or 1
@@ -229,6 +244,7 @@ class ModelStageRunner:
                         attempts=1,
                         waiting_id=request.request_id,
                         batch_ids_json=json.dumps(list(handle.batch_ids)),
+                        run_id=handle.run_id,
                         characters=request.characters,
                         updated_at=self.clock(),
                     )
@@ -243,6 +259,40 @@ class ModelStageRunner:
         self.session.flush()
         return report
 
+    def _too_big(self, request: ModelRequest, report: StageReport, error: str) -> None:
+        self.session.add(
+            ModelRequestRow(
+                stage_key=request.request_id,
+                stage_id=request.stage_id,
+                provider_id=self.provider.identity.provider_id,
+                state=REVIEW_REQUIRED,
+                attempts=1,
+                waiting_id=request.request_id,
+                characters=0,  # nothing was sent
+                last_error=error,
+            )
+        )
+        report.review_required.append(request.request_id)
+        report.too_big.append(request.request_id)
+
+    def _within_provider(
+        self, fresh: list[ModelRequest], report: StageReport
+    ) -> list[ModelRequest]:
+        # LEG-006: one request over the provider's own size limit used to
+        # raise and stop the whole run. It is recorded and skipped instead;
+        # the splitting that could be done (LEG-005) already has been.
+        limit = _provider_limit(self.provider)
+        if limit is None:
+            return fresh
+        sendable = []
+        for request in fresh:
+            if request.characters <= limit:
+                sendable.append(request)
+            else:
+                self._too_big(request, report, LIMIT_PROVIDER)
+                self._event("model.too_big", request, characters=request.characters, limit=limit)
+        return sendable
+
     def _within_limits(self, fresh: list[ModelRequest], report: StageReport) -> list[ModelRequest]:
         # OPS-002: an oversize request is recorded as a capped failure and
         # never sent; requests past the call budget stay unsent (no row),
@@ -253,19 +303,7 @@ class ModelStageRunner:
             if self.budget.fits(request.characters, stage_key=request.request_id):
                 sendable.append(request)
                 continue
-            self.session.add(
-                ModelRequestRow(
-                    stage_key=request.request_id,
-                    stage_id=request.stage_id,
-                    provider_id=self.provider.identity.provider_id,
-                    state=REVIEW_REQUIRED,
-                    attempts=1,
-                    waiting_id=request.request_id,
-                    characters=0,  # nothing was sent
-                    last_error=LIMIT_TOKENS,
-                )
-            )
-            report.review_required.append(request.request_id)
+            self._too_big(request, report, LIMIT_TOKENS)
         allowed = self.budget.take_calls(len(sendable))
         report.capped.extend(r.request_id for r in sendable[allowed:])
         return sendable[:allowed]
@@ -282,7 +320,9 @@ class ModelStageRunner:
         report = StageReport()
         waiting: dict[str, ModelRequest] = {}
         rows: dict[str, ModelRequestRow] = {}
-        batches: list[str] = []
+        # Run -> (its batches, the request IDs waiting in them): each row is
+        # collected from the run it was written to (LEG-007).
+        runs: dict[str | None, tuple[list[str], list[str]]] = {}
         for request in requests:
             row = self.session.get(ModelRequestRow, request.request_id)
             if row is None or row.state != PENDING:
@@ -297,14 +337,22 @@ class ModelStageRunner:
             rows[request.request_id] = row
             asked = request if row.attempts == 1 else self._repair(request, row.last_error)
             waiting[asked.request_id] = asked
+            batches, ids = runs.setdefault(row.run_id, ([], []))
             batches.extend(b for b in json.loads(row.batch_ids_json) if b not in batches)
+            ids.append(asked.request_id)
         if not waiting:
             return report
-        handle = BatchHandle(tuple(batches), tuple(waiting))
+        results = [
+            result
+            for run_id, (batches, ids) in runs.items()
+            for result in self.provider.collect(
+                BatchHandle(tuple(batches), tuple(ids), run_id=run_id), waiting
+            )
+        ]
         repairs: list[ModelRequest] = []
         # (stage key, the exact ask to repeat: the first try or the repair)
         resend: list[tuple[str, ModelRequest]] = []
-        for result in self.provider.collect(handle, waiting):
+        for result in results:
             original = next(r for r in requests if result.request_id in _ids(r))
             row = rows[original.request_id]
             if result.state is ResultState.PENDING:
@@ -351,6 +399,18 @@ class ModelStageRunner:
                 row.updated_at = self.clock()
                 report.review_required.append(request.request_id)
             repairs = repairs[:allowed]
+        limit = _provider_limit(self.provider)
+        if repairs and limit is not None:
+            # The repair adds the error to the question; it may no longer fit.
+            for request in list(repairs):
+                row = rows[request.request_id]
+                if self._repair(request, row.last_error).characters > limit:
+                    row.state = REVIEW_REQUIRED
+                    row.last_error = LIMIT_PROVIDER
+                    row.updated_at = self.clock()
+                    report.review_required.append(request.request_id)
+                    report.too_big.append(request.request_id)
+                    repairs.remove(request)
         if repairs:
             repair_requests = [self._repair(r, rows[r.request_id].last_error) for r in repairs]
             repair_handle = self._send(repair_requests)
@@ -359,6 +419,7 @@ class ModelStageRunner:
                 row.attempts = 2
                 row.waiting_id = repair_id(request.request_id)
                 row.batch_ids_json = json.dumps(list(repair_handle.batch_ids))
+                row.run_id = repair_handle.run_id
                 row.characters += len(row.last_error or "") + request.characters
                 row.updated_at = self.clock()
                 report.repairs.append(request.request_id)
@@ -384,6 +445,7 @@ class ModelStageRunner:
         handle = self._send([ask for _, ask in asks])
         for key, ask in asks:
             rows[key].batch_ids_json = json.dumps(list(handle.batch_ids))
+            rows[key].run_id = handle.run_id
             rows[key].characters += ask.characters
             report.resent.append(key)
 
@@ -436,6 +498,12 @@ class ModelStageRunner:
         row.updated_at = _utc_now()
 
 
+def _provider_limit(provider: StructuredModelProvider) -> int | None:
+    # Only some providers cap one request's size (the file batches do).
+    limit = getattr(provider, "max_characters", None)
+    return limit if isinstance(limit, int) else None
+
+
 def _ids(request: ModelRequest) -> tuple[str, str]:
     return request.request_id, repair_id(request.request_id)
 
@@ -468,8 +536,7 @@ def schema_failures(session: Session, stage_id: str | None = None) -> Mapping[st
     rows = [
         r
         for r in every
-        if r.last_error not in (TIMEOUT, LIMIT_TOKENS)
-        and r.transient_failures < MAX_TRANSIENT_FAILURES
+        if r.last_error not in (TIMEOUT, *TOO_BIG) and r.transient_failures < MAX_TRANSIENT_FAILURES
     ]
     repaired = sum(1 for r in rows if r.attempts >= 2 and r.state == DONE)
     failed = sum(1 for r in rows if r.state == REVIEW_REQUIRED)
@@ -490,6 +557,6 @@ def not_answered(session: Session, stage_id: str | None = None) -> Mapping[str, 
     rows = list(session.scalars(query))
     return {
         "timeout": sum(1 for r in rows if r.last_error == TIMEOUT),
-        "too_big": sum(1 for r in rows if r.last_error == LIMIT_TOKENS),
+        "too_big": sum(1 for r in rows if r.last_error in TOO_BIG),
         "provider_failed": sum(1 for r in rows if r.transient_failures >= MAX_TRANSIENT_FAILURES),
     }

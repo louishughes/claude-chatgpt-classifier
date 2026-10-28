@@ -187,6 +187,7 @@ class SegmentClassifier:
         later = self.runner.collect(unique)
         outputs: Mapping[str, BaseModel] = {**first.outputs, **later.outputs}
         failed = set(first.review_required) | set(later.review_required)
+        too_big = set(first.too_big) | set(later.too_big)
         results = []
         for (conv, seg, msgs), group in zip(contexts, asked, strict=True):
             key = group[0].request_id if len(group) == 1 else _combined_key(group)
@@ -206,7 +207,12 @@ class SegmentClassifier:
                         ("the parts of this long segment got different primary labels",),
                     )
             elif any(r.request_id in failed for r in group):
-                problems = ("answer failed validation twice",)
+                big = any(r.request_id in too_big for r in group)
+                problems = (
+                    ("too big to send in one request",)
+                    if big
+                    else ("answer failed validation twice",)
+                )
                 results.append(
                     _make(
                         self.snapshot,
