@@ -1,0 +1,338 @@
+[
+  {
+    "title": "Synthetic mixed projects",
+    "create_time": 1708387200.0,
+    "update_time": 1708387560.0,
+    "mapping": {
+      "c0000020-0000-4000-8000-000000000001-root": {
+        "id": "c0000020-0000-4000-8000-000000000001-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000020-0000-4000-8000-000000000001-sys"
+        ]
+      },
+      "c0000020-0000-4000-8000-000000000001-sys": {
+        "id": "c0000020-0000-4000-8000-000000000001-sys",
+        "message": {
+          "id": "c0000020-0000-4000-8000-000000000001-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708387260.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000020-0000-4000-8000-000000000001-root",
+        "children": [
+          "c0000020-0000-4000-8000-000000000001-u0"
+        ]
+      },
+      "c0000020-0000-4000-8000-000000000001-u0": {
+        "id": "c0000020-0000-4000-8000-000000000001-u0",
+        "message": {
+          "id": "c0000020-0000-4000-8000-000000000001-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708387320.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question: I've decided the Garden plan comes first this spring. Which seedlings go in the raised bed? The Bakery site menu page can wait."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000020-0000-4000-8000-000000000001-sys",
+        "children": [
+          "c0000020-0000-4000-8000-000000000001-a0"
+        ]
+      },
+      "c0000020-0000-4000-8000-000000000001-a0": {
+        "id": "c0000020-0000-4000-8000-000000000001-a0",
+        "message": {
+          "id": "c0000020-0000-4000-8000-000000000001-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708387380.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: start the seedlings indoors, then move them to the raised bed. When you return to the Bakery site, a menu page is a good first step."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000020-0000-4000-8000-000000000001-u0",
+        "children": [
+          "c0000020-0000-4000-8000-000000000001-u1"
+        ]
+      },
+      "c0000020-0000-4000-8000-000000000001-u1": {
+        "id": "c0000020-0000-4000-8000-000000000001-u1",
+        "message": {
+          "id": "c0000020-0000-4000-8000-000000000001-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708387440.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic reply: thanks, that works."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000020-0000-4000-8000-000000000001-a0",
+        "children": [
+          "c0000020-0000-4000-8000-000000000001-a1"
+        ]
+      },
+      "c0000020-0000-4000-8000-000000000001-a1": {
+        "id": "c0000020-0000-4000-8000-000000000001-a1",
+        "message": {
+          "id": "c0000020-0000-4000-8000-000000000001-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708387500.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: glad it helps."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000020-0000-4000-8000-000000000001-u1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000020-0000-4000-8000-000000000001-a1",
+    "plugin_ids": null,
+    "conversation_id": "c0000020-0000-4000-8000-000000000001",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000020-0000-4000-8000-000000000001"
+  },
+  {
+    "title": "Synthetic engine choice",
+    "create_time": 1708473600.0,
+    "update_time": 1708473960.0,
+    "mapping": {
+      "c0000020-0000-4000-8000-000000000002-root": {
+        "id": "c0000020-0000-4000-8000-000000000002-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000020-0000-4000-8000-000000000002-sys"
+        ]
+      },
+      "c0000020-0000-4000-8000-000000000002-sys": {
+        "id": "c0000020-0000-4000-8000-000000000002-sys",
+        "message": {
+          "id": "c0000020-0000-4000-8000-000000000002-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708473660.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000020-0000-4000-8000-000000000002-root",
+        "children": [
+          "c0000020-0000-4000-8000-000000000002-u0"
+        ]
+      },
+      "c0000020-0000-4000-8000-000000000002-u0": {
+        "id": "c0000020-0000-4000-8000-000000000002-u0",
+        "message": {
+          "id": "c0000020-0000-4000-8000-000000000002-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708473720.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question: which game engine suits a small 2D game?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000020-0000-4000-8000-000000000002-sys",
+        "children": [
+          "c0000020-0000-4000-8000-000000000002-a0"
+        ]
+      },
+      "c0000020-0000-4000-8000-000000000002-a0": {
+        "id": "c0000020-0000-4000-8000-000000000002-a0",
+        "message": {
+          "id": "c0000020-0000-4000-8000-000000000002-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708473780.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: Unity is common. Unity has many tutorials. Unity runs on phones. Unity has a big asset store. Unity is used by many studios. Some people also try Godot."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000020-0000-4000-8000-000000000002-u0",
+        "children": [
+          "c0000020-0000-4000-8000-000000000002-u1"
+        ]
+      },
+      "c0000020-0000-4000-8000-000000000002-u1": {
+        "id": "c0000020-0000-4000-8000-000000000002-u1",
+        "message": {
+          "id": "c0000020-0000-4000-8000-000000000002-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708473840.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic decision: I've decided to go with Godot, not Unity."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000020-0000-4000-8000-000000000002-a0",
+        "children": [
+          "c0000020-0000-4000-8000-000000000002-a1"
+        ]
+      },
+      "c0000020-0000-4000-8000-000000000002-a1": {
+        "id": "c0000020-0000-4000-8000-000000000002-a1",
+        "message": {
+          "id": "c0000020-0000-4000-8000-000000000002-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708473900.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: noted, good luck with the game."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000020-0000-4000-8000-000000000002-u1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000020-0000-4000-8000-000000000002-a1",
+    "plugin_ids": null,
+    "conversation_id": "c0000020-0000-4000-8000-000000000002",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000020-0000-4000-8000-000000000002"
+  }
+]

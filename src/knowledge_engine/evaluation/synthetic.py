@@ -1241,6 +1241,65 @@ def _segment_cases() -> list[Case]:
     ]
 
 
+def _classification_cases() -> list[Case]:
+    """CLS-002 / CLS-003: two projects in one segment; a decision beats repetition."""
+    mixed = _chat(
+        "c0000020-0000-4000-8000-000000000001",
+        "Synthetic mixed projects",
+        50,
+        [
+            (
+                "Synthetic question: I've decided the Garden plan comes first this spring. "
+                "Which seedlings go in the raised bed? The Bakery site menu page can wait.",
+                "Synthetic answer: start the seedlings indoors, then move them to the raised "
+                "bed. When you return to the Bakery site, a menu page is a good first step.",
+            ),
+            ("Synthetic reply: thanks, that works.", "Synthetic: glad it helps."),
+        ],
+    )
+    engine = _chat(
+        "c0000020-0000-4000-8000-000000000002",
+        "Synthetic engine choice",
+        51,
+        [
+            (
+                "Synthetic question: which game engine suits a small 2D game?",
+                "Synthetic answer: Unity is common. Unity has many tutorials. Unity runs on "
+                "phones. Unity has a big asset store. Unity is used by many studios. Some "
+                "people also try Godot.",
+            ),
+            (
+                "Synthetic decision: I've decided to go with Godot, not Unity.",
+                "Synthetic: noted, good luck with the game.",
+            ),
+        ],
+    )
+    return [
+        Case(
+            "mixed_projects",
+            "CLS-002/CLS-003: a segment about two projects gets both as allowed labels with "
+            "the decisive one primary; a once-mentioned decisive choice (Godot) outranks a "
+            "name repeated in passing (Unity).",
+            "official",
+            [mixed.native(), engine.native()],
+            expected={
+                "conversations": 2,
+                "primary": {
+                    mixed.conversation_id: {"projects": "proj_garden", "topic": "term_gardening"},
+                    engine.conversation_id: {"topic": "term_godot"},
+                },
+                "secondary": {
+                    mixed.conversation_id: {
+                        "projects": ["proj_bakery"],
+                        "topic": ["term_webdesign"],
+                    },
+                    engine.conversation_id: {"topic": ["term_unity"]},
+                },
+            },
+        )
+    ]
+
+
 def without_children(native: JsonDict) -> JsonDict:
     """Return a copy of a native conversation with every ``children`` list removed."""
     copy: JsonDict = json.loads(json.dumps(native))
@@ -1261,6 +1320,7 @@ def all_cases() -> list[Case]:
         *_relationship_cases(),
         *_search_cases(),
         *_segment_cases(),
+        *_classification_cases(),
     ]
 
 

@@ -1227,3 +1227,29 @@ migration drift         # 0
 Fix attempts: 1. With only one approved ID, Pydantic writes `const` instead of `enum`, so I now always list `enum` as well. Two test-side slips (a `$defs` entry without properties, and "Synthetic" in a project name) were corrected in the new tests.
 
 **Next exact task:** CLS-002 (SegmentClassifier service) + CLS-003 (keyword scoring and ranking).
+
+### 06:15 — CLS-002 + CLS-003: labelling a segment, and why saying it once can beat saying it five times
+**What:** the classifier itself, and a free, local scorer it uses by default.
+- **Scoring (CLS-003).** Each approved term or project mentioned in a segment gets five features:
+  - *mentions*, log-scaled, so the fifth "Unity" adds little;
+  - *distinctiveness*: rarer across the corpus is higher;
+  - *user*: did the user say it?
+  - *decisive*: the user said it in a sentence with a decision cue ("decided", "going with", "switch to"...), with no "not" just before the name;
+  - an optional *semantic* score from elsewhere.
+
+  `rank` makes the best score in each field primary and the rest secondary. A near tie is broken by ID, the same way every time, and flagged for review instead of guessed.
+- **Classifier (CLS-002).** `SegmentClassifier` pins one taxonomy version for the whole run. The keyword path builds its answer in the same CLS-001 shape a model must use, and validates it the same way. The model path goes through the stage runner, so it gets the cache, the egress switch and the single repair. An answer that cites messages outside the segment, or has two primaries, is kept but marked `review_required`, never `done`.
+- **Fixture.** `mixed_projects` was added through the synthetic generator, so the regenerated fixtures stay byte-identical. In one chat the user names two projects and decides on one. In another, the assistant says "Unity" five times and the user settles on "Godot, not Unity".
+
+**Teach-back (`classification/scoring.py`):** "I score each approved name a segment mentions on several clues, and how often it's said is only one of them. A user saying 'I've decided to go with Godot' counts for much more than an assistant repeating 'Unity'. If two labels end up almost level, I don't pick quietly: I break the tie the same way every time and send it to review."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 163 source files
+pytest -q               # 880 passed, 6 skipped
+migration drift         # 0
+```
+Fix attempts: 2.
+1. A typing slip in `corpus_frequencies`. Also, my new test expected a refused answer to reach review in a single round, but the repair is a separate round by design, so I corrected the test.
+2. I had hand-written the fixture folder, which the fixture suite rejects. I added it to the generator instead.
+
+**Next exact task:** CLS-004 (classification persistence and review) + CLS-005 (order-independence diagnostic).
