@@ -170,7 +170,7 @@ ke imports report latest      # exact new/unchanged/revised/new_branches/new_med
 ke import tests/fixtures/chatgpt/split_wrapper --format chatgpt-split-v1 --account-ns fixture
 ke imports report latest      # all 'unchanged' (same logical records as the official format)
 # 5. Browse
-ke inspect conversation <id> --branches --assets
+ke inspect <id> --redact      # --redact: 8-character ID prefixes, for anything pasted into a report or checklist (OPS-009)
 ke render sources --out <tmp_vault>     # then the link checker runs over <tmp_vault>
 # 6. Raw safety
 ke raw inventory tests/fixtures/chatgpt/reexport_v1   # tree hash identical to step 1
