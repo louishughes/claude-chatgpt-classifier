@@ -966,6 +966,73 @@ def _eval_smoke(settings: Settings, args: argparse.Namespace) -> CommandResult:
     return CommandResult("eval smoke", data=data, message="Smoke test passed")
 
 
+def _eval_semantic(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Run the EVAL-011 semantic smoke test on a scratch copy, never the real database."""
+    import sqlite3
+    from contextlib import closing
+    from datetime import UTC, datetime
+
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.evaluation.semantic_smoke import Faults, run_semantic_smoke
+    from knowledge_engine.evaluation.synthetic import write_generated
+    from knowledge_engine.importer import import_source
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.infrastructure.logs import event_log
+
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+    base = settings.workspace_root / "smoke"
+    label = f"semantic-synthetic-{args.synthetic}" if args.synthetic else f"semantic-{args.limit}"
+    scratch = settings.model_copy(update={"workspace_root": base / f"{label}-{stamp}"})
+    if args.synthetic:
+        source = write_generated(base / f"{label}-src-{stamp}", args.synthetic, args.seed)
+        import_source(source / "export", "smoke", settings=scratch)
+        limit = args.synthetic
+    else:
+        real = database_path(settings)
+        if not real.exists():
+            return CommandResult(
+                "eval semantic", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+            )
+        # Work on a copy: the smoke run writes fake answers and records.
+        # SQLite's backup API copies a consistent snapshot, including
+        # anything still in the write-ahead log; the source opens read-only.
+        target = database_path(scratch)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with (
+            closing(sqlite3.connect(real.resolve().as_uri() + "?mode=ro", uri=True)) as src,
+            closing(sqlite3.connect(target)) as dst,
+        ):
+            src.backup(dst)
+        limit = args.limit
+    limits = settings.limits.model_copy(update={"max_model_calls_per_run": args.max_calls})
+    engine = create_sqlite_engine(database_path(scratch))
+    try:
+        with Session(engine) as session:
+            report = run_semantic_smoke(
+                session,
+                limit=limit,
+                limits=limits,
+                faults=Faults(invalid_every=args.invalid_every, silent_every=args.silent_every),
+                log=event_log(scratch),
+            )
+            session.commit()
+    finally:
+        engine.dispose()
+    report_path = base / f"{label}-{stamp}.json"
+    report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    data = {**report, "report": report_path.name}
+    if not report["passed"]:
+        return CommandResult(
+            "eval semantic",
+            ExitCode.ERROR,
+            data=data,
+            message="semantic smoke test FAILED",
+            error_code="failed",
+        )
+    return CommandResult("eval semantic", data=data, message="Semantic smoke test passed")
+
+
 def _not_built(name: str, ticket: str) -> Callable[[Settings, argparse.Namespace], CommandResult]:
     def handler(_settings: Settings, _args: argparse.Namespace) -> CommandResult:
         return CommandResult(
@@ -1041,6 +1108,17 @@ def build_parser() -> argparse.ArgumentParser:
     smoke.add_argument("--seed", type=int, default=1, help="seed for --synthetic (default 1)")
     smoke.add_argument("--limit", type=int, metavar="N", help="import only the first N")
     smoke.set_defaults(handler=_eval_smoke)
+    semantic = eval_commands.add_parser(
+        "semantic",
+        help="segment, classify and extract a batch with a local fake model, on a scratch copy",
+    )
+    semantic.add_argument("--limit", type=int, default=50, help="first N imported conversations")
+    semantic.add_argument("--synthetic", type=int, metavar="N", help="use N fake conversations")
+    semantic.add_argument("--seed", type=int, default=1, help="seed for --synthetic (default 1)")
+    semantic.add_argument("--max-calls", type=int, default=10_000, help="model call budget")
+    semantic.add_argument("--invalid-every", type=int, default=7, help="every Nth answer is broken")
+    semantic.add_argument("--silent-every", type=int, default=13, help="every Nth never answers")
+    semantic.set_defaults(handler=_eval_semantic)
 
     transcript = commands.add_parser("transcript", help="YouTube video transcripts")
     transcript_commands = transcript.add_subparsers(

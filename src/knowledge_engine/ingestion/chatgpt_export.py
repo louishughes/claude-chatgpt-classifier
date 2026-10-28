@@ -29,6 +29,7 @@ from pathlib import Path, PurePosixPath
 
 from knowledge_engine.ingestion.inventory import sniff_media
 from knowledge_engine.ingestion.source import (
+    MAX_ARCHIVE_ENTRIES,
     ImportWarning,
     MediaFile,
     NativeConversation,
@@ -78,21 +79,25 @@ class ChatGPTExportAdapter:
             return ProbeResult(True, "conversations.json found")
         return ProbeResult(False, "no conversations.json or conversations-NNN.json")
 
-    def open(self, path: Path, *, max_bytes: int) -> SourceListing:
+    def open(
+        self, path: Path, *, max_bytes: int, max_entries: int = MAX_ARCHIVE_ENTRIES
+    ) -> SourceListing:
         """List the export's conversation files and media.
 
         Args:
             path: A folder or a ZIP file.
             max_bytes: Largest single file that will be read.
+            max_entries: Most members a ZIP may list (OPS-002).
 
         Returns:
             The listing; conversations are read when iterated.
 
         Raises:
             UnsafeArchiveError: If a ZIP member name is unsafe.
-            SourceTooLargeError: If a conversations file exceeds ``max_bytes``.
+            SourceTooLargeError: If a conversations file exceeds ``max_bytes``,
+                or a ZIP lists more than ``max_entries`` members.
         """
-        reader = _ZipReader(path) if path.is_file() else _DirReader(path)
+        reader = _ZipReader(path, max_entries) if path.is_file() else _DirReader(path)
         names = reader.names()
         conv_names = sorted((n for n in names if _is_conversations(n)), key=_shard_order)
 
@@ -186,9 +191,13 @@ class _DirReader:
 
 
 class _ZipReader:
-    def __init__(self, archive: Path) -> None:
+    def __init__(self, archive: Path, max_entries: int = MAX_ARCHIVE_ENTRIES) -> None:
         self._archive = archive
         with zipfile.ZipFile(archive) as zf:
+            # ZipFile has read the member list by now, but refusing here
+            # stops the per-member listing, sniffing and hashing that follow.
+            if len(zf.filelist) > max_entries:
+                raise SourceTooLargeError(f"archive lists over {max_entries} members")
             self._infos = {i.filename: i for i in zf.infolist() if not i.is_dir()}
         unsafe = [n for n in self._infos if not safe_member_name(n)]
         if unsafe:

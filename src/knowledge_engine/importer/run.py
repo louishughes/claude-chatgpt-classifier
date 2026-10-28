@@ -81,7 +81,11 @@ def run_import(
         full_export = False
     before = tree_signature(path)
     adapter = select_adapter(path, default_adapters(), format_id)
-    listing = adapter.open(path, max_bytes=settings.limits.max_source_file_bytes)
+    listing = adapter.open(
+        path,
+        max_bytes=settings.limits.max_source_file_bytes,
+        max_entries=settings.limits.max_archive_entries,
+    )
 
     # The whole import holds the workspace lock: "running means crashed" and
     # "not touched by this import means not seen" both assume it's alone.

@@ -32,6 +32,7 @@ from typing import Any
 
 from knowledge_engine.ingestion.inventory import sniff_media
 from knowledge_engine.ingestion.source import (
+    MAX_ARCHIVE_ENTRIES,
     ImportWarning,
     MediaFile,
     NativeConversation,
@@ -80,12 +81,15 @@ class ChatGPTSplitAdapter:
                 return ProbeResult(True, "per-conversation wrapper files found")
         return ProbeResult(False, "JSON files found, but none wraps a conversation")
 
-    def open(self, path: Path, *, max_bytes: int) -> SourceListing:
+    def open(
+        self, path: Path, *, max_bytes: int, max_entries: int = MAX_ARCHIVE_ENTRIES
+    ) -> SourceListing:
         """List wrapper files and media, hashing each conversation file.
 
         Args:
             path: The raw root, or its ``conversations/`` folder.
             max_bytes: Largest single file that will be read.
+            max_entries: Unused: this format is a folder, not a ZIP.
 
         Returns:
             The listing; conversations are re-read (and re-checked against

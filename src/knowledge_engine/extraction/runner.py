@@ -56,6 +56,7 @@ from knowledge_engine.extraction.text import ExtractionMessage, quote
 from knowledge_engine.graph.offsets import find_all
 from knowledge_engine.infrastructure.db import Base
 from knowledge_engine.infrastructure.logs import EventLog, null_log
+from knowledge_engine.orchestration.limits import Deadline
 from knowledge_engine.orchestration.stage_keys import stage_key
 from knowledge_engine.providers.base import ModelRequest
 from knowledge_engine.providers.ledger import ModelStageRunner
@@ -132,6 +133,7 @@ class RunReport:
     pending: list[str] = field(default_factory=list)
     failed: list[str] = field(default_factory=list)
     gave_up: list[str] = field(default_factory=list)
+    deferred: list[str] = field(default_factory=list)
     records: int = 0
 
 
@@ -161,6 +163,7 @@ def run(
     extractors: Sequence[Extractor],
     *,
     log: EventLog | None = None,
+    deadline: Deadline | None = None,
 ) -> RunReport:
     """Run every extractor over every segment; skip done work; bound retries.
 
@@ -170,12 +173,25 @@ def run(
         segments: (segment ID, its messages) pairs.
         extractors: Rule or model extractors.
         log: Where to write one ``extract.run`` event per run (OPS-001).
+        deadline: The stage's time budget (OPS-002). Once it has passed, no
+            new run starts; the rest are reported ``deferred`` and done by
+            the next call, which skips everything already done.
     """
     log = log or null_log()
     report = RunReport()
     for segment_id, messages in segments:
         for extractor in extractors:
             key, versions = run_key(extractor, messages)
+            if deadline is not None and deadline.passed:
+                if not report.deferred:
+                    log.emit(
+                        "limit.reached",
+                        limit_name="stage_deadline_s",
+                        limit=deadline.seconds,
+                        stage_id="extract",
+                    )
+                report.deferred.append(key)
+                continue
             row = session.get(ExtractionRunRow, key)
             if row is not None and row.state == DONE:
                 report.skipped.append(key)

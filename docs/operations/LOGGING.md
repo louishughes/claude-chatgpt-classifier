@@ -18,6 +18,8 @@ Jobs write one JSON object per line to `<workspace>/logs/events-YYYYMMDD.jsonl`.
 | `model.repair` | `collect` (one repair sent) | stage_key, attempts, characters |
 | `model.stored` | `collect` (valid answer stored) | stage_key, attempts, model |
 | `model.review_required` | `collect` (failed twice) | stage_key, attempts |
+| `model.timeout` | `collect` (waited past `provider_timeout_s`) | stage_key, attempts |
+| `limit.reached` | `RunBudget`, extraction `run` (OPS-002) | limit_name, limit, value, stage_key |
 | `extract.run` | `extraction.runner.run` | stage_key, segment_id, extractor, version, state, records, attempts, error_type, duration_ms, outcome |
 
 Done runs that are skipped aren't logged: nothing happened.
@@ -31,3 +33,20 @@ ke logs --job-id ... --json     # machine-readable, with summed characters, cost
 ```
 
 Cost: `cost_usd` is an allowed field, but no provider reports a price yet (the only provider in use is the free fake one), so cost is tracked as `characters` for now. `totals()` sums cost, characters and time over any search. Filling `cost_usd` is follow-up work for the first paid provider.
+
+## Limits (OPS-002)
+
+Bounds live in `Settings.limits` (`KE_LIMITS__…`). Each is checked before the work, and reaching one is logged as `limit.reached`. Code: `src/knowledge_engine/orchestration/limits.py`.
+
+| Limit | Default | What happens when it is reached |
+|---|---|---|
+| `max_source_file_bytes` / `max_media_file_bytes` | 2 GiB / 512 MiB | the file is refused (`SourceTooLargeError`) |
+| `max_archive_entries` | 500,000 | the ZIP is refused before its members are listed or hashed |
+| `max_model_calls_per_run` | 0 (no calls) | requests past the cap are not sent (`capped`, picked up next run); a repair with no budget left ends `review_required` / `limit:max_model_calls_per_run` |
+| `max_input_tokens_per_request` | 100,000 (4 chars per token) | never sent; `review_required` / `limit:max_input_tokens` |
+| `max_requests_per_batch` | 50 | requests go in several batches |
+| `provider_timeout_s` | 86,400 | `review_required` / `timeout` |
+| `stage_deadline_s` | 3,600 | no new extraction run starts; the rest is `deferred` to the next run |
+| retries | 1 repair per model request; 3 attempts per extraction run | then `review_required` / `failed` |
+
+Memory is bounded by the file-size limits (a conversations file is the largest thing read whole) and by `max_conversations_per_batch` per commit.

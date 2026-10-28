@@ -1418,3 +1418,29 @@ migration drift         # 0
 Fix attempts: 1. The forged-decision test showed the gate missed a decision quoting only assistant words; the rule now requires the user's own words.
 
 **Next exact task:** OPS-002 (resource, timeout and queue limits) + EVAL-011 (semantic batch smoke at 50/100).
+
+### 11:05 — OPS-002 + EVAL-011: limits, and a semantic smoke test at 50 and 100
+**What:** bounds on everything a run can consume, and a batch test that pushes 50 and 100 chats through classification and extraction.
+- **Limits (OPS-002).** New `Settings.limits` fields: ZIP member cap, request size cap, batch size, provider timeout and stage deadline, next to the existing file-size and call caps. `orchestration/limits.py` holds a `RunBudget` shared by a run and a `Deadline`.
+  - Every limit is checked **before** the work, so reaching one costs nothing. Each is logged as `limit.reached` and ends as a recorded outcome:
+    - an oversize request is never sent and ends `review_required` with `limit:max_input_tokens`;
+    - requests past the call cap stay unsent (`capped`) for the next run;
+    - a repair with no budget left ends `review_required`;
+    - a silent provider times out to `review_required` with `timeout`;
+    - extraction past its deadline defers the rest.
+  - The schema failure rate now leaves out requests that never got an answer.
+- **Semantic smoke (EVAL-011).** `ke eval semantic` works on a scratch copy of the database (SQLite backup API, source opened read-only). Its fake model is local and answers with the keyword classifier's labels, but breaks every 7th answer and never answers every 13th.
+  - Extraction is interrupted halfway and resumed.
+  - At 50 and 100 conversations every check passes, and the measured failure rate (0.14) matches the injected one.
+  - The real-provider half needs Louis's opt-in and stays open.
+
+**Teach-back (`orchestration/limits.py`):** "A run gets a budget of model calls, a maximum request size, a batch size, a timeout and a deadline, all from the settings. Each limit is checked before the work, so going over one never costs anything, and it's logged. Work that didn't fit isn't lost: it's either marked for review with the reason or left for the next run."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 121 source files
+pytest -q               # 972 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 1. The fake provider counts as sending data, so the smoke run failed with egress off. The smoke run now uses a local fake that truthfully declares it sends nothing.
+
+**Next exact task:** the LEG-002..005 and REV-012 fold-ins, then M4.

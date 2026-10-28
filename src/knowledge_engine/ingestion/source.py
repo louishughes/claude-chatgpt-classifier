@@ -41,6 +41,10 @@ class UnsafeArchiveError(ValueError):
     """A ZIP contains a member name that could escape its folder."""
 
 
+# Default for ``Limits.max_archive_entries`` (OPS-002).
+MAX_ARCHIVE_ENTRIES = 500_000
+
+
 class SourceTooLargeError(ValueError):
     """An input file is bigger than the configured limit."""
 
@@ -177,8 +181,13 @@ class SourceAdapter(Protocol):
         """Say cheaply whether this adapter can read ``path``."""
         ...
 
-    def open(self, path: Path, *, max_bytes: int) -> SourceListing:
-        """List files and media and prepare to stream conversations."""
+    def open(
+        self, path: Path, *, max_bytes: int, max_entries: int = MAX_ARCHIVE_ENTRIES
+    ) -> SourceListing:
+        """List files and media and prepare to stream conversations.
+
+        ``max_entries`` bounds a ZIP's member count; folder formats ignore it.
+        """
         ...
 
 
