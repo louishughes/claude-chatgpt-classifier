@@ -94,6 +94,20 @@ Signatures and comments are in `ARCHITECTURE.md` §7.1 (source layer) and §3 (s
 
 Human approval points: before M1 starts (this plan); before the first real-provider call in M3 (provider, cost cap, egress profile: OD-04/05); before any network integration in M6; before any deletion/retention feature is used on real data.
 
+### 4a. Local interface (owner requirement, 2026-10-28 00:14 UTC: "Make sure there is also an easy to use interface")
+
+Louis is a Python beginner, so a CLI on its own isn't enough. A small **local web interface** is added. It is started with one command (`ke ui`), opens in the browser, listens on `127.0.0.1` only, and has no accounts, no cloud and no JavaScript build step: pages are rendered by the server, with plain HTML and a little CSS. It calls the same modules as the CLI (`import_source`, the stored import reports, `rendering/transcript`), so it adds screens, not new logic. Tickets (GitHub Issues; IDs new, frozen CSV untouched):
+
+| Ticket | Milestone | What the user gets | Blocked by |
+|---|---|---|---|
+| UI-001 | M1 tail (next) | `ke ui` starts the app; home screen with workspace status and the list of past imports; one import's report in plain words (what's new, changed, missing, needs a look) | IMP-005, BRW-001 (done) |
+| UI-002 | M1 tail | Import from the browser: pick a configured raw folder or type a path, press Import, watch progress, land on the report | UI-001 |
+| UI-003 | M1 tail | Browse chats: list with filter, a chat page showing the active path, labelled branches, images (or missing markers), and its import history | UI-001 |
+| UI-004 | M2 | Links, YouTube videos and social accounts pages; search box once RET-001 lands | UI-003, LNK-001, YTB-001, SOC-002, RET-001 |
+| UI-005 | M3 | Read-only view of AI suggestions and of what the independent reviewer sessions decided and why (no owner action required) | UI-003, EXT-007, TAX-004 |
+
+Each is one PR (at most two tickets per PR, with a teach-back). The parked API tickets (API-001..005) stay parked: the UI uses server-rendered pages, not a public API.
+
 ## 5. Ordered tickets, dependencies and estimates
 
 The full ordered list per milestone with blockers is in `DEPENDENCY_MAP.md` §4. Critical paths: G1 = 12 tickets (`FND-001 → FND-002 → FND-003 → ING-001 → ING-002 → ING-004 → ING-005 → NRM-001 → IMP-003 → IMP-004 → IMP-005 → BRW-001`); G3 = 18; G4 release gate = 27.
@@ -235,7 +249,7 @@ Packaging and monetisation are recorded as a future option (OD-16) and do not en
 **Lessons carried into the plan:**
 - **FND-009 / provider adapter:** direct provider APIs; retry transport and format errors only; trim harmless overflows in code; log schema-error kinds.
 - **M3 design:** discover, then consolidate into an owner-approved two-level taxonomy and project registry, then classify *segments*. Items cite message numbers, which code checks (speaker, decided-by-user, quote present). No clipping, or clipped results reported separately. Keep code messages.
-- **EVAL-001:** the answer key in `private/answer-key/` (10 chats, 95 items, awaiting owner review) is the seed of the golden set. Score by message number. Reports must name the reviewer. An AI check is never reported as accuracy.
+- **EVAL-001** (2026-10-28: no owner review; see OPEN_DECISIONS "reference set"): the answer key in `private/answer-key/` (10 chats, 95 items, to be reviewed by an independent Claude session, not the owner) is the seed of the golden set. Score by message number. Reports must name the reviewer. An AI check is never reported as accuracy.
 - **M1 dependency:** NRM/IMP must keep message order and numbering stable per active branch, because evidence anchors and segment ranges use them. They must also keep `code` content.
 The owner chose to validate the AI labelling step before starting M1. `prototype/classification_spike/` is throwaway code that labels a reproducible sample of 50, then 100, real conversations twice with schema-checked output, and reports:
 - **Reliability:** ok rate, first-try schema failures, repairs, timeouts and rate limits, latency, cost. Retries cover transport and format errors only; a well-formed wrong answer is never retried.

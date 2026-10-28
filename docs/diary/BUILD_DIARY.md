@@ -808,3 +808,11 @@ Fix attempts: 0.
 ### 00:12 — REV-009 prep: `ke inspect` shows what the checkpoint asks for
 **What:** `ke inspect <conversation>` now also lists role counts, content-type counts and the first 8 characters of each message ID on the active path. That's everything REV-009 asks to see on real data, still with no text, titles or file names. 1 new test, 555 in total.
 **Next:** run the REV-009 checkpoint and the real half of EVAL-010 on Louis's PC (read-only, outputs in the git-ignored workspace).
+
+### 00:15 — Two owner decisions: no tagging by Louis, and an easy interface
+**What:** Louis made two calls tonight, now recorded in `OPEN_DECISIONS.md` and the plan.
+- **"You perform the review."** Louis won't tag, label or review anything. Wherever the plan had him checking an answer key or giving yes/no verdicts, a separate Claude session now builds a *reference set* without seeing the output it will be compared with (ideally a different model), and the code checks still run. Disagreements go to another independent session, never to whoever produced either side. REV-003 and the evaluation tickets no longer wait on him.
+- **"Make sure there is also an easy to use interface."** A small local web app, started with `ke ui`, comes right after the import report: import history and reports, an Import button, and a chat browser with branches and images. Registry and search pages follow in M2, and a read-only view of AI suggestions in M3. It runs only on his machine, with no accounts. New tickets: UI-001 to UI-005.
+**Talking points:**
+- "Evaluation doesn't need me: an independent, blind reviewer builds the reference, and code checks the evidence."
+- "Everything the CLI does has a plain browser screen, local-only."
