@@ -2544,3 +2544,19 @@ tests/integration/test_import_fidelity.py            8 passed (one expected valu
 Fix attempts: 0.
 
 **Next exact task:** merge the open PRs; then the next unblocked ticket.
+
+### 13:05 — REV-011: three annotation rules, written down
+
+- The annotation guide gains "Three rules for every item": number every message on the active branch whatever its type (the same numbering as `ConversationGraph.message_number`; the ticket's `loader.py` doesn't exist, the graph is where it lives); every record and `forbidden` item carries a verbatim quote; an owner fact, idea or decision must cite a user message. One example each.
+- The gold schema gains an optional `quote` on records and forbidden items. Optional, so golden-v1 on Louis's PC stays valid without being touched; the evaluators don't score it. It's for reviewers checking an item against the chat.
+
+**Teach-back (the `quote` field):** Each answer-key item can now carry the exact words it is based on. A reviewer can then check the item against the chat without hunting for it. It's optional and not scored, so older answer keys still load and the scores don't change.
+
+Checks:
+```
+tests/unit/test_gold_quote.py   3 passed
+gold tests (-k gold)            23 passed (unchanged)
+```
+Fix attempts: 0.
+
+**Next exact task:** IMP-007 (#237).

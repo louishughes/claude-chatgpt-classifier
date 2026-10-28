@@ -912,3 +912,6 @@ docs/operations/HOSTING_AND_SECURITY.md; OD-19; authz log by account ID; rotate_
 
 ## 2026-10-28 13:15 IMP-007 (#237)
 chatgpt_export: `unread_conversation_file` warning for other JSON files holding conversations (folder and ZIP); side files skipped; EVAL-002 reproduction expected verdict silent_drop → warned per #237. Tests: test_unread_conversation_file.py (6).
+
+## 2026-10-28 13:05 REV-011 (#186)
+ANNOTATION_GUIDE "Three rules for every item" (numbering, verbatim quote, owner facts cite user); gold.py optional `quote` on GoldRecord/GoldForbidden. Tests: tests/unit/test_gold_quote.py (3).
