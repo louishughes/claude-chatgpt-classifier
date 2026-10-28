@@ -2,6 +2,8 @@
 
 A running, timestamped log of what is being worked on, the problems hit, how they were handled, and why each decision was made. It doubles as raw material for build-in-public posts and for explaining the project in job interviews.
 
+> **New entries live in [`entries/`](entries/), one file per entry** (from 2026-10-28, DOC-001, #343). Every PR used to add its entry here, and parallel PRs kept conflicting on it. This file keeps everything written before that, unchanged. Read the folder in filename order to continue the story.
+
 **Rules for this file**
 - Times are UTC.
 - Never paste anything from `raw/` (conversation text, titles, filenames, images) or any secret, key or private ID. Counts and format descriptions are fine. The repository is public.

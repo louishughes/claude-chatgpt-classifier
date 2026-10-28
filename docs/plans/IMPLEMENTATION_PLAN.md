@@ -216,7 +216,7 @@ Property-based tests (Hypothesis): random message DAGs (no cycles lost, every no
 
 ## 9. Decisions, changes and status accounting
 
-- Every ticket closure appends to `.agent-history/SESSION_LOG.md` and updates `STATUS.md` (create on first ticket), and adds a dated entry to `docs/diary/BUILD_DIARY.md`.
+- Every ticket closure adds a session-log entry and a diary entry, and updates `STATUS.md` (create on first ticket). Since DOC-001 (#343), each entry is its own file, `.agent-history/sessions/YYYY-MM-DD-HHMM-<ticket>.md` and `docs/diary/entries/YYYY-MM-DD-HHMM-<ticket>.md`, so two PRs never edit the same lines. The older entries stay in `SESSION_LOG.md` and `BUILD_DIARY.md`. Add a `STATUS.md` row beside its ticket family, not at one shared spot.
 - Architecture changes → new ADR in `docs/adr/` (append-only, `supersedes`). Small choices → `.agent-history/DECISION_LOG.md`.
 - Status words from `DECISIONS_AND_HISTORY.md`: `NOT_STARTED`, `IN_PROGRESS`, `BLOCKED`, `REVIEW_REQUIRED`, `VERIFIED`, `DEFERRED`, `CANCELLED`, `FAILED`, `UNKNOWN`. A ticket is `VERIFIED` only with the acceptance commands' real output.
 - Distinguish in every report: test not run, test failed, not implemented, intentionally omitted, source lacks the feature.
@@ -240,7 +240,7 @@ The owner is learning Python and wants the code to work as a portfolio piece and
 - **Typed everything:** type hints on all public functions; Pydantic models at boundaries. This is also the main fix for the past "not type-safe" problem.
 - **Small, readable functions** over clever ones; names that match `CONTEXT.md`/glossary terms once it exists.
 - FND-001 writes these rules into `docs/CODE_STYLE.md` and adds a docstring lint for public functions.
-- Each ticket's diary entry ends with "What I learned" and "Talking points" (see `docs/diary/BUILD_DIARY.md`).
+- Each ticket's diary entry ends with "What I learned" and "Talking points" (see `docs/diary/BUILD_DIARY.md` for the rules and `docs/diary/entries/` for the entries).
 
 Packaging and monetisation are recorded as a future option (OD-16) and do not enlarge the MVP. The one early action worth considering is choosing a licence, because the repository is public.
 
