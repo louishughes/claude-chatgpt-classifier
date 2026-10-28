@@ -44,6 +44,11 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from knowledge_engine.domain.enums import ReviewState
 from knowledge_engine.domain.ids import relationship_id
+
+# Imported for its table: a relationship row's foreign key names import_batches,
+# and a command that loads only this module (`ke related suggest`) would
+# otherwise fail to build the table metadata (NoReferencedTableError).
+from knowledge_engine.importer import ledger as _ledger  # noqa: F401
 from knowledge_engine.infrastructure.db import Base
 
 
