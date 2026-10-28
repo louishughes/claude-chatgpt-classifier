@@ -46,6 +46,9 @@ from knowledge_engine.documents.model import (
     KnowledgeDocument,
     build_document,
 )
+from knowledge_engine.domain.models import EvidenceRef
+from knowledge_engine.extraction.records import KnowledgeRecord
+from knowledge_engine.extraction.store import KnowledgeRecordRow
 from knowledge_engine.importer.records import ConversationRow, MessageNodeRow, MessageRevisionRow
 from knowledge_engine.reconciliation.graph import edges
 from knowledge_engine.reconciliation.timeline import TimelineEntry, timeline
@@ -57,12 +60,14 @@ from knowledge_engine.rendering.markdown import (
     Paragraph,
     PropertyValue,
     block_anchor,
+    escape_text,
     render_note,
     safe_filename,
     safe_relative_path,
     write_note,
 )
 from knowledge_engine.rendering.transcript import message_anchor
+from knowledge_engine.retrieval.citations import Citation, quote, resolve
 
 RENDER_VERSION = "doc-004-v1"
 PROJECTS_DIR = "Projects"
@@ -158,7 +163,50 @@ def _label(item: DocItem) -> str:
     return label
 
 
-def _item_blocks(item: DocItem, links: dict[str, SourceLink]) -> list[Block]:
+def evidence_of(session: Session, record_ids: list[str]) -> dict[str, tuple[EvidenceRef, ...]]:
+    """Record ID -> the evidence spans it was extracted with."""
+    found: dict[str, tuple[EvidenceRef, ...]] = {}
+    wanted = sorted(set(record_ids))
+    for start in range(0, len(wanted), 500):
+        for row in session.scalars(
+            select(KnowledgeRecordRow).where(
+                KnowledgeRecordRow.record_id.in_(wanted[start : start + 500])
+            )
+        ):
+            found[row.record_id] = KnowledgeRecord.model_validate_json(row.record_json).evidence
+    return found
+
+
+def evidence_blocks(
+    session: Session, refs: tuple[EvidenceRef, ...], links: dict[str, SourceLink]
+) -> list[Block]:
+    """Each evidence span as a quote with its speaker and a link to the message.
+
+    The span is re-checked against the stored text first (RET-006): a quote
+    is shown only if it still matches, word for word, and the speaker is
+    the one the record names. Otherwise a marker says why it isn't shown.
+    """
+    blocks: list[Block] = []
+    for ref in refs:
+        found = resolve(
+            session, ref.revision_id, ref.start, ref.end, ref.quote_sha256, actor=ref.actor
+        )
+        where = links[ref.revision_id].wikilink if ref.revision_id in links else "source not found"
+        if not isinstance(found, Citation):
+            blocks.append(Paragraph(f"> Evidence not shown: {found.problem.value} ({where})", True))
+            continue
+        said = " ".join(quote(session, found).split())  # one line, so the quote stays a quote
+        blocks.append(
+            Paragraph(f"> {escape_text(said)} (said by **{found.actor}**, {where})", True)
+        )
+    return blocks
+
+
+def _item_blocks(
+    item: DocItem,
+    links: dict[str, SourceLink],
+    quotes: list[Block] | None = None,
+) -> list[Block]:
     sources = [links[r].wikilink for r in item.revisions if r in links]
     facts = [
         _label(item),
@@ -170,6 +218,7 @@ def _item_blocks(item: DocItem, links: dict[str, SourceLink]) -> list[Block]:
     return [
         Paragraph(item.assertion, anchor=record_anchor(item.record_id)),
         BulletList(tuple(facts), trusted=True),
+        *(quotes or []),
     ]
 
 
@@ -179,16 +228,26 @@ def knowledge_note(
     *,
     mode: Mode = Mode.ALL,
     title: str | None = None,
+    quotes: bool = False,
 ) -> DocumentModel:
-    """A note model for any knowledge document: labelled, linked items by section."""
+    """A note model for any knowledge document: labelled, linked items by section.
+
+    With ``quotes``, each item is followed by its checked evidence quotes,
+    each naming who said it (DOC-003).
+    """
     links = source_links(session, list(document.revision_ids))
+    spans = evidence_of(session, list(document.record_ids)) if quotes else {}
+    if quotes:  # evidence can cite messages the item's own revisions don't list
+        extra = [r.revision_id for refs in spans.values() for r in refs]
+        links |= source_links(session, extra)
     blocks: list[Block] = []
     for section in document.sections:
         if section.key not in _IN_MODE[mode]:
             continue
         blocks.append(Heading(section.title, 2))
         for item in section.items:
-            blocks += _item_blocks(item, links)
+            said = evidence_blocks(session, spans.get(item.record_id, ()), links) if quotes else []
+            blocks += _item_blocks(item, links, said)
     properties: dict[str, PropertyValue] = {
         "ke_type": f"{document.kind.value}_knowledge",
         "document_id": document.document_id,

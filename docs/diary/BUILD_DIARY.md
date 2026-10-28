@@ -1776,3 +1776,28 @@ migration drift         # 0
 Fix attempts: 1 (current mode linked to replaced records through the dependency list; now only records the mode shows are linked).
 
 **Next exact task:** DOC-003 (conversation knowledge notes), then DOC-005.
+
+### 10:40 — DOC-003 + DOC-005: a knowledge page for each chat, and topic pages by canonical term
+**DOC-003.** `documents/notes.py` writes a knowledge note beside each chat's transcript, under `Knowledge/`. Its sections are:
+- **Summary**: counts only (messages, branches, segments, records, images, links, related chats), so nothing is invented;
+- **Classification**: each segment's labels in force (a review beats the machine), with a link to where the segment starts;
+- **Knowledge**: the chat's DOC-001 document, each record followed by its evidence quotes. Each quote is re-checked against the stored message (RET-006 `resolve`, speaker included) and names who said it. A quote that no longer matches is replaced by a marker saying why;
+- **Branches**: each edited or regenerated branch, with where it leaves the active path;
+- **Images**: embeds (files copied into the vault by fingerprint) and missing markers with reasons;
+- **Links**, **Videos**, **Accounts**: every URL, YouTube mention and social account mention, with who wrote it and a message link;
+- **Related conversations**: links in both directions with kind, evidence class, confidence and review state. Rejected links are left out.
+
+**DOC-005.** A topic is named by its term ID, label or alias. A name that fits several terms, or none, is refused. The topic master shows the records tagged with that term and the segments whose labels in force carry it in any field, plus their sources. Proved: the programming chat's record, segments and source never appear on the recipes page; removing a segment's label removes the segment but not the tagged record.
+
+`knowledge_note` gained an opt-in `quotes` flag, so project masters are unchanged.
+
+**Teach-back (`documents/notes.py`):** "For each chat, it writes a page next to the transcript listing the chat's labels, the knowledge taken from it with the exact quotes and who said them, its branches, images, links and related chats. Every quote is checked against the stored message before it is shown, so a page can't quote words that aren't there. A topic page is chosen by the topic's exact ID or a name that fits only one topic, so unrelated chats never slip in through a loose word match."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 151 source files
+pytest -q               # 
+migration drift         # 0
+```
+Fix attempts: 1 (topic and knowledge file names used IDs with an underscore, which the safe-filename check rejects; now hyphenated).
+
+**Next exact task:** DOC-006.
