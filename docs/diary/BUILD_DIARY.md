@@ -3291,6 +3291,24 @@ Checks:
 ```
 tests/integration/test_rich_note_card.py   1 passed (fails on the old code: '48' was in '48, Celeste')
 tests/integration/test_rich_note.py, test_note_checks.py   unchanged, pass
+
+### 16:05 — NOTE-019: "Want me to make another?" doesn't mean the chat is open
+
+**What:** The first real score of rich notes found the digest got the chat's status right in 12 of 15 chats. The three misses were image chats that ended on the assistant saying "Want me to make a version in portrait?". The model called them open. The user had their picture; nothing was unresolved.
+
+Two changes:
+
+- **The instruction:** the digest prompt now says to decide status by how the chat ends. It's a new prompt version (`digest-v2`), which gives every request a new key, so digests written under the old wording are asked for again instead of being silently reused.
+- **A code check:** `digest/ending.py` reads the chat's last turns with plain rules: the user's last message is a short thank-you or "done" → settled; the assistant delivered something (text before its closing offer, or an image) and ends on an offer → settled; the user's last message asks something nobody answered → open. If no rule fits, the model's reading stands. When a rule disagrees with the model, the rule wins, the new status cites the message that decided it, and a flag records what the model said. A correction is never silent.
+
+**Decision:** an offer with nothing delivered ("Want me to start?") is *not* treated as settled. It might be the assistant asking a clarifying question, so no rule applies and the model decides.
+
+**Teach-back (`digest/ending.py`):** It looks at the last couple of messages in a chat and asks three simple questions: did the user say thanks or done, did the assistant hand over a result and then just offer more, or did the user ask something that never got an answer. The first two mean the chat is settled and the third means it's open. If the model's digest disagrees, the code uses its own answer and leaves a note for a reviewer saying what changed.
+
+Checks:
+```
+tests/integration/test_digest_ending.py   5 passed (offer after a result, unanswered question, "thanks, done"; no rule keeps the model's answer; a bare offer isn't settled)
+digest stage and dry-run tests            10 passed, unchanged
 ```
 Fix attempts: 0.
 
@@ -3299,3 +3317,8 @@ Talking points:
 - "An empty row that says 'not stated' still reads like a fact, so the card leaves it out."
 
 **Next exact task:** none in this thread; the remaining NOTE tickets are with the rich-notes threads.
+
+- "A model mistook politeness for unfinished business. A ten-line rule fixed it, and the rule flags every change it makes."
+- "Changing a prompt changes its version, so old cached answers can't sneak back in."
+
+**Next exact task:** NOTE-017 (one ordered digest for multi-part chats).

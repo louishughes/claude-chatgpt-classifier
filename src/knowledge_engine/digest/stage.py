@@ -46,6 +46,7 @@ from knowledge_engine.digest.contract import (
     DigestItemAnswer,
     resolve_digest,
 )
+from knowledge_engine.digest.ending import settle_status
 from knowledge_engine.domain.enums import Role
 from knowledge_engine.extraction.text import ExtractionMessage, exchanges_of
 from knowledge_engine.orchestration.stage_keys import stage_key
@@ -56,7 +57,10 @@ from knowledge_engine.segmentation.segmenter import SegmenterSettings, split_par
 
 STAGE_ID = "digest.conversation.v1"
 STAGE_VERSION = "note-003-v1"
-PROMPT_VERSION = "digest-v1"
+# v2 (NOTE-019): the status rule for chats that end on an assistant offer.
+# A new version gives every request a new key, so digests written under v1
+# are asked for again rather than silently reused.
+PROMPT_VERSION = "digest-v2"
 
 INSTRUCTIONS = """\
 You write a short, accurate digest of one chat between a user and an AI \
@@ -73,7 +77,10 @@ Fill in:
 - summary: 1 to 4 sentences on what happened, in order, with specifics.
 - purpose: what the chat was for. outcome: how it ended, if it did.
 - status: open (unresolved or ongoing), settled (reached an answer or a \
-result) or abandoned (dropped without one).
+result) or abandoned (dropped without one). Decide it by how the chat \
+ends: if the user got what they asked for and the assistant's last message \
+only offers more ("Want me to...?"), the chat is settled; it is open only \
+when the user's last message asks something that was not answered.
 - intent: what the user wanted (learn, build, decide, create, fix, plan, \
 explore or other), with one line in your own words.
 - topics: the main subjects, as short noun phrases.
@@ -246,7 +253,7 @@ class DigestStage:
             answer = outputs[request_id]
             assert isinstance(answer, DigestAnswer)
             answers.append(answer)
-        digest = resolve_digest(merge_answers(answers), chat_messages(conversation))
+        digest = _checked(merge_answers(answers), conversation)
         return DigestOutcome(cid, "done" if digest.usable else "review_required", digest, ids)
 
 
@@ -268,8 +275,14 @@ def stored_digest(
         if row is None:
             return None
         answers.append(DigestAnswer.model_validate_json(row.output_json))
-    digest = resolve_digest(merge_answers(answers), chat_messages(conversation))
+    digest = _checked(merge_answers(answers), conversation)
     return digest if digest.usable else None
+
+
+def _checked(answer: DigestAnswer, conversation: StoredConversation) -> ConversationDigest:
+    """Check every quote against the chat, then the status against how it ended."""
+    messages = chat_messages(conversation)
+    return settle_status(resolve_digest(answer, messages), messages, conversation)
 
 
 def merge_answers(answers: Sequence[DigestAnswer]) -> DigestAnswer:
