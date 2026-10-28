@@ -353,6 +353,12 @@ def _tally(values: Iterable[str]) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
+def transcript_path(conversation_id: str, title: str | None) -> PurePosixPath:
+    """Where a chat's transcript note lives in the vault (``Sources/…``)."""
+    suffix = conversation_id.replace("_", "-", 1)[:13]
+    return safe_relative_path(SOURCES_DIR, safe_filename(title or "Untitled conversation", suffix))
+
+
 def write_transcript(
     session: Session, conversation: StoredConversation, vault_root: Path, store_root: Path
 ) -> tuple[PurePosixPath, list[str]]:
@@ -374,10 +380,7 @@ def write_transcript(
         vault_root,
         blob_sources(session, store_root),
     )
-    suffix = conversation.conversation_id.replace("_", "-", 1)[:13]
-    relative = safe_relative_path(
-        SOURCES_DIR, safe_filename(conversation.title or "Untitled conversation", suffix)
-    )
+    relative = transcript_path(conversation.conversation_id, conversation.title)
     write_note(vault_root, relative, text)
     return relative, check_embeds(vault_root, text)
 

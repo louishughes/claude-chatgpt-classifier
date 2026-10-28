@@ -1801,3 +1801,25 @@ migration drift         # 0
 Fix attempts: 1 (topic and knowledge file names used IDs with an underscore, which the safe-filename check rejects; now hyphenated).
 
 **Next exact task:** DOC-006.
+
+### 11:10 — DOC-006: a vault the engine shares safely with its owner
+`documents/vault.py` `sync_vault` writes every note the engine owns: transcripts, chat knowledge notes, project masters and (with a taxonomy) topic masters, plus their images.
+- **Only its own files.** A manifest (`.ke/manifest.json`) lists the paths it manages. A file someone else put at one of those paths is reported as `occupied` and never touched or claimed.
+- **Additions kept.** Each managed note ends with a `%% ke:manual … %%` marker line. Whatever is written below it is carried into every new version. Chat text can't fake the marker because `%%` in imported text is escaped.
+- **Edits not overwritten.** The manifest stores a fingerprint of the part above the marker. If the file no longer matches, the note is a `conflict` and stays exactly as it is. Deleting it hands it back to the engine.
+- **Stale notes.** A managed note the engine no longer makes (e.g. a title change renamed it) is removed only if unedited; otherwise it is kept and reported.
+- **No needless writes.** Every note and image is compared byte for byte first. Proved: a second run changes no file's modification time, the manifest included.
+- Embeds are checked after images are copied; broken ones are reported.
+- Path helpers (`transcript_path`, `knowledge_path`, `project_path`, `topic_path`) now name every note in one place.
+- Known limit: notes written earlier by `ke docs chat|project|topic` or `ke inspect --note` have no manifest entry, so the vault sync reports them as occupied. Point those commands at another folder, or delete the old files once.
+
+**Teach-back (`documents/vault.py`):** "It keeps a list of the files it made and a fingerprint of what it wrote, and it only ever touches files on that list. Anything I write under the marker line is copied into the new version, and if I edit the part above it, it leaves my file alone and tells me. If nothing changed, it compares and writes nothing at all."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 152 source files
+pytest -q               # 1126 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 0.
+
+**Next exact task:** IMP-006.

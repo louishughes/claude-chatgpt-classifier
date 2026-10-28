@@ -315,12 +315,16 @@ def project_master(session: Session, project_id: str, *, mode: Mode = Mode.ALL) 
     return DocumentModel(note.title, note.properties, tuple(blocks))
 
 
+def project_path(project_id: str, mode: Mode = Mode.ALL) -> PurePosixPath:
+    """Where a project master lives in the vault (``Projects/…``)."""
+    return safe_relative_path(PROJECTS_DIR, safe_filename(f"{project_id} {mode.value}", "master"))
+
+
 def write_project_master(
     session: Session, project_id: str, vault_root: Path, *, mode: Mode = Mode.ALL
 ) -> PurePosixPath:
     """Write the project master into ``vault_root/Projects`` (unchanged notes aren't rewritten)."""
     note = project_master(session, project_id, mode=mode)
-    suffix = mode.value if mode is not Mode.ALL else "all"
-    relative = safe_relative_path(PROJECTS_DIR, safe_filename(f"{project_id} {suffix}", "master"))
+    relative = project_path(project_id, mode)
     write_note(vault_root, relative, render_note(note))
     return relative
