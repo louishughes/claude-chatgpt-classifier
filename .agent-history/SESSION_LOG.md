@@ -748,3 +748,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - reconciliation/supersession.py (Outcome, Verdict, stored_quotes, evaluate, find_verdicts, reconcile); synthetic fixture engine_switch (appended; existing fixtures byte-identical); `ke timeline [--record] [--build]`.
 - Tests: test_decision_timeline.py (6). Full suite 1060 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: REC-006.
+
+## 2026-10-28 07:45 REC-006 (#89) + REC-007 (#90)
+- reconciliation/projection.py (Status, Entry, ProposalEntry, Projection, project); reconciliation/graph.py (Edge, Step, Direction, edges, walk, describe); `ke state`, `ke walk`. No migration.
+- Tests: test_state_and_walk.py (4). Full suite 1064 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: RET-002.
