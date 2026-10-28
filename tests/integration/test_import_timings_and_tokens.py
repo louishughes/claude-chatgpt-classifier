@@ -108,7 +108,9 @@ def _request(stage: str, text: str) -> ModelRequest:
     return ModelRequest(key, stage, "Label it.", text, Label, "p1", "s1")
 
 
-def test_tokens_are_estimated_per_stage_and_cached_answers_counted_apart(tmp_path: Path) -> None:
+def test_tokens_are_estimated_per_stage_and_cached_answers_counted_apart(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     assert estimate_tokens("") == 0
     assert estimate_tokens("abcd") == 1 and estimate_tokens("abcde") == 2  # rounded up
     settings = Settings(workspace_root=tmp_path / "ws")
@@ -139,3 +141,8 @@ def test_tokens_are_estimated_per_stage_and_cached_answers_counted_apart(tmp_pat
     assert totals["classify"]["requests"] == 3 and totals["classify"]["cached"] == 0
     assert totals["classify"]["input_tokens"] == sum(-(-r.characters // 4) for r in classify)
     assert totals["extract"] == dict.fromkeys(totals["extract"], 0)
+
+    monkeypatch.setenv("KE_WORKSPACE_ROOT", str(settings.workspace_root))
+    assert main(["eval", "tokens"]) == 0
+    out = capsys.readouterr().out
+    assert "classify: 3 requests (0 answered" in out and "Synthetic" not in out

@@ -3689,7 +3689,7 @@ def _eval_tokens(settings: Settings, args: argparse.Namespace) -> CommandResult:
     finally:
         engine.dispose()
     lines = [
-        f"{family}: {n['requests']} requests ({n['cached']} cached), "
+        f"{family}: {n['requests']} requests ({n['cached']} answered, so re-runs are free), "
         f"~{n['input_tokens']} input and ~{n['output_tokens']} output tokens"
         for family, n in data.items()
         if n["requests"] or family != "other"

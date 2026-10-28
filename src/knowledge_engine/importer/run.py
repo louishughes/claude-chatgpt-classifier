@@ -207,6 +207,8 @@ def _run(
     }
     files: Counter[str] = Counter()
     snapshots: dict[str, str] = {}
+    # "archive" is the snapshot ledger; reading the tree, opening the source
+    # and migrations before it count only towards the total.
     with clock.stage("archive"), factory.transaction() as session:
         workspace_id = WorkspaceRepo(session).get_or_create(DEFAULT_WORKSPACE_NAME).workspace_id
         ledger = ImportLedger(session, archive)
