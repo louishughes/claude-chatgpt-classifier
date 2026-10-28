@@ -2,20 +2,40 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
 <title>{% block title %}Knowledge Engine{% endblock %}</title>
 <link rel="stylesheet" href="/style.css">
 {% block head %}{% endblock %}
 </head>
 <body>
-<header>
-  <a class="brand" href="/">Knowledge Engine</a>
-  <nav><a href="/chats">Chats</a> · <a href="/search">Search</a> · <a href="/links">Links</a> · <a href="/videos">Videos</a> · <a href="/accounts">Accounts</a> · <a href="/suggestions">Suggestions</a> · <a href="/reviews">Reviews</a> · <a href="/evaluation">Evaluation</a> · <a href="/import">Import</a></nav>
-  <span class="muted">local only · v{{ version }}</span>
-</header>
+{# The sidebar groups pages by what you use them for. "section" is the first
+   part of the address (/evaluation/outputs -> evaluation), so sub-pages
+   light up their parent link. #}
+{% set section = (current_path or "/").split("/")[1] %}
+{% set groups = [
+  ("Your archive", [("", "Overview"), ("chats", "Chats"), ("search", "Search")]),
+  ("Found in chats", [("links", "Links"), ("videos", "Videos"), ("accounts", "Accounts")]),
+  ("Check the AI", [("suggestions", "Suggestions"), ("reviews", "Reviews"), ("evaluation", "Evaluation")]),
+  ("Add", [("import", "Import")]),
+] %}
+<aside class="sidebar">
+  <a class="brand" href="/"><strong>Knowledge Engine</strong><span>Your ChatGPT archive</span></a>
+  <nav class="nav" aria-label="Pages">
+  {% for heading, items in groups %}
+    <div class="nav-group">
+      <h2>{{ heading }}</h2>
+      {% for slug, words in items %}
+      <a href="/{{ slug }}"{% if slug == section %} aria-current="page"{% endif %}>{{ words }}</a>
+      {% endfor %}
+    </div>
+  {% endfor %}
+  </nav>
+  <p class="local-badge">Runs on this computer only · v{{ version }}</p>
+</aside>
 <main>
 {% block main %}{% endblock %}
 </main>
-<footer class="muted">Workspace: {{ workspace }}. Nothing on this page leaves your computer.</footer>
+<footer>Workspace: <span class="wrap">{{ workspace }}</span>. Nothing on this page leaves your computer.</footer>
 </body>
 </html>

@@ -2682,3 +2682,41 @@ Talking points:
 - "Evidence is folded away, not deleted: open the box and the quote is there, re-checked against the archive."
 
 **Next exact task:** NOTE-006, the first taxonomy discovered from the real chats.
+
+### 13:30 — A design pass on the dashboard (`ke ui`)
+
+Louis asked for the local dashboard to be easier to use and nicer to look at. It worked, but it was a page of links separated by dots, long grey tables and raw state names like `review_required`, and on a phone the tables pushed the whole page sideways.
+
+What changed (templates, CSS and one line in `ui/app.py`; no new routes, still read-only):
+
+- **One visual system** in `style.css`: every colour is a named token, and dark mode only swaps the tokens. Colour always means something: green fine, amber look at this, red wrong, and **violet for "an AI said so, not the owner"**.
+- **A sidebar grouped by purpose** (Your archive / Found in chats / Check the AI / Add) that highlights where you are. `app.py` now passes the current address to the templates for that. On a phone it becomes a wrapping top bar.
+- **Tables** sit in their own scrolling box, with small-caps headers and right-aligned numbers, so a wide table never drags the page sideways.
+- **Plain labels**: trust states are pills that say "review required" instead of `review_required`, the filter links are chips with counts, and long hashes are folded under "Fingerprints".
+- **Empty states** say what's missing and the next step ("Run `ke extract`…", "Import your ChatGPT export").
+- **Charts on the Evaluation page**: a stacked bar per record type (found and expected / found but not expected / expected but missed) and one for how far each output got (trust). Score tiles get a thin meter. Every score block carries "Scored against: AI check (not owner-verified)", in violet.
+
+Challenges:
+
+- **The page's security policy blocks scripts and inline styles.** That's on purpose (chat text must never become code), but it rules out chart libraries and `style="width: 40%"`. The fix: draw the bars as plain SVG from the template, where `width="40%"` is an attribute, not a style, and colour them from the stylesheet. Hover text comes from SVG `<title>`, which needs no script.
+- **Tests pin exact HTML** (for example `<td>(\d+)</td>` for the message count). My first pass added `class="num"` to those cells and broke two tests. Tests can't be changed without Louis, so I put the cells back and right-aligned the columns from CSS instead.
+- **The sidebar stopped halfway down** long pages in full-page screenshots, because a sticky box is only one screen tall. Painting the sidebar's panel onto the page background fixed it at any length.
+
+Before and after screenshots, all from synthetic test fixtures: `docs/diary/img/ui-design-2026-10-28/`.
+
+**Teach-back (`stackbar` in `ui/templates/macros.html`):** It draws one horizontal bar made of coloured pieces, such as found and expected, found but not expected, and missed. Every bar on a chart shares one scale, the biggest total, so you can compare their lengths fairly. It's plain SVG with percentage widths and a hover title, because the page isn't allowed to run scripts.
+
+Checks:
+```
+pytest tests/   1340 passed, 22 skipped (no test changed)
+ruff check src/knowledge_engine/ui   clean
+Screenshots: 11 pages, light and dark, plus 400px phone width
+```
+Fix attempts: 1 (the two HTML-pinning tests above).
+
+Talking points:
+- "My dashboard has no JavaScript at all, for security, so the charts are SVG drawn by the server-side template."
+- "Colour carries meaning: violet always means an AI checked this, not me, so a score can't look more certain than it is."
+- "The tests guard the exact numbers on the page, so a redesign that broke them got caught straight away."
+
+**Next exact task:** Louis looks at the screenshots and says what to change; possible follow-ups are a light/dark switch and a chart on the segment-labels page.

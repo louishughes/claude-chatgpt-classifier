@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Chats · Knowledge Engine{% endblock %}
 {% block main %}
-<h1>Chats</h1>
+<header class="page-head">
+  <p class="eyebrow">Your archive</p>
+  <h1>Chats</h1>
+  <p class="lede">Every chat you have imported, newest first. Open one to read it with its branches and images.</p>
+</header>
 <form method="get" action="/chats" class="search">
   <label for="q">Find by title</label>
   <input id="q" name="q" type="text" value="{{ q }}">
@@ -9,8 +13,8 @@
 </form>
 <p class="muted">{{ total }} chat{{ "" if total == 1 else "s" }}{% if q %} with "{{ q }}" in the title{% endif %}.</p>
 {% if rows %}
-<table>
-  <thead><tr><th>Title</th><th>Started</th><th>Messages</th><th></th></tr></thead>
+<div class="table-wrap"><table class="chat-list">
+  <thead><tr><th>Title</th><th>Started</th><th class="num">Messages</th><th></th></tr></thead>
   <tbody>
   {% for row in rows %}
   <tr>
@@ -21,7 +25,7 @@
   </tr>
   {% endfor %}
   </tbody>
-</table>
+</table></div>
 {% if pages > 1 %}
 <p>
   {% if page > 1 %}<a href="/chats?q={{ q | urlencode }}&amp;page={{ page - 1 }}">← Newer</a>{% endif %}
@@ -29,5 +33,7 @@
   {% if page < pages %}<a href="/chats?q={{ q | urlencode }}&amp;page={{ page + 1 }}">Older →</a>{% endif %}
 </p>
 {% endif %}
+{% elif total == 0 and not q %}
+<div class="empty"><p class="what">No chats yet.</p><p class="next"><a href="/import">Import your ChatGPT export</a> to fill this list.</p></div>
 {% endif %}
 {% endblock %}
