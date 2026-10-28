@@ -1358,3 +1358,28 @@ migration drift         # 0
 Fix attempts: 1. Entity records first came out grouped by cue type rather than in text order. They are now sorted by first mention, and the new fixture's expected order was written to match.
 
 **Next exact task:** EXT-007 (evidence promotion and review queue) + EXT-008 (extraction runner and versions).
+
+### 08:45 — EXT-007 + EXT-008: one gate to the truth, and a runner that doesn't redo work
+**What:** the only road from "an extractor proposed this" to "the system treats this as true", and the job runner that drives all the extractors.
+- **Gate (EXT-007).** Migration 0019 adds `knowledge_records` and an append-only `knowledge_record_events` log. `add_candidates` stores proposals idempotently. `gate` runs the EXT-002 check:
+  - a malformed reference means **rejected**;
+  - a doubtful meaning means **review_required**;
+  - otherwise the record is **supported**, but only if the record rules allow it. A user decision with no acceptance goes to review even when its quotes are perfect.
+
+  A named reviewer can support, confirm or reject; "validator" can't confirm. `current_truth()` returns supported and confirmed records only, and it is the one reader later stages may use. Every trust change is logged with who, from, to, why and the problem codes.
+- **Runner (EXT-008).** Each (segment, extractor) pair is one run with its own stage key. The key covers the segment's exact text plus the extractor, record-schema, prompt and taxonomy versions.
+  - **Done** runs are skipped: zero work and zero model calls.
+  - Each run sits in its own **savepoint**, so a crash rolls back only that run's writes and keeps everything the other extractors found.
+  - A failure stores only the error's type name. Runs are retried up to 3 attempts in total, then left failed.
+  - Model extractors use the FND-009 stage runner (cache, egress switch, one repair). The model only quotes words; the code finds them in the segment and builds the fingerprinted evidence itself. A quote that isn't really there is dropped.
+
+**Teach-back (`extraction/store.py`):** "Everything an extractor finds starts as a candidate and has to pass one gate. The gate rejects broken quotes, sends doubtful ones to a person, and only lets well-supported ones through. The rest of the system can only read records that got through, and every change of trust is logged with who made it and why."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 183 source files
+pytest -q               # 945 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 0. One fix in my own new test: it passed a plain string where an enum was expected, which caused a serializer warning.
+
+**Next exact task:** EVAL-001 + EVAL-003, then EVAL-004/011, OPS-001/002 and the LEG/REV fold-ins.
