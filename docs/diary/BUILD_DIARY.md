@@ -1795,7 +1795,7 @@ Fix attempts: 1 (current mode linked to replaced records through the dependency 
 ```
 ruff check / format     # All checks passed! / already formatted
 mypy                    # Success: no issues found in 151 source files
-pytest -q               # 
+pytest -q               # 1121 passed, 7 skipped
 migration drift         # 0
 ```
 Fix attempts: 1 (topic and knowledge file names used IDs with an underscore, which the safe-filename check rejects; now hyphenated).

@@ -781,5 +781,5 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 
 ## 2026-10-28 10:40 DOC-003 (#99) + DOC-005 (#101)
 - documents/notes.py (conversation_note, ConversationNote, write_conversation_note, Related, related_conversations, TopicNotFound, resolve_topic, TopicSegment, topic_segments, topic_master, write_topic_master); documents/render.py gains evidence_of, evidence_blocks and `knowledge_note(quotes=...)`; `ke docs chat|topic`. No migration.
-- Tests: test_conversation_notes.py (6). Full suite ; ruff, mypy OK; drift 0.
+- Tests: test_conversation_notes.py (6). Full suite 1121 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: DOC-006.
