@@ -1,0 +1,51 @@
+{
+  "fixture_format_version": 1,
+  "case": "legacy_regressions",
+  "synthetic": true,
+  "layout": "official",
+  "proves": "LEG-001: interleaved branches stay apart; short replies, same-title chats, code and execution output, and image occurrences are all kept.",
+  "expected": {
+    "conversations": 4,
+    "mapping_nodes": 26,
+    "messages": 22,
+    "branch_points": {
+      "edit": 1,
+      "regeneration": 1
+    },
+    "active_path_node_ids": [
+      "mix-sys",
+      "mix-u0b",
+      "mix-a0b"
+    ],
+    "inactive_node_ids": [
+      "mix-u0",
+      "mix-a0",
+      "mix-a0r"
+    ],
+    "active_path_messages": {
+      "c0000006-0000-4000-8000-000000000001": 3,
+      "c0000006-0000-4000-8000-000000000002": 7,
+      "c0000006-0000-4000-8000-000000000003": 3,
+      "c0000006-0000-4000-8000-000000000004": 6
+    },
+    "short_replies": [
+      "Synthetic no",
+      "Synthetic ok",
+      "Synthetic y",
+      "Synthetic k"
+    ],
+    "message_numbers": {
+      "code-a0": 3,
+      "code-t0": 4,
+      "code-a1": 5,
+      "code-u1": 6
+    },
+    "asset_occurrences": {
+      "available": 1
+    },
+    "assets": 1,
+    "image_files": 2,
+    "unreferenced_image_files": 1,
+    "warnings": []
+  }
+}
