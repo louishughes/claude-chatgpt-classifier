@@ -802,6 +802,109 @@ def _similar(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _find(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Answer a question with the right search (RET-005 route, RET-004 fusion); syncs first."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.infrastructure.workspace import WorkspaceRow
+    from knowledge_engine.retrieval.embeddings import LocalHashEmbedder
+    from knowledge_engine.retrieval.hybrid import HybridRetriever
+    from knowledge_engine.retrieval.lexical import LexicalIndex, search_index_path, sync_index
+    from knowledge_engine.retrieval.planner import plan, run_plan
+    from knowledge_engine.retrieval.semantic import (
+        SemanticIndex,
+        StaleIndexError,
+        semantic_index_path,
+        sync_semantic,
+    )
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "find", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    question = plan(args.question)
+    engine = create_sqlite_engine(db)
+    records: list[dict[str, object]] = []
+    hits: list[dict[str, object]] = []
+    fallback = False
+    try:
+        try:
+            semantic = SemanticIndex(
+                semantic_index_path(settings), LocalHashEmbedder(), rebuild=args.rebuild
+            )
+        except StaleIndexError as error:
+            return CommandResult(
+                "find", ExitCode.ERROR, message=f"{error} (use --rebuild)", error_code="stale"
+            )
+        with (
+            Session(engine) as session,
+            semantic,
+            LexicalIndex(search_index_path(settings)) as lexical,
+        ):
+            sync_index(session, lexical)
+            sync_semantic(session, semantic, settings.egress)
+            retriever = HybridRetriever(session, lexical, semantic, settings.egress)
+            for workspace_id in session.scalars(select(WorkspaceRow.workspace_id)):
+                result = run_plan(
+                    session,
+                    question,
+                    retriever,
+                    lexical,
+                    workspace_id=workspace_id,
+                    limit=args.limit,
+                    as_of=args.as_of,
+                )
+                fallback = fallback or result.fallback
+                records += [
+                    {
+                        "record_id": r.record_id,
+                        "record_type": r.record_type,
+                        "status": r.status.value,
+                        "assertion": r.assertion,
+                        "conversation_id": r.conversation_id,
+                        "revisions": list(r.revisions),
+                        "because": list(r.because),
+                        "superseded_by": list(r.superseded_by),
+                        "conflicts_with": list(r.conflicts_with),
+                    }
+                    for r in result.records
+                ]
+                hits += [
+                    {
+                        "kind": h.kind,
+                        "key": h.key,
+                        "conversation_id": h.conversation_id,
+                        "revision_id": h.revision_id,
+                        "pinned": h.pinned,
+                        "ranks": dict(h.ranks),
+                        "score": round(h.score, 6),
+                        "role": h.role,
+                        "snippet": h.snippet,
+                        "record_type": h.record_type,
+                    }
+                    for h in result.hits
+                ]
+    finally:
+        engine.dispose()
+    found = len(records) + len(hits)
+    return CommandResult(
+        "find",
+        data={
+            "route": question.route.value,
+            "reasons": list(question.reasons),
+            "exact_terms": list(question.exact_terms),
+            "fallback": fallback,
+            "records": records[: args.limit],
+            "hits": hits[: args.limit],
+        },
+        message=f"{question.route.value} route{' (fell back to hybrid)' if fallback else ''}: "
+        f"{found} result(s)",
+    )
+
+
 def _state(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """What holds now or on a date, with the events behind it (REC-006); no text."""
     from datetime import UTC, datetime
@@ -1552,6 +1655,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--rebuild", action="store_true", help="rebuild an index made by another embedder"
     )
     similar.set_defaults(handler=_similar)
+
+    find = commands.add_parser(
+        "find", help="ask a question; picks decision records, exact or combined search"
+    )
+    find.add_argument("question", help="the question or text to look for")
+    find.add_argument("--limit", type=int, default=20, help="at most this many results")
+    find.add_argument(
+        "--as-of", type=float, help="decision questions: the state at this time (epoch seconds)"
+    )
+    find.add_argument(
+        "--rebuild", action="store_true", help="rebuild a meaning index made by another embedder"
+    )
+    find.set_defaults(handler=_find)
 
     related = commands.add_parser("related", help="links between conversations (forks, quotes)")
     related_commands = related.add_subparsers(
