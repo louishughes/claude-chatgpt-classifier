@@ -829,3 +829,9 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - evaluation/workspace_score.py (WorkspaceScore, score_extraction); `ke gold score --gold --reviewer [--review] [--out] [--no-rules]`; gate line quality.real_golden_set now names EVAL-013 and the command; gate report regenerated. No migration.
 - Tests: test_gold_score.py (2). Full suite 1165 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: UI-005 issue check, then M5.
+
+## 2026-10-28 16:05 Merged eval-004-real (#246); LEG-002 fix: review hash ignores line endings
+- Opened and merged #246 for the PC session: docs/evaluation/EVAL-004_REAL.md (rule-extractor baseline on golden-v1: P 0.124, R 0.058, F1 0.079; gate passed; counts only).
+- Found: the report's review hash was of a CRLF checkout, so it didn't match the committed record. report_labels.sha256_review (CRLF read as LF) now hashes review records; note added to EVAL-004_REAL.md. Synthetic review hash unchanged (LF file).
+- Tests: test_report_labels.py +1. Full suite 1166 passed, 7 skipped; ruff, mypy OK.
+- Next: ING-008 + ING-009.

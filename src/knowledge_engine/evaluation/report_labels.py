@@ -121,6 +121,16 @@ def sha256_file(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def sha256_review(path: Path) -> str:
+    """A review record's SHA-256, the same on every computer.
+
+    Review records live in Git, which may check them out with Windows line
+    endings (CRLF) on one machine and LF on another. The hash is taken with
+    every CRLF read as LF, so it names the record, not the checkout.
+    """
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+
+
 def key_from_gold(gold: GoldSet) -> AnswerKey:
     """A key for an in-memory set: canonical-content hash, no review claimed."""
     content = json.dumps(gold.model_dump(mode="json"), sort_keys=True, ensure_ascii=False)
@@ -140,5 +150,5 @@ def key_from_file(
         version=f"{gold.name} ({gold.schema_version})",
         sha256=sha256_file(path),
         reviewer_kind=reviewer_kind,
-        review_sha256=sha256_file(review_file) if review_file is not None else None,
+        review_sha256=sha256_review(review_file) if review_file is not None else None,
     )

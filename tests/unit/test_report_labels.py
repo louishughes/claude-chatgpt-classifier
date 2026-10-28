@@ -15,6 +15,8 @@ from knowledge_engine.evaluation.report_labels import (
     AnswerKey,
     ReviewerKind,
     key_from_file,
+    sha256_file,
+    sha256_review,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -94,3 +96,14 @@ def test_default_key_claims_no_review_and_the_synthetic_key_is_agent_reviewed() 
     assert key.version == f"{load_gold(GOLD_PATH).name} (gold-v1)"
     assert key.label == "agent-reviewed, not owner-approved" and key.heading == AI_HEADING
     assert key.review_sha256 is not None and len(key.sha256) == 64
+
+
+def test_review_hash_ignores_checkout_line_endings(tmp_path: Path) -> None:
+    # Reproduction: the same review record hashed differently on Windows
+    # (CRLF checkout) and in Git (LF), so a report's review hash could not
+    # be matched to the committed record.
+    lf, crlf = tmp_path / "lf.md", tmp_path / "crlf.md"
+    lf.write_bytes(b"# Review\n\nline one\nline two\n")
+    crlf.write_bytes(b"# Review\r\n\r\nline one\r\nline two\r\n")
+    assert sha256_review(lf) == sha256_review(crlf) == sha256_file(lf)
+    assert sha256_file(crlf) != sha256_file(lf)
