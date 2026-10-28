@@ -1,0 +1,28 @@
+{
+  "fixture_format_version": 1,
+  "case": "topic_segments",
+  "synthetic": true,
+  "layout": "official",
+  "proves": "NRM-004: annotated topic starts (a vocabulary change and an eight-hour pause); a short 'no' stays with the suggestion it rejects; a one-topic chat stays whole.",
+  "expected": {
+    "conversations": 2,
+    "topic_starts": {
+      "c0000010-0000-4000-8000-000000000001": [
+        "bread-u1",
+        "py-u1"
+      ],
+      "c0000010-0000-4000-8000-000000000002": []
+    },
+    "boundary_reasons": {
+      "bread-u1": "vocabulary",
+      "py-u1": "gap"
+    },
+    "same_segment": [
+      [
+        "shed-u3",
+        "shed-u4",
+        "shed-a4"
+      ]
+    ]
+  }
+}

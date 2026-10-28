@@ -632,3 +632,9 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 ## 2026-10-28 03:05 M1 gate (REV-009 #143, EVAL-010 #39)
 - Results from the Windows RC session: pytest 589 passed / 6 skipped / 0 failed at d878333; real smoke 50 (import 409.8 s, reimport 856.1 s) and 100 (489.3 s, 864.6 s), all checks true; inspect x3 clean; ke ui 200 with 50 chat links.
 - Recorded in docs/evaluation/EVAL-010_SMOKE.md and STATUS. Follow-ups filed: PERF-001 #200, OPS-009 #201. Closing #143 and #39.
+
+## 2026-10-28 03:30 NRM-004 (#54), LEG-005 half (#193)
+- segmentation/segmenter.py (SegmentMessage, Segment, SegmentPart, SegmenterSettings, segment_section, segment_conversation, truncation_count, boundary_scores), fixture topic_segments, CLI `ke segments`.
+- Tests: test_segments.py (7), test_segmenter.py (6). Full suite 803 passed, 6 skipped. ruff, mypy, git_guard OK.
+- Segments are computed, not stored yet (storage comes with classification persistence). LEG-005 stays open for the extraction and length-band parts.
+- Next: TAX-001/002.

@@ -433,6 +433,64 @@ def _accounts(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _segments(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Show where a conversation's topic segments start, and their size parts (NRM-004)."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.rendering.transcript import load_conversation
+    from knowledge_engine.segmentation.segmenter import (
+        SEGMENTER_VERSION,
+        segment_conversation,
+        truncation_count,
+    )
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "segments", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            try:
+                conversation = load_conversation(session, args.conversation)
+            except KeyError:
+                return CommandResult(
+                    "segments",
+                    ExitCode.ERROR,
+                    message="no such conversation",
+                    error_code="unknown_conversation",
+                )
+            found = segment_conversation(conversation)
+    finally:
+        engine.dispose()
+    data = {
+        "segmenter": SEGMENTER_VERSION,
+        "truncation_count": truncation_count(found),
+        "segments": [
+            {
+                "segment_id": s.segment_id,
+                "section": s.section,
+                "sequence": s.sequence,
+                "reason": s.reason,
+                "first_message": s.messages[0],
+                "messages": len(s.messages),
+                "parts": [
+                    {
+                        "messages": len(p.messages),
+                        "characters": p.characters,
+                        "oversized": p.oversized,
+                    }
+                    for p in s.parts
+                ],
+            }
+            for s in found
+        ],
+    }
+    return CommandResult("segments", data=data, message=f"{len(found)} segment(s)")
+
+
 def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Search message text (RET-001). Brings the search index up to date first."""
     from sqlalchemy import select
@@ -855,6 +913,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--ambiguous", action="store_true", help="list bare @handles with no platform instead"
     )
     accounts.set_defaults(handler=_accounts)
+
+    segments = commands.add_parser("segments", help="a chat's topic segments (no text shown)")
+    segments.add_argument("conversation", help="the conv_ ID")
+    segments.set_defaults(handler=_segments)
 
     search = commands.add_parser("search", help="find messages by words, phrase or exact text")
     search.add_argument("query", help="what to look for")

@@ -1,0 +1,860 @@
+[
+  {
+    "title": "Synthetic three topics",
+    "create_time": 1707955200.0,
+    "update_time": 1707956400.0,
+    "mapping": {
+      "c0000010-0000-4000-8000-000000000001-root": {
+        "id": "c0000010-0000-4000-8000-000000000001-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000010-0000-4000-8000-000000000001-sys"
+        ]
+      },
+      "c0000010-0000-4000-8000-000000000001-sys": {
+        "id": "c0000010-0000-4000-8000-000000000001-sys",
+        "message": {
+          "id": "c0000010-0000-4000-8000-000000000001-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707955200.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000010-0000-4000-8000-000000000001-root",
+        "children": [
+          "shed-u1"
+        ]
+      },
+      "shed-u1": {
+        "id": "shed-u1",
+        "message": {
+          "id": "shed-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707955260.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: planning a garden shed, what base works under the shed floor?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000010-0000-4000-8000-000000000001-sys",
+        "children": [
+          "shed-a1"
+        ]
+      },
+      "shed-a1": {
+        "id": "shed-a1",
+        "message": {
+          "id": "shed-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707955320.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: a gravel shed base with timber bearers keeps the shed floor dry."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "shed-u1",
+        "children": [
+          "shed-u2"
+        ]
+      },
+      "shed-u2": {
+        "id": "shed-u2",
+        "message": {
+          "id": "shed-u2",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707955380.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: which timber for the shed floor and the shed frame?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "shed-a1",
+        "children": [
+          "shed-a2"
+        ]
+      },
+      "shed-a2": {
+        "id": "shed-a2",
+        "message": {
+          "id": "shed-a2",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707955440.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: treated timber for the floor; the frame timber can be lighter."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "shed-u2",
+        "children": [
+          "shed-u3"
+        ]
+      },
+      "shed-u3": {
+        "id": "shed-u3",
+        "message": {
+          "id": "shed-u3",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707955500.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: and the shed roof, felt or shingles over the timber?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "shed-a2",
+        "children": [
+          "shed-a3"
+        ]
+      },
+      "shed-a3": {
+        "id": "shed-a3",
+        "message": {
+          "id": "shed-a3",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707955560.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: felt on the shed roof is cheapest; shingles over timber last longer."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "shed-u3",
+        "children": [
+          "shed-u4"
+        ]
+      },
+      "shed-u4": {
+        "id": "shed-u4",
+        "message": {
+          "id": "shed-u4",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707955620.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: no shingles."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "shed-a3",
+        "children": [
+          "shed-a4"
+        ]
+      },
+      "shed-a4": {
+        "id": "shed-a4",
+        "message": {
+          "id": "shed-a4",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707955680.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: understood, felt on the shed roof then."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "shed-u4",
+        "children": [
+          "bread-u1"
+        ]
+      },
+      "bread-u1": {
+        "id": "bread-u1",
+        "message": {
+          "id": "bread-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707955740.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: different question, how do I feed a sourdough starter with flour?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "shed-a4",
+        "children": [
+          "bread-a1"
+        ]
+      },
+      "bread-a1": {
+        "id": "bread-a1",
+        "message": {
+          "id": "bread-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707955800.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: feed the sourdough starter equal flour and water daily."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "bread-u1",
+        "children": [
+          "bread-u2"
+        ]
+      },
+      "bread-u2": {
+        "id": "bread-u2",
+        "message": {
+          "id": "bread-u2",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707955860.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: what hydration should the sourdough loaf dough have?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "bread-a1",
+        "children": [
+          "bread-a2"
+        ]
+      },
+      "bread-a2": {
+        "id": "bread-a2",
+        "message": {
+          "id": "bread-a2",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707955920.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: a sourdough loaf dough at seventy percent hydration is easy to shape."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "bread-u2",
+        "children": [
+          "bread-u3"
+        ]
+      },
+      "bread-u3": {
+        "id": "bread-u3",
+        "message": {
+          "id": "bread-u3",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707955980.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: how hot should the oven be for the sourdough loaf?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "bread-a2",
+        "children": [
+          "bread-a3"
+        ]
+      },
+      "bread-a3": {
+        "id": "bread-a3",
+        "message": {
+          "id": "bread-a3",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707956040.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: a hot oven with steam gives the sourdough loaf a crust."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "bread-u3",
+        "children": [
+          "py-u1"
+        ]
+      },
+      "py-u1": {
+        "id": "py-u1",
+        "message": {
+          "id": "py-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707984060.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: how do I build a python package wheel from pyproject?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "bread-a3",
+        "children": [
+          "py-a1"
+        ]
+      },
+      "py-a1": {
+        "id": "py-a1",
+        "message": {
+          "id": "py-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707984120.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: run python -m build; the wheel follows your pyproject."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "py-u1",
+        "children": [
+          "py-u2"
+        ]
+      },
+      "py-u2": {
+        "id": "py-u2",
+        "message": {
+          "id": "py-u2",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707984180.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: how do I install that python package wheel locally?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "py-a1",
+        "children": [
+          "py-a2"
+        ]
+      },
+      "py-a2": {
+        "id": "py-a2",
+        "message": {
+          "id": "py-a2",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1707984240.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: pip install the wheel file to install the python package."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "py-u2",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "py-a2",
+    "plugin_ids": null,
+    "conversation_id": "c0000010-0000-4000-8000-000000000001",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000010-0000-4000-8000-000000000001"
+  },
+  {
+    "title": "Synthetic one topic",
+    "create_time": 1708041600.0,
+    "update_time": 1708042200.0,
+    "mapping": {
+      "c0000010-0000-4000-8000-000000000002-root": {
+        "id": "c0000010-0000-4000-8000-000000000002-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000010-0000-4000-8000-000000000002-sys"
+        ]
+      },
+      "c0000010-0000-4000-8000-000000000002-sys": {
+        "id": "c0000010-0000-4000-8000-000000000002-sys",
+        "message": {
+          "id": "c0000010-0000-4000-8000-000000000002-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708041660.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000010-0000-4000-8000-000000000002-root",
+        "children": [
+          "c0000010-0000-4000-8000-000000000002-u0"
+        ]
+      },
+      "c0000010-0000-4000-8000-000000000002-u0": {
+        "id": "c0000010-0000-4000-8000-000000000002-u0",
+        "message": {
+          "id": "c0000010-0000-4000-8000-000000000002-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708041720.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: what base works under a garden shed floor?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000010-0000-4000-8000-000000000002-sys",
+        "children": [
+          "c0000010-0000-4000-8000-000000000002-a0"
+        ]
+      },
+      "c0000010-0000-4000-8000-000000000002-a0": {
+        "id": "c0000010-0000-4000-8000-000000000002-a0",
+        "message": {
+          "id": "c0000010-0000-4000-8000-000000000002-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708041780.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: a gravel shed base."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000010-0000-4000-8000-000000000002-u0",
+        "children": [
+          "c0000010-0000-4000-8000-000000000002-u1"
+        ]
+      },
+      "c0000010-0000-4000-8000-000000000002-u1": {
+        "id": "c0000010-0000-4000-8000-000000000002-u1",
+        "message": {
+          "id": "c0000010-0000-4000-8000-000000000002-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708041840.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: which timber for the shed floor joists?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000010-0000-4000-8000-000000000002-a0",
+        "children": [
+          "c0000010-0000-4000-8000-000000000002-a1"
+        ]
+      },
+      "c0000010-0000-4000-8000-000000000002-a1": {
+        "id": "c0000010-0000-4000-8000-000000000002-a1",
+        "message": {
+          "id": "c0000010-0000-4000-8000-000000000002-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708041900.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: treated timber joists."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000010-0000-4000-8000-000000000002-u1",
+        "children": [
+          "c0000010-0000-4000-8000-000000000002-u2"
+        ]
+      },
+      "c0000010-0000-4000-8000-000000000002-u2": {
+        "id": "c0000010-0000-4000-8000-000000000002-u2",
+        "message": {
+          "id": "c0000010-0000-4000-8000-000000000002-u2",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708041960.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: how far apart should the shed floor joists be?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000010-0000-4000-8000-000000000002-a1",
+        "children": [
+          "c0000010-0000-4000-8000-000000000002-a2"
+        ]
+      },
+      "c0000010-0000-4000-8000-000000000002-a2": {
+        "id": "c0000010-0000-4000-8000-000000000002-a2",
+        "message": {
+          "id": "c0000010-0000-4000-8000-000000000002-a2",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708042020.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: 400 mm joists."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000010-0000-4000-8000-000000000002-u2",
+        "children": [
+          "c0000010-0000-4000-8000-000000000002-u3"
+        ]
+      },
+      "c0000010-0000-4000-8000-000000000002-u3": {
+        "id": "c0000010-0000-4000-8000-000000000002-u3",
+        "message": {
+          "id": "c0000010-0000-4000-8000-000000000002-u3",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708042080.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: and what goes on the shed floor joists?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000010-0000-4000-8000-000000000002-a2",
+        "children": [
+          "c0000010-0000-4000-8000-000000000002-a3"
+        ]
+      },
+      "c0000010-0000-4000-8000-000000000002-a3": {
+        "id": "c0000010-0000-4000-8000-000000000002-a3",
+        "message": {
+          "id": "c0000010-0000-4000-8000-000000000002-a3",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1708042140.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: shed floor boards."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000010-0000-4000-8000-000000000002-u3",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000010-0000-4000-8000-000000000002-a3",
+    "plugin_ids": null,
+    "conversation_id": "c0000010-0000-4000-8000-000000000002",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000010-0000-4000-8000-000000000002"
+  }
+]
