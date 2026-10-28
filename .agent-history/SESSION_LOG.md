@@ -574,7 +574,7 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - Tests: test_ui.py +20. Full suite 589 passed, 6 skipped. ruff, mypy, git_guard OK.
 - Next: ING-010 + NRM-003.
 
-## 2026-10-28 00:35 NRM-003 + ING-010 (slice T1)
+## 2026-10-28 00:36 NRM-003 + ING-010 (slice T1)
 - graph/offsets.py (Span, quote_hash ke-quote-v1, cite, verify, find_all, UTF-16/UTF-8 converters). ingestion/transcripts.py (parse_transcript: VTT/SRT/text, Cue, TranscriptDocument, TranscriptWarning; exact ms or None; <v> speakers only; sha256/source_url/language; size limit).
 - Tests: test_offsets.py (7), test_transcripts.py (9). Full suite 605 passed, 6 skipped. ruff, mypy, git_guard OK.
 - M1 gate (Windows tests, REV-009 real data, ke ui on Windows) handed to the PC session at 00:34; results pending.
@@ -602,246 +602,253 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - Full suite 672 passed, 6 skipped. ruff, mypy, git_guard OK.
 - Next: SOC-001/002.
 
-## 2026-10-28 01:20 SOC-001 + SOC-002 (#48, #49)
+## 2026-10-28 01:01 SOC-001 + SOC-002 (#48, #49)
 - links/social.py (detection), links/social_store.py (SocialAccountRow, AccountAliasRow, AccountMentionRow, record_accounts), ids account_mention_id, migration 0012, importer delta/run/report wiring (report.accounts), CLI `ke accounts`.
 - Tests: test_social_detection.py (25), test_social_registry.py (2). Full suite 699 passed, 6 skipped. ruff, mypy, git_guard OK; no migration drift.
 - Next: REL-002.
 
-## 2026-10-28 01:45 REL-002 (#50)
+## 2026-10-28 01:10 REL-002 (#50)
 - relationships/store.py (ConversationRelationshipRow, RelationshipReviewRow, propose, review, history; append-only triggers), relationships/detect.py (native-node-v1, prefix-v1, chatgpt-url-v1, quote-v1), migration 0013, importer runs detection when anything changed (report.relationships), CLI `ke related list|review|detect`.
 - Fixtures copied_prefix, similar_unrelated (existing fixtures byte-identical). Tests: test_conversation_relationships.py (5), test_relationship_detectors.py (5).
 - Full suite 729 passed, 6 skipped. ruff, mypy, git_guard OK; no migration drift. Detection 2.7 s over 1,000 generated chats.
 - Next: RET-001.
 
-## 2026-10-28 02:10 RET-001 (#51)
+## 2026-10-28 01:15 RET-001 (#51)
 - retrieval/lexical.py (LexicalIndex over <workspace>/index/search.db, external-content FTS5, SearchMode tokens|phrase|exact, match_expression quoting, sync_index), import syncs when anything changed (report.search_indexed; sqlite errors -> warning search_index_unavailable), CLI `ke search`.
 - Fixture search_terms (12 expected queries). Tests: test_lexical_search.py (16), test_search_query.py (2, Hypothesis).
 - Full suite 757 passed, 6 skipped. ruff, mypy, git_guard OK. No archive migration (index is a separate file).
 - Next: UI-004.
 
-## 2026-10-28 02:30 UI-004 (#174)
+## 2026-10-28 01:20 UI-004 (#174)
 - ui/registries.py (places, list_links, link_page, list_videos, video_page, account_page), app routes /search /links /videos /accounts (+ detail pages), templates macros/links/link/videos/video/accounts/account/search, nav + home search box, `clock` filter. social_store.account_summaries/ambiguous_handles/account_mentions (CLI `ke accounts` now uses them).
 - Tests: test_ui_registries.py (9; follows every mention link to its anchor). Full suite 766 passed, 6 skipped. ruff, mypy, git_guard OK.
 - Next: M3.
 
-## 2026-10-28 02:55 FND-007 + FND-009 (#52, #53)
+## 2026-10-28 01:25 FND-007 + FND-009 (#52, #53)
 - providers/base.py (ModelRequest, ProviderResult, BatchHandle, StructuredModelProvider protocol, validate_output, FakeProvider, ReplayProvider, read_response_lines), providers/file_batch.py (FileBatchProvider, ChangedRequestFileError), providers/ledger.py (ModelRequestRow, ModelOutputRow, ModelStageRunner, repair_id, usage), migration 0014, Settings.model_batch_root, docs/runbooks/LABELLING_SESSION.md.
 - Tests: test_providers.py (10), test_model_ledger.py (4). Full suite 780 passed, 6 skipped. ruff, mypy, git_guard OK; no migration drift.
 - Next: NRM-004.
 
-## 2026-10-28 03:05 M1 gate (REV-009 #143, EVAL-010 #39)
+## 2026-10-28 01:27 M1 gate (REV-009 #143, EVAL-010 #39)
 - Results from the Windows RC session: pytest 589 passed / 6 skipped / 0 failed at d878333; real smoke 50 (import 409.8 s, reimport 856.1 s) and 100 (489.3 s, 864.6 s), all checks true; inspect x3 clean; ke ui 200 with 50 chat links.
 - Recorded in docs/evaluation/EVAL-010_SMOKE.md and STATUS. Follow-ups filed: PERF-001 #200, OPS-009 #201. Closing #143 and #39.
 
-## 2026-10-28 03:30 NRM-004 (#54), LEG-005 half (#193)
+## 2026-10-28 01:31 NRM-004 (#54), LEG-005 half (#193)
 - segmentation/segmenter.py (SegmentMessage, Segment, SegmentPart, SegmenterSettings, segment_section, segment_conversation, truncation_count, boundary_scores), fixture topic_segments, CLI `ke segments`.
 - Tests: test_segments.py (7), test_segmenter.py (6). Full suite 803 passed, 6 skipped. ruff, mypy, git_guard OK.
 - Segments are computed, not stored yet (storage comes with classification persistence). LEG-005 stays open for the extraction and length-band parts.
 - Next: TAX-001/002.
 
-## 2026-10-28 03:50 TAX-001 + TAX-002 (#56, #57)
+## 2026-10-28 01:35 TAX-001 + TAX-002 (#56, #57)
 - taxonomy/registry.py (Dimension, TermStatus, normalise_alias, TaxonomyTermRow, TaxonomyAliasRow, TaxonomyVersionRow, TaxonomyProposalRow, ProjectRow, ProjectAliasRow, TaxonomySnapshot, TaxonomyRegistry.add_term/add_alias/add_project/publish/snapshot/versions), migration 0015.
 - Tests: test_taxonomy_registry.py (8). Full suite 811 passed, 6 skipped. ruff, mypy, git_guard OK; no migration drift.
 - Next: TAX-003/004.
 
-## 2026-10-28 04:25 TAX-003 + TAX-004 (#58, #59)
+## 2026-10-28 04:15 TAX-003 + TAX-004 (#58, #59)
 - taxonomy/aliases.py (AliasResolver.resolve/find/collisions, MatchStatus, Candidate, Resolution, Mention); taxonomy/review.py (Operation, propose, approve, reject, proposals, ReviewError); TaxonomyProposalRow.decision_note/result_id; migration 0016.
 - Tests: test_alias_resolver.py (7), test_taxonomy_review.py (9). Full suite 827 passed, 6 skipped. ruff, mypy OK; no migration drift.
 - Next: TAX-005/006.
 
-## 2026-10-28 04:45 NRM-006 + TAX-005 (#55, #60)
+## 2026-10-28 04:20 NRM-006 + TAX-005 (#55, #60)
 - segmentation/inventory.py (SegmentText, CorpusSummary, segment_texts, corpus_inventory, theme_words, summarise, sample, sample_ids); CLI `ke corpus`. taxonomy/projects.py (same_name_projects, propose_project); review.approve gains `label` override and the high-impact note rule for project rename/merge.
 - Tests: test_corpus_sample.py (5), test_corpus_inventory.py (2), test_project_proposals.py (5). Full suite 839 passed, 6 skipped. ruff, mypy OK; no migration drift.
 - Next: TAX-006/007.
 
-## 2026-10-28 05:10 TAX-006 + TAX-007 (#61, #62)
+## 2026-10-28 04:25 TAX-006 + TAX-007 (#61, #62)
 - taxonomy/discovery.py (DiscoveryBackend, TfidfBackend, BertopicBackend, BackendUnavailable, Cluster, DiscoveryReport, discover, STOP_WORDS); taxonomy/changes.py (TaxonomyChangeRow, StageInvalidationRow, TaxonomyDiff, diff_snapshots, record_diff, invalidate, invalidated); migration 0017.
 - Tests: test_taxonomy_discovery.py (4), test_taxonomy_changes.py (3). Full suite 846 passed, 6 skipped. ruff, mypy OK; no migration drift.
 - Next: TAX-008 + CLS-001.
 
-## 2026-10-28 05:40 TAX-008 + CLS-001 (#63, #64)
+## 2026-10-28 04:31 TAX-008 + CLS-001 (#63, #64)
 - taxonomy/governance.py (Issue, GovernanceReport, governance_report), `ke taxonomy report`; classification/schema.py (output_model, instructions, segment_input, classification_request, assignments, answer_problems, Rank, SegmentMessageText).
 - Tests: test_taxonomy_governance.py (5), test_classifier_schema.py (12). Full suite 863 passed, 6 skipped; ruff, mypy OK; drift 0.
 - Next: CLS-002 + CLS-003.
 
-## 2026-10-28 06:15 CLS-002 + CLS-003 (#65, #66)
+## 2026-10-28 04:38 CLS-002 + CLS-003 (#65, #66)
 - classification/scoring.py (Weights, Signals, KeywordScorer, corpus_frequencies, rank, Ranking, as_answer); classification/classifier.py (SegmentClassifier, SegmentClassification, segment_messages); synthetic fixture case mixed_projects.
 - Tests: test_segment_classifier.py (7). Full suite 880 passed, 6 skipped; ruff, mypy OK; drift 0.
 - Next: CLS-004 + CLS-005.
 
-## 2026-10-28 06:45 CLS-004 + CLS-005 (#67, #68)
+## 2026-10-28 04:42 CLS-004 + CLS-005 (#67, #68)
 - classification/store.py (ClassificationRow, ClassificationLabelRow, ClassificationReviewRow, save, record_review, effective_labels, review_queue, FieldLabels, ReviewInputError); migration 0018_classifications; classification/drift.py (order_experiment, canonical, DriftReport, Unstable).
 - Tests: test_classification_store.py (7). Full suite 887 passed, 6 skipped; ruff, mypy OK; drift 0.
 - Next: EXT-001 + EXT-002.
 
-## 2026-10-28 07:10 EXT-001 + EXT-002 (#69, #70)
+## 2026-10-28 04:47 EXT-001 + EXT-002 (#69, #70)
 - extraction/records.py (RecordType, Origin, Acceptance, Scope, Trust, TRANSITIONS, COMMITMENTS, Provenance, CandidateRecord, KnowledgeRecord, advance, TrustTransitionError); extraction/evidence.py (check_record, revision_text, Verdict, EvidenceCheck, EvidenceProblem).
 - Tests: test_knowledge_records.py (14), test_evidence_validator.py (7). Full suite 908 passed, 6 skipped; ruff, mypy OK; drift 0.
 - Next: EXT-003 + EXT-004.
 
-## 2026-10-28 07:40 EXT-003 + EXT-004 (#71, #72)
+## 2026-10-28 04:52 EXT-003 + EXT-004 (#71, #72)
 - extraction/text.py (ExtractionMessage, segment_extraction_messages, sentences, quote); extraction/decisions.py (extract_decisions); extraction/preferences.py (extract_preferences); records.py v2 (Strength, Polarity, attributed_to); evidence.py (quoted_at, inside_quotation, someone_elses_view); synthetic case extraction_rules.
 - Tests: test_rule_extractors.py (8). Full suite 926 passed, 6 skipped; ruff, mypy OK; drift 0.
 - Next: EXT-005 + EXT-006.
 
-## 2026-10-28 08:10 EXT-005 + EXT-006 (#73, #74)
+## 2026-10-28 04:58 EXT-005 + EXT-006 (#73, #74)
 - extraction/actions.py (extract_actions, load_occurrences, Occurrence); extraction/entities.py (extract_entities); records.py v3 (EntityType, Entity, asset_occurrences, missing_occurrences); evidence.py occurrence checks; synthetic case actions_entities.
 - Tests: test_action_entity_extractors.py (4). Full suite 939 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: EXT-007 + EXT-008.
 
-## 2026-10-28 08:45 EXT-007 + EXT-008 (#75, #76)
+## 2026-10-28 05:03 EXT-007 + EXT-008 (#75, #76)
 - extraction/store.py (KnowledgeRecordRow, KnowledgeRecordEventRow, add_candidates, gate, decide, current_truth, review_queue, history, Decision, GateError); extraction/runner.py (ExtractionRunRow, run, run_key, RuleExtractor, ModelExtractor, ModelAnswer, PendingAnswer, RunReport); migration 0019_knowledge_records.
 - Tests: test_extraction_gate_runner.py (6). Full suite 945 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: EVAL-001 + EVAL-003.
 
-## 2026-10-28 09:40 EVAL-001 + EVAL-003 (#77, #78)
+## 2026-10-28 05:13 EVAL-001 + EVAL-003 (#77, #78)
 - evaluation/gold.py (gold-v1 schema, load/write, annotation_template, records_annotated, label-ID check); evaluation/classification_eval.py (evaluate_classification, stability, predicted_from); providers/ledger.py schema_failures; CLI `ke gold template|schema`; synthetic gold set; docs/evaluation/ANNOTATION_GUIDE.md, EVAL-003_BASELINE.md.
 - Independent review: CHANGES_REQUESTED, 6 must-fix items applied.
 - Tests: test_gold_and_classification_eval.py (13). Full suite 958 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: EVAL-004 + EVAL-011.
 
-## 2026-10-28 10:20 EVAL-004 + OPS-001 (#79, #80)
+## 2026-10-28 05:20 EVAL-004 + OPS-001 (#79, #80)
 - evaluation/extraction_eval.py (ScoredRecord, scored_records, evaluate_extraction, ExtractionReport.passed); infrastructure/logs.py (EventLog, FIELDS, scrub, error_type, search, totals, event_log, null_log); ledger and extraction runner emit events; CLI `ke logs`; docs/evaluation/EVAL-004_BASELINE.md, docs/operations/LOGGING.md.
 - Tests: test_extraction_eval.py (3), test_structured_logs.py (4). Full suite 965 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: OPS-002 + EVAL-011.
 
-## 2026-10-28 11:05 OPS-002 + EVAL-011 (#81, #82)
+## 2026-10-28 05:30 OPS-002 + EVAL-011 (#81, #82)
 - orchestration/limits.py (RunBudget, Deadline, estimated_tokens); Limits: max_archive_entries, max_input_tokens_per_request, max_requests_per_batch, provider_timeout_s, stage_deadline_s; ledger: budget, batching, timeout, LIMIT_* errors, capped, not_answered(); extraction runner deadline/deferred; ZIP member cap; evaluation/semantic_smoke.py; CLI `ke eval semantic`.
 - Tests: test_limits_and_semantic_smoke.py (7). Full suite 972 passed, 7 skipped; ruff, mypy OK; drift 0.
 - EVAL-011 real-provider run not done (needs owner opt-in); issue stays open.
 - Next: LEG-002..005, REV-012.
 
-## 2026-10-28 11:30 LEG-002 + REV-012 (#190, #187)
+## 2026-10-28 05:34 LEG-002 + REV-012 (#190, #187)
 - evaluation/report_labels.py (ReviewerKind, AnswerKey, key_from_gold, key_from_file); reports take `key=`; baselines regenerated with key block; docs/reviews/GOLD_SYNTHETIC_V1_REVIEW.md; ANNOTATION_GUIDE "Report labels".
 - Tests: tests/unit/test_report_labels.py (10). Full suite 982 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: LEG-003 + LEG-004.
 
-## 2026-10-28 12:00 LEG-003 + LEG-004 (#191, #192)
+## 2026-10-28 05:39 LEG-003 + LEG-004 (#191, #192)
 - providers/base.py (ResultState.TRANSIENT, RawResponse, result_from_response, TRUNCATED, list trimming, ProviderResult.trimmed); ledger (transient resend, MAX_TRANSIENT_FAILURES=3, transient_failures/last_transient, resent, not_answered.provider_failed, model.transient/model.trimmed events); migration 0020_provider_failures; graph/offsets.py (normalise_for_match, find_quote); model extractor uses find_quote.
 - Tests: test_provider_failures.py (5), test_quote_matching.py (14). Full suite 1001 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: LEG-005.
 
-## 2026-10-28 12:40 LEG-005 (#193)
+## 2026-10-28 05:47 LEG-005 (#193)
 - segmenter.split_parts (public, generic); extraction/text.exchanges_of; ModelExtractor per-part requests and merge; classifier model path per-part with disagreement -> review; Predicted.input_messages/chat_chars; reports: truncation_count, by_band / recall_by_band, length_band; synthetic case late_rejection; baselines regenerated (numbers unchanged).
 - Tests: test_long_chats.py (5). Full suite 1016 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: M4.
 
-## 2026-10-28 05:55 UI-005 (#221)
+## 2026-10-28 05:53 UI-005 (#221)
 - ui/review.py (suggestions, reviews); templates suggestions.html, reviews.html; routes /suggestions, /reviews; nav links. Issue #221 created (the plan listed UI-005 but no issue existed).
 - Tests: test_ui_review.py (5). Full suite 1021 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: M4.
 
-## 2026-10-28 06:20 NRM-005 (#83) + REC-001 (#84)
+## 2026-10-28 06:02 NRM-005 (#83) + REC-001 (#84)
 - segmentation/overrides.py (SegmentOverrideRow, Action, record_override, active_overrides, load_segments, orphaned, revalidation); segmenter: overrides param, exchange_starts, section_messages, Segment.derived_from; migration 0021_segment_overrides; inventory and semantic smoke use the overrides; `ke segments --split/--merge/--clear`.
 - reconciliation/equivalence.py (find_candidates, compare, propose_equivalences, review, equivalence_groups, pairs); migration 0022_record_equivalences; `ke duplicates detect/list/review`.
 - Tests: test_segment_overrides.py (8), test_record_equivalence.py (5). Full suite 1034 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: REC-002.
 
-## 2026-10-28 06:50 REC-002 (#85) + REC-003 (#86)
+## 2026-10-28 06:09 REC-002 (#85) + REC-003 (#86)
 - reconciliation/relations.py (Predicate, allowed, place, find_links, store_link, propose_links, review_link, links_of); migration 0023_record_links.
 - reconciliation/conflicts.py (ConflictKind, overlap, compare, find_conflicts, detect_conflicts, review_conflict, conflicts); migration 0024_record_conflicts; equivalence: public `differences`, stance words excluded from content words; `ke reconcile`.
 - Tests: test_record_links.py (5), test_record_conflicts.py (5). Full suite 1044 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: REC-004.
 
-## 2026-10-28 07:20 REC-004 (#87) + REC-005 (#88)
+## 2026-10-28 06:17 REC-004 (#87) + REC-005 (#88)
 - reconciliation/timeline.py (Transition, DecisionEventRow, check, record_event, revoke, revoked, build_events, timeline); migration 0025_decision_events.
 - reconciliation/supersession.py (Outcome, Verdict, stored_quotes, evaluate, find_verdicts, reconcile); synthetic fixture engine_switch (appended; existing fixtures byte-identical); `ke timeline [--record] [--build]`.
 - Tests: test_decision_timeline.py (6). Full suite 1060 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: REC-006.
 
-## 2026-10-28 07:45 REC-006 (#89) + REC-007 (#90)
+## 2026-10-28 06:22 REC-006 (#89) + REC-007 (#90)
 - reconciliation/projection.py (Status, Entry, ProposalEntry, Projection, project); reconciliation/graph.py (Edge, Step, Direction, edges, walk, describe); `ke state`, `ke walk`. No migration.
 - Tests: test_state_and_walk.py (4). Full suite 1064 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: RET-002.
 
-## 2026-10-28 08:10 RET-002 + RET-003
+## 2026-10-28 06:28 RET-002 + RET-003
 - retrieval/embeddings.py (EmbeddingIdentity, Embedder, embed, stem, LocalHashEmbedder, FakeEmbedder, cosine, normalise); retrieval/semantic.py (SemanticIndex, StaleIndexError, SyncReport, SemanticHit, sync_semantic, semantic_index_path); lexical.passages made public; `ke similar`; OD-18 added (embedding model, default local).
 - Tests: test_semantic_search.py (6). Full suite 1070 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: RET-004.
 
-## 2026-10-28 08:40 RET-004 (#93) + RET-005 (#94)
+## 2026-10-28 06:36 RET-004 (#93) + RET-005 (#94)
 - retrieval/hybrid.py (Channel, fuse, Fused, HybridHit, HybridResult, HybridRetriever, query_words); retrieval/planner.py (Route, Plan, plan, codes, RecordAnswer, RouteResult, structured_answers, run_plan); `ke find`. No migration.
 - Tests: tests/unit/test_rank_fusion_and_routes.py (19), tests/integration/test_hybrid_and_routes.py (6). Full suite 1095 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: RET-006.
 
-## 2026-10-28 09:10 RET-006 (#95) + RET-007 (#96)
+## 2026-10-28 06:44 RET-006 (#95) + RET-007 (#96)
 - retrieval/citations.py (Citation, Rejected, Problem, citation_id, resolve, cite_message, quote, audit, ContextMessage, EvidenceBundle, Hydrated, hydrate); retrieval/answers.py (Sentence, GroundedAnswer, Evidence, Writer, ExtractiveWriter, ModelWriter, AnswerDraft, answer, to_json, MIN_SIMILARITY); HybridHit gains optional `similarity`; `ke ask`. No migration.
 - Tests: test_citations_and_answers.py (8). Full suite 1103 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: RET-008.
 
-## 2026-10-28 09:30 RET-008 (#97)
+## 2026-10-28 06:49 RET-008 (#97)
 - evaluation/retrieval_bench.py (CHATS, QUERIES, THRESHOLDS, BenchReport, MethodScore, run_benchmark, check, to_markdown, write_export); `ke eval retrieval [--out]`; docs/evaluation/RET-008_BENCHMARK.md generated.
 - Tests: test_retrieval_bench.py (3). Full suite 1106 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: DOC-001.
 
-## 2026-10-28 10:10 DOC-001 (#98) + DOC-004 (#100)
+## 2026-10-28 06:57 DOC-001 (#98) + DOC-004 (#100)
 - documents/model.py (DocumentKind, document_id, DocItem, DocSection, KnowledgeDocument, Snapshot, snapshot, subjects_of, chats_of, build_document, build_all); documents/dependencies.py (DocumentBuildRow, DocumentDependencyRow, APPEND_ONLY_TRIGGERS, register, latest_builds, Affected, affected_documents); migration 0026_document_builds; documents/render.py (Mode, record_anchor, SourceLink, transcript_stem, source_links, knowledge_note, project_master, write_project_master); `ke docs build|affected|project`.
 - Tests: test_documents.py (5), test_project_master.py (4). Full suite 1115 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: DOC-003.
 
-## 2026-10-28 10:40 DOC-003 (#99) + DOC-005 (#101)
+## 2026-10-28 07:07 DOC-003 (#99) + DOC-005 (#101)
 - documents/notes.py (conversation_note, ConversationNote, write_conversation_note, Related, related_conversations, TopicNotFound, resolve_topic, TopicSegment, topic_segments, topic_master, write_topic_master); documents/render.py gains evidence_of, evidence_blocks and `knowledge_note(quotes=...)`; `ke docs chat|topic`. No migration.
 - Tests: test_conversation_notes.py (6). Full suite 1121 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: DOC-006.
 
-## 2026-10-28 11:10 DOC-006 (#102)
+## 2026-10-28 07:12 DOC-006 (#102)
 - documents/vault.py (MARKER, MANIFEST, PlannedNote, plan_vault, split_manual, SyncReport, sync_vault); path helpers transcript_path, knowledge_path, project_path, topic_path; `ke docs vault`. No migration.
 - Tests: test_vault_sync.py (5). Full suite 1126 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: IMP-006.
 
-## 2026-10-28 11:40 IMP-006 (#103)
+## 2026-10-28 07:19 IMP-006 (#103)
 - importer/corrections.py (OverrideKind, OverrideState, OverrideAnchorRow, APPEND_ONLY_TRIGGERS, anchor, Change, OverrideCheck, newest_revisions, check_overrides, segment_messages, node_revision); migration 0027_override_anchors; record_override and record_review anchor themselves (record_review gains optional conversation_id); ImportReport.corrections; `ke corrections`.
 - Tests: test_corrections_survive.py (3). Full suite 1129 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: REL-003.
 
-## 2026-10-28 12:20 REL-003 (#104) + REL-004 (#105)
+## 2026-10-28 07:27 REL-003 (#104) + REL-004 (#105)
 - relationships/related.py (suggest_related, RELATED_DETECTOR, SAME_PROJECT_DETECTOR); relationships/view.py (RelatedLink, revision_ids_in, related_links, related_by_conversation); documents/render.relationship_lines; Related sections in conversation notes, project and topic masters; `ke find` related map; UI chat page and search show related chats; `ke related suggest`. No migration.
 - Tests: test_related_conversations.py (5). Full suite 1134 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: YTB-003 + SOC-003.
 
-## 2026-10-28 12:50 YTB-003 (#106) + SOC-003 (#107)
+## 2026-10-28 07:34 YTB-003 (#106) + SOC-003 (#107)
 - documents/registries.py (STATUS_WORDS, watch_url, video_path, video_mentions, video_note, CueHit, find_cues, registry_path, account_path, account_registry_note, account_note); vault plans video, registry and account notes; `ke transcript find`. No migration.
 - Tests: test_registry_notes.py (5). Full suite 1139 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: EVAL-002.
 
-## 2026-10-28 13:30 EVAL-002 (#108) + EVAL-005 (#109)
+## 2026-10-28 07:46 EVAL-002 (#108) + EVAL-005 (#109)
 - evaluation/import_fidelity.py (census, ExportFidelity, FidelityReport, evaluate_export, evaluate_fixtures, verdict, to_dict, to_markdown); evaluation/temporal_bench.py (CASES, run_pairs, run_pipeline, TemporalReport, run_benchmark, to_dict, to_markdown); reconciliation/supersession.py v2 target test; `ke eval fidelity`, `ke eval temporal`; reports docs/evaluation/EVAL-002_FIDELITY.md, EVAL-005_TEMPORAL.md. Filed #237 (stray conversations file read by no adapter).
 - Tests: test_import_fidelity.py (8), test_temporal_bench.py (3). Full suite 1150 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: EVAL-006.
 
-## 2026-10-28 14:10 EVAL-006 (#110)
+## 2026-10-28 07:54 EVAL-006 (#110)
 - evaluation/end_to_end.py (check_vault, LinkCheck, NoteShape, golden_key, vault_golden, golden_diff, run_end_to_end, EndToEndReport, to_dict, build_fixture, E2E_FIXTURE, E2E_GOLDEN); fixtures tests/fixtures/e2e/export.zip + vault_golden.json; `ke eval e2e [--update-golden]`, `ke docs check --vault`. No migration.
 - Tests: test_end_to_end.py (5). Full suite 1155 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: EVAL-007.
 
-## 2026-10-28 14:50 EVAL-007 (#111)
+## 2026-10-28 08:02 EVAL-007 (#111)
 - evaluation/gate.py (Status, Outcome, Check, GateInputs, Result, GateReport, CHECKS, run_gate, classification_report, extraction_report, to_dict, to_markdown); `ke eval gate [--fixtures] [--out] [--commit]`; report docs/evaluation/EVAL-007_GATE.md. Filed #240 (EVAL-012 relationship answer key). No migration.
 - Tests: test_gate.py (4). Full suite 1159 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: EVAL-008.
 
-## 2026-10-28 15:20 EVAL-008 (#112)
+## 2026-10-28 08:10 EVAL-008 (#112)
 - evaluation/variance.py (SEEDS, SOURCES, ReviewItem, RunView, VarianceReport, shuffled_export, pinned_fake, run_order, differences, run_variance, to_dict); gate line `variance.order_and_repeats`; `ke eval variance [--fixtures]`; docs/evaluation/EVAL-007_GATE.md regenerated (8 PASS, 2 REVIEW, 3 BLOCKED, 0 FAIL). No migration.
 - Tests: test_variance.py (4). Full suite 1163 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: check UI-005 issue #175, then M5.
 
-## 2026-10-28 15:45 EVAL-013 (#244) + merged gold-real-v1-review (#243)
+## 2026-10-28 08:17 EVAL-013 (#244) + merged gold-real-v1-review (#243)
 - Opened and merged #243 for the PC session: docs/reviews/GOLD_REAL_V1_REVIEW.md + diary entry (merged main into the branch, both diary histories kept; no gold content).
 - evaluation/workspace_score.py (WorkspaceScore, score_extraction); `ke gold score --gold --reviewer [--review] [--out] [--no-rules]`; gate line quality.real_golden_set now names EVAL-013 and the command; gate report regenerated. No migration.
 - Tests: test_gold_score.py (2). Full suite 1165 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: UI-005 issue check, then M5.
 
-## 2026-10-28 16:05 Merged eval-004-real (#246); LEG-002 fix: review hash ignores line endings
+## 2026-10-28 08:20 Merged eval-004-real (#246); LEG-002 fix: review hash ignores line endings
 - Opened and merged #246 for the PC session: docs/evaluation/EVAL-004_REAL.md (rule-extractor baseline on golden-v1: P 0.124, R 0.058, F1 0.079; gate passed; counts only).
 - Found: the report's review hash was of a CRLF checkout, so it didn't match the committed record. report_labels.sha256_review (CRLF read as LF) now hashes review records; note added to EVAL-004_REAL.md. Synthetic review hash unchanged (LF file).
 - Tests: test_report_labels.py +1. Full suite 1166 passed, 7 skipped; ruff, mypy OK.
 - Next: ING-008 + ING-009.
 
-## 2026-10-28 16:40 ING-008 (#114) + ING-009 (#115)
+## 2026-10-28 08:32 ING-008 (#114) + ING-009 (#115)
 - ingestion/documents.py (DOCUMENT_PARSER_VERSION, BlockKind, Block, AssetReference, ParsedDocument, decode_text, parse_markdown, parse_text, TextBuilder); ingestion/structured.py (DocumentConverter, BuiltinDocx, PdfWithoutConverter, DoclingConverter (optional, untested), default_converters, read_document, UnsafeDocumentError); `ke file read PATH [--blocks]`. No migration; nothing stored yet.
 - Tests: test_documents.py (12). Full suite 1173 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: OPS-003.
 
-## 2026-10-28 17:10 OPS-003 (#121)
+## 2026-10-28 08:38 OPS-003 (#121)
 - infrastructure/backup.py (BACKUP_VERSION, BackupError, Check, create_backup, verify_backup, restore_backup, check_against, check_to_dict); `ke backup create --to`, `ke backup verify`, `ke backup restore --to`. No migration.
 - Tests: test_backup.py (4). Full suite 1177 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: OPS-004.
+
+## 2026-10-28 08:55 OPS-004 (#122)
+- retention/tombstones.py (PurgeEventRow, PurgeTombstoneRow, TombstoneKind, conversation_key, is_purged, PURGE_LOG_TRIGGERS); retention/purge.py (PURGE_VERSION, DELETE_ORDER, PurgePlan with token/counts, Verification, plan_purge, run_purge, residual_ids, purge_log); migration 0028_purge_log; importer skips tombstoned chats (`purged` count) and doesn't re-archive a purged file; `ke purge plan|run|log`. ADR-0010 (proposed, delegated) and an OPEN_DECISIONS line.
+- Found while testing: the vault sync never removes image copies, so the purge removes the engine's own copy of each purged image (same path and hash).
+- Tests: test_purge.py (4). Full suite 1181 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Record fix: entry times in this log and the build diary from 00:35 on 2026-10-28 had drifted hours ahead of the clock (they were estimates, not readings). They are now each PR's merge time from `git log`.
+- Next: OPS-005.

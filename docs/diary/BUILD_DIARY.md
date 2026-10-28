@@ -881,7 +881,7 @@ Fix attempts: 1 (the chat list counted the tree's empty root as a message; it no
 
 **Next exact task:** ING-010 + NRM-003 (Milestone 2).
 
-### 00:35 — NRM-003 + ING-010: exact positions, and transcripts with honest times
+### 00:36 — NRM-003 + ING-010: exact positions, and transcripts with honest times
 **What (NRM-003):** one fixed way to point at exact words: a start and end position counted in characters, as Python counts them (an emoji is one character, a Windows line break is two), plus a fingerprint of the quoted words, so a citation can be checked before it's trusted. Converters handle the other ways tools count: browsers count UTF-16 units and files count bytes.
 **What (ING-010):** reads a transcript file (WebVTT subtitles, SRT subtitles, or pasted plain text) into cues. Each cue keeps the time the file gave it, to the millisecond, or no time at all. A speaker comes only from an explicit WebVTT voice tag; "Name: words" stays as words. Cues that are out of order, end before they start, or have unreadable timing are kept as they are and reported. The file's fingerprint, source URL and language travel with it. Nothing is downloaded. 16 new tests (7 offsets, 9 transcripts, including two random round trips), 605 in total.
 **Teach-back (`ingestion/transcripts.py`):** "A transcript file becomes a list of cues, each with the exact time the file gave it or no time at all, never a guessed one. A speaker name is only taken from an explicit subtitle tag, so a line like 'Bob: hi' isn't mistaken for a speaker. Anything odd, like cues out of order, is kept as written and reported as a warning instead of being fixed."
@@ -990,7 +990,7 @@ Fix attempts: 1 (the fixture's short replies first lacked the required "syntheti
 
 **Next exact task:** SOC-001 + SOC-002 (social account mentions and registry).
 
-### 01:20 — SOC-001 + SOC-002: social accounts mentioned in chats
+### 01:01 — SOC-001 + SOC-002: social accounts mentioned in chats
 **What:** the importer now spots social accounts in every message and keeps a registry of them.
 - A profile URL (X/Twitter, Instagram, TikTok, LinkedIn, YouTube, GitHub, Reddit, Bluesky, Threads, Facebook, Twitch) becomes a resolved mention. Posts, repos, videos and lookalike hosts don't count.
 - A handle with its platform named ("GitHub: @octo", "@octo on Twitter") resolves too, and so does a Fediverse address (`@user@server`).
@@ -1010,7 +1010,7 @@ Fix attempts: 1 (a test line was too long for ruff).
 
 **Next exact task:** REL-002.
 
-### 01:45 — REL-002: links between separate chats
+### 01:10 — REL-002: links between separate chats
 **What:** a new `relationships` package. It stores links between conversations and proposes them from exact evidence only. There are four detectors:
 - **Copied node IDs:** two chats contain the same message node, as when ChatGPT copies messages into a new chat. The newer chat is proposed as `forked_from` the older one.
 - **Copied opening:** two chats start with the same two or more messages, word for word, including a user message. The newer chat is proposed as `forked_from` the earlier chat it shares the longest opening with, so a prompt reused across many chats doesn't link every pair.
@@ -1031,7 +1031,7 @@ Fix attempts: 1 (the new fixture manifests lacked the conversation count the fix
 
 **Next exact task:** RET-001.
 
-### 02:10 — RET-001: search every message
+### 01:15 — RET-001: search every message
 **What:** `ke search "words"` finds messages across every imported chat, using SQLite's built-in full-text search (FTS5). It has three modes:
 - **tokens** (the default): all the words, in any order.
 - **phrase:** the words together, in order.
@@ -1052,7 +1052,7 @@ Fix attempts: 1 (a typing error from building a hit out of a row slice).
 
 **Next exact task:** UI-004 (links, YouTube and accounts pages, plus a search box).
 
-### 02:30 — UI-004: links, videos, accounts and search in the web UI
+### 01:20 — UI-004: links, videos, accounts and search in the web UI
 **What:** `ke ui` gets five new pages, linked from the header and the home page:
 - **Search:** one box with three choices (all the words, the words in order, exactly). Each result shows its chat, who wrote it and when, with the match in [brackets], and links to that message.
 - **Links:** every web address once, with mention and chat counts, filterable. Each address has a page listing every mention as written.
@@ -1072,7 +1072,7 @@ Fix attempts: 0. Screenshots of the search and video pages checked by eye.
 
 **Next exact task:** start M3. Read the M3 plan and LEG-002..005 (#190–#193) and REV-012 (#187) first.
 
-### 02:55 — FND-007 + FND-009: how the engine will ask a model, without paying for an API
+### 01:25 — FND-007 + FND-009: how the engine will ask a model, without paying for an API
 **What:** the start of Milestone 3, built the way ADR-0009 decided. There is no API client. A provider takes a batch of requests (`submit`) and later hands back whatever has arrived (`collect`): each answer is **ok**, **invalid** (with the reason) or **pending**.
 - **FakeProvider** and **ReplayProvider** support tests and repeatable re-runs. Neither makes a network call.
 - **FileBatchProvider** is the real one. It writes `private/model-batches/<run>/<batch>.request.jsonl` with a manifest. A Claude Code session on Louis's PC appends answers to `<batch>.response.jsonl`, and the engine reads them back.
@@ -1100,7 +1100,7 @@ Fix attempts: 1 (a variable reused with two types).
 
 **Next exact task:** NRM-004 (topic segments), then the taxonomy tickets.
 
-### 03:05 — The M1 gate passes on Louis's PC
+### 01:27 — The M1 gate passes on Louis's PC
 **What:** the gate run finished in the Remote Control session on Louis's PC (Windows, Python 3.13.2, `main` at d878333). It was read-only, with outputs only in the git-ignored `workspace\rev009\` and nothing committed.
 - **Tests on Windows:** ruff clean, mypy clean, pytest 589 passed, 6 skipped, 0 failed. That includes the ZIP test that used to fail on Windows.
 - **Real smoke, 50 and 100 conversations:** all seven checks passed in both runs (everything rendered, no broken embeds, raw unchanged, counts reconciled, a re-import adds nothing, zero model calls). `raw/` has 2,074 files and none was touched.
@@ -1113,7 +1113,7 @@ So REV-009 (#143) and EVAL-010 (#39) are closed.
 - "The gate isn't my tests passing in the cloud. It's the real export, on the real machine, unchanged afterwards."
 - "Doubling the chats barely changed the time. That tells you the cost is somewhere else."
 
-### 03:30 — NRM-004: where a chat changes subject
+### 01:31 — NRM-004: where a chat changes subject
 **What:** a segmenter that splits each chat into topic segments without any model, so later labels are about one subject at a time. It works in four steps:
 1. It cuts only *between exchanges*: a user question and its answers stay together. A short reply such as "no" never starts a segment, because it answers what came before.
 2. A pause of six hours or more starts a new segment.
@@ -1133,7 +1133,7 @@ Fix attempts: 0. The 1,000 generated chats: full coverage, zero truncation, 2.5 
 
 **Next exact task:** TAX-001 + TAX-002 (taxonomy registry and published snapshots).
 
-### 03:50 — TAX-001 + TAX-002: the vocabulary, and frozen versions of it
+### 01:35 — TAX-001 + TAX-002: the vocabulary, and frozen versions of it
 **What:** the tables for the governed vocabulary, plus the one way classification will read it.
 - **Terms by dimension.** Following OD-17, a term belongs to one dimension: domain, purpose, topic, knowledge type or output. Terms go two levels deep at most. A term starts as *proposed*. **Projects** have their own registry.
 - **IDs never come from labels.** IDs are random (`term_…`, `proj_…`), so renaming "Unreal" to "Unreal Engine" keeps every label that points at it. A merged term must name what it merged into, and the database checks that.
@@ -1151,7 +1151,7 @@ Fix attempts: 2. An alias row was flushed before its term, which broke the forei
 
 **Next exact task:** TAX-003 (alias matching) + TAX-004 (proposal review and publish).
 
-### 04:25 — TAX-003 + TAX-004: matching names, and reviewing changes
+### 04:15 — TAX-003 + TAX-004: matching names, and reviewing changes
 **What:** turning text into vocabulary IDs, and the only way the vocabulary changes.
 - **Alias matching (TAX-003).** `AliasResolver` is built from a *published* snapshot, so it can only ever answer with approved IDs. "UE5", "ue5", "Unreal Engine 5" and "unreal-engine 5" all reach the same term. When a spelling names things in two places (a topic and a purpose, say), the answer is **ambiguous** with every candidate listed; narrowing the scope to one dimension (or `project`) settles it. Nothing is guessed. `find()` scans longer text for whole-word mentions only ("UE" never matches inside "queue"), lets the longest alias win, and keeps each mention's exact span. `collisions()` lists every shared spelling for review.
 - **Review workflow (TAX-004).** A change starts as a proposal: add, rename, alias, merge, retire or reparent, for terms or projects. A proposed term doesn't exist as a term at all until someone *other than the proposer* approves it, and then only from the next published version. Every rule is checked at approval time: alias collisions, a third level, merging across dimensions, retiring a term that still has children, or touching something that isn't approved. Rename keeps the old label as an alias. Merge moves the aliases and keeps the old ID pointing at the new one. Decisions are final, and the proposal row records reviewer, note, time and the ID an approved add created. That row is the audit trail. Migration 0016 adds the note and the created ID.
@@ -1166,7 +1166,7 @@ Fix attempts: 0.
 
 **Next exact task:** TAX-005 (project identity and merge proposals) + TAX-006 (corpus discovery).
 
-### 04:45 — NRM-006 + TAX-005: a fair look at the corpus, and project names as questions
+### 04:20 — NRM-006 + TAX-005: a fair look at the corpus, and project names as questions
 **What:** the input for taxonomy discovery, and how project names enter the registry.
 - **Corpus inventory (NRM-006).** `corpus_inventory` reads every stored chat, segments it and keeps each segment's text in memory. It writes nothing; a test checks the database file is byte-identical afterwards. `summarise` gives counts only (chats, segments, characters, sections, length bands, themes), so it is safe to print.
 - **A sample that reaches rare subjects.** Each segment's *theme word* is its most distinctive word by TF-IDF. `sample(items, n, seed=...)` takes one segment from every theme, rarest first, then a second from each, and so on. Within a theme the order is a hash of seed and segment ID, so the same seed always gives the same sample, whatever order the input came in. In the test, 40 shed segments and 3 rare ones (sourdough, beekeeping): every seed's sample of 4 includes both rare subjects.
@@ -1183,7 +1183,7 @@ Fix attempts: 1. Two of my own new tests were wrong: one rolled back a proposal 
 
 **Next exact task:** TAX-006 (discovery candidates) + TAX-007 (version diff and invalidation).
 
-### 05:10 — TAX-006 + TAX-007: suggesting categories, and knowing what a new version changes
+### 04:25 — TAX-006 + TAX-007: suggesting categories, and knowing what a new version changes
 **What:** where candidate categories come from, and how a new taxonomy version avoids redoing everything.
 - **Discovery (TAX-006).** `discover()` groups segments and files one `add` proposal per group. That is its only write: no term exists, and nothing reaches a published snapshot, until a different reviewer approves it. The default backend is plain and repeatable. It takes the word shared by the most remaining segments, ignoring a fixed list of filler words and anything in more than half the corpus, makes those segments a group, and repeats. Each group is labelled by its top TF-IDF words. BERTopic is an optional local backend; without the library it says so up front. Labels that already name an approved term are reported as *known*, and labels already waiting are not proposed twice. Evidence keeps the backend, its version, keywords, size and up to 50 segment IDs.
 - **Version diff (TAX-007).** `diff_snapshots(old, new)` lists IDs that were added, removed (merged or retired) and changed (label, aliases, definition or parent). `invalidate(diff, outputs)` marks only the saved outputs that cite a removed or changed ID, in an append-only table. When project A gets an alias, a classification that cites only project B or a topic is untouched. Stale outputs are flagged, never deleted. Migration 0017.
@@ -1198,7 +1198,7 @@ Fix attempts: 2. Grouping each segment by its single most distinctive word split
 
 **Next exact task:** TAX-008 (governance reports) + CLS-001 (classifier schema).
 
-### 05:40 — TAX-008 + CLS-001: a health check for the vocabulary, and a classifier that can't make things up
+### 04:31 — TAX-008 + CLS-001: a health check for the vocabulary, and a classifier that can't make things up
 **What:** a report that finds vocabulary problems, and the answer shape every classifier must fit.
 - **Governance report (TAX-008).** `governance_report()` only reads. It lists the following, by ID:
   - exact duplicates and near duplicates (spellings that differ only by spaces or a plural "s");
@@ -1228,7 +1228,7 @@ Fix attempts: 1. With only one approved ID, Pydantic writes `const` instead of `
 
 **Next exact task:** CLS-002 (SegmentClassifier service) + CLS-003 (keyword scoring and ranking).
 
-### 06:15 — CLS-002 + CLS-003: labelling a segment, and why saying it once can beat saying it five times
+### 04:38 — CLS-002 + CLS-003: labelling a segment, and why saying it once can beat saying it five times
 **What:** the classifier itself, and a free, local scorer it uses by default.
 - **Scoring (CLS-003).** Each approved term or project mentioned in a segment gets five features:
   - *mentions*, log-scaled, so the fifth "Unity" adds little;
@@ -1254,7 +1254,7 @@ Fix attempts: 2.
 
 **Next exact task:** CLS-004 (classification persistence and review) + CLS-005 (order-independence diagnostic).
 
-### 06:45 — CLS-004 + CLS-005: corrections that stick, and labels that don't depend on order
+### 04:42 — CLS-004 + CLS-005: corrections that stick, and labels that don't depend on order
 **What:** saving classifications and reviewers' corrections, and a check that processing order can't change a label.
 - **Store (CLS-004).** Migration 0018 adds three append-only tables:
   - `classifications`: one row per stage key. Saving the same work again changes nothing; a `pending` row is completed once its answer arrives.
@@ -1275,7 +1275,7 @@ Fix attempts: 0. Only lint fixes were needed: import order in env.py and the doc
 
 **Next exact task:** EXT-001 (typed knowledge record contract) + EXT-002 (evidence validator).
 
-### 07:10 — EXT-001 + EXT-002: what a piece of knowledge is, and checking what it stands on
+### 04:47 — EXT-001 + EXT-002: what a piece of knowledge is, and checking what it stands on
 **What:** the record contract every extractor must fill in, and the check every record's quotes go through.
 - **Records (EXT-001).** A record has:
   - a type (decision, rejection, preference, task...);
@@ -1306,7 +1306,7 @@ Fix attempts: 0.
 
 **Next exact task:** EXT-003 (decision and rejection extractor) + EXT-004 (preference and requirement extractor).
 
-### 07:40 — EXT-003 + EXT-004: who decided, and whose preference it is
+### 04:52 — EXT-003 + EXT-004: who decided, and whose preference it is
 **What:** the first two extractors, both rule-based, local and free.
 - **Decisions (EXT-003).** An assistant sentence with a suggestion cue becomes a *proposal* held by the assistant. The user's next message is then read in one of four ways:
   - a rejection ("No, not green");
@@ -1333,7 +1333,7 @@ Fix attempts: 1. In the fixture, a quoted preference started mid-sentence, so th
 
 **Next exact task:** EXT-005 (actions, questions, artefacts) + EXT-006 (named entities).
 
-### 08:10 — EXT-005 + EXT-006: tasks, open questions, artefacts and named things
+### 04:58 — EXT-005 + EXT-006: tasks, open questions, artefacts and named things
 **What:** two more rule-based extractors, plus a small change to the record contract.
 - **Actions, questions, artefacts (EXT-005).**
   - **Tasks.** "I'll sand it tomorrow" is the user's task, accepted explicitly. "You should sand it first" is a task the assistant suggested: it is held by the assistant with no acceptance, so it is never the user's commitment.
@@ -1359,7 +1359,7 @@ Fix attempts: 1. Entity records first came out grouped by cue type rather than i
 
 **Next exact task:** EXT-007 (evidence promotion and review queue) + EXT-008 (extraction runner and versions).
 
-### 08:45 — EXT-007 + EXT-008: one gate to the truth, and a runner that doesn't redo work
+### 05:03 — EXT-007 + EXT-008: one gate to the truth, and a runner that doesn't redo work
 **What:** the only road from "an extractor proposed this" to "the system treats this as true", and the job runner that drives all the extractors.
 - **Gate (EXT-007).** Migration 0019 adds `knowledge_records` and an append-only `knowledge_record_events` log. `add_candidates` stores proposals idempotently. `gate` runs the EXT-002 check:
   - a malformed reference means **rejected**;
@@ -1384,7 +1384,7 @@ Fix attempts: 0. One fix in my own new test: it passed a plain string where an e
 
 **Next exact task:** EVAL-001 + EVAL-003, then EVAL-004/011, OPS-001/002 and the LEG/REV fold-ins.
 
-### 09:40 — EVAL-001 + EVAL-003: an answer key, and a scorer for classification
+### 05:13 — EVAL-001 + EVAL-003: an answer key, and a scorer for classification
 **What:** a format for hand-made answer keys, and the evaluator that scores classification against them.
 - **Golden set (EVAL-001).** `evaluation/gold.py` defines `gold-v1`: per segment (named by its first message) the expected primary and secondary labels per field, or "ambiguous"; the records that must be found; and the records that must **never** appear, above all an assistant suggestion recorded as the user's decision.
   - A synthetic set lives in `tests/fixtures/gold/synthetic-v1/` and covers 9 synthetic conversations. The real set is started on Louis's PC with `ke gold template`, holds IDs only, and stays in the git-ignored workspace.
@@ -1402,7 +1402,7 @@ Fix attempts: 2. A mypy type error in the evaluator's label set, and a CLI crash
 
 **Next exact task:** EVAL-004 (extraction precision/recall) + EVAL-011 (semantic batch smoke).
 
-### 10:20 — EVAL-004 + OPS-001: scoring extraction, and logs that can't leak
+### 05:20 — EVAL-004 + OPS-001: scoring extraction, and logs that can't leak
 **What:** the extraction evaluator with its hard gate, and a structured run log.
 - **Extraction evaluation (EVAL-004).** `evaluation/extraction_eval.py` pairs each gold record with a produced record of the same type that quotes the same message, preferring the one that agrees on most attributes (two records can quote one message, like the user's own preference and a client's). It reports precision, recall and F1 per record type, actor, acceptance, attribution and strength agreement, evidence anchor validity, and forbidden records. Only conversations marked `records_annotated` are scored.
   - **The gate:** no forbidden record in current truth, and no user decision in current truth without valid anchors, the user's own words, a user actor and acceptance. It passes on the synthetic gold. A forged decision (an assistant proposal written straight into truth as a confirmed user decision) fails it; that test first passed wrongly, which is how the "user's own words" rule was added.
@@ -1419,7 +1419,7 @@ Fix attempts: 1. The forged-decision test showed the gate missed a decision quot
 
 **Next exact task:** OPS-002 (resource, timeout and queue limits) + EVAL-011 (semantic batch smoke at 50/100).
 
-### 11:05 — OPS-002 + EVAL-011: limits, and a semantic smoke test at 50 and 100
+### 05:30 — OPS-002 + EVAL-011: limits, and a semantic smoke test at 50 and 100
 **What:** bounds on everything a run can consume, and a batch test that pushes 50 and 100 chats through classification and extraction.
 - **Limits (OPS-002).** New `Settings.limits` fields: ZIP member cap, request size cap, batch size, provider timeout and stage deadline, next to the existing file-size and call caps. `orchestration/limits.py` holds a `RunBudget` shared by a run and a `Deadline`.
   - Every limit is checked **before** the work, so reaching one costs nothing. Each is logged as `limit.reached` and ends as a recorded outcome:
@@ -1445,7 +1445,7 @@ Fix attempts: 1. The fake provider counts as sending data, so the smoke run fail
 
 **Next exact task:** the LEG-002..005 and REV-012 fold-ins, then M4.
 
-### 11:30 — LEG-002 + REV-012: every score says what it was scored against
+### 05:34 — LEG-002 + REV-012: every score says what it was scored against
 **What:** older attempts printed AI-made verdicts under owner-sounding headings. Every accuracy report now opens with the answer key's version, its SHA-256 and a reviewer label.
 - `evaluation/report_labels.py` defines `ReviewerKind` (owner, ai_session, same_model, none) and `AnswerKey`. Only `owner` gets the heading "Owner verdict"; everything else is headed "AI check (not owner-verified)".
 - A key missing its version, hash or label refuses to render. A reviewed key must carry its review file's hash. A report with no key prints "unscored".
@@ -1462,7 +1462,7 @@ Fix attempts: 0.
 
 **Next exact task:** LEG-003 (provider failure cases) + LEG-004 (quote matching on real text).
 
-### 12:00 — LEG-003 + LEG-004: provider failures, and quotes in real text
+### 05:39 — LEG-003 + LEG-004: provider failures, and quotes in real text
 **What:** two lessons from the old runs, turned into code and tests.
 - **Provider failures (LEG-003).** A new `RawResponse` describes what an HTTP-style provider got back. `result_from_response` sorts it in one place:
   - an error envelope (even inside HTTP 200), a 429 or a 5xx is **transient**: the provider failed, not the model. The same ask is sent again without using the one repair, at most 3 tries in total, then review;
@@ -1483,7 +1483,7 @@ Fix attempts: 0. Ruff asked for raw docstrings where they show backslashes.
 
 **Next exact task:** LEG-005 (no clipping; split long segments; truncation_count and length bands; late short "no" fixture).
 
-### 12:40 — LEG-005: no clipping, anywhere
+### 05:47 — LEG-005: no clipping, anywhere
 **What:** old v1 kept 20 messages of 800 characters each and lost late decisions. The segmenter already split long segments into overlapping parts (NRM-004). Now every model stage uses that same split, and reports prove nothing was cut.
 - `segmenter.split_parts` is public and works on any message type. The model extractor groups a segment into exchanges and sends one request per part, then merges the records and stores a duplicate from the shared exchange only once. A segment that fits still sends one request with the same key as before, so the cache stays valid.
 - The model classifier sends one request per part. If the parts disagree on a primary label, the segment goes to review rather than being silently merged.
@@ -1501,7 +1501,7 @@ Fix attempts: 0. The fixture's "No." first lacked the word "Synthetic", which th
 
 **Next exact task:** M4, starting with its first unblocked ticket.
 
-### 05:55 — UI-005: see what the AI suggested and what reviewers decided
+### 05:53 — UI-005: see what the AI suggested and what reviewers decided
 **What:** two new read-only pages in `ke ui`, linked from the top bar.
 - **Suggestions** lists every knowledge record the extractors proposed, with a count per trust state (waiting for a reviewer, proposed, evidence checked, confirmed, rejected), filters for trust and type, and each quote one click from its message. The page says plainly that a suggestion is not a decision.
 - **Reviews** lists every named reviewer's decision and the reason they gave: on knowledge records, vocabulary proposals (plus how many are still open), topic-label corrections and conversation links. The automatic evidence validator is counted in its own section and never appears as a reviewer, and nothing is labelled as the owner's approval.
@@ -1518,7 +1518,7 @@ Fix attempts: 1. `dict()` over a SQLAlchemy result treats it as a mapping, so th
 
 **Next exact task:** M4, starting with its first unblocked ticket (DEPENDENCY_MAP §4).
 
-### 06:20 — NRM-005 + REC-001: reviewers can fix segments; repeated claims are proposed, never merged
+### 06:02 — NRM-005 + REC-001: reviewers can fix segments; repeated claims are proposed, never merged
 **NRM-005.** Segment boundaries were only the machine's proposal. Now a reviewer can split or merge them.
 - Each decision (split, merge, clear) is one row in an append-only log, tied to the export's own message ID. Because those IDs are the same in every later export, the decisions are applied again after a re-import or any recomputation.
 - A split is only allowed where an exchange starts, so a short "no" is never cut off from what it rejects. Every message still lands in exactly one segment.
@@ -1542,7 +1542,7 @@ Fix attempts: 0. One test helper first lacked a scope ID, which the record contr
 
 **Next exact task:** REC-002 (relationship candidate discovery), then REC-003.
 
-### 06:50 — REC-002 + REC-003: typed links between records, and conflicts left open
+### 06:09 — REC-002 + REC-003: typed links between records, and conflicts left open
 **REC-002.** Records are now linked to each other, but only in four typed ways, each allowed only between record types where it makes sense:
 - *creates*: a request makes an artefact;
 - *references*: a record mentions a named game, book or tool;
@@ -1571,7 +1571,7 @@ Fix attempts: 1. The fixture expectation first counted a reference from another 
 
 **Next exact task:** REC-004 (decision transitions and event timeline).
 
-### 07:20 — REC-004 + REC-005: a decision's history, and when a newer one really replaces it
+### 06:17 — REC-004 + REC-005: a decision's history, and when a newer one really replaces it
 **REC-004.** Every step in a decision's life is now an event: proposed, accepted, rejected, clarified, revised, superseded, contradicted.
 - The events table is append-only (database triggers). A wrong event is withdrawn by adding a `revokes` event, so the history shows the mistake and the correction.
 - `build_events` adds the events that need no judgement:
@@ -1606,7 +1606,7 @@ Fix attempts: 2, both in the new test's setup:
 
 **Next exact task:** REC-006 (current-state and as-of projector), then REC-007.
 
-### 07:45 — REC-006 + REC-007: what holds, as of when, and what's connected
+### 06:22 — REC-006 + REC-007: what holds, as of when, and what's connected
 **REC-006.** `project()` gives every decision, rejection, requirement and preference a standing, with the events behind it:
 - **current**;
 - **superseded** (and by what);
@@ -1632,7 +1632,7 @@ Fix attempts: 0.
 
 **Next exact task:** RET-002 (embeddings provider and index protocol), then RET-003.
 
-### 08:10 — RET-002 + RET-003: search by meaning, locally, with the model stamped on the index
+### 06:28 — RET-002 + RET-003: search by meaning, locally, with the model stamped on the index
 **RET-002.** Every embedder declares who it is: provider, model, vector size and version. The fingerprint of those goes on every index. `embed()` checks the `embedding` egress switch before any embedder that sends data, and checks the vectors that come back.
 - The built-in `LocalHashEmbedder` is local, free and deterministic: rough word stems plus three-letter pieces, hashed into 512 numbers.
 - It finds reworded, re-ordered, inflected and misspelt text, but not synonyms. That limit is recorded as **OD-18**, with the default kept; a real model can be plugged in behind the same interface later.
@@ -1655,7 +1655,7 @@ Fix attempts: 0.
 
 **Next exact task:** RET-004 (hybrid rank fusion), then RET-005/006.
 
-### 08:40 — RET-004 + RET-005: one ranked list, and the right search for each question
+### 06:36 — RET-004 + RET-005: one ranked list, and the right search for each question
 **RET-004.** `retrieval/hybrid.py` runs up to three channels and fuses their rankings with reciprocal rank fusion (each item scores 1/(60 + rank) per channel, summed):
 - the word index; the meaning index (optional); and stored knowledge records whose assertion shares words with the query.
 - One hit per message: several matching versions of a message collapse into one hit that lists them. Records are keyed by `krec_` ID. Ties break on the key, so the order is stable.
@@ -1679,7 +1679,7 @@ Fix attempts: 0 (two expectations in the new unit test corrected while writing i
 
 **Next exact task:** RET-006 (source context hydrator and citation resolver), then RET-007.
 
-### 09:10 — RET-006 + RET-007: checked citations, and answers that cite every sentence or say "I don't know"
+### 06:44 — RET-006 + RET-007: checked citations, and answers that cite every sentence or say "I don't know"
 **RET-006.** `retrieval/citations.py` turns hits into evidence.
 - A citation is (revision, start, end, quote fingerprint), with a stable `kcit_` ID made from those four.
 - `resolve` checks it against the stored text: the revision exists, the range fits, the fingerprint matches, and the speaker matches when known. Otherwise it is rejected with a problem code.
@@ -1705,7 +1705,7 @@ Fix attempts: 0 (three expectations in the new test corrected while writing it: 
 
 **Next exact task:** RET-008 (retrieval benchmarks and tuning report).
 
-### 09:30 — RET-008: a pinned retrieval benchmark with regression floors
+### 06:49 — RET-008: a pinned retrieval benchmark with regression floors
 `evaluation/retrieval_bench.py` holds a fixed synthetic benchmark: 36 messages in 8 chats, including eight near-identical "deploy error" messages as noise. It asks 21 questions of five kinds: exact code, keyword, paraphrase, misspelling and no answer.
 - For word search, meaning search and the combined search, it measures Recall@1/5/10, MRR, exact-term hit and cost: texts embedded, and model requests (0).
 - It also measures how often `ke ask` answers with a right citation, and how often it correctly says it doesn't know.
@@ -1737,7 +1737,7 @@ Fix attempts: 0.
 
 **Next exact task:** DOC-001 (document model and dependency tracking).
 
-### 10:10 — DOC-001 + DOC-004: documents as data, exact rebuild lists, and a labelled project master
+### 06:57 — DOC-001 + DOC-004: documents as data, exact rebuild lists, and a labelled project master
 **DOC-001.** `documents/model.py` builds a conversation, project or topic document as plain data. Its sections come in a fixed order (current, in conflict, waiting for a check, date unknown, replaced, suggestions, other). Each item has its REC-006 status, the events behind it and the messages it cites.
 - Records a reviewer rejected are left out.
 - One selector, `subjects_of`, decides which documents a record belongs to.
@@ -1777,7 +1777,7 @@ Fix attempts: 1 (current mode linked to replaced records through the dependency 
 
 **Next exact task:** DOC-003 (conversation knowledge notes), then DOC-005.
 
-### 10:40 — DOC-003 + DOC-005: a knowledge page for each chat, and topic pages by canonical term
+### 07:07 — DOC-003 + DOC-005: a knowledge page for each chat, and topic pages by canonical term
 **DOC-003.** `documents/notes.py` writes a knowledge note beside each chat's transcript, under `Knowledge/`. Its sections are:
 - **Summary**: counts only (messages, branches, segments, records, images, links, related chats), so nothing is invented;
 - **Classification**: each segment's labels in force (a review beats the machine), with a link to where the segment starts;
@@ -1802,7 +1802,7 @@ Fix attempts: 1 (topic and knowledge file names used IDs with an underscore, whi
 
 **Next exact task:** DOC-006.
 
-### 11:10 — DOC-006: a vault the engine shares safely with its owner
+### 07:12 — DOC-006: a vault the engine shares safely with its owner
 `documents/vault.py` `sync_vault` writes every note the engine owns: transcripts, chat knowledge notes, project masters and (with a taxonomy) topic masters, plus their images.
 - **Only its own files.** A manifest (`.ke/manifest.json`) lists the paths it manages. A file someone else put at one of those paths is reported as `occupied` and never touched or claimed.
 - **Additions kept.** Each managed note ends with a `%% ke:manual … %%` marker line. Whatever is written below it is carried into every new version. Chat text can't fake the marker because `%%` in imported text is escaped.
@@ -1824,7 +1824,7 @@ Fix attempts: 0.
 
 **Next exact task:** IMP-006.
 
-### 11:40 — IMP-006: corrections remember which words they were made on
+### 07:19 — IMP-006: corrections remember which words they were made on
 `importer/corrections.py` ties every kind of human correction to logical message IDs plus the revision in force when the person decided:
 - **segment overrides** and **classification reviews** are anchored when recorded, in a new append-only `override_anchors` table (migration 0027). `record_override` and `record_review` write the anchors themselves; `record_review` gains an optional `conversation_id` for a segment never classified;
 - **record decisions** are anchored by their evidence revisions; **reviewed relationships** by the revision IDs in their evidence.
@@ -1849,7 +1849,7 @@ Fix attempts: 0.
 
 **Next exact task:** REL-003.
 
-### 12:20 — REL-003 + REL-004: related chats, suggested with reasons and shown everywhere
+### 07:27 — REL-003 + REL-004: related chats, suggested with reasons and shown everywhere
 `relationships/related.py` (REL-003) suggests links between chats that are *about the same thing*:
 - `same_project` when both chats carry the same approved project label;
 - `related_to` when they share a distinctive approved topic or named entity (a book, game...), or their words are close in meaning (local embedder, cosine >= 0.55).
@@ -1871,7 +1871,7 @@ Fix attempts: 1 (the test export reused node IDs across chats, which REL-002 rig
 
 **Next exact task:** YTB-003 + SOC-003.
 
-### 12:50 — YTB-003 + SOC-003: video notes, transcript search and the account registry
+### 07:34 — YTB-003 + SOC-003: video notes, transcript search and the account registry
 `documents/registries.py` adds three kinds of note to the managed vault.
 
 - **Video notes** (`Videos/YouTube <id> (video).md`). Each one opens with the transcript status in words, which is never blank: "No transcript: none attached and none requested." counts as an answer. It then lists:
@@ -1894,7 +1894,7 @@ Fix attempts: 1 (my test assumed cue ordinals start at 1; they start at 0, as YT
 
 **Next exact task:** EVAL-002.
 
-### 13:30 — EVAL-002 + EVAL-005: nothing lost quietly, and "later" never quietly means "instead"
+### 07:46 — EVAL-002 + EVAL-005: nothing lost quietly, and "later" never quietly means "instead"
 **EVAL-002** (`evaluation/import_fidelity.py`, `ke eval fidelity`) gives the import a third opinion. It walks every JSON file of an export itself, inside folders and ZIPs, and lists each conversation's node IDs. It then imports the export into a scratch workspace and checks node by node. Each export gets a verdict:
 - `ok`;
 - `warned`: everything is stored but the report flags something, or nodes are missing and the report says so;
@@ -1931,7 +1931,7 @@ Fix attempts: 2 (target = first word after the marker misread "replace the shed 
 
 **Next exact task:** EVAL-006.
 
-### 14:10 — EVAL-006: a ZIP all the way to Obsidian, then click every link
+### 07:54 — EVAL-006: a ZIP all the way to Obsidian, then click every link
 **EVAL-006** (`evaluation/end_to_end.py`, `ke eval e2e`) runs one pinned path through the whole engine with no model and no network: import a ZIP, classify under a small published taxonomy, run the rule extractors, reconcile, build the vault, and search. The input is `tests/fixtures/e2e/export.zip`: the existing synthetic ZIP plus two new synthetic chats about a garden shed. Between them they carry a decision, a preference, a requirement, YouTube and GitHub links, the same image used again, and a follow-up that changes the roof. A builder makes the ZIP and a test checks it rebuilds byte for byte.
 
 Then it reads the vault the way Obsidian does:
@@ -1958,7 +1958,7 @@ Fix attempts: 2 (a taxonomy alias equal to its own label collides with the label
 
 **Next exact task:** EVAL-007.
 
-### 14:50 — EVAL-007: one pass, four labels, then stop
+### 08:02 — EVAL-007: one pass, four labels, then stop
 **EVAL-007** (`evaluation/gate.py`, `ke eval gate`) is the release gate. It runs twelve checks against the proposed release thresholds in TEST_STRATEGY §6, each **exactly once**, then stops. Nothing is re-run to get a better answer. If a check crashes, that check is a FAIL and the rest still run. Each line carries:
 - a label: PASS, FAIL, REVIEW (the hard rule held but some cases wait for a person) or BLOCKED (can't be measured here);
 - the threshold next to the measured number;
@@ -1985,7 +1985,7 @@ Fix attempts: 0.
 
 **Next exact task:** EVAL-008.
 
-### 15:20 — EVAL-008: any order, same answers
+### 08:10 — EVAL-008: any order, same answers
 **EVAL-008** (`evaluation/variance.py`, `ke eval variance`) imports five synthetic exports in three seeded orders. The order of the exports, the chats inside each and the segments reaching each stage are all shuffled. Each run classifies through the model path with a pinned fake model, extracts and reconciles.
 
 Each run becomes a **canonical view** keyed only by what the export itself names: native conversation and message IDs, record type and the quoted words. Workspace IDs are random, so they can't be compared. The view holds each segment's labels and each record's trust, standing and replacements. Any key whose value differs between runs becomes a **review item**, with every run's value side by side. Nothing is averaged or quietly picked.
@@ -2031,7 +2031,7 @@ Fix attempts: 1 (my drifting fake first answered "needs review" only once, and t
 
 **Next exact task:** discover and publish the first taxonomy. After that, add segment labels to `golden-v1` with a fresh annotation and review pass.
 
-### 15:45 — EVAL-013: scoring where the private key lives
+### 08:17 — EVAL-013: scoring where the private key lives
 The session on Louis's PC finished the real golden set `golden-v1` (40 chats, 398 records, 64 forbidden, reviewed by a separate AI session, extraction only). It has no GitHub access, so I opened and merged its docs-only branch as #243. I merged main into that branch so both diary histories survive; it contains no gold content.
 
 There was no command to score a workspace against a key file, so the real extraction baseline couldn't be made where the data is. **EVAL-013** (`evaluation/workspace_score.py`, `ke gold score`) adds it:
@@ -2055,7 +2055,7 @@ Fix attempts: 0.
 
 **Next exact task:** check UI-005 (#175) against STATUS and close it if done; then M5.
 
-### 16:05 — The first real number, and a hash that depended on Windows
+### 08:20 — The first real number, and a hash that depended on Windows
 The PC session scored the rule extractors against the real key with `ke gold score`, and I merged its report as #246 (`docs/evaluation/EVAL-004_REAL.md`, counts only). The result was P 0.124, R 0.058 and F1 0.079 over 398 expected records. The hard gate held: 0 forbidden records, 0 unsupported decisions in current truth, every anchor valid, and the actor right on all 23 matches. Recall is 0 for decisions, facts, ideas, questions, recommendations and preferences. That's the baseline any model extractor has to beat, and it shows how little hand-written rules catch in real chats.
 
 One thing didn't line up. The report's review-record hash wasn't the hash of the record in Git, because Windows checks text files out with CRLF line endings. A hash meant to name a record shouldn't depend on the computer. `sha256_review` now reads CRLF as LF before hashing; the synthetic review record (already LF) keeps its hash. The real report gets a comment naming both hashes rather than being rewritten.
@@ -2070,7 +2070,7 @@ Fix attempts: 0.
 
 **Next exact task:** ING-008 + ING-009.
 
-### 16:40 — ING-008 + ING-009: notes, text, Word and PDF as located blocks
+### 08:32 — ING-008 + ING-009: notes, text, Word and PDF as located blocks
 **ING-008** (`ingestion/documents.py`) reads Markdown and plain text into **blocks**: frontmatter, headings (`#` style and underlined), paragraphs, lists, quotes, fenced code, tables and rules. Each block keeps its exact character range in the decoded text, its line numbers, the headings above it, and a short locator like `L12-L15`, so `text[start:end]` is the block exactly as written. The tests check this with CRLF line endings and emoji.
 - Frontmatter is parsed as YAML when it can be. Otherwise the raw text is kept and a warning code says why.
 - Decoding tries UTF-8 (with or without a BOM), UTF-16 by its BOM, then Windows-1252, then Latin-1. Each fallback is reported, and no character is ever replaced.
@@ -2094,7 +2094,7 @@ Fix attempts: 1 (my first paragraph/underlined-heading loop was tangled; rewrote
 
 **Next exact task:** OPS-003 (local backups and verified restore).
 
-### 17:10 — OPS-003: a backup that proves it restores
+### 08:38 — OPS-003: a backup that proves it restores
 **OPS-003** (`infrastructure/backup.py`, `ke backup`) has three commands. None of them overwrites anything.
 - **create** copies the database with SQLite's own online-backup API, which gives a consistent copy even while it's open. It also copies the archive of original files and images, checking each against the hash it's named by. It holds the import lock while doing this, so no import is half-way through. The backup is built in a temporary folder and renamed only when finished, and it must sit outside the workspace. Its `manifest.json` lists every file's SHA-256 and size, the schema revision and every table's row count. The search indexes are left out because `ke index` rebuilds them.
 - **verify** re-hashes every file, runs SQLite's integrity check and recounts every table.
@@ -2114,3 +2114,36 @@ migration drift         # 0
 Fix attempts: 1 (the WAL-mode copy hid a change from the file hash; the backup copy now uses journal_mode=DELETE).
 
 **Next exact task:** OPS-004 (data deletion and downstream purge).
+
+### 08:55 — OPS-004: deleting a chat for good, and proving it
+**OPS-004** (`retention/purge.py`, `ke purge`) deletes whole conversations and everything made from them. It works in two steps.
+- **`ke purge plan ID…`** only reads. It prints how many rows of each kind would go and what is kept because another chat still uses it (an image, a video, a link, an account). It also lists what the engine can't reach: the original export in `raw/`, images kept by reference, and older backups. Last, it prints a 12-character token.
+- **`ke purge run ID… --confirm TOKEN --reason "…"`** needs that token, so nothing goes that wasn't shown first. If anything changed since the plan, the token no longer matches and nothing is deleted. Everything is deleted in one transaction: the message tree, images nobody else shows (bytes included), link, video, transcript and account mentions, related-chat links, labels, corrections, extraction runs, the model answers behind them, knowledge records and everything attached to them, document builds, and the archived export file. The append-only guards are lifted only inside that transaction.
+
+A purge leaves **tombstones**: hashes of the conversation ID and of the export file. Re-importing the same full export then skips the chat and doesn't re-archive the file. The audit log `purge_events` keeps counts and the check result, never the words, and it refuses deletes.
+
+**Acceptance check: post-delete retrieval returns nothing deleted.** Before deleting, a few short passages of the chat's own text are held in memory as probes. They are never written anywhere. After the purge, the database is compacted and the indexes are rebuilt. Then the check requires that:
+- search finds none of the purged messages;
+- the database file's bytes don't contain the probes;
+- no table still names a purged ID;
+- every planned file is gone;
+- if a vault is given, it is re-synced and no note or image copy remains.
+
+On the synthetic workspace all of these come back clean.
+
+Design choice (ADR-0010, OPEN_DECISIONS): the archived copy of an export file is deleted whole, even though it also holds other chats. Their messages stay; only their archived original file goes, and the plan says how many chats that affects. Running a purge on the real archive still needs Louis's go-ahead.
+
+Failing-case reproduction: in the image test, the check found the image still in the vault after the second chat that showed it was purged. The vault sync never removes image files, because it doesn't track who put them there. The purge now removes exactly the engine's own copy: the file at the engine's attachment path whose bytes still hash to the purged image.
+
+**Teach-back (`retention/purge.py`):** "To delete a chat I first make a plan that lists everything made from it and gives me a token, and the delete only runs with that token. It removes the chat and everything derived from it in one go, keeps anything another chat still uses, and leaves a fingerprint so re-importing my history doesn't bring it back. Then it proves the job is done by searching for the chat's own words and IDs and finding nothing."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 170 source files
+pytest -q               # 1181 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 1 (vault image copies survived the purge; the purge now removes the engine's own copies).
+
+Record fix: the times on this diary's entries since 00:35 had drifted hours ahead of the real clock, because I estimated them instead of reading the clock. Each is now the PR's merge time from `git log`.
+
+**Next exact task:** OPS-005 (CI with no real credentials).

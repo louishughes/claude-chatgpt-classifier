@@ -48,6 +48,7 @@ from knowledge_engine.domain.enums import ImportBatchStatus, check_transition
 from knowledge_engine.domain.ids import snapshot_id
 from knowledge_engine.importer.archive import BlobStore, StorageMode, StoredBlob
 from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.retention.tombstones import TombstoneKind, is_purged
 
 
 def _utc_now() -> datetime:
@@ -257,6 +258,13 @@ class ImportLedger:
             blob = self._archive.put_file(path)
 
         snapshot = self._session.get(SourceSnapshotRow, snapshot_id(blob.sha256))
+        if snapshot is not None and is_purged(self._session, TombstoneKind.SNAPSHOT, blob.sha256):
+            # This file was purged (OPS-004): the copy just stored goes again,
+            # so re-importing the same export can't restore what was deleted.
+            if blob.mode == "copy":
+                blob.location.unlink(missing_ok=True)
+            self._link(batch, relative_path, snapshot.snapshot_id)
+            return snapshot, False
         created = snapshot is None
         if snapshot is None:
             snapshot = SourceSnapshotRow(
@@ -271,17 +279,20 @@ class ImportLedger:
         else:
             # Reused: check the copy the ledger points at, not just the new one.
             self._archive.verify(stored_blob(snapshot))
+        self._link(batch, relative_path, snapshot.snapshot_id)
+        return snapshot, created
+
+    def _link(self, batch: ImportBatchRow, relative_path: str, snapshot_id: str) -> None:
         link = self._session.get(ImportBatchFileRow, (batch.import_id, relative_path))
         if link is None:
             self._session.add(
                 ImportBatchFileRow(
                     import_id=batch.import_id,
                     relative_path=relative_path,
-                    snapshot_id=snapshot.snapshot_id,
+                    snapshot_id=snapshot_id,
                 )
             )
         self._session.flush()
-        return snapshot, created
 
     def finish(
         self,
