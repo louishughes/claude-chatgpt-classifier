@@ -35,6 +35,12 @@
 | requirement | 2 | 0 | 0 | 1.000 | 1.000 | 1.000 |
 | all | 29 | 0 | 0 | 1.000 | 1.000 | 1.000 |
 
+- Truncated messages: 0 (must be 0)
+
+| Chat length | Expected records | Found | Recall |
+|---|---|---|---|
+| short (<4k chars) | 29 | 29 | 1.000 |
+
 | Attribute (matched records) | Checked | Right | Rate |
 |---|---|---|---|
 | acceptance | 19 | 19 | 1.000 |

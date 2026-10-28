@@ -42,6 +42,7 @@ import re
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import Protocol
 
 from knowledge_engine.rendering.transcript import StoredConversation, transcript_sections
 
@@ -165,7 +166,7 @@ def segment_section(
                 messages=tuple(m.native_id for m in members),
                 revisions=tuple(m.revision_id for m in members),
                 reason=reason,
-                parts=_parts(exchanges[start:end], config.max_characters),
+                parts=split_parts(exchanges[start:end], config.max_characters),
             )
         )
     return segments
@@ -248,7 +249,23 @@ def _gap_hours(previous: list[SegmentMessage], current: list[SegmentMessage]) ->
     return (min(after) - max(before)) / 3600
 
 
-def _parts(exchanges: list[list[SegmentMessage]], budget: int) -> tuple[SegmentPart, ...]:
+class _Sized(Protocol):
+    @property
+    def native_id(self) -> str: ...
+
+    @property
+    def text(self) -> str: ...
+
+
+def split_parts(exchanges: Sequence[Sequence[_Sized]], budget: int) -> tuple[SegmentPart, ...]:
+    """Split exchanges into parts of at most ``budget`` characters, never clipping.
+
+    Neighbouring parts share one exchange, so context carries across the
+    cut; no message is cut and the head and tail are always kept. An
+    exchange over the budget on its own becomes an ``oversized`` part
+    (LEG-005). Works on any message type with ``native_id`` and ``text``,
+    so model stages split exactly like the segmenter.
+    """
     sizes = [sum(len(m.text) for m in exchange) for exchange in exchanges]
     if sum(sizes) <= budget:
         members = tuple(m.native_id for e in exchanges for m in e)

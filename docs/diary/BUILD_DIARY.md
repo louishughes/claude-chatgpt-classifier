@@ -1482,3 +1482,21 @@ migration drift         # 0
 Fix attempts: 0. Ruff asked for raw docstrings where they show backslashes.
 
 **Next exact task:** LEG-005 (no clipping; split long segments; truncation_count and length bands; late short "no" fixture).
+
+### 12:40 — LEG-005: no clipping, anywhere
+**What:** old v1 kept 20 messages of 800 characters each and lost late decisions. The segmenter already split long segments into overlapping parts (NRM-004). Now every model stage uses that same split, and reports prove nothing was cut.
+- `segmenter.split_parts` is public and works on any message type. The model extractor groups a segment into exchanges and sends one request per part, then merges the records and stores a duplicate from the shared exchange only once. A segment that fits still sends one request with the same key as before, so the cache stays valid.
+- The model classifier sends one request per part. If the parts disagree on a primary label, the segment goes to review rather than being silently merged.
+- Classification and extraction reports print a **truncation count** (measured: segment messages missing from what the stage was given; must be 0) and accuracy or recall **by chat-length band** (<4k, 4k-16k, 16k-64k, 64k+ characters).
+- New fixture `late_rejection`: a 33k-character chat on one topic ends with "I suggest painting the shed door bright red." and the user's "No.". The segment has several parts, nothing is clipped, and the "No." comes out as the user's supported rejection citing both messages.
+
+**Teach-back (`segmenter.split_parts`):** "When a segment is too big for one model request, it's cut into parts at exchange boundaries, and neighbouring parts share one exchange so nothing loses its context. Every message is in some part, the first and last always are, and a single huge exchange is kept whole and flagged. The extractor and classifier both use this same split, and the reports count any dropped message, which must be zero."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 123 source files
+pytest -q               # 1016 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 0. The fixture's "No." first lacked the word "Synthetic", which the fixture suite requires, so it became "No. Synthetic.".
+
+**Next exact task:** M4, starting with its first unblocked ticket.

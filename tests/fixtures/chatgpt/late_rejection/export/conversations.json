@@ -1,0 +1,1910 @@
+[
+  {
+    "title": "Synthetic long varnish chat",
+    "create_time": 1710115200.0,
+    "update_time": 1710119160.0,
+    "mapping": {
+      "c0000050-0000-4000-8000-000000000001-root": {
+        "id": "c0000050-0000-4000-8000-000000000001-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-sys"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-sys": {
+        "id": "c0000050-0000-4000-8000-000000000001-sys",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115260.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-root",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u0"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u0": {
+        "id": "c0000050-0000-4000-8000-000000000001-u0",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115320.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 0: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-sys",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a0"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a0": {
+        "id": "c0000050-0000-4000-8000-000000000001-a0",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115380.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u0",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u1"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u1": {
+        "id": "c0000050-0000-4000-8000-000000000001-u1",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115440.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 1: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a0",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a1"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a1": {
+        "id": "c0000050-0000-4000-8000-000000000001-a1",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115500.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u1",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u2"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u2": {
+        "id": "c0000050-0000-4000-8000-000000000001-u2",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u2",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115560.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 2: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a1",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a2"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a2": {
+        "id": "c0000050-0000-4000-8000-000000000001-a2",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a2",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115620.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u2",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u3"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u3": {
+        "id": "c0000050-0000-4000-8000-000000000001-u3",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u3",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115680.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 3: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a2",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a3"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a3": {
+        "id": "c0000050-0000-4000-8000-000000000001-a3",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a3",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115740.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u3",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u4"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u4": {
+        "id": "c0000050-0000-4000-8000-000000000001-u4",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u4",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115800.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 4: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a3",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a4"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a4": {
+        "id": "c0000050-0000-4000-8000-000000000001-a4",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a4",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115860.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u4",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u5"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u5": {
+        "id": "c0000050-0000-4000-8000-000000000001-u5",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u5",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115920.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 5: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a4",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a5"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a5": {
+        "id": "c0000050-0000-4000-8000-000000000001-a5",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a5",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710115980.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u5",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u6"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u6": {
+        "id": "c0000050-0000-4000-8000-000000000001-u6",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u6",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710116040.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 6: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a5",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a6"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a6": {
+        "id": "c0000050-0000-4000-8000-000000000001-a6",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a6",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710116100.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u6",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u7"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u7": {
+        "id": "c0000050-0000-4000-8000-000000000001-u7",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u7",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710116160.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 7: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a6",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a7"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a7": {
+        "id": "c0000050-0000-4000-8000-000000000001-a7",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a7",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710116220.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u7",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u8"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u8": {
+        "id": "c0000050-0000-4000-8000-000000000001-u8",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u8",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710116280.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 8: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a7",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a8"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a8": {
+        "id": "c0000050-0000-4000-8000-000000000001-a8",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a8",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710116340.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u8",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u9"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u9": {
+        "id": "c0000050-0000-4000-8000-000000000001-u9",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u9",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710116400.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 9: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a8",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a9"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a9": {
+        "id": "c0000050-0000-4000-8000-000000000001-a9",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a9",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710116460.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u9",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u10"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u10": {
+        "id": "c0000050-0000-4000-8000-000000000001-u10",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u10",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710116520.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 10: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a9",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a10"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a10": {
+        "id": "c0000050-0000-4000-8000-000000000001-a10",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a10",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710116580.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u10",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u11"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u11": {
+        "id": "c0000050-0000-4000-8000-000000000001-u11",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u11",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710116640.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 11: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a10",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a11"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a11": {
+        "id": "c0000050-0000-4000-8000-000000000001-a11",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a11",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710116700.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u11",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u12"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u12": {
+        "id": "c0000050-0000-4000-8000-000000000001-u12",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u12",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710116760.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 12: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a11",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a12"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a12": {
+        "id": "c0000050-0000-4000-8000-000000000001-a12",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a12",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710116820.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u12",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u13"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u13": {
+        "id": "c0000050-0000-4000-8000-000000000001-u13",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u13",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710116880.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 13: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a12",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a13"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a13": {
+        "id": "c0000050-0000-4000-8000-000000000001-a13",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a13",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710116940.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u13",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u14"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u14": {
+        "id": "c0000050-0000-4000-8000-000000000001-u14",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u14",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710117000.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 14: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a13",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a14"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a14": {
+        "id": "c0000050-0000-4000-8000-000000000001-a14",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a14",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710117060.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u14",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u15"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u15": {
+        "id": "c0000050-0000-4000-8000-000000000001-u15",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u15",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710117120.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 15: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a14",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a15"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a15": {
+        "id": "c0000050-0000-4000-8000-000000000001-a15",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a15",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710117180.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u15",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u16"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u16": {
+        "id": "c0000050-0000-4000-8000-000000000001-u16",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u16",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710117240.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 16: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a15",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a16"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a16": {
+        "id": "c0000050-0000-4000-8000-000000000001-a16",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a16",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710117300.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u16",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u17"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u17": {
+        "id": "c0000050-0000-4000-8000-000000000001-u17",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u17",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710117360.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 17: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a16",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a17"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a17": {
+        "id": "c0000050-0000-4000-8000-000000000001-a17",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a17",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710117420.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u17",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u18"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u18": {
+        "id": "c0000050-0000-4000-8000-000000000001-u18",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u18",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710117480.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 18: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a17",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a18"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a18": {
+        "id": "c0000050-0000-4000-8000-000000000001-a18",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a18",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710117540.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u18",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u19"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u19": {
+        "id": "c0000050-0000-4000-8000-000000000001-u19",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u19",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710117600.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 19: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a18",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a19"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a19": {
+        "id": "c0000050-0000-4000-8000-000000000001-a19",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a19",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710117660.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u19",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u20"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u20": {
+        "id": "c0000050-0000-4000-8000-000000000001-u20",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u20",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710117720.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 20: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a19",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a20"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a20": {
+        "id": "c0000050-0000-4000-8000-000000000001-a20",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a20",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710117780.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u20",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u21"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u21": {
+        "id": "c0000050-0000-4000-8000-000000000001-u21",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u21",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710117840.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 21: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a20",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a21"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a21": {
+        "id": "c0000050-0000-4000-8000-000000000001-a21",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a21",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710117900.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u21",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u22"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u22": {
+        "id": "c0000050-0000-4000-8000-000000000001-u22",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u22",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710117960.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 22: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a21",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a22"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a22": {
+        "id": "c0000050-0000-4000-8000-000000000001-a22",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a22",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710118020.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u22",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u23"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u23": {
+        "id": "c0000050-0000-4000-8000-000000000001-u23",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u23",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710118080.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 23: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a22",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a23"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a23": {
+        "id": "c0000050-0000-4000-8000-000000000001-a23",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a23",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710118140.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u23",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u24"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u24": {
+        "id": "c0000050-0000-4000-8000-000000000001-u24",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u24",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710118200.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 24: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a23",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a24"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a24": {
+        "id": "c0000050-0000-4000-8000-000000000001-a24",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a24",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710118260.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u24",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u25"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u25": {
+        "id": "c0000050-0000-4000-8000-000000000001-u25",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u25",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710118320.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 25: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a24",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a25"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a25": {
+        "id": "c0000050-0000-4000-8000-000000000001-a25",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a25",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710118380.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u25",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u26"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u26": {
+        "id": "c0000050-0000-4000-8000-000000000001-u26",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u26",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710118440.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 26: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a25",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a26"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a26": {
+        "id": "c0000050-0000-4000-8000-000000000001-a26",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a26",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710118500.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u26",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u27"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u27": {
+        "id": "c0000050-0000-4000-8000-000000000001-u27",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u27",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710118560.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 27: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a26",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a27"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a27": {
+        "id": "c0000050-0000-4000-8000-000000000001-a27",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a27",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710118620.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u27",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u28"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u28": {
+        "id": "c0000050-0000-4000-8000-000000000001-u28",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u28",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710118680.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 28: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a27",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a28"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a28": {
+        "id": "c0000050-0000-4000-8000-000000000001-a28",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a28",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710118740.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u28",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u29"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u29": {
+        "id": "c0000050-0000-4000-8000-000000000001-u29",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u29",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710118800.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question 29: what is the next step for the shed varnish?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a28",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a29"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a29": {
+        "id": "c0000050-0000-4000-8000-000000000001-a29",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a29",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710118860.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. Synthetic answer: sand the shed boards along the grain, wipe the dust, then brush on a thin coat of varnish and let it dry before the next one. "
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u29",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u30"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u30": {
+        "id": "c0000050-0000-4000-8000-000000000001-u30",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u30",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710118920.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic question: what colour should the shed door be?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a29",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a30"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a30": {
+        "id": "c0000050-0000-4000-8000-000000000001-a30",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a30",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710118980.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: I suggest painting the shed door bright red."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u30",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-u31"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-u31": {
+        "id": "c0000050-0000-4000-8000-000000000001-u31",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-u31",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710119040.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "No. Synthetic."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-a30",
+        "children": [
+          "c0000050-0000-4000-8000-000000000001-a31"
+        ]
+      },
+      "c0000050-0000-4000-8000-000000000001-a31": {
+        "id": "c0000050-0000-4000-8000-000000000001-a31",
+        "message": {
+          "id": "c0000050-0000-4000-8000-000000000001-a31",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1710119100.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic answer: understood, the shed door stays as it is."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000050-0000-4000-8000-000000000001-u31",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000050-0000-4000-8000-000000000001-a31",
+    "plugin_ids": null,
+    "conversation_id": "c0000050-0000-4000-8000-000000000001",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000050-0000-4000-8000-000000000001"
+  }
+]

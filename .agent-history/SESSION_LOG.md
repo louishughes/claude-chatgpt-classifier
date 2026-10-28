@@ -720,3 +720,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - providers/base.py (ResultState.TRANSIENT, RawResponse, result_from_response, TRUNCATED, list trimming, ProviderResult.trimmed); ledger (transient resend, MAX_TRANSIENT_FAILURES=3, transient_failures/last_transient, resent, not_answered.provider_failed, model.transient/model.trimmed events); migration 0020_provider_failures; graph/offsets.py (normalise_for_match, find_quote); model extractor uses find_quote.
 - Tests: test_provider_failures.py (5), test_quote_matching.py (14). Full suite 1001 passed, 7 skipped; ruff, mypy OK; drift 0.
 - Next: LEG-005.
+
+## 2026-10-28 12:40 LEG-005 (#193)
+- segmenter.split_parts (public, generic); extraction/text.exchanges_of; ModelExtractor per-part requests and merge; classifier model path per-part with disagreement -> review; Predicted.input_messages/chat_chars; reports: truncation_count, by_band / recall_by_band, length_band; synthetic case late_rejection; baselines regenerated (numbers unchanged).
+- Tests: test_long_chats.py (5). Full suite 1016 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: M4.

@@ -41,6 +41,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from knowledge_engine.domain.enums import Role
+from knowledge_engine.evaluation.classification_eval import (
+    band_order,
+    length_band,
+    truncation_text,
+)
 from knowledge_engine.evaluation.gold import GoldForbidden, GoldRecord, GoldSet
 from knowledge_engine.evaluation.report_labels import UNSCORED, AnswerKey, key_from_gold
 from knowledge_engine.extraction.evidence import Verdict, check_record
@@ -132,6 +137,8 @@ class ExtractionReport:
     forbidden_in_truth: list[str] = field(default_factory=list)
     unsupported_truth_decisions: list[str] = field(default_factory=list)
     key: AnswerKey | None = None
+    truncation_count: int | None = None
+    recall_by_band: dict[str, TypeScore] = field(default_factory=dict)
 
     @property
     def anchor_validity(self) -> float:
@@ -187,6 +194,15 @@ class ExtractionReport:
                 f"| {name} | {s.true_pos} | {s.false_pos} | {s.false_neg} | "
                 f"{s.precision:.3f} | {s.recall:.3f} | {s.f1:.3f} |"
             )
+        lines += [
+            "",
+            f"- Truncated messages: {truncation_text(self.truncation_count)}",
+            "",
+            "| Chat length | Expected records | Found | Recall |",
+            "|---|---|---|---|",
+        ]
+        for band, b in sorted(self.recall_by_band.items(), key=lambda kv: band_order(kv[0])):
+            lines.append(f"| {band} | {b.true_pos + b.false_neg} | {b.true_pos} | {b.recall:.3f} |")
         lines += [
             "",
             "| Attribute (matched records) | Checked | Right | Rate |",
@@ -283,6 +299,8 @@ def evaluate_extraction(
     versions: Mapping[str, str],
     *,
     key: AnswerKey | None = None,
+    lengths: Mapping[str, int] | None = None,
+    truncation_count: int | None = None,
 ) -> ExtractionReport:
     """Score produced records against the golden set.
 
@@ -293,9 +311,14 @@ def evaluate_extraction(
         versions: What produced them (extractor versions, validator...).
         key: The key's version, hash and reviewer (``key_from_file``);
             defaults to a content hash with no review claimed.
+        lengths: Native conversation ID -> characters, for recall by
+            chat-length band (LEG-005).
+        truncation_count: Messages dropped from the extractors' input
+            (``segmenter.truncation_count``); must be 0. None: not measured.
     """
     live = [item for item in produced if item.record.trust is not Trust.REJECTED]
     by_type: dict[str, TypeScore] = defaultdict(TypeScore)
+    by_band: dict[str, TypeScore] = defaultdict(TypeScore)
     agreement: dict[str, Agreement] = defaultdict(Agreement)
     forbidden_produced: list[str] = []
     forbidden_in_truth: list[str] = []
@@ -316,6 +339,7 @@ def evaluate_extraction(
             continue
         unmatched = list(here)
         scored_ids |= {item.record.record_id for item in here}
+        band = by_band[length_band(lengths.get(native) if lengths else None)]
         for expected in conversation.records:
             candidates = [
                 item
@@ -325,6 +349,7 @@ def evaluate_extraction(
             ]
             if not candidates:
                 by_type[expected.record_type.value].false_neg += 1
+                band.false_neg += 1
                 continue
             # Two records of one type can quote the same message (the user's
             # own preference and a client's). Pair each gold record with the
@@ -333,6 +358,7 @@ def evaluate_extraction(
             best = max(candidates, key=lambda c: _agreements(expected, c))
             unmatched.remove(best)
             by_type[expected.record_type.value].true_pos += 1
+            band.true_pos += 1
             _compare(agreement, expected, best)
         for item in unmatched:
             by_type[item.record.record_type.value].false_pos += 1
@@ -362,4 +388,6 @@ def evaluate_extraction(
         forbidden_in_truth=sorted(set(forbidden_in_truth)),
         unsupported_truth_decisions=sorted(set(unsupported)),
         key=key or key_from_gold(gold),
+        truncation_count=truncation_count,
+        recall_by_band=dict(by_band),
     )
