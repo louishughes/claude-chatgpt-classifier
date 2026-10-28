@@ -3047,3 +3047,16 @@ Talking points:
 - "Precision for links needs a closed world: the key lists every chat it covers, so a link it doesn't contain really is wrong."
 - "A link pointing the wrong way and a link of the wrong kind need different fixes, so they're counted separately from invented ones."
 - "The answer key is written by a session that never saw the engine's output, and code checks every quote before a single point is scored."
+
+### 16:05 UTC — REV-010: answer key v2, written beside v1
+
+Louis approved both answer-key changes on a decision card ("Approve both", 15:42 UTC), so REV-010 ran as a Remote Control session on his PC, where the private chats live. It checked v1's hash first (unchanged), wrote v2 in a new folder, and proved every item with code: 113 of 113 quotes found in the cited message, right speaker, right message number. It also planted three deliberate mistakes in a copy to show the checker catches them. Only hashes and counts came back here; the hashes are in `docs/reviews/OPEN_DECISIONS.md`.
+
+The surprise: the brief said two chats were misnumbered, but **all ten** were. The engine numbers every message on the active path, hidden system messages and tool output included, and v1 had skipped those. v2 now stores each message's native ID next to its number, so the number can always be rechecked.
+
+The second surprise: `ke gold score` can't read this answer key at all (v1 or v2), because the key is per-chat and the scorer expects one combined golden-set file. That's a converter ticket, not something to patch into the key.
+
+Talking points:
+- "Before changing the answer key, the session proved the old one was untouched by its hash, and afterwards proved it again."
+- "Every answer in the key is checked by code against the real message: the quote, the speaker and the number."
+- "A checker that's never been shown to fail isn't proven, so we planted three mistakes and watched it catch them."
