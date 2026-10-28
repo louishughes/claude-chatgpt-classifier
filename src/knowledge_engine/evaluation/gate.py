@@ -345,6 +345,20 @@ def _retrieval(inputs: GateInputs) -> Outcome:
     return Outcome(status, f"hybrid Recall@10 {_rate(value)}", tuple(failures))
 
 
+def _variance(inputs: GateInputs) -> Outcome:
+    from knowledge_engine.evaluation.variance import SOURCES, run_variance
+
+    report = run_variance([inputs.fixtures / s for s in SOURCES], inputs.scratch / "variance")
+    measured = (
+        f"{len(report.runs)} orders, {len(report.items)} difference(s), "
+        f"{report.repeat_new_requests} new request(s) on repeat"
+    )
+    if report.silent_drift or report.repeat_new_requests or not report.repeat_identical:
+        return Outcome(Status.FAIL, measured)
+    notes = tuple(f"{i.kind} {i.key}" for i in report.items[:5])
+    return Outcome(Status.REVIEW if report.items else Status.PASS, measured, notes)
+
+
 def _blocked(reason: str) -> Callable[[GateInputs], Outcome]:
     return lambda inputs: Outcome(Status.BLOCKED, "not run", (reason,))
 
@@ -413,6 +427,14 @@ CHECKS: tuple[Check, ...] = (
         "synthetic",
         "ke eval e2e",
         _end_to_end,
+    ),
+    Check(
+        "variance.order_and_repeats",
+        "EVAL-008",
+        "same answers in 3 shuffled orders and on pinned repeats; differences go to review",
+        "synthetic",
+        "ke eval variance",
+        _variance,
     ),
     Check(
         "retrieval.recall_at_10",

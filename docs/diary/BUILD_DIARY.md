@@ -1984,3 +1984,29 @@ ke eval gate            # BLOCKED: 3 BLOCKED, 2 REVIEW, 7 PASS (0 FAIL; gate pas
 Fix attempts: 0.
 
 **Next exact task:** EVAL-008.
+
+### 15:20 — EVAL-008: any order, same answers
+**EVAL-008** (`evaluation/variance.py`, `ke eval variance`) imports five synthetic exports in three seeded orders. The order of the exports, the chats inside each and the segments reaching each stage are all shuffled. Each run classifies through the model path with a pinned fake model, extracts and reconciles.
+
+Each run becomes a **canonical view** keyed only by what the export itself names: native conversation and message IDs, record type and the quoted words. Workspace IDs are random, so they can't be compared. The view holds each segment's labels and each record's trust, standing and replacements. Any key whose value differs between runs becomes a **review item**, with every run's value side by side. Nothing is averaged or quietly picked.
+
+The first run also asks the pinned model twice more. The answers must be identical and come from the ledger, with 0 new requests.
+
+Result: 17 segments and 26 records give identical answers in all three orders, including the engine_switch replacement. The repeats made 0 new requests.
+
+Failing-case reproduction: a fake model that never labels the first segment it sees (so its answers depend on order) produces review items, never silent drift.
+
+The gate gains a thirteenth line, `variance.order_and_repeats`: PASS when nothing differs, REVIEW when differences are listed, FAIL only if a repeat changed, asked the model again, or a difference went unlisted. Regenerated `docs/evaluation/EVAL-007_GATE.md`: 8 PASS, 2 REVIEW, 3 BLOCKED, 0 FAIL.
+
+**Teach-back (`evaluation/variance.py`):** "It imports the same fake chats in three different orders and asks the same pinned model twice, then compares the labels and the 'what is current' answers using only names that come from the export. If anything changes with the order, that item is listed for a person with each run's answer next to the others. Asking again must give the same answer without calling the model again."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 162 source files
+pytest -q               # 1163 passed, 7 skipped
+migration drift         # 0
+ke eval variance        # PASS: 17 segments and 26 records gave the same answers in 3 orders; repeats made 0 new requests
+ke eval gate            # BLOCKED: 3 BLOCKED, 2 REVIEW, 8 PASS (0 FAIL)
+```
+Fix attempts: 1 (my drifting fake first answered "needs review" only once, and the retry hid it; it now never labels the first segment it sees).
+
+**Next exact task:** check UI-005 (#175) against STATUS and close it if done; then M5.

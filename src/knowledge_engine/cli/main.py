@@ -1221,6 +1221,46 @@ def _eval_gate(settings: Settings, args: argparse.Namespace) -> CommandResult:
     return CommandResult("eval gate", data=data, message=f"{report.overall.value}: {summary}")
 
 
+def _eval_variance(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Run the synthetic exports in 3 shuffled orders plus pinned repeats (EVAL-008)."""
+    import tempfile
+
+    from knowledge_engine.evaluation.variance import SOURCES, run_variance, to_dict
+
+    sources = [args.fixtures / s for s in SOURCES]
+    if not all(s.exists() for s in sources):
+        return CommandResult(
+            "eval variance",
+            ExitCode.USAGE,
+            message="fixtures folder not found (run from the repository, or pass --fixtures)",
+            error_code="no_fixtures",
+        )
+    with tempfile.TemporaryDirectory(prefix="ke-variance-") as scratch:
+        report = run_variance(sources, Path(scratch))
+    data = to_dict(report)
+    if report.silent_drift or report.repeat_new_requests or not report.repeat_identical:
+        return CommandResult(
+            "eval variance",
+            ExitCode.ERROR,
+            data=data,
+            message="FAIL: repeats changed or asked the model again, or drift went unlisted",
+            error_code="regression",
+        )
+    if report.items:
+        return CommandResult(
+            "eval variance",
+            data=data,
+            message=f"REVIEW: {len(report.items)} answer(s) changed with the order; "
+            "each is listed for review",
+        )
+    return CommandResult(
+        "eval variance",
+        data=data,
+        message=f"PASS: {data['segments']} segments and {data['records']} records gave the "
+        f"same answers in {len(report.runs)} orders; repeats made 0 new requests",
+    )
+
+
 def _docs_check(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Check every link, embed and frontmatter block in a vault, as Obsidian reads them."""
     from knowledge_engine.evaluation.end_to_end import check_vault
@@ -2195,6 +2235,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="write the vault shape as the new golden (review the diff before committing)",
     )
     e2e.set_defaults(handler=_eval_e2e)
+    variance = eval_commands.add_parser(
+        "variance", help="check the same chats give the same answers in any order"
+    )
+    variance.add_argument(
+        "--fixtures",
+        type=Path,
+        default=Path("tests/fixtures"),
+        help="the fixtures folder (default: the repository's)",
+    )
+    variance.set_defaults(handler=_eval_variance)
     gate = eval_commands.add_parser(
         "gate", help="run every evaluation once: PASS, FAIL, REVIEW or BLOCKED for each"
     )
