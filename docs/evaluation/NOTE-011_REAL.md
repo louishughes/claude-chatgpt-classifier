@@ -50,3 +50,76 @@ No paid API was called.
 
 - Run the NOTE-005 extractor on the 40 chats (request files, fresh sessions), re-render and re-score with the same references. The references stay unchanged.
 - File fixes 2 to 5 as tickets with the build thread.
+
+## Re-score after the AI extractor (NOTE-005), same 15 references
+
+The NOTE-005 extractor ran on all 85 segments through request files, answered by 5 fresh Claude Sonnet sessions with every quote checked in code. It stored 94 records. The 40 notes were re-rendered and the code rubric passes 35 of 40 (all 5 failures are size only). A **new** scorer session (Claude Opus), which didn't see the first scoring, compared them with the unchanged references.
+
+| Measure | First score | Re-score |
+|---|---|---|
+| Summary | 1.53 mean (23/30) | 24/30 |
+| Category | 8 exact, 3 top only, 4 unclassified | same (no reclassification yet) |
+| Status matches | 12/15 | 12/15 |
+| **Decisions found** | **5 of 22 (23%)** | **12 of 22 (55%)**; the notes hold 28, 2 wrong |
+| Open questions found | 1 of 9 | 0 of 9 |
+| Key points covered | 58/75 (77%) | 59/75 (79%) |
+| Unsupported claims | 9 in 6 notes | 9 in 6 notes |
+| Noise lines in "from the chat" sections | not counted | 57 (42 are pasted custom instructions, in 10 notes) |
+| Readability | 1.73 mean | 19/30 (1.27 mean; the new records add length and noise) |
+
+**What changed:** decision recall more than doubled. **What didn't:** open questions, noise and stitched summaries. The noise comes from the older rule-extractor records, which are still stored and shown next to the new ones. The fixes are the same as listed above, plus two more:
+
+- Hide or retire the rule-extractor records for a chat once a model extraction has run on it, so pasted custom instructions and drafted letter text stop appearing as requirements.
+- Have the extractor and the digest fill open questions from how the chat ends (an unanswered offer, an unsent letter, a promise to report back).
+
+## Extraction scored against answer key v2 (`ke gold convert` + `ke gold score`)
+
+The answer key fingerprints were checked first, and both were unchanged: v1 `1dbf3d2a…781b64` and v2 `a37caa31…d9f5b` (combined SHA-256 of the 10 files, as in `docs/reviews/OPEN_DECISIONS.md`). `ke gold convert` turned v2 into a gold set: 90 records, with 21 key items left unmapped (12 `fact_about_owner`, 7 `fact`, 1 `task`, 1 unclear decision) and 0 number mismatches. Label: **AI check (not owner-verified)**.
+
+| | Result |
+|---|---|
+| Key chats found | 10 of 10 |
+| Produced records in those chats | 71 |
+| Precision / recall / F1 | **0.056 / 0.044 / 0.050** |
+| Gate (anchors, forbidden records, unsupported decisions) | passed; anchor validity 1.0, 0 forbidden |
+| Rejections | P 1.00, R 0.50 |
+| Requirements | P 0.14, R 0.10 |
+| Decisions | 0 of 12 |
+| Key "idea" items (32) | 0 found. The engine records an assistant suggestion as a `proposal` (24 produced, none expected) |
+
+**Reading it honestly:** the low score is partly real and partly a vocabulary mismatch between the key and the engine.
+
+- The key calls an assistant's suggestion an `idea`. The engine calls it a `proposal` and never emits `idea`. So 32 key items and 24 engine records can never pair, even when they describe the same suggestion.
+- The key has no `action` or `proposal` items at all, so every engine action and proposal counts as a false positive.
+- The real misses are decisions (0 of 12 under this matcher, although the separate note re-score found 12 of 22 by meaning) and requirements (2 of 21).
+- Changing how types map is a change to the evaluation criteria, so it needs Louis's approval. The decision is whether `proposal` should count as a match for the key's `idea` (assistant suggestion), or whether the extractor should emit `idea`.
+
+## Third score: after NOTE-022 (rule records dropped) and the classification review
+
+The changes since the second score:
+- A separate reviewer session (Claude Opus) settled 14 of the 18 unsure segments. The other 4 are empty or nearly empty.
+- NOTE-022 leaves rule-extractor records out of a note once a model extraction has run for that segment.
+- The 40 notes were re-rendered, and the code rubric passes 38 of 40 (2 fail on size).
+
+A third fresh scorer session (Claude Opus) used the same 15 references, which are unchanged.
+
+| Measure | 1st | 2nd | **3rd** |
+|---|---|---|---|
+| Summary (of 30) | 23 | 24 | **25** |
+| Category exact / top only / miss / unclassified | 8/3/0/4 | 8/3/0/4 | **9/4/1/1** |
+| Status matches | 12/15 | 12/15 | 12/15 |
+| Decisions found (of 22) | 5 | 12 | **9** (1 fabricated) |
+| Open questions found (of 9) | 1 | 0 | **0** |
+| Key points (of 75) | 58 | 59 | 59 |
+| Unsupported claims | 9 | 9 | 10 |
+| Noise lines | – | 57 | **3** |
+| Readability (of 30) | 26 | 19 | **25** |
+
+**What it shows:**
+- Dropping the rule records removed almost all the noise (57 lines down to 3) and readability recovered. It also removed a few real user constraints that only the rule extractor had caught, so decisions fell from 12 to 9.
+- The review fixed most of the unclassified chats.
+
+**What's left (the top three, and what to fix):**
+1. **Open questions:** 0 of 9 found. The extractor and digest need to read how a chat ends (an unanswered check-in, an unsent letter, a promise to report back, an option never chosen).
+2. **User constraints and decisions:** 13 of 22 missed, mostly short user instructions such as numbers, limits and "no repeats". The extractor prompt should treat a user's own constraint as a requirement even when it isn't phrased as "I decided".
+3. **Long, multi-part chats:** summaries are stitched together, with chunk wording left in. These chats hold 6 of the 10 unsupported claims, including one misread request that caused a fabricated decision. The fix is a merge step for multi-part digests.

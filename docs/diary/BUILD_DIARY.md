@@ -2963,6 +2963,107 @@ Fix attempts: 2 (my FakeProvider digest left out the required intent; the table-
 
 **Next exact task:** keywords into the note (NOTE-007 wiring), then NOTE-008.
 
+### 17:30 — NOTE-018: a suggested category instead of "unclassified", and a reviewer session
+
+The first real score found four notes saying "unclassified": the classifier answered every segment of those chats, but each answer was unsure, so all of them went to review and none became a label. A reader got nothing from that.
+
+Now, when a chat has no settled category, the note shows the classifier's best candidate beside the word: "unclassified; suggested: Home and garden › Raised beds (waiting for review)", and the category section names the segments it came from. Candidates are weighed like settled labels, by the messages in their segments. It is never a label: the front-matter `category` stays unclassified until a review settles it.
+
+**`ke classify review --taxonomy tax-1 --run-id review-1`** sends the review queue to a separate reviewer session through request files. Each request carries the segment, the first answer and what was wrong with it, under the same rules as the classifier. A clean answer is stored with `record_review`, naming the session (`session:<ref>`), for each flagged field; reviews already outrank machine labels, so the category settles. An answer that is unsure too, or breaks a rule, records nothing and the segment waits for a person. A reviewed segment leaves the queue, so a second run asks for nothing.
+
+**Teach-back (`review_session.py`):** It takes every segment the classifier was unsure about and asks a second Claude session to label it, showing it the first answer and what was wrong. If that answer is clean, it's saved as a review with the session's name on it, and reviews beat machine labels, so the chat gets its category. If the second session is unsure too, nothing is saved and a person decides.
+
+Checks:
+```
+tests/integration/test_note_suggested_review.py   4 passed (all-review chat: suggestion shown, label unset; reviewer files settle it, named reviewer, no repeat requests; unsure reviewer records nothing; the Notes page shows the suggestion under "unclassified")
+tests/integration/test_note_categories.py         unchanged, pass
+```
+Fix attempts: 0.
+
+The Notes page (NOTE-012) shows the suggestion too, beside the chat under "unclassified", never as its group.
+
+**Next exact task:** on the PC, `ke classify review --taxonomy tax-1 --run-id review-1` for the 18 review_required segments, answered by a separate session.
+
+### 16:45 — NOTE-012: the knowledge note beside the chat, and a Notes page
+
+The dashboard's chat page now has two columns on a wide screen: the chat's rich note on the left (it stays in view while you scroll) and the transcript on the right. On a phone they stack. Every `m3` in the note is a link to message 3 on the same page, which is highlighted when you land on it. A new **Notes** page (sidebar, under Chats) lists every chat grouped by category, with its status and how many open questions the digest found.
+
+- `ui/notes.py` builds the note in memory, the same way `ke docs rubric` does: the newest published taxonomy, the stored digest, nothing written.
+- The Markdown-to-HTML step only knows the shapes our own notes use (headings, bullets, callouts, the card table, bold, italics, wikilinks). Every character of text is HTML-escaped first, so chat text can't become markup; the test chat contains a `<script>` tag to prove it.
+- A link to another chat's note goes to that chat's page; any other link is shown as plain words.
+- If a note can't be built, the page says so and still shows the transcript.
+
+A small trap I hit: the page template's sidebar already uses a variable called `groups`, so the first Notes page rendered four empty tables. The categories are now passed as `categories`.
+
+**Teach-back (`note_html`):** It turns one of our rich notes into HTML for the dashboard. It escapes all the text first and only recognises the few shapes our own notes use, so nothing from a chat can sneak in as markup. Citations become links to the message's spot on the same page, so you can check every claim with one click.
+
+Checks:
+```
+tests/integration/test_ui_notes.py   5 passed (summary, card and decisions shown; every m-number opens the message it names; no script tag survives; Notes page grouping; converter shapes)
+```
+Fix attempts: 1 (the `groups` name clash; a whole-transcript link was counted as a citation).
+
+**Next exact task:** merge the open PRs on green, then the NOTE-007 keyword section in the note.
+
+### 15:25 — NOTE-010 (part 1): `ke docs check` now checks a note is readable, not just linked
+
+**What:** The rich-note plan (§7 of the gap analysis) promised that a note fits on a screen or two, that an empty section is one plain sentence, and that hashes and run IDs stay out of the front matter. Until now only `ke docs rubric` checked the first two, and only by rebuilding notes from the database. NOTE-010 wants the vault check itself to catch them, on the files Obsidian actually opens. `evaluation/readability.py` adds three rules to `ke docs check`:
+
+- **budget**: a rich note's body (the part above the vault's "write below this line" marker, so your own notes never count) stays under the budget for its chat's length, read from its own `messages` property;
+- **empty_evidence**: an evidence box (`> [!quote]`) in a section with no item in it fails, in any note;
+- **properties**: front matter holds plain values and flat lists Dataview can filter on; no nested maps, and no hashes or bookkeeping like `content_hash` (those go in the `.meta` sidecar).
+
+Older notes (DOC-003 knowledge notes, the masters) were never written to that standard, so they are counted as "not checked" rather than failed. The summary line now says how many rich notes were within budget.
+
+**Challenge:** the new test writes a rich note, with a fake digest, for every chat in every fixture export (24 exports), then runs the vault check. It failed straight away, and not on readability: the link checker said six citations were broken. They were the `[m4]` links inside the knowledge card table, where the alias pipe has to be written `\|` so it doesn't end the table cell. Obsidian reads that fine; the checker read the backslash as part of the link target. It's the same mistake the NOTE-011 checks hit earlier today, in a different file. The note was right, so the checker was fixed.
+
+**Also:** I'd claimed NOTE-012 (the dashboard) first, then found another thread already had it up as a PR. I dropped my half-built copy rather than open a duplicate.
+
+**Teach-back (`evaluation/readability.py`, `check_note`):** It reads one note file, front matter and body, and checks three promises: the note isn't longer than its chat deserves, no section shows an evidence box without anything for it to back up, and the front matter only holds simple values a reader or Dataview would use. Only notes whose `generator` says they use the new layout get the length and front-matter checks, because older notes never made those promises. It never opens the database, so it works on any vault folder.
+
+Checks:
+```
+tests/unit/test_readability.py                6 passed
+tests/integration/test_note_readability.py   25 passed (24 fixture exports, every rich note clean; CLI reports budget and empty-evidence problems)
+```
+Fix attempts: 2 (the table-cell pipe in the link checker; one fixture ships its export as a ZIP).
+
+Talking points:
+- "My vault checker now fails a note that's too long for its chat, not just one with a broken link."
+- "The first real run caught a bug in the checker, not the notes. Same bug I'd fixed in another checker that morning, which says the pipe-in-a-table rule deserves one shared helper."
+- "Two agents claimed the same ticket. The fix was simple: check the open PRs before starting, and back off when someone's ahead."
+
+### 15:45 — NOTE-010 (part 2): topic and project masters you can read
+
+The topic and project masters (DOC-004/005) were complete but hard going: every record printed as its claim, then a list of status, sources, record ID and event IDs, then its quotes in full. `documents/readable_master.py` renders the same document in the chat-note style, chosen with `ke docs topic|project --template v2` (the old layout stays the default, so nothing that uses it changes):
+
+- a **summary** box first, in the engine's own words ("3 items from 2 chats: 1 current, 2 replaced"), with the topic's definition;
+- **one line per item**: the claim in bold, its kind and who holds it, and short citations;
+- a citation is `[c2·m12]`, message 12 of chat 2. A master spans many chats, so the chats are numbered once in a **Chats** list at the end, which keeps every link short;
+- quotes **folded** under the item, at most two, each re-checked against the archive;
+- the DOC-004 rule still holds: a replaced choice says what replaced it, now in words ("Replaced by "…" (c2·m4)") instead of a record ID;
+- **How these connect** and the **Decision timeline** name items by their words and place too;
+- IDs and hashes go to a `.meta/` JSON sidecar; the front matter is flat counts and labels Dataview can filter on.
+
+Masters get their own budget in `ke docs check` (a base plus so much per item and per chat), since a topic grows with the archive.
+
+**Decision:** the place in brackets after a claim ("(c1·m2)") was added after I read the first rendered master. Two chats had made the same decision in the same words, so "How these connect" showed two identical lines. The place tells them apart without bringing record IDs back.
+
+**Teach-back (`documents/readable_master.py`):** It takes a topic's or project's list of knowledge items, already sorted into current, replaced, in conflict and suggestions, and writes it as a note a person can skim: a short summary, then one line per item with links to the exact messages. Each chat gets a number, so a link reads "c2·m12" instead of a long title. Anything only a program needs, like record IDs, goes in a separate file next to the note.
+
+Checks:
+```
+tests/integration/test_readable_masters.py   5 passed (summary first; every replaced line names its replacement; no IDs in the note; every c·m number is the transcript's; vault check clean; CLI v2)
+python -m knowledge_engine.devtools.ci       lint, format, types, guard ok; 1448 passed, 22 skipped
+```
+Fix attempts: 2 (a query result needed `.all()` before `dict()`; my test unpacked `write_transcript`'s return value wrongly).
+
+Talking points:
+- "A master note now reads like a briefing: summary, then one line per decision, with a link to the exact message."
+- "Old decisions are still labelled, just in words instead of IDs."
+
+**Next exact task:** NOTE-007 wiring (keyword candidates into the note's Keywords and topics section) once #296 merges.
+
 ### 15:55 — Step 4: tax-1 published, 40 real chats classified and digested, and the notes scored by a separate session
 
 Louis approved tax-1 and asked me to run the publish ("I need you to run it"); this PC's safety check had blocked my first try.
@@ -3019,6 +3120,55 @@ tests/integration/test_conversation_relationships.py, test_related_conversations
 Fix attempts: 1 (the first test run showed the copied-opening detector also needed the filter).
 
 **Next exact task:** NOTE-012 dashboard chat view.
+
+### 19:35 — NOTE-026: one citation per message on the topics line
+
+The third score found the same message link up to three times on one bullet, in "Keywords and topics". Each digest topic carried its own citation, and a model usually takes several topics from one message. Now topics that cite the same messages are grouped and share one citation, "raised beds, cedar, drainage [m1]; watering [m3]", in the order the digest gave them. Repeats across sections stay: one item, one citation, is intended.
+
+**Teach-back (`_topics_line` in `rich_note.py`):** It walks the digest's topics in order and groups them by the messages they cite. Each group is written once, its topic names joined by commas and followed by one link per message. So a message is linked once on the line however many topics came from it.
+
+Checks:
+```
+tests/integration/test_note_topic_citations.py   1 passed (fails on the old code: links 1, 1, 3, 1)
+full local CI: types, guard, tests ok (1497 passed); lint and format failed on one long line in the new test, fixed with ruff format
+```
+Fix attempts: 1 (formatting).
+
+**Next exact task:** NOTE-025 (#328), with NOTE-023's extractor half, after Louis answers on the prompt-version test line.
+
+### 18:20 — NOTE-022: the note prefers the model's records where the model ran
+
+The re-score found 57 noise lines in the "from the chat" sections, and 42 of them were pasted custom instructions. They came from the older rule extractors. Those records stay stored next to the newer model-extractor records (NOTE-005), so both showed up in the note.
+
+Now, when a model extraction has finished for a segment, the note leaves out the rule records from that segment. A segment the model hasn't covered keeps its rule records, so nothing goes missing in a chat that's only partly processed. Nothing is deleted. The Source section says how many records were held back ("3 rule-based record(s) left out: a model extraction covers their segments"). A run counts as a model run when its stored versions name a prompt, so the check uses only what the run recorded about itself.
+
+**Teach-back (`_prefer_model` in `rich_note.py`):** For each record in the note, it finds the extraction run that made it and that run's segment. If a model run has finished on that segment, a rule record from it is left out of the note, though it stays in the database. The note then says how many it held back, so nothing is hidden silently.
+
+Checks:
+```
+tests/integration/test_note_prefers_model_records.py   1 passed (segment 1: rule records out, model record in; segment 2: rule record kept; count shown; 5 records still stored)
+```
+Fix attempts: 1 (the test's "left out" check matched the Related chats subtitle).
+
+**Next exact task:** on the PC, re-render the 40 gold notes and re-score them (rich-notes thread).
+
+### 18:00 — EVAL-014: scoring against the per-chat answer key
+
+`ke gold score` couldn't read the real answer key (v1 or v2): the key is one JSON file per chat in the classification spike's shape, and the scorer wants one combined golden-set file. **`ke gold convert --key <folder>`** now reads the folder and writes a golden set to the workspace (git-ignored). It never writes to the key folder, it refuses an output path inside that folder, and it never overwrites a file.
+
+It converts only what maps exactly. Ideas, requirements, preferences, artefacts and open questions map one to one. A decision maps by its state: accepted or superseded becomes the user's decision at the message where they decided, rejected becomes a rejection, and proposed becomes a proposal by whoever made it. `fact`, `task`, `fact_about_owner`, `problem_fix` and an `unclear` decision are counted as unmapped and left out. Unverified items are also left out and counted. The spike's segment labels aren't taxonomy IDs, so segments are counted, not converted.
+
+The numbering trap from REV-010 is handled. A v2 item is placed by its native `message_id`, and if its number disagrees, that's counted. A v1 item has only a number, so its quote must be found in the numbered message, otherwise it's skipped. An off-by-one then shows up in the counts instead of moving an item to the wrong message.
+
+**Teach-back (`answer_key.py`):** It turns the answer key, written one file per chat, into the single file the scorer reads, and it only ever reads the key. Each item is pinned to its exact message by ID, or its quote must be found in the message its number points at. Anything with no exact equivalent in the engine is counted and left out, never guessed.
+
+Checks:
+```
+tests/integration/test_answer_key_convert.py   2 passed (synthetic key: 5 records placed, 3 unmapped, 1 unverified, 1 v1-style skip, 1 number mismatch, key folder hash unchanged, the output loads and `ke gold score` reads it; output inside the key folder refused)
+```
+Fix attempts: 1 (the repo guard wants a SYNTHETIC marker in every fixture folder).
+
+**Next exact task:** on the PC, run `ke gold convert --key private/answer-key/v2`, then score. Check that v1's and v2's hashes are unchanged (the hashes are recorded in OPEN_DECISIONS).
 
 ### 15:25 — #288: the "import didn't finish" page that lied
 
@@ -3083,6 +3233,16 @@ Talking points:
 - "Precision for links needs a closed world: the key lists every chat it covers, so a link it doesn't contain really is wrong."
 - "A link pointing the wrong way and a link of the wrong kind need different fixes, so they're counted separately from invented ones."
 - "The answer key is written by a session that never saw the engine's output, and code checks every quote before a single point is scored."
+### 16:45 — NOTE-005 real run and re-score: decisions found went from 5 to 12 out of 22
+
+- `ke extract run` landed on main (#313). Its real run on the 40 gold chats was 85 requests, answered by 5 fresh Claude sessions on the subscription with every quote checked in code, and stored 94 records.
+- The 40 notes were re-rendered and the code rubric passes 35 of 40 (size only).
+- A new scorer session that hadn't seen the first scoring compared them with the same 15 references, which were left unchanged. Decision recall went from 23% to 55%. Open questions stayed at almost zero. The "from the chat" sections are still noisy: 42 lines of pasted custom instructions, left over from the older rule extractor.
+- The report is in `docs/evaluation/NOTE-011_REAL.md` (counts only). The next fixes are to retire rule records once a model extraction exists, take open questions from how a chat ends, add a digest merge step for long chats, and reclassify the 4 unclassified chats.
+
+Talking points:
+- "Same answer key, new scorer: the AI extractor more than doubled how many of my real decisions the notes catch."
+- "The score also showed exactly what's still wrong, which is old rule-based records cluttering the notes, so the next fix is specific."
 
 ### 16:05 UTC — REV-010: answer key v2, written beside v1
 
@@ -3096,6 +3256,17 @@ Talking points:
 - "Before changing the answer key, the session proved the old one was untouched by its hash, and afterwards proved it again."
 - "Every answer in the key is checked by code against the real message: the quote, the speaker and the number."
 - "A checker that's never been shown to fail isn't proven, so we planted three mistakes and watched it catch them."
+
+### 17:45 — Third score: the noise is gone, and three clear gaps remain
+
+- `ke classify review`: a separate reviewer session settled 14 of the 18 unsure segments.
+- NOTE-022 (#324) drops the old rule records where the AI extraction ran. Re-rendering the 40 notes brought the noise down from 57 lines to 3 and readability from 19/30 to 25/30. Only 1 of the 15 scored chats is unclassified now (it was 4).
+- The answer key v2 scorer was F1 0.05. Much of that is a naming mismatch: the key calls an assistant suggestion an `idea`, the engine calls it a `proposal`. Louis is deciding whether those should count as a match.
+- Still to fix: open questions (0 of 9), short user constraints (13 of 22 missed), and stitched summaries on long chats.
+
+Talking points:
+- "Three scorings, same answer key: noise down from 57 lines to 3, and the remaining gaps are named and countable."
+- "Removing the old rules cost three true decisions. That trade-off only shows up because something independent is measuring it."
 
 
 ### 15:20 UTC — NOTE-014: the taxonomy keeps up as new chats arrive
@@ -3130,6 +3301,177 @@ Talking points:
 - "Adding a word changes no existing ID, so 'what's stale' isn't enough: the loop also asks which old chats *mention* the new word."
 
 **Next exact task:** run the refresh loop on the real archive on the PC after the next export (proposer and reviewer sessions named in the diary).
+
+### 16:21 UTC — NOTE-024: two small honesty fixes on the knowledge card
+
+The re-score of the real notes (NOTE-011) found two things on the knowledge card that read wrong:
+
+- **"48" listed as a tool.** The entity extractor records a name only after a cue like "playing", and its title pattern accepts numbers so titles like "Factorio 2" work. So "playing 48 levels a night" produced a game called "48". The card now leaves out any name with no letters in it. The record stays stored; it just isn't shown as a name.
+- **"not stated" next to a digest.** When a chat's digest has no purpose or no outcome, the card wrote "not stated", which reads like a claim about the chat. The other notes thread pointed out that the wording only appears in that case, so the fix is to leave the empty row out. Without any digest, both rows still say "not written yet", because that is true and tells you the step hasn't run.
+
+Before writing the fix, I checked who held which ticket. NOTE-018 (#309) already had a PR from the rich-notes thread, and NOTE-022 (#321) was built there too, so I took only this one.
+
+**Teach-back (`rich_conversation_note`, the card):** The card is the short table at the top of each chat note. It now shows only names that contain a letter, so a number the extractor caught by accident doesn't appear as a tool. It shows Purpose and Outcome only when the digest actually found them, so it never states something about the chat that nobody checked.
+
+Checks:
+```
+tests/integration/test_rich_note_card.py   1 passed (fails on the old code: '48' was in '48, Celeste')
+tests/integration/test_rich_note.py, test_note_checks.py   unchanged, pass
+
+### 16:05 — NOTE-019: "Want me to make another?" doesn't mean the chat is open
+
+**What:** The first real score of rich notes found the digest got the chat's status right in 12 of 15 chats. The three misses were image chats that ended on the assistant saying "Want me to make a version in portrait?". The model called them open. The user had their picture; nothing was unresolved.
+
+Two changes:
+
+- **The instruction:** the digest prompt now says to decide status by how the chat ends. It's a new prompt version (`digest-v2`), which gives every request a new key, so digests written under the old wording are asked for again instead of being silently reused.
+- **A code check:** `digest/ending.py` reads the chat's last turns with plain rules: the user's last message is a short thank-you or "done" → settled; the assistant delivered something (text before its closing offer, or an image) and ends on an offer → settled; the user's last message asks something nobody answered → open. If no rule fits, the model's reading stands. When a rule disagrees with the model, the rule wins, the new status cites the message that decided it, and a flag records what the model said. A correction is never silent.
+
+**Decision:** an offer with nothing delivered ("Want me to start?") is *not* treated as settled. It might be the assistant asking a clarifying question, so no rule applies and the model decides.
+
+**Teach-back (`digest/ending.py`):** It looks at the last couple of messages in a chat and asks three simple questions: did the user say thanks or done, did the assistant hand over a result and then just offer more, or did the user ask something that never got an answer. The first two mean the chat is settled and the third means it's open. If the model's digest disagrees, the code uses its own answer and leaves a note for a reviewer saying what changed.
+
+Checks:
+```
+tests/integration/test_digest_ending.py   5 passed (offer after a result, unanswered question, "thanks, done"; no rule keeps the model's answer; a bare offer isn't settled)
+digest stage and dry-run tests            10 passed, unchanged
+```
+Fix attempts: 0.
+
+Talking points:
+- "A number is not a name: the card checks for a letter before listing something as a tool."
+- "An empty row that says 'not stated' still reads like a fact, so the card leaves it out."
+
+**Next exact task:** none in this thread; the remaining NOTE tickets are with the rich-notes threads.
+
+- "A model mistook politeness for unfinished business. A ten-line rule fixed it, and the rule flags every change it makes."
+- "Changing a prompt changes its version, so old cached answers can't sneak back in."
+
+**Next exact task:** NOTE-017 (one ordered digest for multi-part chats).
+
+### 16:20 — NOTE-017: a long chat's digest reads in order, as one chat
+
+**What:** A chat too long for one request is digested in parts. In the first real score, 4 of 15 notes came from long chats, and 6 of the 9 unsupported claims were in those 4. The merged summary jumped around ("part 3's opening, then part 1's"), and sentences still said "In this part, the user…". Two causes, both mine:
+
+- `merge_answers` picked summary sentences round-robin (each part's first, then each part's second) and **kept them in that order**. Picking round-robin is right, because every part gets represented in the four sentences allowed. Now the picked sentences are **put back in chat order** before they're used.
+- The prompt itself said "if the chat is partial, describe only that part", which invited "this part" wording. It now says to describe the part as sentences about the chat, in order (prompt `digest-v3`, so older digests are asked for again). Whatever wording still slips through is rewritten in code: "In this part, the user picks cedar" becomes "The user picks cedar", and "this part" becomes "the chat".
+
+The NOTE-011 code rubric gets a seventh check, **part_wording**, as the ticket asked. It fails a note whose generated lines (summary, card cells, insights, tensions, next steps, topics) still say "this part" or "part 2 of 3". Quotes and records are the chat's own words, so they aren't checked.
+
+**Decision:** I made the merge deterministic rather than sending a second "merge these parts" request to a Claude session. The ticket allowed either. Code is free, repeatable and testable, and the problem was ordering and wording, not missing understanding.
+
+**Teach-back (`merge_answers`):** A long chat is digested in pieces, and this function joins the pieces' answers into one. It chooses summary sentences fairly from every piece, then puts them back in the order the chat happened, and rewrites leftovers like "in this part" so the summary talks about the whole chat. The start of the chat gives the purpose and the end gives the outcome and status.
+
+Checks:
+```
+tests/integration/test_digest_parts.py   2 passed (a 3+ part chat: summary in chat order, no part wording, note passes; "this part" fails only part_wording)
+note checks, digest stage, ending, dry run, contract   33 passed, unchanged
+```
+Fix attempts: 1 (my test's regex was case-sensitive after the rewrite capitalised "Step").
+
+Talking points:
+
+
+- "Choosing fairly and showing in order are two different steps. I'd merged them into one, and the summary read backwards."
+- "The prompt was causing the bug: it told the model to talk about 'this part'."
+
+**Next exact task:** NOTE-016 (drop boilerplate and assistant-drafted text before extraction).
+
+
+### 16:40 — NOTE-016: a pasted profile and an assistant's draft letter aren't the user's words
+
+**What:** The first real score found two kinds of text read as if the user had said them in the chat. A custom-instruction profile pasted at the top of many chats ("I prefer British spelling. Answers must be short…") became a requirement in 10 of 15 notes. And when the assistant drafted a letter for the user, its lines ("I will send the lease by Friday", "you should check the boiler") became actions, suggestions and requirements, some twice.
+
+`extraction/clean.py` adds a **Cleaner** that hides three things from the extractors:
+
+1. a paragraph that appears in more than 5 chats (or 1% of them): boilerplate, counted across every chat in the workspace;
+2. a user message that is a pasted setup prompt ("You are…", "Act as…"), using the same rule the model extractor already had;
+3. inside an assistant message, drafted content: a letter or email from "Dear…" or "Subject:" to the sign-off and name, or a fenced block of prose. A fence with a programming language stays, because code is an artefact, not a draft.
+
+The rich note also stops showing an unanswered suggestion's extraction trust ("supported", which only meant the quote checked out). It now says "not taken up".
+
+**Challenge:** extraction evidence is stored as character positions in the original message plus a fingerprint, so deleting text would shift every later quote and break the evidence checks. The cleaner replaces hidden characters with spaces, keeping line breaks. The text keeps its exact length, and every sentence the extractors still see is at the same position as in the archive. The test checks exactly that.
+
+**Decision:** the cleaner is something callers use explicitly (`cleaner.clean(messages)`), not a change inside the shared message loader. Evaluation gates and benchmarks keep reading the same text they were scored on, and the new `ke extract run` (NOTE-015, another thread) is where it gets switched on.
+
+**Teach-back (`extraction/clean.py`):** Before the rule extractors read a chat, the cleaner blanks out text that isn't really the conversation: a paragraph pasted into lots of chats, a setup prompt, or a letter the assistant wrote for the user. It blanks with spaces rather than deleting, so every remaining sentence stays at the same position and its quote still matches the original message exactly. The stored chat is never changed. Only what the extractors see is.
+
+Checks:
+```
+tests/integration/test_extraction_clean.py   4 passed (baseline: profile and letter do produce records; cleaned: none; offsets unchanged; untaken suggestion says "not taken up", and that test fails without the fix)
+rich note, note checks, model knowledge      23 passed, unchanged
+```
+Fix attempts: 0.
+
+Talking points:
+- "A profile pasted into 50 chats is one paragraph of setup, not 50 requirements."
+- "I blank text out with spaces instead of deleting it, so every quote still points at the right characters."
+- "'Supported' meant 'the quote is real'. It never meant 'the user agreed', so the note doesn't use that word for suggestions any more."
+
+**Wired in (16:15).** Once NOTE-015's `ke extract run` (#313) had merged, `_extract` started passing each segment's messages through `workspace_cleaner(session).clean(...)`. A fifth test runs the command on the same chats and checks that no request file sent to the model carries the profile or the letter, while the real question still goes. That test fails without the two-line change.
+
+**Next exact task:** PRs for NOTE-019 + NOTE-017 and NOTE-016 once #312 merges, then the NOTE-007 keyword wiring.
+
+### 16:35 — NOTE-023 (#322): what the chat's ending leaves open becomes an open question
+
+The PC re-score (#320) found 0 of 9 open questions. The digest only listed questions someone asked out loud, and a chat that stops on an unsent letter or "I'll let you know" says nothing.
+
+**What changed.**
+- `digest/ending.py` now knows three more endings, and each makes the chat **open**:
+  - the assistant's last message holds a draft (the NOTE-016 letter and prose-fence rule);
+  - the user promises to report back ("I'll try it tonight and let you know");
+  - the user puts a choice off ("I'll decide later").
+- `ending_questions` adds the open question an ending leaves when the model didn't list one. For an unanswered question it uses the user's own words; for the other endings it says it in plain words. It cites the closing message and is flagged for review.
+- The digest instructions name the same endings (prompt **digest-v4**, so no cached digest is reused).
+
+**Challenge:** the new tests turned up two bugs in my NOTE-019 rules:
+- "Thanks. And how many coats...?" was read as a sign-off, because the thank-you rule let any text follow "thanks". A message with a question mark is no longer a sign-off.
+- The status citation (last 8 words) failed on a letter, because its last words run over line breaks. It now quotes them exactly as written.
+
+**Decision:** the model extractor's half (knowledge-v2 instructions) waits on Louis. One existing test matches the literal "knowledge-v1", and tests aren't changed without his OK, so I asked on a decision card.
+
+**Teach-back (`digest/ending.py` `ending_questions`):** It looks at how the chat ends: a question nobody answered, a letter the assistant drafted that nobody said was sent, or the user saying they'll report back or decide later. If the model's digest has no open question about that ending, it adds one, quotes the last message as evidence, and flags it so a reviewer can see the code added it. A plain "thanks, done" adds nothing.
+
+Checks:
+```
+tests/integration/test_digest_open_endings.py   5 passed (question, draft and report-back each give one cited open question; thanks gives none; no duplicate on a second pass)
+tests/integration/test_digest_ending.py         5 passed, unchanged
+```
+Fix attempts: 1 (the sign-off rule, the multi-line citation and the report-back wording).
+
+Talking points:
+- "An unsent letter is unfinished business even if nobody asks a question."
+- "The code only adds an open question when the model missed one, and it always says so."
+
+**Next exact task:** the extractor half of NOTE-023 once Louis answers, then the PRs in order.
+
+### 16:20 — NOTE-021 (#314): the keywords NOTE-007 works out now show in the note
+
+NOTE-007 (#296) added a keyword step (`documents/keywords.py`), but nothing called it, so the rich note's "Keywords and topics" section still listed only the digest's topics. I opened #314 for the follow-up and built it.
+
+**What changed.** `workspace_keywords(session, taxonomy=..., topics=...)` works out candidates for every chat in the workspace at once. Rarity only means something across the whole corpus: "cedar" is a keyword because the other chats don't say it. The note's section now has two lines:
+- **Keywords**: every must-tier keyword and the top 8 should-tier ones. Each cites the first message that says it (a title-only word cites none). Keywords from the same message share one citation, the rule NOTE-026 (#330) set for topics.
+- **Topics**: the digest's topics, split into "Topics (approved terms)" and "Topic candidates (not tags)", each through NOTE-026's grouped `_topics_line`.
+
+`ke docs chat --template v2` and `ke digest run --vault` pass the keywords in. Tags and front matter are unchanged: a candidate never becomes a tag.
+
+**Challenge:** the vault link check failed on the first try. The cause was the knowledge-card `\|` bug that #312 fixes, not this change. So this PR goes up after #312.
+
+**Decision:** without keywords (any other caller) the section renders exactly as before, so existing notes and tests don't move.
+
+**Teach-back (`documents/keywords.py` `workspace_keywords`):** It reads every chat in the workspace and asks NOTE-007's keyword step which words each one is really about: words in its title, named things, and phrases it says often that other chats rarely do. The rich note shows the strongest of those words, each linked to the message where it first appears, so a reader can check it. A digest topic that isn't an approved taxonomy term is labelled a candidate, so nobody mistakes it for a tag.
+
+Checks:
+```
+tests/integration/test_note_keywords.py   4 passed (cited keywords that the cited message really says; candidate topic not a tag; unchanged without keywords; CLI v2 note and vault check clean)
+```
+Fix attempts: 2 (the test fixture's digest needed status and intent, and the vault check needed #312; after rebasing onto NOTE-026, the test had to find "cedar" inside a group of keywords that share a citation).
+
+Talking points:
+- "Every keyword in a note links to the message that says it."
+- "A topic the taxonomy doesn't know is labelled a candidate in plain words. It never quietly becomes a tag."
+
+**Next exact task:** ask for more unclaimed tickets once my PRs are merged.
 
 ### 16:30 UTC — EVAL-012 on real chats: 0.80, and why
 

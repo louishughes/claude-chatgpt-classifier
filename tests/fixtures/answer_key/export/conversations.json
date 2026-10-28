@@ -1,0 +1,144 @@
+[
+ {
+  "id": "c-keyed",
+  "title": "Synthetic keyed chat",
+  "create_time": 1704067200.0,
+  "mapping": {
+   "root": {
+    "id": "root",
+    "parent": null,
+    "children": [
+     "sys"
+    ],
+    "message": null
+   },
+   "sys": {
+    "id": "sys",
+    "parent": "root",
+    "children": [
+     "u1"
+    ],
+    "message": {
+     "id": "sys",
+     "author": {
+      "role": "system"
+     },
+     "create_time": 1704067200.0,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       "You are a helpful assistant."
+      ]
+     },
+     "metadata": {
+      "is_visually_hidden_from_conversation": true
+     }
+    }
+   },
+   "u1": {
+    "id": "u1",
+    "parent": "sys",
+    "children": [
+     "a1"
+    ],
+    "message": {
+     "id": "u1",
+     "author": {
+      "role": "user"
+     },
+     "create_time": 1704067260.0,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       "I want a raised bed that is 30 cm deep."
+      ]
+     },
+     "metadata": {}
+    }
+   },
+   "a1": {
+    "id": "a1",
+    "parent": "u1",
+    "children": [
+     "u2"
+    ],
+    "message": {
+     "id": "a1",
+     "author": {
+      "role": "assistant"
+     },
+     "create_time": 1704067320.0,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       "I suggest cedar boards because they resist rot."
+      ]
+     },
+     "metadata": {}
+    }
+   },
+   "u2": {
+    "id": "u2",
+    "parent": "a1",
+    "children": [
+     "a2"
+    ],
+    "message": {
+     "id": "u2",
+     "author": {
+      "role": "user"
+     },
+     "create_time": 1704067380.0,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       "Yes, let's use cedar. I prefer untreated wood."
+      ]
+     },
+     "metadata": {}
+    }
+   },
+   "a2": {
+    "id": "a2",
+    "parent": "u2",
+    "children": [
+     "u3"
+    ],
+    "message": {
+     "id": "a2",
+     "author": {
+      "role": "assistant"
+     },
+     "create_time": 1704067440.0,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       "You could also add a trellis along the back later."
+      ]
+     },
+     "metadata": {}
+    }
+   },
+   "u3": {
+    "id": "u3",
+    "parent": "a2",
+    "children": [],
+    "message": {
+     "id": "u3",
+     "author": {
+      "role": "user"
+     },
+     "create_time": 1704067500.0,
+     "content": {
+      "content_type": "text",
+      "parts": [
+       "What soil mix should I use for vegetables?"
+      ]
+     },
+     "metadata": {}
+    }
+   }
+  },
+  "current_node": "u3"
+ }
+]

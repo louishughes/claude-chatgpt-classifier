@@ -28,6 +28,12 @@ How evidence is shown, and why (the old v2 notes drowned in it):
 * hashes, record IDs and stage keys go to a JSON sidecar in
   ``Knowledge/.meta/`` instead of the reader's way.
 
+Where a model extraction (NOTE-005) has finished for a segment, the older
+rule-extractor records of that segment are left out of the note (NOTE-022):
+they repeat what the model found and pick up pasted instructions and drafted
+text as if the user had said them. They stay stored, and the Source section
+says how many were held back.
+
 Only stored facts are used: nothing here calls a model, and a section with
 nothing behind it says so instead of guessing. DOC-003 stays the default
 note; this one is chosen with ``ke docs chat --template v2``.
@@ -53,12 +59,20 @@ from sqlalchemy.orm import Session
 
 from knowledge_engine.classification.store import effective_labels
 from knowledge_engine.digest.contract import ConversationDigest, DigestItem
-from knowledge_engine.documents.categories import category_shares, waiting_candidates
+from knowledge_engine.documents.categories import (
+    Suggestion,
+    category_shares,
+    suggested_category,
+    waiting_candidates,
+)
+from knowledge_engine.documents.keywords import ChatKeywords, Tier
 from knowledge_engine.documents.model import DocItem, DocumentKind, build_document
 from knowledge_engine.documents.notes import _branches, _images, _links, knowledge_path
 from knowledge_engine.documents.render import transcript_stem
 from knowledge_engine.domain.models import EvidenceRef
 from knowledge_engine.extraction.records import KnowledgeRecord
+from knowledge_engine.extraction.runner import DONE as RUN_DONE
+from knowledge_engine.extraction.runner import ExtractionRunRow
 from knowledge_engine.extraction.store import KnowledgeRecordRow
 from knowledge_engine.importer.records import ConversationRow
 from knowledge_engine.relationships.view import RelatedLink, related_links
@@ -83,7 +97,13 @@ from knowledge_engine.rendering.transcript import (
 )
 from knowledge_engine.retrieval.citations import Citation, quote, resolve
 from knowledge_engine.segmentation.overrides import load_segments
-from knowledge_engine.taxonomy.registry import Dimension, TaxonomySnapshot, UnknownTermError
+from knowledge_engine.taxonomy.aliases import MatchStatus
+from knowledge_engine.taxonomy.registry import (
+    Dimension,
+    TaxonomySnapshot,
+    UnknownTermError,
+    normalise_alias,
+)
 
 TEMPLATE_VERSION = "note-001-v2"
 META_DIR = ".meta"
@@ -97,6 +117,9 @@ BUDGET_BASE = 6_000
 BUDGET_PER_MESSAGE = 250
 BUDGET_MAX = 40_000
 
+# The should-tier keywords shown in a note (all must-tier ones are shown):
+# enough to say what the chat is about without crowding the page.
+SHOWN_SHOULD = 8
 WAITING = "Not written yet: the digest step hasn't run for this chat."
 
 
@@ -249,6 +272,47 @@ class _Sorted:
     references: list[_Item]
 
 
+def _prefer_model(session: Session, items: Sequence[_Item]) -> tuple[list[_Item], int]:
+    """Leave out rule records of segments a model extraction covers (NOTE-022).
+
+    A run is a model run when its versions name a prompt. Records with no
+    extraction run behind them (a person's, say) are always kept.
+
+    Returns:
+        The records to show, and how many were left out.
+    """
+    keys = {i.record.provenance.stage_key for i in items if i.record.provenance}
+    runs = {
+        r.stage_key: r
+        for r in session.scalars(
+            select(ExtractionRunRow).where(ExtractionRunRow.stage_key.in_(sorted(keys)))
+        )
+    }
+    segments = sorted({r.segment_id for r in runs.values()})
+    covered = {
+        r.segment_id
+        for r in session.scalars(
+            select(ExtractionRunRow).where(
+                ExtractionRunRow.segment_id.in_(segments), ExtractionRunRow.state == RUN_DONE
+            )
+        )
+        if "prompt" in json.loads(r.versions_json)
+    }
+    kept = []
+    for it in items:
+        provenance = it.record.provenance
+        run = runs.get(provenance.stage_key) if provenance else None
+        if (
+            run is not None
+            and provenance is not None
+            and provenance.prompt_version is None
+            and run.segment_id in covered
+        ):
+            continue
+        kept.append(it)
+    return kept, len(items) - len(kept)
+
+
 def _sort(items: Sequence[_Item]) -> _Sorted:
     """Place each record in exactly one section.
 
@@ -292,6 +356,25 @@ def _digest_line(item: DigestItem, citer: Citer) -> str:
     cites = " ".join(citer.native(m) for m in item.message_ids if m in citer.chat.node_keys)
     text = escape_text(" ".join(item.text.split()))
     return f"{text} {cites}".rstrip()
+
+
+def _topics_line(topics: Sequence[DigestItem], citer: Citer) -> str:
+    """Topics on one line, grouped by the messages they cite (NOTE-026).
+
+    Several topics often come from the same message; citing it after each
+    one repeated the same link on one line. Topics that cite the same
+    messages share one citation ("raised beds, cedar [m5]"), in the order
+    the topics were given.
+    """
+    groups: dict[tuple[str, ...], list[str]] = {}
+    for item in topics:
+        cited = tuple(dict.fromkeys(m for m in item.message_ids if m in citer.chat.node_keys))
+        groups.setdefault(cited, []).append(escape_text(" ".join(item.text.split())))
+    parts = []
+    for cited, names in groups.items():
+        cites = " ".join(citer.native(m) for m in cited)
+        parts.append(f"{', '.join(names)} {cites}".rstrip())
+    return "; ".join(parts)
 
 
 def _digest_blocks(session: Session, items: Sequence[DigestItem], citer: Citer) -> list[Block]:
@@ -394,10 +477,20 @@ def chat_labels(
 
 
 def _category_lines(
-    session: Session, chat: StoredConversation, taxonomy: TaxonomySnapshot, citer: Citer
+    session: Session,
+    chat: StoredConversation,
+    taxonomy: TaxonomySnapshot,
+    citer: Citer,
+    suggestion: Suggestion | None,
 ) -> list[str]:
     """One line per domain term (NOTE-008), then the candidates waiting for review."""
     lines = []
+    if suggestion is not None:
+        segments = ", ".join(str(n) for n in suggestion.segments)
+        lines.append(
+            f"Suggested, waiting for review (not a label): **{escape_text(suggestion.label)}**, "
+            f"the classifier's best candidate from segment(s) {segments}."
+        )
     for share in category_shares(session, chat, taxonomy):
         segments = ", ".join(str(n) for n in share.segments)
         cites = " ".join(citer.native(n) for n in share.evidence if n in chat.node_keys)
@@ -463,6 +556,48 @@ class RichNote:
     meta: dict[str, object]
 
 
+def _keyword_lines(
+    digest: ConversationDigest | None, keywords: ChatKeywords | None, citer: Citer
+) -> list[str]:
+    """The "Keywords and topics" lines: keyword candidates, then the digest's topics.
+
+    A keyword cites the first message it appears in (a title word cites
+    none); keywords from the same message share one citation, as topics do
+    (NOTE-026). With keywords, topics are split by whether they name an
+    approved term: the others are only candidates, so a reader never
+    mistakes one for a tag.
+    """
+    lines = []
+    if keywords is not None:
+        shown = [k for k in keywords.keywords if k.tier is Tier.MUST]
+        shown += keywords.tier(Tier.SHOULD)[:SHOWN_SHOULD]
+        groups: dict[tuple[str, ...], list[str]] = {}
+        for k in shown:
+            first = next((m for m in k.message_ids if m in citer.chat.node_keys), None)
+            groups.setdefault((first,) if first else (), []).append(escape_text(k.term))
+        if groups:
+            parts = [
+                f"{', '.join(names)} {' '.join(citer.native(m) for m in cited)}".rstrip()
+                for cited, names in groups.items()
+            ]
+            lines.append("Keywords: " + "; ".join(parts))
+    if digest and digest.topics:
+        if keywords is None:
+            # Without keywords the line is the topics alone, as before NOTE-021.
+            lines.append(_topics_line(digest.topics, citer))
+        else:
+            matched = {
+                normalise_alias(t.text) for t in keywords.topics if t.status is MatchStatus.MATCHED
+            }
+            approved = [t for t in digest.topics if normalise_alias(t.text) in matched]
+            others = [t for t in digest.topics if normalise_alias(t.text) not in matched]
+            if approved:
+                lines.append("Topics (approved terms): " + _topics_line(approved, citer))
+            if others:
+                lines.append("Topic candidates (not tags): " + _topics_line(others, citer))
+    return lines
+
+
 def _artefact_names(session: Session, items: Sequence[_Item]) -> list[str]:
     """What the chat made, by name: "2 image(s) or file(s)", "code block (python)".
 
@@ -497,6 +632,7 @@ def rich_conversation_note(
     *,
     taxonomy: TaxonomySnapshot | None = None,
     digest: ConversationDigest | None = None,
+    keywords: ChatKeywords | None = None,
 ) -> RichNote:
     """Build one chat's rich note (template v2) from stored facts. Reads only.
 
@@ -506,12 +642,16 @@ def rich_conversation_note(
         taxonomy: The published version to show labels under, or None.
         digest: The chat's checked digest (NOTE-003), or None: its sections
             then say the digest hasn't run.
+        keywords: The chat's keyword candidates (NOTE-007, from
+            ``workspace_keywords``), or None to list only the digest's topics.
     """
     chat = load_conversation(session, conversation_id)
     stem = transcript_stem(conversation_id, chat.title)
     citer = Citer(chat, stem)
     document = build_document(session, DocumentKind.CONVERSATION, conversation_id)
-    items = _load_items(session, [i for s in document.sections for i in s.items])
+    items, hidden = _prefer_model(
+        session, _load_items(session, [i for s in document.sections for i in s.items])
+    )
     sorted_ = _sort(items)
     labels = chat_labels(session, chat, taxonomy)
     links = related_links(session, [conversation_id])
@@ -523,28 +663,45 @@ def rich_conversation_note(
 
     category = labels.category or "unclassified"
     where = category if labels.subcategory is None else f"{category} › {labels.subcategory}"
-    names = sorted(
-        {" ".join(i.record.entity.name.split()) for i in sorted_.references if i.record.entity}
+    # Shown beside "unclassified", never in its place: the front-matter
+    # category stays unset until a reviewer settles it (NOTE-018).
+    suggestion = (
+        suggested_category(session, chat, taxonomy)
+        if taxonomy is not None and labels.category is None
+        else None
     )
+    shown = (
+        where
+        if suggestion is None
+        else (f"{where}; suggested: {suggestion.label} (waiting for review)")
+    )
+    # A "name" made only of digits and punctuation ("48" from "playing 48
+    # levels") is a number the entity cue caught, not a tool or a title.
+    spelled = {
+        " ".join(i.record.entity.name.split()) for i in sorted_.references if i.record.entity
+    }
+    names = sorted(n for n in spelled if any(ch.isalpha() for ch in n))
     made = _artefact_names(session, sorted_.artefacts)
 
     def card_cell(item: DigestItem | None, missing: str) -> str:
         return _cell(_digest_line(item, citer)) if item else missing
 
-    pending = "not written yet" if digest is None else "not stated"
-    card = [
-        "| | |",
-        "|---|---|",
-        f"| **Purpose** | {card_cell(digest.purpose if digest else None, pending)} |",
-        f"| **Outcome** | {card_cell(digest.outcome if digest else None, pending)} |",
-    ]
+    card = ["| | |", "|---|---|"]
+    if digest is None:
+        card += ["| **Purpose** | not written yet |", "| **Outcome** | not written yet |"]
+    else:
+        # A digest that found no purpose or outcome leaves the row out: an
+        # empty "not stated" row reads as a claim about the chat (NOTE-024).
+        for title, item in (("Purpose", digest.purpose), ("Outcome", digest.outcome)):
+            if item is not None:
+                card.append(f"| **{title}** | {card_cell(item, '')} |")
     if digest is not None:
         status = digest.status.value if digest.status else "unknown"
         intent = digest.intent.value if digest.intent else "unknown"
         card.append(f"| **Status** | {status} |")
         card.append(f"| **Intent** | {intent}: {card_cell(digest.intent_item, 'unknown')} |")
     card += [
-        f"| **Category** | {_cell(escape_text(where))} |",
+        f"| **Category** | {_cell(escape_text(shown))} |",
         f"| **Project** | {_cell(escape_text(labels.project or 'none matched'))} |",
         "| **Tools and names** | "
         + (_cell(", ".join(escape_text(n) for n in names)) or "none recorded")
@@ -589,7 +746,9 @@ def rich_conversation_note(
     }
     suggested: list[Block] = []
     for it in sorted_.suggestions:
-        status = _PROPOSAL_STATUS.get(it.item.status, it.item.status)
+        # A suggestion's standing is whether the user took it up, never its
+        # extraction trust: "supported" only meant the quote checked out (NOTE-016).
+        status = _PROPOSAL_STATUS.get(it.item.status, "not taken up")
         spans = {(r.revision_id, r.start, r.end) for r in it.record.evidence}
         verdicts = {answered[s] for s in spans if s in answered}
         if len(verdicts) == 1:
@@ -650,7 +809,7 @@ def rich_conversation_note(
         )
     tag_lines = [classified]
     if taxonomy is not None:
-        tag_lines += _category_lines(session, chat, taxonomy, citer)
+        tag_lines += _category_lines(session, chat, taxonomy, citer, suggestion)
     if labels.tags:
         tag_lines.append("Topics: " + ", ".join(escape_text(t) for t in labels.tags))
     for facet, values in (labels.facets or {}).items():
@@ -662,16 +821,12 @@ def rich_conversation_note(
         ),
         BulletList(tuple(tag_lines), trusted=True),
     ]
-    topics: list[Block] = (
-        [BulletList((", ".join(_digest_line(t, citer) for t in digest.topics),), trusted=True)]
-        if digest and digest.topics
-        else []
-    )
+    topics = _keyword_lines(digest, keywords, citer)
     blocks += _section(
         "Keywords and topics",
         "Candidates; only approved terms become tags",
-        topics,
-        WAITING if digest is None else "None suggested.",
+        [BulletList(tuple(topics), trusted=True)] if topics else [],
+        WAITING if digest is None and keywords is None else "None suggested.",
     )
     blocks += _section(
         "Related chats",
@@ -695,6 +850,12 @@ def rich_conversation_note(
                 if digest is None
                 else f"summary and generated sections from a {digest.schema_version} digest, "
                 "not yet scored."
+            )
+            + (
+                f" {hidden} rule-based record(s) left out: a model extraction covers "
+                "their segments."
+                if hidden
+                else ""
             ),
             True,
         ),
@@ -748,13 +909,16 @@ def write_rich_note(
     *,
     taxonomy: TaxonomySnapshot | None = None,
     digest: ConversationDigest | None = None,
+    keywords: ChatKeywords | None = None,
 ) -> PurePosixPath:
     """Write a chat's rich note into ``vault_root/Knowledge``, its images and sidecar.
 
     It goes where the DOC-003 note would, so a vault holds one knowledge
     note per chat whichever template wrote it.
     """
-    note = rich_conversation_note(session, conversation_id, taxonomy=taxonomy, digest=digest)
+    note = rich_conversation_note(
+        session, conversation_id, taxonomy=taxonomy, digest=digest, keywords=keywords
+    )
     export_attachments(note.media, vault_root, blob_sources(session, store_root))
     title = session.get_one(ConversationRow, conversation_id).title
     relative = knowledge_path(conversation_id, title)

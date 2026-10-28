@@ -54,7 +54,7 @@ from knowledge_engine.extraction.model_knowledge import is_preamble
 from knowledge_engine.extraction.text import ExtractionMessage
 from knowledge_engine.taxonomy.aliases import AliasResolver, MatchStatus
 from knowledge_engine.taxonomy.discovery import STOP_WORDS
-from knowledge_engine.taxonomy.registry import Dimension, normalise_alias
+from knowledge_engine.taxonomy.registry import Dimension, TaxonomySnapshot, normalise_alias
 from knowledge_engine.taxonomy.review import OPEN, Operation, proposals, propose
 
 KEYWORDS_VERSION = "note-007-v1"
@@ -582,3 +582,45 @@ def _one_slip(a: str, b: str) -> bool:
         if long_[:i] + long_[i + 1 :] == short:
             return True
     return False
+
+
+def workspace_keywords(
+    session: Session,
+    *,
+    taxonomy: TaxonomySnapshot | None = None,
+    topics: Mapping[str, Sequence[str]] | None = None,
+) -> dict[str, ChatKeywords]:
+    """Keyword candidates for every chat in the workspace (NOTE-021).
+
+    Rarity is judged across all of them, so one chat's note gets the same
+    keywords whether it is written alone or with the rest.
+
+    Args:
+        session: A read session.
+        taxonomy: The published version whose aliases name topic terms.
+        topics: Digest topic phrases by conversation ID, where a digest exists.
+    """
+    # Imported here: the digest and transcript layers import from documents.
+    from sqlalchemy import select
+
+    from knowledge_engine.digest.stage import chat_messages
+    from knowledge_engine.importer.records import ConversationRow
+    from knowledge_engine.rendering.transcript import load_conversation
+
+    chats = []
+    for conversation_id, title in session.execute(
+        select(ConversationRow.conversation_id, ConversationRow.title).order_by(
+            ConversationRow.conversation_id
+        )
+    ).all():
+        chat = load_conversation(session, conversation_id)
+        chats.append(
+            ChatInput(
+                conversation_id,
+                title or "",
+                tuple(chat_messages(chat)),
+                tuple((topics or {}).get(conversation_id, ())),
+            )
+        )
+    resolver = AliasResolver(taxonomy) if taxonomy is not None else None
+    return keyword_candidates(chats, resolver=resolver)
