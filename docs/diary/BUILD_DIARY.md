@@ -787,3 +787,20 @@ pytest -q               # 550 passed, 6 skipped (19 new)
 Finish line: all 14 fixtures render with every message reachable and anchored, labelled branches, and 0 broken embeds. Fix attempts: 1 (my new tests compared the full active path instead of its messages, and expected a "Detached" label the stored form can't know about; the code was right, the tests were corrected before commit).
 
 **Next exact task:** slice E (EVAL-010: M1 evaluation).
+
+### 00:11 — EVAL-010: the whole pipeline on 50 and 100 chats
+**What:** `ke eval smoke` runs the whole first milestone on a batch in a scratch workspace: import, identical re-import, and a transcript note for every chat. It records timings, memory and warnings, and checks seven things. 4 new tests, 554 in total.
+**Results on generated batches:** 50 chats import in 1.5 s, re-import in 1.0 s and render in 0.2 s; 100 chats take 2.7 s, 1.9 s and 0.5 s. Peak memory is about 75 MB. Both pass every check: the second import adds nothing, nothing calls a model, every note renders with no broken image links, the source is untouched, and the counts reconcile. Details are in `docs/evaluation/EVAL-010_SMOKE.md`.
+**Not done yet:** the same run on 50 and 100 of Louis's real chats. That has to happen on his PC (read-only, outputs in the git-ignored workspace), together with the REV-009 checkpoint, so EVAL-010 stays open.
+**Also:** the importer gained an internal `limit` (import only the first N chats). A limited run never marks other chats "not seen".
+**Teach-back (`evaluation/smoke.py`):** "The smoke test runs import, re-import and rendering on a batch and checks that the second import adds nothing, nothing calls a model, every image link works and the source is untouched. It records timings and warning codes, never content. It's the 'does the whole thing work' test, sized like a real slice of my archive."
+**Talking points:**
+- "One command proves the pipeline end to end on a realistic batch, and its report is safe to share."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 83 source files
+pytest -q               # 554 passed, 6 skipped (4 new)
+```
+Fix attempts: 0.
+
+**Next exact task:** Milestone 2, starting with ING-010 (in plan order); REV-009 real-data checkpoint when a session on Louis's PC is available.

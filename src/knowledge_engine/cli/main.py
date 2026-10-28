@@ -292,6 +292,52 @@ def _inspect(settings: Settings, args: argparse.Namespace) -> CommandResult:
     return CommandResult("inspect", data=data, message="Conversation structure (counts only)")
 
 
+def _eval_smoke(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Run the EVAL-010 batch smoke test in a fresh scratch workspace."""
+    from datetime import UTC, datetime
+
+    from knowledge_engine.evaluation.smoke import run_smoke
+    from knowledge_engine.evaluation.synthetic import write_generated
+
+    if (args.root is None) == (args.synthetic is None):
+        return CommandResult(
+            "eval smoke",
+            ExitCode.USAGE,
+            message="give a source folder or --synthetic N, not both",
+            error_code="usage",
+        )
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+    base = settings.workspace_root / "smoke"
+    if args.synthetic is not None:
+        label = f"synthetic-{args.synthetic}-seed{args.seed}"
+        root = write_generated(base / label, args.synthetic, args.seed) / "export"
+        limit = None
+    else:
+        label = f"source-{args.limit or 'all'}"
+        root, limit = args.root, args.limit
+    scratch = settings.model_copy(update={"workspace_root": base / f"{label}-{stamp}"})
+    report = run_smoke(root, scratch, limit=limit)
+    report_path = base / f"{label}-{stamp}.json"
+    report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    data = {
+        "conversations": report["conversations"],
+        "timings_s": report["timings_s"],
+        "peak_memory_mb": report["peak_memory_mb"],
+        "checks": report["checks"],
+        "warnings": report["first_import"]["warnings"],
+        "report": report_path.name,
+    }
+    if not report["passed"]:
+        return CommandResult(
+            "eval smoke",
+            ExitCode.ERROR,
+            data=data,
+            message="smoke test FAILED",
+            error_code="failed",
+        )
+    return CommandResult("eval smoke", data=data, message="Smoke test passed")
+
+
 def _not_built(name: str, ticket: str) -> Callable[[Settings, argparse.Namespace], CommandResult]:
     def handler(_settings: Settings, _args: argparse.Namespace) -> CommandResult:
         return CommandResult(
@@ -354,6 +400,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--note", type=Path, metavar="VAULT", help="also write a source transcript note here"
     )
     inspect.set_defaults(handler=_inspect)
+
+    evaluation = commands.add_parser("eval", help="evaluation runs")
+    eval_commands = evaluation.add_subparsers(
+        dest="eval_command", metavar="ACTION", parser_class=_Parser
+    )
+    smoke = eval_commands.add_parser(
+        "smoke", help="import, re-import and render a batch in a scratch workspace"
+    )
+    smoke.add_argument("root", nargs="?", type=Path, help="export folder or ZIP (only read)")
+    smoke.add_argument("--synthetic", type=int, metavar="N", help="generate N fake conversations")
+    smoke.add_argument("--seed", type=int, default=1, help="seed for --synthetic (default 1)")
+    smoke.add_argument("--limit", type=int, metavar="N", help="import only the first N")
+    smoke.set_defaults(handler=_eval_smoke)
 
     importer = commands.add_parser("import", help="import an export (not built yet)")
     importer.add_argument("source", type=Path, help="export ZIP or folder")
