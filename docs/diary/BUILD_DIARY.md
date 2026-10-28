@@ -1541,3 +1541,32 @@ migration drift         # 0
 Fix attempts: 0. One test helper first lacked a scope ID, which the record contract requires.
 
 **Next exact task:** REC-002 (relationship candidate discovery), then REC-003.
+
+### 06:50 — REC-002 + REC-003: typed links between records, and conflicts left open
+**REC-002.** Records are now linked to each other, but only in four typed ways, each allowed only between record types where it makes sense:
+- *creates*: a request makes an artefact;
+- *references*: a record mentions a named game, book or tool;
+- *elaborates*: a later record adds detail to an earlier one;
+- *same_project*: records in different chats share a project and a topic.
+
+`allowed()` refuses any other pairing before it is stored. Each link stores the source messages behind both records. Links stay candidates until a named reviewer decides.
+
+**REC-003.** Two records conflict when the same person says opposite things about the same thing in an overlapping scope:
+- the same thing both decided and rejected;
+- a preference for and against;
+- the same sentence with and without "not";
+- different numbers.
+
+Records for different projects never conflict. The order of the two records is stored as context only: the later one does not win. Conflicts stay `unresolved` until a reviewer dismisses or resolves them, with a reason. `ke reconcile` runs REC-001..003 together.
+- Change to REC-001: "stance" words (prefer, hate, love...) no longer count as content words, so "I prefer tabs" and "I hate tabs" are recognised as being about the same thing. The for or against is compared through the record's polarity instead.
+
+**Teach-back (`reconciliation/conflicts.py`):** "It looks for two of my statements about the same thing that can't both be true, like port 8080 versus 8081, or accepting and rejecting the same idea. It only compares statements in the same project or the same chat, so different projects never clash. It never decides that the newer one wins: the conflict is recorded as unresolved, and only evidence or a reviewer with a reason can close it."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 133 source files
+pytest -q               # 1044 passed, 7 skipped
+migration drift         # 0
+```
+Fix attempts: 1. The fixture expectation first counted a reference from another fixture, and was corrected to the one in actions_entities.
+
+**Next exact task:** REC-004 (decision transitions and event timeline).

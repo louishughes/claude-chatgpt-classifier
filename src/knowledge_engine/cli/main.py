@@ -740,6 +740,42 @@ def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _reconcile(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Propose repeated claims, record links and conflicts in one go (REC-001..003); no text."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.reconciliation.conflicts import conflicts, detect_conflicts
+    from knowledge_engine.reconciliation.equivalence import propose_equivalences
+    from knowledge_engine.reconciliation.relations import propose_links
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "reconcile", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            same = propose_equivalences(session)
+            links = propose_links(session)
+            found = detect_conflicts(session)
+            open_conflicts = len(conflicts(session))
+            session.commit()
+    finally:
+        engine.dispose()
+    return CommandResult(
+        "reconcile",
+        data={
+            "duplicates_added": len(same.added),
+            "links_added": links.by_predicate,
+            "conflicts_added": len(found.added),
+            "conflicts_unresolved": open_conflicts,
+        },
+        message="Proposals only: nothing merged, linked or resolved until a reviewer decides",
+    )
+
+
 def _duplicates(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Propose, list and review records that may state the same claim (REC-001); no text."""
     from sqlalchemy.orm import Session
@@ -1340,6 +1376,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     rerun.set_defaults(handler=_related_detect)
 
+    commands.add_parser(
+        "reconcile", help="propose repeated claims, record links and conflicts"
+    ).set_defaults(handler=_reconcile)
     duplicates = commands.add_parser(
         "duplicates", help="records that may state the same claim (never merged automatically)"
     )
