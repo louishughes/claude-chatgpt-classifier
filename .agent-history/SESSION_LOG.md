@@ -835,3 +835,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - Found: the report's review hash was of a CRLF checkout, so it didn't match the committed record. report_labels.sha256_review (CRLF read as LF) now hashes review records; note added to EVAL-004_REAL.md. Synthetic review hash unchanged (LF file).
 - Tests: test_report_labels.py +1. Full suite 1166 passed, 7 skipped; ruff, mypy OK.
 - Next: ING-008 + ING-009.
+
+## 2026-10-28 16:40 ING-008 (#114) + ING-009 (#115)
+- ingestion/documents.py (DOCUMENT_PARSER_VERSION, BlockKind, Block, AssetReference, ParsedDocument, decode_text, parse_markdown, parse_text, TextBuilder); ingestion/structured.py (DocumentConverter, BuiltinDocx, PdfWithoutConverter, DoclingConverter (optional, untested), default_converters, read_document, UnsafeDocumentError); `ke file read PATH [--blocks]`. No migration; nothing stored yet.
+- Tests: test_documents.py (12). Full suite 1173 passed, 7 skipped; ruff, mypy OK; drift 0.
+- Next: OPS-003.

@@ -730,6 +730,60 @@ def _gold_score(settings: Settings, args: argparse.Namespace) -> CommandResult:
     return CommandResult("gold score", data=data, message=message)
 
 
+def _file_read(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Read a Markdown, text, Word or PDF file into located blocks (ING-008/009). Reads only."""
+    import collections
+
+    from knowledge_engine.ingestion.structured import UnsafeDocumentError, read_document
+
+    if not args.path.is_file():
+        return CommandResult(
+            "file read", ExitCode.USAGE, message="file not found", error_code="missing"
+        )
+    try:
+        document = read_document(args.path, max_bytes=settings.limits.max_source_file_bytes)
+    except UnsafeDocumentError as error:
+        return CommandResult(
+            "file read", ExitCode.ERROR, message=f"refused: {error}", error_code="unsafe"
+        )
+    except ValueError as error:
+        return CommandResult(
+            "file read", ExitCode.USAGE, message=str(error), error_code="unsupported"
+        )
+    data = {
+        "format": document.format,
+        "parser": document.parser,
+        "sha256": document.sha256,
+        "size": document.size,
+        "encoding": document.encoding,
+        "pages": document.pages,
+        "frontmatter_keys": sorted(document.frontmatter or {}),
+        "blocks": len(document.blocks),
+        "kinds": dict(collections.Counter(b.kind.value for b in document.blocks)),
+        "assets": [a.target for a in document.assets],
+        "warnings": list(document.warnings),
+        "outline": [
+            {
+                "level": b.level,
+                "title": b.text.splitlines()[0].lstrip("# ").rstrip(" #"),
+                "at": b.locator,
+            }
+            for b in document.headings()
+        ],
+    }
+    if args.blocks:
+        data["located"] = [
+            {"at": b.locator, "kind": b.kind.value, "start": b.start, "end": b.end}
+            for b in document.blocks
+        ]
+    return CommandResult(
+        "file read",
+        data=data,
+        message=f"{document.format}: {len(document.blocks)} block(s), "
+        f"{len(document.warnings)} warning(s)",
+    )
+
+
 def _gold_schema(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """The golden-set JSON Schema (EVAL-001)."""
     from knowledge_engine.evaluation.gold import gold_schema
@@ -2399,6 +2453,14 @@ def build_parser() -> argparse.ArgumentParser:
     gold_commands.add_parser("schema", help="print the golden set JSON Schema").set_defaults(
         handler=_gold_schema
     )
+    file_parser = commands.add_parser("file", help="read a note, text, Word or PDF file")
+    file_commands = file_parser.add_subparsers(dest="file_command", required=True)
+    file_read = file_commands.add_parser(
+        "read", help="show a file's blocks, headings and warnings (reads only)"
+    )
+    file_read.add_argument("path", type=Path, help="a .md, .markdown, .txt, .docx or .pdf file")
+    file_read.add_argument("--blocks", action="store_true", help="list every block's location")
+    file_read.set_defaults(handler=_file_read)
     logs = commands.add_parser("logs", help="search the run log by ID (no private text)")
     logs.add_argument("--stage-key", help="one stage key's whole lineage")
     logs.add_argument("--job-id", help="one job's events")

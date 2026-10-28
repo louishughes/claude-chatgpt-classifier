@@ -1,181 +1,218 @@
-"""DOC-001: document content as data, and a changed record maps to exactly its documents."""
+"""ING-008 + ING-009: notes, text, Word and PDF files as located blocks."""
 
 from __future__ import annotations
 
+import io
 import json
-from collections.abc import Iterator
+import zipfile
 from pathlib import Path
 
 import pytest
-from sqlalchemy import select, text
-from sqlalchemy.exc import DatabaseError
-from sqlalchemy.orm import Session
 
-from knowledge_engine.documents.dependencies import (
-    DocumentBuildRow,
-    affected_documents,
-    latest_builds,
-    register,
+from knowledge_engine.ingestion.documents import (
+    BlockKind,
+    ParsedDocument,
+    decode_text,
+    parse_markdown,
+    parse_text,
 )
-from knowledge_engine.documents.model import (
-    DocumentKind,
-    build_all,
-    build_document,
-    document_id,
+from knowledge_engine.ingestion.structured import (
+    BuiltinDocx,
+    PdfWithoutConverter,
+    UnsafeDocumentError,
+    read_document,
 )
-from knowledge_engine.extraction import decisions
-from knowledge_engine.extraction.records import CandidateRecord, KnowledgeRecord, Provenance
-from knowledge_engine.extraction.runner import RuleExtractor, run
-from knowledge_engine.extraction.store import KnowledgeRecordRow, add_candidates
-from knowledge_engine.extraction.text import segment_extraction_messages
-from knowledge_engine.importer import import_source
-from knowledge_engine.importer.records import ConversationRow
-from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
-from knowledge_engine.reconciliation.supersession import reconcile
-from knowledge_engine.rendering.transcript import load_conversation
-from knowledge_engine.segmentation.segmenter import segment_conversation
-from knowledge_engine.settings import Settings
 
-FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "chatgpt"
+NOTE = (
+    "---\r\ntitle: Synthétique ✓\r\ntags: [a, b]\r\n---\r\n"
+    "# Shed plan 🛖\r\n\r\nCedar cladding, naïve café text.\r\nSecond line.\r\n\r\n"
+    "Roof\r\n----\r\n\r\n- felt\r\n- metal\r\n\r\n"
+    "```\r\n# not a heading\r\n```\r\n\r\n"
+    "| part | cost |\r\n|---|---|\r\n| base | 10 |\r\n\r\n"
+    "## Pictures\r\n![front](img/front.png) ![[back.png|300]]\r\n"
+)
 
 
-@pytest.fixture
-def switch(tmp_path: Path) -> Iterator[tuple[Settings, Session]]:
-    settings = Settings(workspace_root=tmp_path / "switch")
-    import_source(FIXTURES / "engine_switch" / "export", "fixture", settings=settings)
-    session = Session(create_sqlite_engine(database_path(settings)))
-    segments = []
-    for conversation_id in session.scalars(select(ConversationRow.conversation_id)).all():
-        conv = load_conversation(session, conversation_id)
-        segments += [
-            (seg.segment_id, segment_extraction_messages(conv, seg))
-            for seg in segment_conversation(conv)
-        ]
-    rule = RuleExtractor("decisions", decisions.EXTRACTOR_VERSION, decisions.extract_decisions)
-    run(session, segments, [rule])
-    session.commit()
-    yield settings, session
-    session.close()
+def test_markdown_keeps_frontmatter_headings_and_exact_offsets() -> None:
+    doc = parse_markdown(NOTE.encode("utf-8"))
+    assert doc.encoding == "utf-8" and doc.warnings == ()
+    assert doc.frontmatter == {"title": "Synthétique ✓", "tags": ["a", "b"]}
+    for block in doc.blocks:
+        assert doc.text[block.start : block.end] == block.text  # exact, CRLF and emoji kept
+    kinds = [b.kind for b in doc.blocks]
+    assert kinds == [
+        BlockKind.FRONTMATTER,
+        BlockKind.HEADING,
+        BlockKind.PARAGRAPH,
+        BlockKind.HEADING,  # "Roof" underlined with ----
+        BlockKind.LIST,
+        BlockKind.CODE,  # its "# not a heading" stays code
+        BlockKind.TABLE,
+        BlockKind.HEADING,
+        BlockKind.PARAGRAPH,
+    ]
+    paragraph = doc.blocks[2]
+    assert paragraph.locator == "L7-L8" and paragraph.heading_path == ("Shed plan 🛖",)
+    assert "\r\n" in paragraph.text
+    assert [h.heading_path for h in doc.headings()] == [
+        ("Shed plan 🛖",),
+        ("Shed plan 🛖", "Roof"),
+        ("Shed plan 🛖", "Pictures"),
+    ]
+    assert [(a.target, a.style) for a in doc.assets] == [
+        ("img/front.png", "markdown"),
+        ("back.png", "wikilink"),
+    ]
 
 
-def _chats(session: Session) -> dict[str, str]:
-    """Native conversation ID suffix (1 or 2) -> conv_ ID."""
-    return {
-        native[-1]: conv
-        for conv, native in session.execute(
-            select(ConversationRow.conversation_id, ConversationRow.native_conversation_id)
-        )
-    }
+@pytest.mark.parametrize(
+    ("source", "warning"),
+    [
+        (b"---\ntitle: [broken\n---\nbody\n", "frontmatter_invalid"),
+        (b"---\n- just\n- a list\n---\nbody\n", "frontmatter_not_mapping"),
+        (b"---\ntitle: x\nbody without end\n", "frontmatter_unclosed"),
+        (b"```\nnever closed\n", "unclosed_code_fence"),
+    ],
+)
+def test_odd_markdown_is_kept_and_reported(source: bytes, warning: str) -> None:
+    doc = parse_markdown(source)
+    assert warning in doc.warnings
+    assert doc.frontmatter is None or warning == "unclosed_code_fence"
+    for block in doc.blocks:
+        assert doc.text[block.start : block.end] == block.text
 
 
-def _records_in(session: Session, conversation_id: str) -> list[str]:
-    return list(build_document(session, DocumentKind.CONVERSATION, conversation_id).record_ids)
-
-
-def test_documents_are_data_with_statuses_in_a_fixed_order(
-    switch: tuple[Settings, Session],
-) -> None:
-    _, session = switch
-    chats = _chats(session)
-    before = build_document(session, DocumentKind.CONVERSATION, chats["2"])
-    assert before.document_id == document_id(DocumentKind.CONVERSATION, chats["2"])
-    assert [s.key for s in before.sections] == ["current"]
-    assert before == build_document(session, DocumentKind.CONVERSATION, chats["2"])
-    reconcile(session)
-    session.commit()
-    after = build_document(session, DocumentKind.CONVERSATION, chats["2"])
-    assert [s.key for s in after.sections] == ["current", "superseded"]
-    [replaced] = after.sections[1].items
-    assert replaced.superseded_by and replaced.because  # the label and the reason
-    assert after.content_hash != before.content_hash
-    assert after.revision_ids and set(after.record_ids) == set(before.record_ids)
-
-
-def test_a_changed_record_maps_to_exactly_its_documents(
-    switch: tuple[Settings, Session],
-) -> None:
-    _, session = switch
-    chats = _chats(session)
-    built = build_all(session)
-    assert {d.kind for d in built} == {DocumentKind.CONVERSATION}  # no projects or topics here
-    assert all(register(session, d).changed for d in built)
-    session.commit()
-    first_chat, second_chat = _records_in(session, chats["1"]), _records_in(session, chats["2"])
-    one = first_chat[0]
-    [hit] = affected_documents(session, [one])
-    assert hit.document_id == document_id(DocumentKind.CONVERSATION, chats["1"])
-    assert hit.reasons == (f"depends:{one}", f"selects:{one}")
-    both = affected_documents(session, [one, second_chat[0]])
-    assert {a.subject_id for a in both} == {chats["1"], chats["2"]}
-    assert affected_documents(session, ["krec_" + "0" * 32]) == []
-    # A revision maps to the documents that cite it.
-    [cited] = build_document(session, DocumentKind.CONVERSATION, chats["1"]).revision_ids[:1]
-    assert [a.subject_id for a in affected_documents(session, [cited])] == [chats["1"]]
-
-
-def test_a_new_record_is_caught_by_the_selector(switch: tuple[Settings, Session]) -> None:
-    _, session = switch
-    chats = _chats(session)
-    for document in build_all(session):
-        register(session, document)
-    session.commit()
-    existing = KnowledgeRecord.model_validate_json(
-        session.get_one(KnowledgeRecordRow, _records_in(session, chats["2"])[0]).record_json
+def test_encodings_never_replace_characters() -> None:
+    assert decode_text("é".encode("utf-8-sig"))[:2] == ("é", "utf-8-sig")
+    assert decode_text("é ✓".encode("utf-16"))[:2] == ("é ✓", "utf-16")
+    text, encoding, warnings = decode_text("café – “quoted”".encode("cp1252"))
+    assert (text, encoding, warnings) == (
+        "café – “quoted”",
+        "cp1252",
+        ("encoding_fallback_cp1252",),
     )
-    fields = existing.model_dump(include=set(CandidateRecord.model_fields) - {"project_ids"})
-    provenance = Provenance(
-        stage_id="extract.test.v1", stage_key="stg_" + "e" * 64, extractor_version="t"
+    text, encoding, warnings = decode_text(b"\x81\x8d")  # undefined in cp1252
+    assert encoding == "latin-1" and warnings == ("encoding_fallback_latin1",)
+    assert "�" not in text
+
+
+def test_plain_text_is_paragraphs_with_lines() -> None:
+    doc = parse_text(b"one\ntwo\n\n\nthree # not a heading\n")
+    assert [(b.locator, b.kind) for b in doc.blocks] == [
+        ("L1-L2", BlockKind.PARAGRAPH),
+        ("L5", BlockKind.PARAGRAPH),
+    ]
+
+
+def _docx(*, doctype: bool = False) -> bytes:
+    w = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    r = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+    a = "http://schemas.openxmlformats.org/drawingml/2006/main"
+    body = (
+        f'<w:document xmlns:w="{w}" xmlns:r="{r}" xmlns:a="{a}"><w:body>'
+        '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Shed plan</w:t></w:r></w:p>'
+        "<w:p><w:r><w:t>Cedar </w:t></w:r><w:r><w:t>cladding.</w:t></w:r></w:p>"
+        '<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t>Costs</w:t></w:r></w:p>'
+        "<w:tbl><w:tr><w:tc><w:p><w:r><w:t>part</w:t></w:r></w:p></w:tc>"
+        "<w:tc><w:p><w:r><w:t>cost</w:t></w:r></w:p></w:tc></w:tr>"
+        "<w:tr><w:tc><w:p><w:r><w:t>base</w:t></w:r></w:p></w:tc>"
+        "<w:tc><w:p><w:r><w:t>10</w:t></w:r></w:p></w:tc></w:tr></w:tbl>"
+        '<w:p><w:r><w:drawing><a:blip r:embed="rId5"/></w:drawing></w:r></w:p>'
+        "<w:p/>"
+        "</w:body></w:document>"
     )
-    [added] = add_candidates(
-        session, [CandidateRecord(**fields, project_ids=("proj_engine",))], provenance
+    if doctype:
+        body = '<!DOCTYPE x [<!ENTITY a "aaaa">]>' + body
+    rels = (
+        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+        '<Relationship Id="rId5" Target="media/image1.png"/></Relationships>'
     )
-    session.commit()
-    found = {
-        (a.kind, a.subject_id): a.reasons for a in affected_documents(session, [added.record_id])
-    }
-    # Its chat's document (never built with it) and its project's (never built at all).
-    assert found == {
-        (DocumentKind.CONVERSATION, chats["2"]): (f"selects:{added.record_id}",),
-        (DocumentKind.PROJECT, "proj_engine"): (f"selects:{added.record_id}",),
-    }
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("word/document.xml", body)
+        archive.writestr("word/_rels/document.xml.rels", rels)
+        archive.writestr("word/footnotes.xml", "<x/>")
+        archive.writestr("word/media/image1.png", b"synthetic")
+    return buffer.getvalue()
 
 
-def test_rebuilding_unchanged_documents_adds_nothing(switch: tuple[Settings, Session]) -> None:
-    _, session = switch
-    for document in build_all(session):
-        register(session, document)
-    session.commit()
-    count = len(session.scalars(select(DocumentBuildRow)).all())
-    assert not any(register(session, d).changed for d in build_all(session))
-    assert len(session.scalars(select(DocumentBuildRow)).all()) == count
-    reconcile(session)
-    session.commit()
-    changed = [d for d in build_all(session) if register(session, d).changed]
-    session.commit()
-    assert len(changed) == 1  # only the chat where Unity was replaced
-    assert latest_builds(session)[changed[0].document_id].sequence == 2
-    with pytest.raises(DatabaseError, match="append-only"):
-        session.execute(text("DELETE FROM document_builds"))
-    session.rollback()
+def test_docx_blocks_have_references_and_report_what_was_skipped() -> None:
+    doc = BuiltinDocx().convert(_docx(), ".docx")
+    assert [(b.kind, b.locator) for b in doc.blocks] == [
+        (BlockKind.HEADING, "p1"),
+        (BlockKind.PARAGRAPH, "p2"),
+        (BlockKind.HEADING, "p3"),
+        (BlockKind.TABLE, "table1/r1c1-r2c2"),
+        (BlockKind.PARAGRAPH, "p4"),  # the image paragraph; the empty one is skipped
+    ]
+    assert doc.blocks[1].text == "Cedar cladding." and doc.blocks[1].heading_path == ("Shed plan",)
+    assert doc.blocks[3].text == "part | cost\nbase | 10"
+    assert doc.blocks[3].heading_path == ("Shed plan", "Costs")
+    for block in doc.blocks:
+        assert doc.text[block.start : block.end] == block.text
+    assert [(a.target, a.block_index) for a in doc.assets] == [("media/image1.png", 4)]
+    assert set(doc.warnings) == {"docx_footnotes_not_extracted", "docx_images_not_described"}
+    assert doc.parser.endswith("builtin-docx") and len(doc.sha256) == 64
 
 
-def test_cli_docs(
-    switch: tuple[Settings, Session],
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+def test_docx_safety_limits() -> None:
+    with pytest.raises(UnsafeDocumentError, match="xml_doctype_refused"):
+        BuiltinDocx().convert(_docx(doctype=True), ".docx")
+    with pytest.raises(UnsafeDocumentError, match="docx_not_a_zip"):
+        BuiltinDocx().convert(b"not a zip", ".docx")
+
+
+def test_pdf_without_a_converter_gives_provenance_and_says_nothing_was_read() -> None:
+    pdf = (
+        b"%PDF-1.4\n1 0 obj << /Type /Pages /Kids [2 0 R 3 0 R] >>\n"
+        b"2 0 obj << /Type /Page >>\n3 0 obj << /Type /Page >>\n%%EOF\n"
+    )
+    doc = PdfWithoutConverter().convert(pdf, ".pdf")
+    assert doc.blocks == () and doc.pages == 2 and doc.size == len(pdf)
+    assert doc.warnings == ("pdf_text_not_extracted",)
+
+
+def test_the_converter_seam_takes_any_converter(tmp_path: Path) -> None:
+    class Fake:
+        name = "fake"
+
+        def accepts(self, suffix: str) -> bool:
+            return suffix == ".pdf"
+
+        def convert(self, data: bytes, suffix: str) -> ParsedDocument:
+            return parse_markdown(b"# Converted\n\nbody\n")
+
+    path = tmp_path / "file.pdf"
+    path.write_bytes(b"%PDF-1.4\n")
+    assert (
+        read_document(path, max_bytes=10_000, converters=[Fake()]).headings()[0].text
+        == "# Converted"
+    )
+    with pytest.raises(ValueError, match="file_too_large"):
+        read_document(path, max_bytes=3, converters=[Fake()])
+    other = tmp_path / "file.xyz"
+    other.write_bytes(b"x")
+    with pytest.raises(ValueError, match="unsupported_suffix"):
+        read_document(other, max_bytes=10, converters=[])
+
+
+def test_cli_file_read(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from knowledge_engine.cli.main import main
 
-    settings, session = switch
-    chats = _chats(session)
-    record = _records_in(session, chats["1"])[0]
-    session.close()
-    monkeypatch.setenv("KE_WORKSPACE_ROOT", str(settings.workspace_root))
-    assert main(["--json", "docs", "build"]) == 0
+    monkeypatch.setenv("KE_WORKSPACE_ROOT", str(tmp_path / "ws"))
+    note = tmp_path / "note.md"
+    note.write_bytes(NOTE.encode("utf-8"))
+    before = note.read_bytes()
+    assert main(["--json", "file", "read", str(note), "--blocks"]) == 0
     data = json.loads(capsys.readouterr().out)["data"]
-    assert data["by_kind"] == {"conversation": 2} and len(data["changed"]) == 2
-    assert main(["--json", "docs", "build"]) == 0
-    assert json.loads(capsys.readouterr().out)["data"]["changed"] == []
-    assert main(["--json", "docs", "affected", record]) == 0
-    [doc] = json.loads(capsys.readouterr().out)["data"]["documents"]
-    assert doc["subject_id"] == chats["1"]
+    assert data["format"] == "markdown" and data["frontmatter_keys"] == ["tags", "title"]
+    assert [h["at"] for h in data["outline"]] == ["L5", "L10-L11", "L24"]
+    assert len(data["located"]) == data["blocks"] == 9
+    assert note.read_bytes() == before  # read only
+    docx = tmp_path / "plan.docx"
+    docx.write_bytes(_docx())
+    assert main(["--json", "file", "read", str(docx)]) == 0
+    assert json.loads(capsys.readouterr().out)["data"]["kinds"]["table"] == 1
+    assert main(["--json", "file", "read", str(tmp_path / "missing.md")]) == 2
