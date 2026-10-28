@@ -658,3 +658,8 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - taxonomy/discovery.py (DiscoveryBackend, TfidfBackend, BertopicBackend, BackendUnavailable, Cluster, DiscoveryReport, discover, STOP_WORDS); taxonomy/changes.py (TaxonomyChangeRow, StageInvalidationRow, TaxonomyDiff, diff_snapshots, record_diff, invalidate, invalidated); migration 0017.
 - Tests: test_taxonomy_discovery.py (4), test_taxonomy_changes.py (3). Full suite 846 passed, 6 skipped. ruff, mypy OK; no migration drift.
 - Next: TAX-008 + CLS-001.
+
+## 2026-10-28 05:40 TAX-008 + CLS-001 (#63, #64)
+- taxonomy/governance.py (Issue, GovernanceReport, governance_report), `ke taxonomy report`; classification/schema.py (output_model, instructions, segment_input, classification_request, assignments, answer_problems, Rank, SegmentMessageText).
+- Tests: test_taxonomy_governance.py (5), test_classifier_schema.py (12). Full suite 863 passed, 6 skipped; ruff, mypy OK; drift 0.
+- Next: CLS-002 + CLS-003.

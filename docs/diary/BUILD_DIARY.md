@@ -1197,3 +1197,33 @@ pytest -q               # 846 passed, 6 skipped
 Fix attempts: 2. Grouping each segment by its single most distinctive word split one subject into several groups, so I switched to greedy grouping by shared word. Then filler words like "and" won ties, so I added a fixed stop list.
 
 **Next exact task:** TAX-008 (governance reports) + CLS-001 (classifier schema).
+
+### 05:40 — TAX-008 + CLS-001: a health check for the vocabulary, and a classifier that can't make things up
+**What:** a report that finds vocabulary problems, and the answer shape every classifier must fit.
+- **Governance report (TAX-008).** `governance_report()` only reads. It lists the following, by ID:
+  - exact duplicates and near duplicates (spellings that differ only by spaces or a plural "s");
+  - spellings shared between a topic and a project;
+  - parent problems: missing, wrong dimension, loops, or more than two levels;
+  - approved terms whose parent isn't approved (orphans);
+  - broken or looping merges;
+  - open proposals, oldest first, with each reviewer's approved and rejected counts;
+  - any decision made by its own proposer.
+
+  Fixes still go through proposals and a second reviewer. Run it with `ke taxonomy report`.
+- **Classifier schema (CLS-001).** `output_model(snapshot)` builds the answer model from one pinned version:
+  - Each dimension's `term_id` is an enum of that version's approved IDs. Projects get the same treatment.
+  - Extra fields are refused. An invented label, a term from the wrong dimension, or a smuggled `new_term` therefore fails validation.
+  - Each assignment has a rank (primary or secondary), a confidence and evidence message IDs. An empty list is a valid "nothing fits".
+  - `answer_problems` checks the rules JSON Schema can't express: evidence must come from this segment, at most one primary per dimension, no duplicates.
+  - The prompt is built only from the reviewed vocabulary, and the segment goes in as tagged data. The stage key includes the taxonomy version and its content hash.
+
+**Teach-back (`classification/schema.py`):** "For each published vocabulary I build an answer form where the label field only accepts the approved IDs. If the model invents a label or adds a field, the answer is rejected before anything is saved. Rules a form can't express, like evidence having to come from this segment, get checked straight after."
+```
+ruff check / format     # All checks passed! / already formatted
+mypy                    # Success: no issues found in 160 source files
+pytest -q               # 863 passed, 6 skipped
+migration drift         # 0
+```
+Fix attempts: 1. With only one approved ID, Pydantic writes `const` instead of `enum`, so I now always list `enum` as well. Two test-side slips (a `$defs` entry without properties, and "Synthetic" in a project name) were corrected in the new tests.
+
+**Next exact task:** CLS-002 (SegmentClassifier service) + CLS-003 (keyword scoring and ranking).
