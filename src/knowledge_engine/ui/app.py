@@ -40,7 +40,7 @@ from knowledge_engine import __version__
 from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
 from knowledge_engine.settings import Settings
 from knowledge_engine.taxonomy.refresh import refresh_status
-from knowledge_engine.ui import ask, data, evaluation, notes, registries, review
+from knowledge_engine.ui import ask, data, evaluation, notes, registries, review, timeline
 from knowledge_engine.ui.jobs import ImportJobs
 
 StartResponse = Callable[[str, list[tuple[str, str]]], Any]
@@ -194,6 +194,8 @@ def _route(
         conversation_id = path.removeprefix("/chats/")
         if _IMPORT_ID_RE.fullmatch(conversation_id):
             return _chat(settings, conversation_id)
+    if path == "/timeline":
+        return _timeline(settings, query)
     if path == "/ask":
         return _ask(settings, query)
     if path == "/search":
@@ -447,6 +449,18 @@ def _search(settings: Settings, query: dict[str, list[str]]) -> Page:
 
     values["hits"] = _read(settings, run) or []
     return Page("200 OK", "search.html", values)
+
+
+def _timeline(settings: Settings, query: dict[str, list[str]]) -> Page:
+    project_id = query.get("project", [""])[0][:100] or None
+    values: dict[str, Any] = {"view": None, "problem": None}
+    try:
+        values["view"] = _read(settings, lambda s: timeline.timeline_view(s, project_id))
+    except timeline.UnknownProject:
+        values["problem"] = "No such project."
+    if values["view"] is None and values["problem"] is None:
+        values["problem"] = "Nothing imported yet."
+    return Page("200 OK", "timeline.html", values)
 
 
 def _ask(settings: Settings, query: dict[str, list[str]]) -> Page:
