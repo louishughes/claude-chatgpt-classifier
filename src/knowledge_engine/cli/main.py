@@ -904,6 +904,39 @@ def _access(settings: Settings, args: argparse.Namespace) -> CommandResult:
         engine.dispose()
 
 
+def _web(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Fetch one web page safely and show where it came from (INT-001)."""
+    from knowledge_engine.ingestion.web import WebFetchError, fetch_page, save_snapshot
+    from knowledge_engine.settings import EgressDisabledError
+
+    name = "web fetch"
+    try:
+        page = fetch_page(args.url, settings.egress, settings.web_allowlist)
+    except EgressDisabledError:
+        return CommandResult(
+            name,
+            ExitCode.USAGE,
+            message="network_fetch is off: turn it on in [egress] to fetch pages",
+            error_code="egress_off",
+        )
+    except WebFetchError as error:
+        return CommandResult(name, ExitCode.ERROR, message=str(error), error_code=error.code)
+    document = page.document
+    data = {
+        "final_url": page.final_url,
+        "declared_canonical": page.declared_canonical,
+        "redirects": list(page.redirects),
+        "sha256": document.sha256,
+        "bytes": document.size,
+        "title": (document.frontmatter or {}).get("title"),
+        "blocks": len(document.blocks),
+        "headings": [b.text for b in document.headings()][:20],
+        "warnings": list(document.warnings),
+        "snapshot": str(save_snapshot(page, settings.workspace_root)) if args.save else None,
+    }
+    return CommandResult(name, data=data, message=f"read {len(document.blocks)} block(s)")
+
+
 def _purge(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Plan, run or list purges of whole conversations (OPS-004)."""
     from knowledge_engine.retention.purge import PurgeError, plan_purge, purge_log, run_purge
@@ -2896,6 +2929,12 @@ def build_parser() -> argparse.ArgumentParser:
     backup_restore.add_argument("folder", type=Path, help="the backup folder")
     backup_restore.add_argument("--to", type=Path, required=True, help="an empty folder")
     backup_restore.set_defaults(handler=_backup)
+    web = commands.add_parser("web", help="fetch web pages (allowlisted, network_fetch on)")
+    web_commands = web.add_subparsers(dest="web_command", required=True)
+    web_fetch = web_commands.add_parser("fetch", help="fetch one page into located blocks")
+    web_fetch.add_argument("url")
+    web_fetch.add_argument("--save", action="store_true", help="keep the page's bytes by hash")
+    web.set_defaults(handler=_web)
     file_parser = commands.add_parser("file", help="read a note, text, Word or PDF file")
     file_commands = file_parser.add_subparsers(dest="file_command", required=True)
     file_read = file_commands.add_parser(

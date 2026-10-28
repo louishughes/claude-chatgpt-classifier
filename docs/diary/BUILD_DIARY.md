@@ -2527,3 +2527,20 @@ tests/integration/test_api_access.py, test_tenant_isolation.py   12 passed (unch
 Fix attempts: 1 (the test fixture keyed tokens by workspace instead of owner).
 
 **Next exact task:** open the queued PRs in order (PROD-001, PROD-002, #255, PROD-003, `[m:id]` fix, PROD-004), then INT-001.
+
+### 11:42 — INT-001: fetching a web page without opening a door into my network
+
+- `ingestion/web.py`: off unless `network_fetch` is on **and** the host is on `web_allowlist` (empty by default).
+- The main danger is SSRF: a public link that redirects the fetcher to `127.0.0.1`, the router, or a cloud metadata address. So every hop is checked again from the start (allowlist, DNS, every address), and the address must be `is_global`, which also catches 100.64/10 and IPv6-wrapped IPv4. Then the socket connects to the address that was checked. The host name is used only for the Host header and the TLS certificate, so a DNS answer that changes in between (rebinding) can't redirect it.
+- Results are anchored: the URL asked for, the redirects, the final canonical URL (tracking parameters dropped), the page's own canonical link only if it is allowlisted, the SHA-256 of the exact bytes, and located blocks like a note's. `--save` stores the bytes by hash, once.
+- The tests use a fake resolver and a fake connection, so CI never touches the network. The real connection is small, plain `http.client` with default certificate checks, and has no automated test (written down in the doc).
+
+**Teach-back (`fetch_page`):** It fetches a web page only if I switched fetching on and listed the site. Before every connection, including after each redirect, it looks up the site's address and refuses anything inside my own network, then connects to exactly the address it checked. The page comes back as blocks with offsets, the canonical URL and a hash of the exact bytes, so anything quoted from it can be traced to the source.
+
+Checks:
+```
+tests/integration/test_web_fetch.py   24 passed (no network)
+```
+Fix attempts: 0.
+
+**Next exact task:** INT-002 (YouTube transcript input workflow).
