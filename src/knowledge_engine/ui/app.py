@@ -337,8 +337,8 @@ def _links(settings: Settings, query: dict[str, list[str]]) -> Page:
 
 
 def _evaluation(ctx: _Context, path: str, query: dict[str, list[str]]) -> Page:
-    # Three read-only pages (UI-006): the overview, every output with its
-    # verdict, and one output in full. None of them has a form.
+    # Read-only pages (UI-006): the overview, every output with its verdict,
+    # one output in full, and segment labels against the key. No forms.
     settings, key = ctx.settings, ctx.answer_key
     if path == "/evaluation":
         found = _read(settings, lambda s: evaluation.overview(s, key))
@@ -348,6 +348,9 @@ def _evaluation(ctx: _Context, path: str, query: dict[str, list[str]]) -> Page:
         record_type = query.get("type", [""])[0]
         found = _read(settings, lambda s: evaluation.outputs(s, key, verdict, record_type))
         return Page("200 OK", "evaluation_outputs.html", {"found": found})
+    if path == "/evaluation/classifications":
+        found = _read(settings, lambda s: evaluation.classifications(s, key))
+        return Page("200 OK", "evaluation_classifications.html", {"found": found})
     record_id = path.removeprefix("/evaluation/outputs/")
     if record_id != path and _IMPORT_ID_RE.fullmatch(record_id):
         found = _read(settings, lambda s: evaluation.output(s, key, record_id))

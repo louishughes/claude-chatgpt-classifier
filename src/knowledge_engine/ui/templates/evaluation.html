@@ -2,7 +2,7 @@
 {% block title %}Evaluation · Knowledge Engine{% endblock %}
 {% block main %}
 <h1>Evaluation</h1>
-<p class="muted">How the engine's outputs measure up. Everything is counted from this workspace; scores compare knowledge records with the answer key using the same matching as the EVAL-004 report. This page only shows; there is nothing to label or decide here. <a href="/evaluation/outputs">Look at each output →</a></p>
+<p class="muted">How the engine's outputs measure up. Everything is counted from this workspace; scores compare knowledge records with the answer key using the same matching as the EVAL-004 report. This page only shows; there is nothing to label or decide here. <a href="/evaluation/outputs">Look at each output →</a> · <a href="/evaluation/classifications">Segment labels against the key →</a></p>
 {% if found is none %}
 <p>Nothing imported yet.</p>
 {% else %}
@@ -54,6 +54,15 @@
 <section><h3>Vocabulary proposals</h3>{% if found.proposals %}<ul>{% for s, n in found.proposals %}<li>{{ s }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">None yet.</p>{% endif %}</section>
 <section><h3>Model requests</h3>{% if found.model_requests %}<ul>{% for s, n in found.model_requests %}<li>{{ s }}: {{ n }}</li>{% endfor %}</ul>{% else %}<p class="muted">None yet.</p>{% endif %}</section>
 </div>
+
+{% if found.model_runs %}
+<h2>Model requests</h2>
+<p class="muted">Every request the engine sent to a model provider, counted. Prompts and answers aren't shown here.</p>
+<table>
+  <thead><tr><th>Stage</th><th>Provider</th><th>State</th><th>Requests</th><th>Attempts</th><th>Transient failures</th><th>Characters sent</th></tr></thead>
+  <tbody>{% for m in found.model_runs %}<tr><td><code>{{ m.stage }}</code></td><td>{{ m.provider }}</td><td>{{ m.state }}</td><td>{{ m.requests }}</td><td>{{ m.attempts }}</td><td>{{ m.transient }}</td><td>{{ m.characters }}</td></tr>{% endfor %}</tbody>
+</table>
+{% endif %}
 
 <h2>Review outcomes</h2>
 <p class="muted">Decisions by named reviewers (usually independent AI review sessions, not you) are kept apart from the automatic evidence check. <a href="/reviews">Every decision and its reason →</a></p>

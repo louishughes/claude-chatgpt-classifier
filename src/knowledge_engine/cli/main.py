@@ -2152,6 +2152,13 @@ def _ui(settings: Settings, args: argparse.Namespace) -> CommandResult:
                 message="--gold needs --reviewer (who checked the answer key)",
                 error_code="reviewer_required",
             )
+        if args.reviewer != "none" and args.review is None:
+            return CommandResult(
+                "ui",
+                ExitCode.ERROR,
+                message="a reviewed answer key needs --review (the review record)",
+                error_code="review_required",
+            )
         key = KeySource(args.gold, ReviewerKind(args.reviewer), args.review)
     try:
         server = serve(settings, port=args.port, answer_key=key)

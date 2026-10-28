@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 
 from knowledge_engine.classification.classifier import REVIEW_REQUIRED, SegmentClassification
 from knowledge_engine.classification.schema import Rank, assignments
-from knowledge_engine.evaluation.gold import FIELDS, GoldSet
+from knowledge_engine.evaluation.gold import FIELDS, GoldSegment, GoldSet
 from knowledge_engine.evaluation.report_labels import UNSCORED, AnswerKey, key_from_gold
 from knowledge_engine.rendering.transcript import StoredConversation
 from knowledge_engine.segmentation.segmenter import Segment
@@ -225,6 +225,32 @@ def band_order(name: str) -> int:
     return names.index(name) if name in names else len(names)
 
 
+def match_classification(
+    gold: GoldSet, predicted: Sequence[Predicted]
+) -> list[tuple[str, GoldSegment, Predicted | None]]:
+    """Pair each gold segment with the stored segment holding its first message.
+
+    ``evaluate_classification`` scores these pairs; the evaluation dashboard
+    (UI-006) shows them one by one, so both read the very same pairing.
+
+    Returns:
+        (native conversation ID, gold segment, prediction or None), in key order.
+    """
+    by_message: dict[tuple[str, str], Predicted] = {}
+    for item in predicted:
+        for message in item.messages:
+            by_message[(item.native_conversation_id, message)] = item
+    return [
+        (
+            conversation.native_conversation_id,
+            segment,
+            by_message.get((conversation.native_conversation_id, segment.first_message)),
+        )
+        for conversation in gold.conversations
+        for segment in conversation.segments
+    ]
+
+
 def evaluate_classification(
     gold: GoldSet,
     predicted: Sequence[Predicted],
@@ -241,50 +267,44 @@ def evaluate_classification(
         key: The key's version, hash and reviewer (``key_from_file``);
             defaults to a content hash with no review claimed.
     """
-    by_message: dict[tuple[str, str], Predicted] = {}
-    for item in predicted:
-        for message in item.messages:
-            by_message[(item.native_conversation_id, message)] = item
     scores: dict[str, FieldScore] = defaultdict(FieldScore)
     bands: dict[str, BandScore] = defaultdict(BandScore)
     per_label: dict[str, dict[str, Counter[str]]] = defaultdict(lambda: defaultdict(Counter))
     total = unmatched = flagged = missed = 0
-    for conversation in gold.conversations:
-        for segment in conversation.segments:
-            total += 1
-            match = by_message.get((conversation.native_conversation_id, segment.first_message))
-            if match is None:
-                unmatched += 1
-                continue
-            if segment.ambiguous:
-                flagged += int(match.review)
-                missed += int(not match.review)
-                continue
-            band = bands[length_band(match.chat_chars)]
-            band.segments += 1
-            for name in FIELDS:
-                want = segment.labels.get(name)
-                got_primary, got_secondary = match.labels.get(name, (None, ()))
-                want_primary = want.primary if want else None
-                want_set = {x for x in (want_primary, *(want.secondary if want else ())) if x}
-                got_set = {x for x in (got_primary, *got_secondary) if x}
-                if not want_set and not got_set:
-                    continue  # the field doesn't apply here
-                score = scores[name]
-                score.segments += 1
-                score.true_pos += len(want_set & got_set)
-                score.false_pos += len(got_set - want_set)
-                score.false_neg += len(want_set - got_set)
-                score.primary_right += int(want_primary == got_primary)
-                band.checked += 1
-                band.right += int(want_primary == got_primary)
-                row = score.confusion.setdefault(str(want_primary), {})
-                row[str(got_primary)] = row.get(str(got_primary), 0) + 1
-                for label in want_set | got_set:
-                    counts = per_label[name][label]
-                    counts["tp"] += int(label in want_set and label in got_set)
-                    counts["fp"] += int(label in got_set and label not in want_set)
-                    counts["fn"] += int(label in want_set and label not in got_set)
+    for _, segment, match in match_classification(gold, predicted):
+        total += 1
+        if match is None:
+            unmatched += 1
+            continue
+        if segment.ambiguous:
+            flagged += int(match.review)
+            missed += int(not match.review)
+            continue
+        band = bands[length_band(match.chat_chars)]
+        band.segments += 1
+        for name in FIELDS:
+            want = segment.labels.get(name)
+            got_primary, got_secondary = match.labels.get(name, (None, ()))
+            want_primary = want.primary if want else None
+            want_set = {x for x in (want_primary, *(want.secondary if want else ())) if x}
+            got_set = {x for x in (got_primary, *got_secondary) if x}
+            if not want_set and not got_set:
+                continue  # the field doesn't apply here
+            score = scores[name]
+            score.segments += 1
+            score.true_pos += len(want_set & got_set)
+            score.false_pos += len(got_set - want_set)
+            score.false_neg += len(want_set - got_set)
+            score.primary_right += int(want_primary == got_primary)
+            band.checked += 1
+            band.right += int(want_primary == got_primary)
+            row = score.confusion.setdefault(str(want_primary), {})
+            row[str(got_primary)] = row.get(str(got_primary), 0) + 1
+            for label in want_set | got_set:
+                counts = per_label[name][label]
+                counts["tp"] += int(label in want_set and label in got_set)
+                counts["fp"] += int(label in got_set and label not in want_set)
+                counts["fn"] += int(label in want_set and label not in got_set)
     for name, labels in per_label.items():
         f1s = [_ratio(2 * c["tp"], 2 * c["tp"] + c["fp"] + c["fn"]) for c in labels.values()]
         scores[name].macro_f1 = round(sum(f1s) / len(f1s), 6) if f1s else 0.0

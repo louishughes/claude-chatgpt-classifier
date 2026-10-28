@@ -55,3 +55,4 @@ tr.total td { font-weight: 600; }
 .columns { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: 0 1.5rem; }
 .columns h3 { font-size: 1rem; margin-bottom: .2rem; }
 blockquote.quote { margin: .8rem 0 .2rem; padding: .4rem .8rem; border-left: 4px solid var(--line); white-space: pre-wrap; overflow-wrap: anywhere; }
+.segment { border-top: 1px solid var(--line); margin-top: 1rem; }

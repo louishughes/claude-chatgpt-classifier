@@ -2371,3 +2371,30 @@ Fix attempts: 1 (a test read a field the key leaves out when false).
 - "I built a dashboard to judge my AI's output without labelling anything myself. Every score says which answer key it used and that an AI checked that key, not me."
 - "The page and the report use one matching function, so they can't disagree."
 - "It's deliberately read-only. An evaluation page that let me edit answers would turn me into the labeller, and grading against your own edits is how the last attempt fooled itself."
+
+### 11:45 — UI-006 part 2: segment labels and model requests on the dashboard (#260)
+
+**What:** the second half of the evaluation dashboard.
+- `/evaluation/classifications` shows each segment the answer key labels beside the labels stored for the segment that holds its first message: per field, the expected labels (with readable names), the stored ones, and "same", "primary right, others differ" or "differs". Above that are per-field precision, recall, micro/macro F1 and primary accuracy. An ambiguous segment counts as right only if it was sent to review.
+- The overview gains a **Model requests** table: requests, attempts, transient failures and characters sent, by stage, provider and state. It shows counts only and never prompts or answers.
+- `ke ui --gold … --reviewer ai_session` without `--review` is now refused up front. Before, the page just showed an error, because a key that claims a review has to point at the review record.
+
+**Same idea as part 1:** EVAL-003's pairing ("the stored segment holding the key segment's first message") moved into `match_classification()`, and the scorer counts those pairs. Its tests are unchanged and pass. A new test checks the page's per-field numbers against `evaluate_classification` on the same stored labels.
+
+**Scope note:** only labels stored under the key's own taxonomy version are compared, since labels from another vocabulary can't be. The real answer key has no segment labels yet (they wait on the first published taxonomy), so for now the page says so instead of scoring.
+
+**Teach-back:** none new here. The thread picked `ui/evaluation.py` in part 1, and this adds to the same module.
+
+Checks:
+```
+tests/integration/test_ui_evaluation_labels.py   4 passed
+tests/integration/test_gold_and_classification_eval.py, test_gate.py   unchanged, pass
+ci                                               5/5 ok, 1249 passed, 7 skipped
+```
+Fix attempts: 0.
+
+**Next exact task:** none for the dashboard. Saved gate reports could be listed later if Louis wants them in the browser.
+
+**Talking points:**
+- "For each topic section, the dashboard puts the answer key's labels next to what the classifier stored, with readable names, so I can see exactly where it goes wrong."
+- "It also counts every model request, with retries and how much text was sent, without ever showing the text."
