@@ -48,10 +48,15 @@ WSGIApp = Callable[[dict[str, Any], StartResponse], Iterable[bytes]]
 _IMPORT_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 _ACCOUNT_RE = re.compile(r"^[A-Za-z0-9_-]{1,63}$")
 _MAX_FORM_BYTES = 64 * 1024
+_SHA_RE = re.compile(r"^[0-9a-f]{64}$")
+_PAGE_SIZE = 100
 _HEADERS = [
     ("Content-Type", "text/html; charset=utf-8"),
     # No scripts at all, styles only from the page itself, no framing.
-    ("Content-Security-Policy", "default-src 'none'; style-src 'self'; frame-ancestors 'none'"),
+    (
+        "Content-Security-Policy",
+        "default-src 'none'; style-src 'self'; img-src 'self'; frame-ancestors 'none'",
+    ),
     ("X-Content-Type-Options", "nosniff"),
     ("Referrer-Policy", "no-referrer"),
     ("Cache-Control", "no-store"),
@@ -116,13 +121,15 @@ def make_app(settings: Settings) -> WSGIApp:
             return [b"This app only answers requests addressed to localhost."]
         method = environ.get("REQUEST_METHOD", "GET")
         path = environ.get("PATH_INFO", "/")
+        if path.startswith("/media/") and method == "GET":
+            return _media(settings, path.removeprefix("/media/"), start_response)
         if path == "/style.css" and method == "GET":
             start_response("200 OK", [("Content-Type", "text/css"), ("Cache-Control", "no-store")])
             return [style]
         if method == "POST" and not _origin_is_local(environ.get("HTTP_ORIGIN")):
             page = Page("403 Forbidden", "error.html", {"message": "Refused: not from this app."})
         else:
-            page = _route(ctx, method, path, environ)
+            page = _route(ctx, method, path, environ, parse_qs(environ.get("QUERY_STRING", "")))
         if page.location is not None:
             start_response("303 See Other", [("Location", page.location), *_HEADERS])
             return [b""]
@@ -138,7 +145,13 @@ def make_app(settings: Settings) -> WSGIApp:
     return app
 
 
-def _route(ctx: _Context, method: str, path: str, environ: dict[str, Any]) -> Page:
+def _route(
+    ctx: _Context,
+    method: str,
+    path: str,
+    environ: dict[str, Any],
+    query: dict[str, list[str]],
+) -> Page:
     settings = ctx.settings
     if path == "/import":
         if method == "POST":
@@ -155,6 +168,12 @@ def _route(ctx: _Context, method: str, path: str, environ: dict[str, Any]) -> Pa
             if job.state == "done" and job.import_id:
                 return Page("303 See Other", "", {}, location=f"/imports/{job.import_id}")
             return Page("200 OK", "job.html", {"job": job})
+    if path == "/chats":
+        return _chats(settings, query)
+    if path.startswith("/chats/"):
+        conversation_id = path.removeprefix("/chats/")
+        if _IMPORT_ID_RE.fullmatch(conversation_id):
+            return _chat(settings, conversation_id)
     if path.startswith("/imports/"):
         import_id = path.removeprefix("/imports/")
         if _IMPORT_ID_RE.fullmatch(import_id):
@@ -191,6 +210,72 @@ def _report(settings: Settings, import_id: str) -> Page:
     if report is None:
         return Page("404 Not Found", "error.html", {"message": "No import with that ID."})
     return Page("200 OK", "report.html", {"report": report, "lines": data.plain_words(report)})
+
+
+def _read(settings: Settings, read: Callable[[Session], Any]) -> Any:
+    # Every page opens the database read-only in spirit: a session, a query,
+    # closed again. No database yet means "nothing imported".
+    db = database_path(settings)
+    if not db.exists():
+        return None
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            return read(session)
+    finally:
+        engine.dispose()
+
+
+def _chats(settings: Settings, query: dict[str, list[str]]) -> Page:
+    words = query.get("q", [""])[0][:200]
+    try:
+        page_number = max(1, int(query.get("page", ["1"])[0]))
+    except ValueError:
+        page_number = 1
+    offset = (page_number - 1) * _PAGE_SIZE
+    found = _read(
+        settings, lambda s: data.list_conversations(s, words, offset=offset, limit=_PAGE_SIZE)
+    )
+    rows, total = found if found is not None else ([], 0)
+    return Page(
+        "200 OK",
+        "chats.html",
+        {
+            "rows": rows,
+            "total": total,
+            "q": words,
+            "page": page_number,
+            "pages": max(1, -(-total // _PAGE_SIZE)),
+        },
+    )
+
+
+def _chat(settings: Settings, conversation_id: str) -> Page:
+    chat = _read(settings, lambda s: data.conversation_page(s, conversation_id))
+    if chat is None:
+        return Page("404 Not Found", "error.html", {"message": "No chat with that ID."})
+    return Page("200 OK", "chat.html", {"chat": chat})
+
+
+def _media(settings: Settings, sha: str, start_response: StartResponse) -> Iterable[bytes]:
+    found = None
+    if _SHA_RE.fullmatch(sha):
+        store = settings.workspace_root / "archive"
+        found = _read(settings, lambda s: data.media_file(s, store, sha))
+    if found is None:
+        start_response("404 Not Found", [("Content-Type", "text/plain")])
+        return [b"No such image, or it changed since it was imported."]
+    content, media_type = found
+    headers = [
+        ("Content-Type", media_type),
+        ("X-Content-Type-Options", "nosniff"),
+        ("Content-Security-Policy", "default-src 'none'; sandbox"),
+        ("Cache-Control", "no-store"),
+    ]
+    if media_type == "application/octet-stream":
+        headers.append(("Content-Disposition", f'attachment; filename="{sha[:12]}.bin"'))
+    start_response("200 OK", headers)
+    return [content]
 
 
 def _import_form(settings: Settings, form: dict[str, str], error: str | None) -> Page:

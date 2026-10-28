@@ -863,3 +863,20 @@ pytest -q               # 569 passed, 6 skipped
 Fix attempts: 1 (a missing path was reported as "unsupported format"; the CLI now checks it exists first).
 
 **Next exact task:** UI-003 (chat browser with branches and images).
+
+### 00:32 — UI-003: browse chats, branches and images in the browser
+**What:** a Chats page lists every conversation, newest first, with a title search. Opening one shows the conversation the way ChatGPT last showed it, then each other branch (an edited question or a regenerated answer) in its own box, labelled with its kind and a "Go there" link to where it leaves the main path. Images appear in place. A missing or unmatched image shows a marker with the reason instead of a broken picture. 20 new tests, 589 in total.
+**Same as the notes:** the page and the Obsidian transcript note now share one function (`transcript_sections`) that decides what goes where. I checked that the notes come out byte-for-byte the same on all 16 fixture chats after the change.
+**Safety:** images are served only after their fingerprint is checked again, so an image edited after import isn't shown as if it were the original. Only real image types are shown inline; anything else is a download. The title search treats `%` and `_` as plain characters.
+**Teach-back (`ui/data.py` conversation_page):** "The chat page asks the same function as the Obsidian note to split a conversation into the main path, the side branches and anything orphaned, so every message shows up exactly once. Each branch says what kind it is and links back to where it split off. Images are fetched by their fingerprint and re-checked before they're shown."
+**Talking points:**
+- "Branches are never merged: you see the main conversation and each alternative side by side, with a link to where it forked."
+- "The browser view and the Obsidian notes can't drift apart, because they use the same code to lay a chat out."
+```
+ruff check .            # All checks passed!
+mypy                    # Success: no issues found in 90 source files
+pytest -q               # 589 passed, 6 skipped
+```
+Fix attempts: 1 (the chat list counted the tree's empty root as a message; it now counts only nodes with a message, and a test checks the list matches the chat page).
+
+**Next exact task:** ING-010 + NRM-003 (Milestone 2).

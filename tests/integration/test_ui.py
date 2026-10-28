@@ -29,7 +29,7 @@ FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 
 def _call(
     app: WSGIApp,
-    path: str,
+    target: str,
     *,
     host: str = "127.0.0.1:8765",
     method: str = "GET",
@@ -42,9 +42,11 @@ def _call(
         captured["status"], captured["headers"] = status, dict(headers)
 
     payload = urlencode(form or {}).encode("utf-8")
+    path, _, query = target.partition("?")
     environ: dict[str, Any] = {
         "REQUEST_METHOD": method,
         "PATH_INFO": path,
+        "QUERY_STRING": query,
         "HTTP_HOST": host,
         "CONTENT_LENGTH": str(len(payload)),
         "wsgi.input": io.BytesIO(payload),
@@ -52,7 +54,7 @@ def _call(
     if origin is not None:
         environ["HTTP_ORIGIN"] = origin
     body: Iterable[bytes] = app(environ, start_response)
-    return captured["status"], captured["headers"], b"".join(body).decode("utf-8")
+    return captured["status"], captured["headers"], b"".join(body).decode("utf-8", errors="replace")
 
 
 def _get(
@@ -275,3 +277,140 @@ def test_failed_browser_import_says_why(settings: Settings, tmp_path: Path) -> N
         time.sleep(0.05)
     assert "isn&#39;t a ChatGPT export" in body or "isn't a ChatGPT export" in body
     assert str(junk) not in body
+
+
+# ---------------------------------------------------------------- UI-003
+
+CHATGPT = FIXTURES / "chatgpt"
+CASES = sorted(p.name for p in CHATGPT.iterdir() if (p / "manifest.json").is_file())
+_NOTE_ANCHOR_RE = re.compile(r" \^(node-[0-9a-f]{32})$", re.MULTILINE)
+
+
+def _case_root(case: str) -> Path:
+    export = CHATGPT / case / "export"
+    zips = list(export.glob("*.zip"))
+    return zips[0] if zips else export
+
+
+def _chat_ids(settings: Settings) -> list[str]:
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.importer.records import ConversationRow
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+
+    engine = create_sqlite_engine(database_path(settings))
+    try:
+        with Session(engine) as session:
+            return list(session.scalars(select(ConversationRow.conversation_id)).all())
+    finally:
+        engine.dispose()
+
+
+def _note_anchors(settings: Settings, conversation_id: str) -> list[str]:
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.rendering.markdown import render_note
+    from knowledge_engine.rendering.transcript import load_conversation, transcript_model
+
+    engine = create_sqlite_engine(database_path(settings))
+    try:
+        with Session(engine) as session:
+            note = render_note(transcript_model(load_conversation(session, conversation_id)))
+    finally:
+        engine.dispose()
+    return _NOTE_ANCHOR_RE.findall(note)
+
+
+@pytest.mark.parametrize("case", CASES)
+def test_chat_page_shows_every_message_once(case: str, settings: Settings) -> None:
+    run_import(_case_root(case), "fixture", format_id=None, settings=settings)
+    app = make_app(settings)
+    _, _, listing = _call(app, "/chats")
+    for conversation_id in _chat_ids(settings):
+        assert f'href="/chats/{conversation_id}"' in listing
+        status, _, page = _call(app, f"/chats/{conversation_id}")
+        assert status.startswith("200")
+        ids = re.findall(r'<article class="message [^"]*" id="(node-[0-9a-f]{32})"', page)
+        # Same messages as the transcript note, each exactly once.
+        assert sorted(ids) == sorted(_note_anchors(settings, conversation_id))
+        assert len(ids) == len(set(ids))
+        assert "<script" not in page.lower()
+
+
+@pytest.mark.parametrize("case", ["branches_edit", "branches_regen"])
+def test_branches_are_labelled_and_link_to_where_they_leave(case: str, settings: Settings) -> None:
+    run_import(_case_root(case), "fixture", format_id=None, settings=settings)
+    app = make_app(settings)
+    pages = [_call(app, f"/chats/{cid}")[2] for cid in _chat_ids(settings)]
+    branched = [page for page in pages if "Other branches" in page]
+    assert branched
+    for page in branched:
+        assert re.search(r"<h3>Branch \([a-z_]+\)</h3>", page)
+        for anchor in re.findall(r'<a href="#(node-[0-9a-f]{32})">Go there', page):
+            assert f'id="{anchor}"' in page
+
+
+def test_images_are_shown_and_served_only_if_unchanged(settings: Settings, tmp_path: Path) -> None:
+    export = tmp_path / "repeated"
+    shutil.copytree(_case_root("repeated_image"), export)
+    run_import(export, "fixture", format_id=None, settings=settings)
+    app = make_app(settings)
+    urls: set[str] = set()
+    for conversation_id in _chat_ids(settings):
+        _, _, page = _call(app, f"/chats/{conversation_id}")
+        urls.update(re.findall(r'<img src="(/media/[0-9a-f]{64})"', page))
+    assert urls
+    url = sorted(urls)[0]
+    status, headers, _ = _call(app, url)
+    assert status.startswith("200")
+    assert headers["Content-Type"].startswith("image/")
+    assert headers["X-Content-Type-Options"] == "nosniff"
+
+    # Reference mode: the image still lives in the export. If it is edited
+    # after the import, the app refuses to serve the changed bytes.
+    for image in (export / "images").rglob("*"):
+        if image.is_file():
+            image.write_bytes(image.read_bytes() + b"changed")
+    assert _call(app, url)[0].startswith("404")
+
+
+def test_missing_images_are_marked_with_a_reason(settings: Settings) -> None:
+    run_import(_case_root("asset_problems"), "fixture", format_id=None, settings=settings)
+    app = make_app(settings)
+    pages = " ".join(_call(app, f"/chats/{cid}")[2] for cid in _chat_ids(settings))
+    assert re.search(r'<p class="error">Image (missing|unresolved|ambiguous)', pages)
+
+
+def test_chat_list_search_and_bad_addresses(settings: Settings) -> None:
+    assert "0 chats" in _call(make_app(settings), "/chats")[2]  # nothing imported yet
+    run_import(
+        _case_root("same_title_different_chat"), "fixture", format_id=None, settings=settings
+    )
+    app = make_app(settings)
+    _, _, everything = _call(app, "/chats")
+    total = len(re.findall(r'href="/chats/conv_', everything))
+    assert total >= 2
+    # "%" is a wildcard in SQL; here it is just a character, so nothing matches.
+    _, _, none = _call(app, "/chats?q=%25")
+    assert "0 chats" in none
+    assert _call(app, "/chats/conv_nope")[0].startswith("404")
+    assert _call(app, "/chats/../../x")[0].startswith("404")
+    assert _call(app, "/media/" + "0" * 64)[0].startswith("404")
+    assert _call(app, "/media/not-a-hash")[0].startswith("404")
+
+
+def test_chat_list_counts_match_the_chat_page(settings: Settings) -> None:
+    run_import(_case_root("branches_regen"), "fixture", format_id=None, settings=settings)
+    app = make_app(settings)
+    _, _, listing = _call(app, "/chats")
+    for conversation_id in _chat_ids(settings):
+        row = re.search(
+            rf'href="/chats/{conversation_id}">.*?</td>\s*<td>.*?</td>\s*<td>(\d+)</td>',
+            listing,
+            re.S,
+        )
+        assert row is not None
+        page = _call(app, f"/chats/{conversation_id}")[2]
+        assert f"· {row.group(1)} messages ·" in page

@@ -567,3 +567,9 @@ Finish line: `reexport_v1` → `reexport_v2` matches the answer key exactly (con
 - Test change: tests/unit/test_cli.py::test_import_is_an_honest_placeholder replaced by test_import_reports_a_missing_source_plainly (delegated authority, OPEN_DECISIONS). New: tests/integration/test_cli_import.py (2), test_ui.py (+3).
 - Full suite 569 passed, 6 skipped. ruff, mypy, git_guard OK.
 - Next: UI-003.
+
+## 2026-10-28 00:32 UI-003
+- rendering/transcript.py: TranscriptSection + transcript_sections (shared by notes and the web view; note output byte-identical on all 16 fixture conversations, checked against main's version). ui/data.py: ChatRow, list_conversations (LIKE-escaped title search, paging), conversation_page, media_file (re-hash before serving; non-image types as downloads). ui/app.py: /chats, /chats/<id>, /media/<sha>; CSP img-src 'self'. Templates chats.html, chat.html.
+- Visual check: headless Chromium screenshots of list, branches, images and missing markers; no console errors.
+- Tests: test_ui.py +20. Full suite 589 passed, 6 skipped. ruff, mypy, git_guard OK.
+- Next: ING-010 + NRM-003.

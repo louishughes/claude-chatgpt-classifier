@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Chats · Knowledge Engine{% endblock %}
+{% block main %}
+<h1>Chats</h1>
+<form method="get" action="/chats" class="search">
+  <label for="q">Find by title</label>
+  <input id="q" name="q" type="text" value="{{ q }}">
+  <button type="submit">Search</button>
+</form>
+<p class="muted">{{ total }} chat{{ "" if total == 1 else "s" }}{% if q %} with "{{ q }}" in the title{% endif %}.</p>
+{% if rows %}
+<table>
+  <thead><tr><th>Title</th><th>Started</th><th>Messages</th><th></th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+  <tr>
+    <td><a href="/chats/{{ row.conversation_id }}">{{ row.title }}</a></td>
+    <td>{{ row.created | when }}</td>
+    <td>{{ row.messages }}</td>
+    <td>{% if row.presence == "not_seen" %}<span class="status partial" title="Not in the latest full export; kept">not seen</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if pages > 1 %}
+<p>
+  {% if page > 1 %}<a href="/chats?q={{ q | urlencode }}&amp;page={{ page - 1 }}">← Newer</a>{% endif %}
+  Page {{ page }} of {{ pages }}
+  {% if page < pages %}<a href="/chats?q={{ q | urlencode }}&amp;page={{ page + 1 }}">Older →</a>{% endif %}
+</p>
+{% endif %}
+{% endif %}
+{% endblock %}
