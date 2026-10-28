@@ -19,7 +19,10 @@ comparing it with the stored chat:
   warns rather than fails);
 * ``empty_sections``: a section with nothing in it is one sentence, never
   an evidence box;
-* ``budget``: the body stays under ``body_budget`` for the chat's length.
+* ``budget``: the body stays under ``body_budget`` for the chat's length;
+* ``part_wording`` (NOTE-017): no generated line still says "this part" or
+  "part 2 of 3", wording left over from digesting a long chat in parts.
+  Quotes from the chat are not checked: the user may well have said it.
 
 These checks never judge whether a summary is *right*; that is the
 independent reference set and scorer in the PC thread (NOTE-011's other
@@ -42,6 +45,7 @@ from enum import StrEnum
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from knowledge_engine.digest.stage import PART_WORDING
 from knowledge_engine.documents.model import DocumentKind, build_document
 from knowledge_engine.documents.render import transcript_stem
 from knowledge_engine.documents.rich_note import WAITING, body_budget, body_of
@@ -67,6 +71,8 @@ CLAIM_SECTIONS = (
     "Tensions and trade-offs",
     "Next steps",
 )
+# Sections the digest writes in its own words (NOTE-017 checks their wording).
+GENERATED_SECTIONS = ("Insights", "Tensions and trade-offs", "Next steps", "Keywords and topics")
 # Two lines this similar (shared content words over the shorter's words)
 # are taken to say the same thing.
 SAME_THING = 0.6
@@ -132,6 +138,7 @@ def check_note(session: Session, conversation_id: str, text: str) -> NoteCheckRe
         _tensions_next_steps(sections),
         _empty_sections(sections),
         _budget(chat, body),
+        _part_wording(body, sections),
     )
     return NoteCheckReport(conversation_id, findings)
 
@@ -262,6 +269,33 @@ def _budget(chat: StoredConversation, body: str) -> Finding:
     if len(body) <= limit:
         return Finding("budget", CheckStatus.PASS)
     return Finding("budget", CheckStatus.FAIL, (f"{len(body)} characters, budget {limit}",))
+
+
+def _part_wording(body: str, sections: dict[str, str]) -> Finding:
+    """Generated lines only: the summary box, the card's digest cells and generated bullets.
+
+    Records under Decisions, Suggestions and the like are the chat's own
+    words, so they are left alone.
+    """
+    lines = [
+        ("summary", line)
+        for line in sections[""].splitlines()
+        if line.startswith("> ") and not line.startswith("> [!")
+    ]
+    lines += [
+        ("card", line)
+        for line in body.splitlines()
+        if line.startswith(("| **Purpose**", "| **Outcome**", "| **Intent**"))
+    ]
+    lines += [
+        (title, line) for title in GENERATED_SECTIONS for line in _bullets(sections.get(title, ""))
+    ]
+    problems = [
+        f'{where}: says "{match.group(0)}"'
+        for where, line in lines
+        if (match := PART_WORDING.search(line))
+    ]
+    return _finding("part_wording", problems)
 
 
 def summarise(reports: Iterable[NoteCheckReport]) -> dict[str, dict[str, int]]:

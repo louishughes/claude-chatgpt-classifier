@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Literal
@@ -46,6 +47,7 @@ from knowledge_engine.digest.contract import (
     DigestItemAnswer,
     resolve_digest,
 )
+from knowledge_engine.digest.ending import settle_status
 from knowledge_engine.domain.enums import Role
 from knowledge_engine.extraction.text import ExtractionMessage, exchanges_of
 from knowledge_engine.orchestration.stage_keys import stage_key
@@ -56,7 +58,11 @@ from knowledge_engine.segmentation.segmenter import SegmenterSettings, split_par
 
 STAGE_ID = "digest.conversation.v1"
 STAGE_VERSION = "note-003-v1"
-PROMPT_VERSION = "digest-v1"
+# v2 (NOTE-019): the status rule for chats that end on an assistant offer.
+# v3 (NOTE-017): a part of a long chat is described as the chat, never as
+# "this part". A new version gives every request a new key, so digests
+# written under an older wording are asked for again, not silently reused.
+PROMPT_VERSION = "digest-v3"
 
 INSTRUCTIONS = """\
 You write a short, accurate digest of one chat between a user and an AI \
@@ -73,7 +79,10 @@ Fill in:
 - summary: 1 to 4 sentences on what happened, in order, with specifics.
 - purpose: what the chat was for. outcome: how it ended, if it did.
 - status: open (unresolved or ongoing), settled (reached an answer or a \
-result) or abandoned (dropped without one).
+result) or abandoned (dropped without one). Decide it by how the chat \
+ends: if the user got what they asked for and the assistant's last message \
+only offers more ("Want me to...?"), the chat is settled; it is open only \
+when the user's last message asks something that was not answered.
 - intent: what the user wanted (learn, build, decide, create, fix, plan, \
 explore or other), with one line in your own words.
 - topics: the main subjects, as short noun phrases.
@@ -84,8 +93,9 @@ conflicts that came up. These are your reading of the chat.
 the user said they would do.
 
 Attribute carefully: an assistant suggestion is not a user decision. Leave \
-a list empty rather than pad it. If the chat is partial (a "Part" header), \
-describe only that part."""
+a list empty rather than pad it. If the input is one part of a longer chat \
+(a "Part" header), describe what happens in it, in order, as sentences about \
+the chat; never write "this part" or "this section"."""
 
 
 DigestState = Literal["done", "pending", "review_required"]
@@ -246,7 +256,7 @@ class DigestStage:
             answer = outputs[request_id]
             assert isinstance(answer, DigestAnswer)
             answers.append(answer)
-        digest = resolve_digest(merge_answers(answers), chat_messages(conversation))
+        digest = _checked(merge_answers(answers), conversation)
         return DigestOutcome(cid, "done" if digest.usable else "review_required", digest, ids)
 
 
@@ -268,18 +278,64 @@ def stored_digest(
         if row is None:
             return None
         answers.append(DigestAnswer.model_validate_json(row.output_json))
-    digest = resolve_digest(merge_answers(answers), chat_messages(conversation))
+    digest = _checked(merge_answers(answers), conversation)
     return digest if digest.usable else None
 
 
+def _checked(answer: DigestAnswer, conversation: StoredConversation) -> ConversationDigest:
+    """Check every quote against the chat, then the status against how it ended."""
+    messages = chat_messages(conversation)
+    return settle_status(resolve_digest(answer, messages), messages, conversation)
+
+
+# Words that only make sense inside one part of a split chat (NOTE-017).
+# The note checks (NOTE-011) fail a note that still has any of them.
+PART_WORDING = re.compile(
+    r"\b(this|the current) (part|section|segment|portion)\b|\bpart \d+ of \d+\b",
+    re.IGNORECASE,
+)
+_LEADING_PART = re.compile(
+    r"^(in|during|throughout|across) (this|the current) (part|section|segment|portion)"
+    r"( of the (chat|conversation))?,?\s*",
+    re.IGNORECASE,
+)
+_PART_OF_CHAT = re.compile(
+    r"\b(this|the current) (part|section|segment|portion)( of the (chat|conversation))?\b",
+    re.IGNORECASE,
+)
+
+
+def without_part_wording(text: str) -> str:
+    """A part's sentence rewritten to speak about the whole chat.
+
+    "In this part, the user asks X" becomes "The user asks X", and "this
+    part" elsewhere becomes "the chat". The meaning doesn't change: the
+    sentence was always about the chat, seen through one part of it.
+    """
+    cut = _LEADING_PART.sub("", text.strip())
+    if cut != text.strip() and cut:
+        cut = cut[0].upper() + cut[1:]
+    swapped = _PART_OF_CHAT.sub(
+        lambda m: "The chat" if m.group(0)[0].isupper() else "the chat", cut
+    )
+    return swapped or text
+
+
+def _unparted(item: DigestItemAnswer) -> DigestItemAnswer:
+    return item.model_copy(update={"text": without_part_wording(item.text)})
+
+
 def merge_answers(answers: Sequence[DigestAnswer]) -> DigestAnswer:
-    """Combine the answers for the parts of one long chat, in order.
+    """Combine the answers for the parts of one long chat into one, in order.
 
     Purpose and intent come from the first part (how it started); outcome
-    and status from the last (how it ended). Summary sentences are taken
-    round-robin so every part is represented within the four allowed.
-    Lists keep their first occurrence of each text and are cut to their
-    schema maximum. One answer is returned unchanged.
+    and status from the last (how it ended). The summary keeps every part
+    represented within the four sentences allowed: sentences are *chosen*
+    round-robin (each part's first, then each part's second...), then put
+    back in **chat order** (part 1's before part 2's), so the summary reads
+    in the order things happened (NOTE-017). Every text loses its "this
+    part" wording. Lists keep their first occurrence of each text and are
+    cut to their schema maximum. One answer is returned unchanged.
     """
     if len(answers) == 1:
         return answers[0]
@@ -296,21 +352,24 @@ def merge_answers(answers: Sequence[DigestAnswer]) -> DigestAnswer:
         kept: list[DigestItemAnswer] = []
         for answer in answers:
             for item in getattr(answer, name):
+                item = _unparted(item)
                 key = item.text.strip().casefold()
                 if key not in seen:
                     seen.add(key)
                     kept.append(item)
         return kept[: limit(name)]
 
-    summary: list[DigestItemAnswer] = []
+    chosen: list[tuple[int, int]] = []  # (part, sentence) positions
     for round_ in range(max(len(a.summary) for a in answers)):
-        summary.extend(a.summary[round_] for a in answers if round_ < len(a.summary))
+        chosen.extend((p, round_) for p, a in enumerate(answers) if round_ < len(a.summary))
+    in_order = sorted(chosen[: limit("summary")])
+    summary = [_unparted(answers[p].summary[i]) for p, i in in_order]
     return DigestAnswer(
-        summary=summary[: limit("summary")],
-        purpose=first.purpose,
-        outcome=last.outcome,
+        summary=summary,
+        purpose=_unparted(first.purpose) if first.purpose else None,
+        outcome=_unparted(last.outcome) if last.outcome else None,
         status=last.status,
-        intent=first.intent,
+        intent=first.intent.model_copy(update={"text": without_part_wording(first.intent.text)}),
         topics=joined("topics"),
         insights=joined("insights"),
         tensions=joined("tensions"),

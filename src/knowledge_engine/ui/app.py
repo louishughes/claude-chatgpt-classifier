@@ -39,7 +39,8 @@ from sqlalchemy.orm import Session
 from knowledge_engine import __version__
 from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
 from knowledge_engine.settings import Settings
-from knowledge_engine.ui import data, evaluation, registries, review
+from knowledge_engine.taxonomy.refresh import refresh_status
+from knowledge_engine.ui import data, evaluation, notes, registries, review
 from knowledge_engine.ui.jobs import ImportJobs
 
 StartResponse = Callable[[str, list[tuple[str, str]]], Any]
@@ -52,6 +53,8 @@ _SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 _VIDEO_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 _SEARCH_MODES = ("tokens", "phrase", "exact")
 _PAGE_SIZE = 100
+# Each row of the notes page loads its chat and digest, so fewer per page.
+_NOTES_PAGE_SIZE = 50
 _HEADERS = [
     ("Content-Type", "text/html; charset=utf-8"),
     # No scripts at all, styles only from the page itself, no framing.
@@ -185,6 +188,8 @@ def _route(
             return Page("200 OK", "job.html", {"state": state, "error": job.error})
     if path == "/chats":
         return _chats(settings, query)
+    if path == "/notes":
+        return _notes(settings, query)
     if path.startswith("/chats/"):
         conversation_id = path.removeprefix("/chats/")
         if _IMPORT_ID_RE.fullmatch(conversation_id):
@@ -236,6 +241,8 @@ def _home(settings: Settings) -> Page:
             values = {
                 "status": data.workspace_status(session),
                 "imports": data.list_imports(session),
+                # NOTE-014: what the current vocabulary doesn't cover yet.
+                "vocabulary": refresh_status(session),
             }
     finally:
         engine.dispose()
@@ -299,7 +306,26 @@ def _chat(settings: Settings, conversation_id: str) -> Page:
     chat = _read(settings, lambda s: data.conversation_page(s, conversation_id))
     if chat is None:
         return Page("404 Not Found", "error.html", {"message": "No chat with that ID."})
-    return Page("200 OK", "chat.html", {"chat": chat})
+    try:
+        note = _read(settings, lambda s: notes.note_view(s, conversation_id))
+    except Exception as error:  # noqa: BLE001 - the transcript must still show
+        # The note is built from many stored facts; if one of them can't be
+        # read, say so beside the transcript instead of losing the whole page.
+        note = None
+        chat = {**chat, "note_error": type(error).__name__}
+    return Page("200 OK", "chat.html", {"chat": chat, "note": note})
+
+
+def _notes(settings: Settings, query: dict[str, list[str]]) -> Page:
+    page_number = _page_number(query)
+    offset = (page_number - 1) * _NOTES_PAGE_SIZE
+    found = _read(settings, lambda s: notes.notes_index(s, offset=offset, limit=_NOTES_PAGE_SIZE))
+    found = found or {"categories": [], "total": 0, "taxonomy_version": None}
+    return Page(
+        "200 OK",
+        "notes.html",
+        {**found, "page": page_number, "pages": max(1, -(-found["total"] // _NOTES_PAGE_SIZE))},
+    )
 
 
 def _one(

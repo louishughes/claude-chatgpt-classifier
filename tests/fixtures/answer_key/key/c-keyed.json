@@ -1,0 +1,126 @@
+{
+  "conversation_id": "c-keyed",
+  "segments": [
+    {
+      "start": 2,
+      "end": 6,
+      "subject_l1": "home_and_life",
+      "subject_l2": "gardening",
+      "purpose": "plan_or_decide",
+      "projects": [],
+      "summary": "Synthetic."
+    }
+  ],
+  "items": [
+    {
+      "type": "requirement",
+      "text": "Synthetic item.",
+      "message": 2,
+      "speaker": "user",
+      "state": null,
+      "decided_in": null,
+      "evidence_quote": "30 cm deep",
+      "quote": "30 cm deep",
+      "message_id": "u1"
+    },
+    {
+      "type": "decision",
+      "text": "Synthetic item.",
+      "message": 3,
+      "speaker": "assistant",
+      "state": "accepted",
+      "decided_in": 4,
+      "evidence_quote": "let's use cedar",
+      "quote": "let's use cedar",
+      "message_id": "a1"
+    },
+    {
+      "type": "preference",
+      "text": "Synthetic item.",
+      "message": 4,
+      "speaker": "user",
+      "state": null,
+      "decided_in": null,
+      "evidence_quote": "I prefer untreated wood",
+      "quote": "I prefer untreated wood",
+      "message_id": "u2"
+    },
+    {
+      "type": "idea",
+      "text": "Synthetic item.",
+      "message": 5,
+      "speaker": "assistant",
+      "state": null,
+      "decided_in": null,
+      "evidence_quote": "add a trellis",
+      "quote": "add a trellis",
+      "message_id": "a2"
+    },
+    {
+      "type": "open_question",
+      "text": "Synthetic item.",
+      "message": 5,
+      "speaker": "user",
+      "state": null,
+      "decided_in": null,
+      "evidence_quote": "What soil mix",
+      "quote": "What soil mix",
+      "message_id": "u3"
+    },
+    {
+      "type": "fact",
+      "text": "Synthetic item.",
+      "message": 3,
+      "speaker": "assistant",
+      "state": null,
+      "decided_in": null,
+      "evidence_quote": "resist rot",
+      "quote": "resist rot",
+      "message_id": "a1"
+    },
+    {
+      "type": "task",
+      "text": "Synthetic item.",
+      "message": 4,
+      "speaker": "user",
+      "state": null,
+      "decided_in": null,
+      "evidence_quote": "use cedar",
+      "quote": "use cedar",
+      "message_id": "u2"
+    },
+    {
+      "type": "requirement",
+      "text": "Synthetic item.",
+      "message": 6,
+      "speaker": "user",
+      "state": null,
+      "decided_in": null,
+      "evidence_quote": "for vegetables",
+      "quote": "for vegetables",
+      "message_id": "u3",
+      "unverified": true
+    },
+    {
+      "type": "preference",
+      "text": "Synthetic item.",
+      "message": 3,
+      "speaker": "user",
+      "state": null,
+      "decided_in": null,
+      "evidence_quote": "I prefer untreated wood",
+      "quote": "I prefer untreated wood"
+    },
+    {
+      "type": "decision",
+      "text": "Synthetic item.",
+      "message": 3,
+      "speaker": "assistant",
+      "state": "unclear",
+      "decided_in": null,
+      "evidence_quote": "cedar boards",
+      "quote": "cedar boards",
+      "message_id": "a1"
+    }
+  ]
+}

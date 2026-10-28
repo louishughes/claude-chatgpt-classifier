@@ -28,6 +28,12 @@ How evidence is shown, and why (the old v2 notes drowned in it):
 * hashes, record IDs and stage keys go to a JSON sidecar in
   ``Knowledge/.meta/`` instead of the reader's way.
 
+Where a model extraction (NOTE-005) has finished for a segment, the older
+rule-extractor records of that segment are left out of the note (NOTE-022):
+they repeat what the model found and pick up pasted instructions and drafted
+text as if the user had said them. They stay stored, and the Source section
+says how many were held back.
+
 Only stored facts are used: nothing here calls a model, and a section with
 nothing behind it says so instead of guessing. DOC-003 stays the default
 note; this one is chosen with ``ke docs chat --template v2``.
@@ -53,12 +59,19 @@ from sqlalchemy.orm import Session
 
 from knowledge_engine.classification.store import effective_labels
 from knowledge_engine.digest.contract import ConversationDigest, DigestItem
-from knowledge_engine.documents.categories import category_shares, waiting_candidates
+from knowledge_engine.documents.categories import (
+    Suggestion,
+    category_shares,
+    suggested_category,
+    waiting_candidates,
+)
 from knowledge_engine.documents.model import DocItem, DocumentKind, build_document
 from knowledge_engine.documents.notes import _branches, _images, _links, knowledge_path
 from knowledge_engine.documents.render import transcript_stem
 from knowledge_engine.domain.models import EvidenceRef
 from knowledge_engine.extraction.records import KnowledgeRecord
+from knowledge_engine.extraction.runner import DONE as RUN_DONE
+from knowledge_engine.extraction.runner import ExtractionRunRow
 from knowledge_engine.extraction.store import KnowledgeRecordRow
 from knowledge_engine.importer.records import ConversationRow
 from knowledge_engine.relationships.view import RelatedLink, related_links
@@ -249,6 +262,47 @@ class _Sorted:
     references: list[_Item]
 
 
+def _prefer_model(session: Session, items: Sequence[_Item]) -> tuple[list[_Item], int]:
+    """Leave out rule records of segments a model extraction covers (NOTE-022).
+
+    A run is a model run when its versions name a prompt. Records with no
+    extraction run behind them (a person's, say) are always kept.
+
+    Returns:
+        The records to show, and how many were left out.
+    """
+    keys = {i.record.provenance.stage_key for i in items if i.record.provenance}
+    runs = {
+        r.stage_key: r
+        for r in session.scalars(
+            select(ExtractionRunRow).where(ExtractionRunRow.stage_key.in_(sorted(keys)))
+        )
+    }
+    segments = sorted({r.segment_id for r in runs.values()})
+    covered = {
+        r.segment_id
+        for r in session.scalars(
+            select(ExtractionRunRow).where(
+                ExtractionRunRow.segment_id.in_(segments), ExtractionRunRow.state == RUN_DONE
+            )
+        )
+        if "prompt" in json.loads(r.versions_json)
+    }
+    kept = []
+    for it in items:
+        provenance = it.record.provenance
+        run = runs.get(provenance.stage_key) if provenance else None
+        if (
+            run is not None
+            and provenance is not None
+            and provenance.prompt_version is None
+            and run.segment_id in covered
+        ):
+            continue
+        kept.append(it)
+    return kept, len(items) - len(kept)
+
+
 def _sort(items: Sequence[_Item]) -> _Sorted:
     """Place each record in exactly one section.
 
@@ -394,10 +448,20 @@ def chat_labels(
 
 
 def _category_lines(
-    session: Session, chat: StoredConversation, taxonomy: TaxonomySnapshot, citer: Citer
+    session: Session,
+    chat: StoredConversation,
+    taxonomy: TaxonomySnapshot,
+    citer: Citer,
+    suggestion: Suggestion | None,
 ) -> list[str]:
     """One line per domain term (NOTE-008), then the candidates waiting for review."""
     lines = []
+    if suggestion is not None:
+        segments = ", ".join(str(n) for n in suggestion.segments)
+        lines.append(
+            f"Suggested, waiting for review (not a label): **{escape_text(suggestion.label)}**, "
+            f"the classifier's best candidate from segment(s) {segments}."
+        )
     for share in category_shares(session, chat, taxonomy):
         segments = ", ".join(str(n) for n in share.segments)
         cites = " ".join(citer.native(n) for n in share.evidence if n in chat.node_keys)
@@ -511,7 +575,9 @@ def rich_conversation_note(
     stem = transcript_stem(conversation_id, chat.title)
     citer = Citer(chat, stem)
     document = build_document(session, DocumentKind.CONVERSATION, conversation_id)
-    items = _load_items(session, [i for s in document.sections for i in s.items])
+    items, hidden = _prefer_model(
+        session, _load_items(session, [i for s in document.sections for i in s.items])
+    )
     sorted_ = _sort(items)
     labels = chat_labels(session, chat, taxonomy)
     links = related_links(session, [conversation_id])
@@ -523,28 +589,45 @@ def rich_conversation_note(
 
     category = labels.category or "unclassified"
     where = category if labels.subcategory is None else f"{category} › {labels.subcategory}"
-    names = sorted(
-        {" ".join(i.record.entity.name.split()) for i in sorted_.references if i.record.entity}
+    # Shown beside "unclassified", never in its place: the front-matter
+    # category stays unset until a reviewer settles it (NOTE-018).
+    suggestion = (
+        suggested_category(session, chat, taxonomy)
+        if taxonomy is not None and labels.category is None
+        else None
     )
+    shown = (
+        where
+        if suggestion is None
+        else (f"{where}; suggested: {suggestion.label} (waiting for review)")
+    )
+    # A "name" made only of digits and punctuation ("48" from "playing 48
+    # levels") is a number the entity cue caught, not a tool or a title.
+    spelled = {
+        " ".join(i.record.entity.name.split()) for i in sorted_.references if i.record.entity
+    }
+    names = sorted(n for n in spelled if any(ch.isalpha() for ch in n))
     made = _artefact_names(session, sorted_.artefacts)
 
     def card_cell(item: DigestItem | None, missing: str) -> str:
         return _cell(_digest_line(item, citer)) if item else missing
 
-    pending = "not written yet" if digest is None else "not stated"
-    card = [
-        "| | |",
-        "|---|---|",
-        f"| **Purpose** | {card_cell(digest.purpose if digest else None, pending)} |",
-        f"| **Outcome** | {card_cell(digest.outcome if digest else None, pending)} |",
-    ]
+    card = ["| | |", "|---|---|"]
+    if digest is None:
+        card += ["| **Purpose** | not written yet |", "| **Outcome** | not written yet |"]
+    else:
+        # A digest that found no purpose or outcome leaves the row out: an
+        # empty "not stated" row reads as a claim about the chat (NOTE-024).
+        for title, item in (("Purpose", digest.purpose), ("Outcome", digest.outcome)):
+            if item is not None:
+                card.append(f"| **{title}** | {card_cell(item, '')} |")
     if digest is not None:
         status = digest.status.value if digest.status else "unknown"
         intent = digest.intent.value if digest.intent else "unknown"
         card.append(f"| **Status** | {status} |")
         card.append(f"| **Intent** | {intent}: {card_cell(digest.intent_item, 'unknown')} |")
     card += [
-        f"| **Category** | {_cell(escape_text(where))} |",
+        f"| **Category** | {_cell(escape_text(shown))} |",
         f"| **Project** | {_cell(escape_text(labels.project or 'none matched'))} |",
         "| **Tools and names** | "
         + (_cell(", ".join(escape_text(n) for n in names)) or "none recorded")
@@ -650,7 +733,7 @@ def rich_conversation_note(
         )
     tag_lines = [classified]
     if taxonomy is not None:
-        tag_lines += _category_lines(session, chat, taxonomy, citer)
+        tag_lines += _category_lines(session, chat, taxonomy, citer, suggestion)
     if labels.tags:
         tag_lines.append("Topics: " + ", ".join(escape_text(t) for t in labels.tags))
     for facet, values in (labels.facets or {}).items():
@@ -695,6 +778,12 @@ def rich_conversation_note(
                 if digest is None
                 else f"summary and generated sections from a {digest.schema_version} digest, "
                 "not yet scored."
+            )
+            + (
+                f" {hidden} rule-based record(s) left out: a model extraction covers "
+                "their segments."
+                if hidden
+                else ""
             ),
             True,
         ),
