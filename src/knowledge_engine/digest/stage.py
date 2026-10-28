@@ -44,10 +44,11 @@ from knowledge_engine.digest.contract import (
     DIGEST_SCHEMA_VERSION,
     ConversationDigest,
     DigestAnswer,
+    DigestItem,
     DigestItemAnswer,
     resolve_digest,
 )
-from knowledge_engine.digest.ending import ending_questions, settle_status
+from knowledge_engine.digest.ending import ending_questions, questions_keep_open, settle_status
 from knowledge_engine.domain.enums import Role
 from knowledge_engine.extraction.text import ExtractionMessage, exchanges_of
 from knowledge_engine.orchestration.stage_keys import stage_key
@@ -292,7 +293,39 @@ def _checked(answer: DigestAnswer, conversation: StoredConversation) -> Conversa
     """Check every quote against the chat, then the status and open questions against its end."""
     messages = chat_messages(conversation)
     digest = settle_status(resolve_digest(answer, messages), messages, conversation)
-    return ending_questions(digest, messages, conversation)
+    digest = ending_questions(digest, messages, conversation)
+    return tidy_summary(questions_keep_open(digest, messages, conversation))
+
+
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+
+
+def _said(text: str) -> str:
+    return " ".join(text.split()).rstrip(".").casefold()
+
+
+def tidy_summary(digest: ConversationDigest) -> ConversationDigest:
+    """The summary with each sentence said once (NOTE-029).
+
+    The parts of a long chat can each summarise the same exchange, and a
+    model sometimes repeats a sentence inside one item. A sentence already
+    said, in this item or an earlier one, is dropped, unless it is all the
+    item says: an item never disappears, so its citations stay.
+    """
+    said: set[str] = set()
+    kept: list[DigestItem] = []
+    for item in digest.summary:
+        sentences = [x for x in _SENTENCE_END.split(item.text.strip()) if x]
+        fresh = []
+        for sentence in sentences:
+            if _said(sentence) not in said:
+                said.add(_said(sentence))
+                fresh.append(sentence)
+        text = " ".join(fresh) if fresh else sentences[0]
+        kept.append(item if text == item.text else item.model_copy(update={"text": text}))
+    if all(a is b for a, b in zip(kept, digest.summary, strict=True)):
+        return digest
+    return digest.model_copy(update={"summary": tuple(kept)})
 
 
 # Words that only make sense inside one part of a split chat (NOTE-017).

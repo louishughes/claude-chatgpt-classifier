@@ -164,6 +164,8 @@ Live ticket status for the build. The original ticket list is `docs/TICKETS.csv`
 | EVAL-010c Link, YouTube and social counts for Gate G2 (#334) | VERIFIED on fixtures; real 100 not run yet | SESSION_LOG 2026-10-28 EVAL-010c |
 | NOTE-026 One citation per message on the topics line (#329) | VERIFIED (fixture chat) | SESSION_LOG 2026-10-28 NOTE-026 |
 | NOTE-027 One line per repeated claim in a chat's note (#346) | VERIFIED (synthetic chat; the PC re-render and re-score are next) | sessions/2026-10-28-NOTE-027 |
+| NOTE-028 Digest status follows its own open questions (#347) | VERIFIED (synthetic; the PC re-score is next) | sessions/2026-10-28-NOTE-028-029 |
+| NOTE-029 Each summary sentence said once (#348) | VERIFIED (synthetic; identical one-sentence items still repeat, see OPEN_DECISIONS) | sessions/2026-10-28-NOTE-028-029 |
 | NOTE-022 Rule records hidden where a model extraction ran (#321) | VERIFIED (fixture chat; the PC re-score is next) | SESSION_LOG 2026-10-28 NOTE-022 |
 | EVAL-014 Per-chat answer key into a golden set (#317) | VERIFIED (synthetic key; the PC run against v2 is pending) | SESSION_LOG 2026-10-28 EVAL-014 |
 | NOTE-007 Keyword and topic candidates (#279) | VERIFIED (unit tests on synthetic chats; shown in the note later, with NOTE-008) | SESSION_LOG 2026-10-28 NOTE-007 |
