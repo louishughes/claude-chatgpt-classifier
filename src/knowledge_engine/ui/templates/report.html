@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Import report · Knowledge Engine{% endblock %}
 {% block main %}
-<p><a href="/">← All imports</a></p>
+<p class="back"><a href="/">← All imports</a></p>
 <h1>Import report</h1>
 <p class="muted">{{ report.started_at | when }} · {{ report.format_id }} · <span class="status {{ report.status }}">{{ report.status }}</span></p>
 <ul class="lines">
@@ -11,18 +11,18 @@
 </ul>
 {% if report.warnings %}
 <h2>Warnings</h2>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>Code</th><th>Count</th></tr></thead>
   <tbody>
   {% for code, count in report.warnings | dictsort %}
   <tr><td><code>{{ code }}</code></td><td>{{ count }}</td></tr>
   {% endfor %}
   </tbody>
-</table>
+</table></div>
 {% endif %}
 <details>
   <summary>All the numbers</summary>
-  <table>
+  <div class="table-wrap"><table>
     <tbody>
     {% for key, value in report | dictsort %}
     {% if key not in ("warnings",) %}
@@ -30,7 +30,7 @@
     {% endif %}
     {% endfor %}
     </tbody>
-  </table>
+  </table></div>
 </details>
 <p class="muted">Import ID <code>{{ report.import_id }}</code>. Same as <code>ke imports report {{ report.import_id }}</code>.</p>
 {% endblock %}

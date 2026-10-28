@@ -1,34 +1,37 @@
 {% extends "base.html" %}
 {% block title %}Accounts · Knowledge Engine{% endblock %}
 {% block main %}
-<h1>Social accounts</h1>
-<p class="muted">Accounts your chats mention by profile link or with the platform named. Nobody is looked up, followed or contacted. "Probable" means the text says so; only you can confirm who it is.</p>
+<header class="page-head">
+  <p class="eyebrow">Found in chats</p>
+  <h1>Social accounts</h1>
+  <p class="lede">Accounts your chats mention by profile link or with the platform named. Nobody is looked up, followed or contacted. "Probable" means the text says so; only you can confirm who it is.</p>
+</header>
 {% if accounts %}
-<table>
-  <thead><tr><th>Platform</th><th>Account</th><th>Mentions</th><th>Chats</th><th>Seen</th><th>Status</th></tr></thead>
+<div class="table-wrap"><table>
+  <thead><tr><th>Platform</th><th>Account</th><th class="num">Mentions</th><th class="num">Chats</th><th>Seen</th><th>Status</th></tr></thead>
   <tbody>
   {% for a in accounts %}
   <tr>
     <td>{{ a.platform }}</td>
     <td><a href="/accounts/{{ a.account_id }}">{% if a.handle %}@{{ a.handle }}{% else %}ID {{ a.stable_id }}{% endif %}</a></td>
-    <td>{{ a.mentions }}</td><td>{{ a.conversations }}</td>
+    <td class="num">{{ a.mentions }}</td><td class="num">{{ a.conversations }}</td>
     <td class="muted">{{ a.first_seen or "?" }}{% if a.last_seen and a.last_seen != a.first_seen %} to {{ a.last_seen }}{% endif %}</td>
     <td>{{ a.identity_status }}</td>
   </tr>
   {% endfor %}
   </tbody>
-</table>
+</table></div>
 {% else %}
-<p>No accounts found yet.</p>
+<div class="empty"><p class="what">No accounts found yet.</p><p class="next">Accounts appear here when a chat mentions a profile link, or a handle with its platform named.</p></div>
 {% endif %}
 {% if ambiguous %}
 <h2>Bare @names</h2>
 <p class="muted">Written without a platform, so they could be anyone anywhere. Listed, never linked to an account.</p>
-<table>
+<div class="table-wrap"><table>
   <thead><tr><th>Handle</th><th>Mentions</th><th>Chats</th></tr></thead>
   <tbody>
   {% for a in ambiguous %}<tr><td>{{ a.handle }}</td><td>{{ a.mentions }}</td><td>{{ a.conversations }}</td></tr>{% endfor %}
   </tbody>
-</table>
+</table></div>
 {% endif %}
 {% endblock %}

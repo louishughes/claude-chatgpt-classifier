@@ -931,5 +931,8 @@ links/youtube_captions.py (Data API v3 captions.list/download, OAuth token from 
 ## 2026-10-28 14:10 NOTE-005 (#277)
 extraction/model_knowledge.py (knowledge_extractor over ModelExtractor; check_candidates: user commitments need user quotes, one list = one proposal, pasted preambles give no commitments). Tests: tests/integration/test_model_knowledge.py (6).
 
+## 2026-10-28 12:20 INT-003 (#132)
+importer/watch.py (FolderWatcher: debounce, metadata + content fingerprints, failure recorded once, vault stage), `ke watch`. Tests: test_watch_folder.py (7). Docs: docs/operations/WATCHED_FOLDERS.md.
+
 ## 2026-10-28 13:05 NOTE-002 (#274)
 digest/contract.py (DigestAnswer extra=forbid, cited items, FIELD_PROVENANCE, resolve_digest drops an item on any bad quote and flags it). Tests: tests/unit/test_digest_contract.py (11).

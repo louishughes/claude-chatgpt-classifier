@@ -1,9 +1,17 @@
 {% extends "base.html" %}
+{% from "macros.html" import empty %}
 {% block main %}
-<h1>Your archive</h1>
+<header class="page-head">
+  <p class="eyebrow">Overview</p>
+  <h1>Your archive</h1>
+  <p class="lede">Every ChatGPT chat you've imported, kept on this computer. Search it, browse it, and see what the AI found in it.</p>
+</header>
 {% if status is none %}
-<p>No imports yet.</p>
-<p><a class="button" href="/import">Import your ChatGPT export</a></p>
+<div class="empty">
+  <p class="what">No imports yet.</p>
+  <p class="next">Start by importing the export you downloaded from ChatGPT (Settings → Data controls → Export data). Your files are only read, never changed.</p>
+  <p><a class="button" href="/import">Import your ChatGPT export</a></p>
+</div>
 {% else %}
 <ul class="tiles">
   <li><strong>{{ status.conversations }}</strong> chats stored</li>
@@ -13,30 +21,38 @@
 </ul>
 <form method="get" action="/search" class="search">
   <label for="q">Search every message</label>
-  <input id="q" name="q" type="text">
+  <input id="q" name="q" type="text" placeholder="e.g. garden plan">
   <button type="submit">Search</button>
 </form>
-<p><a href="/chats">Browse your chats →</a> · <a href="/links">Links</a> · <a href="/videos">Videos</a> · <a href="/accounts">Accounts</a></p>
+
+<h2>Jump to</h2>
+<div class="cards">
+  <a class="card" href="/chats"><strong>Chats</strong><span>Read any chat, with its branches and images.</span></a>
+  <a class="card" href="/links"><strong>Links, videos and accounts</strong><span>Every web address your chats mention, once each.</span></a>
+  <a class="card" href="/suggestions"><strong>AI suggestions</strong><span>Decisions and preferences the extractors proposed.</span></a>
+  <a class="card" href="/evaluation"><strong>Evaluation</strong><span>How the AI's outputs score against the answer key.</span></a>
+</div>
+
 <h2>Imports</h2>
-<p><a class="button" href="/import">Import an export</a></p>
+<p class="muted">Each time you import an export. Importing the same export again adds nothing. <a href="/import">Import another export →</a></p>
 {% if imports %}
-<table>
-  <thead><tr><th>When</th><th>Result</th><th>New</th><th>Changed</th><th>Unchanged</th><th></th></tr></thead>
+<div class="table-wrap"><table>
+  <thead><tr><th>When</th><th>Result</th><th class="num">New</th><th class="num">Changed</th><th class="num">Unchanged</th><th></th></tr></thead>
   <tbody>
   {% for row in imports %}
   <tr>
     <td>{{ row.started_at | when }}</td>
     <td><span class="status {{ row.status }}">{{ row.status }}</span></td>
-    <td>{{ row.conversations.get("new", 0) }}</td>
-    <td>{{ row.conversations.get("revised", 0) }}</td>
-    <td>{{ row.conversations.get("unchanged", 0) }}</td>
+    <td class="num">{{ row.conversations.get("new", 0) }}</td>
+    <td class="num">{{ row.conversations.get("revised", 0) }}</td>
+    <td class="num">{{ row.conversations.get("unchanged", 0) }}</td>
     <td><a href="/imports/{{ row.import_id }}">Report</a></td>
   </tr>
   {% endfor %}
   </tbody>
-</table>
+</table></div>
 {% else %}
-<p>No imports yet.</p>
+{{ empty("No imports yet.", "Use Import in the sidebar to add your first export.") }}
 {% endif %}
 {% endif %}
 {% endblock %}
