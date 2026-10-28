@@ -41,6 +41,7 @@ from knowledge_engine.infrastructure.workspace import WorkspaceRepo, WorkspaceRo
 
 NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 TOKEN_PREFIX = "ke_"
+_ACCOUNT_ID = re.compile(r"^[0-9a-f]{32}$")
 
 
 def _utc_now() -> datetime:
@@ -94,7 +95,9 @@ class AuthzEventRow(Base):
 
     event_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
-    account: Mapped[str] = mapped_column(String(64))  # the name; "" when no valid token
+    # The account's random ID, never its name, so deleting the account leaves
+    # the log pseudonymous (PROD-004); "" when there was no valid token.
+    account: Mapped[str] = mapped_column(String(64))
     workspace_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     permission: Mapped[str] = mapped_column(String(16))
     resource: Mapped[str] = mapped_column(String(200))  # method and route, never query text
@@ -253,7 +256,8 @@ def grant(session: Session, name: str, workspace: str, role: Role, by: str) -> M
         row = MembershipRow(workspace_id=workspace_id, account_id=account.account_id)
         session.add(row)
     row.role, row.granted_by, row.granted_at = role.value, by, _utc_now()
-    _log(session, by, workspace_id, Permission.MANAGE, f"grant {name} {role.value}", True, "ok")
+    resource = f"grant {account.account_id} {role.value}"
+    _log(session, by, workspace_id, Permission.MANAGE, resource, True, "ok")
     return row
 
 
@@ -265,8 +269,31 @@ def remove_member(session: Session, name: str, workspace: str, by: str) -> bool:
     if row is None or found is None:
         return False
     session.delete(row)
-    _log(session, by, found.workspace_id, Permission.MANAGE, f"remove {name}", True, "ok")
+    resource = f"remove {account.account_id}"
+    _log(session, by, found.workspace_id, Permission.MANAGE, resource, True, "ok")
     return True
+
+
+def rotate_token(session: Session, name: str) -> str:
+    """Revoke every token of an account and issue one new one (key rotation)."""
+    revoke_tokens(session, name)
+    return issue_token(session, name)
+
+
+def delete_account(session: Session, name: str, by: str) -> str:
+    """Erase an account: its row, its tokens and its roles (PROD-004).
+
+    The authorisation log keeps its rows (it is append-only), but they only
+    ever held the account's random ID, which nothing links to a name once
+    the account row is gone. Returns that ID, shortened, for the record.
+    """
+    account = get_account(session, name)
+    for model in (AccountTokenRow, MembershipRow):
+        for row in session.scalars(select(model).where(model.account_id == account.account_id)):
+            session.delete(row)
+    session.delete(account)
+    _log(session, by, None, Permission.MANAGE, f"delete {account.account_id}", True, "ok")
+    return account.account_id[:8]
 
 
 @dataclass(frozen=True)
@@ -307,8 +334,8 @@ def authorize(
         else:
             decision = Decision(True, "ok", role)
     if not decision.allowed or permission is not Permission.READ:
-        name = account.name if account else ""
-        _log(session, name, workspace_id, permission, resource, decision.allowed, decision.reason)
+        who = account.account_id if account else ""
+        _log(session, who, workspace_id, permission, resource, decision.allowed, decision.reason)
     return decision
 
 
@@ -338,14 +365,23 @@ def authz_log(session: Session, limit: int = 50) -> list[dict[str, object]]:
     """The newest authorisation events, newest first."""
     rows = session.scalars(
         select(AuthzEventRow).order_by(AuthzEventRow.event_id.desc()).limit(limit)
-    )
+    ).all()
+    names = {a.account_id: a.name for a in session.scalars(select(AccountRow))}
+
+    def shown(value: str) -> str:
+        # Account IDs read as names while the account exists; a deleted one
+        # stays an anonymous, shortened ID. Anything else ("", "cli") as is.
+        if value in names:
+            return names[value]
+        return f"deleted-{value[:8]}" if _ACCOUNT_ID.fullmatch(value) else value
+
     return [
         {
             "at": row.at.isoformat(),
-            "account": row.account,
+            "account": shown(row.account),
             "workspace_id": row.workspace_id,
             "permission": row.permission,
-            "resource": row.resource,
+            "resource": " ".join(shown(word) for word in row.resource.split(" ")),
             "allowed": row.allowed,
             "reason": row.reason,
         }

@@ -906,3 +906,9 @@ ADR-0011; access/tenants.py; settings.tenants_root; api/deps get_settings by X-K
 
 ## 2026-10-28 12:40 PERF-001 (#200)
 archive.put_file/put_bytes: hash first, write only new bytes; ledger skips re-verifying the file just checked; evaluation/import_timing.py (phase timer, synthetic tree). Tests: tests/unit/test_archive_reuse.py (5). Linux: re-import 7.47 → 5.79 s. Table in docs/evaluation/EVAL-010_SMOKE.md.
+
+## 2026-10-28 11:24 m:ID fix (#255 follow-up)
+providers/base.py MessageRef/bare_message_id; classification evidence and extraction ModelQuote use it. Tests: tests/unit/test_message_ref.py (9).
+
+## 2026-10-28 11:33 PROD-004 (#129)
+docs/operations/HOSTING_AND_SECURITY.md; OD-19; authz log by account ID; rotate_token, delete_account, delete_tenant; `ke access rotate|delete`, `ke tenant delete`. Tests: test_hosting_security.py (6). #255 fix replay on PC: 44/67 done, 23 model_unsure, 0 outside-segment.
