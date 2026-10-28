@@ -2703,3 +2703,27 @@ tests/integration/test_model_knowledge.py   6 passed (FakeProvider, no network)
 Fix attempts: 1 (my new gate test quoted an assistant message from another part of a split segment).
 
 **Next exact task:** NOTE-007 (keyword and topic candidates).
+
+### 14:55 — NOTE-007: keyword and topic candidates, with reasons, no model
+
+The old v1 pre-pass had the right idea: per chat, keywords in three tiers, each with a reason. This ports it and adds the fixes the gap analysis asked for.
+
+- `documents/keywords.py`: `keyword_candidates(chats, resolver=None)` gives every chat:
+  - **must**: title words, named things (capitalised phrases not at the start of a sentence), and approved taxonomy terms found in the text;
+  - **should**: the top 20 repeated 1-3 word phrases by TF-IDF; **optional**: the next ones, up to 50 in all;
+  - **excluded**, each with a reason: title words too general ("help"), phrases in more than 65% of chats (once there are 5 or more), and words that only a pasted setup prompt uses ("role-play wording, not a subject").
+- Spelling: a word one typing slip away from a word used at least three times as often is read as that word, and the spelling seen is kept under `variants`. With a published taxonomy, an approved alias ("UE5") shows as its term.
+- A shorter phrase that is only ever said inside a longer one ("global" in "lumen global illumination") isn't listed on its own.
+- Digest topics are matched to approved topic terms; `propose_topics` files each unmatched topic once as a TAX-004 `add` proposal. Nothing becomes a label without a reviewer.
+- Speed on synthetic worst-case text (every phrase unique): about 0.09 s per chat of 3,600 words, so the whole corpus is a minute or two.
+- Not yet in the note: the Keywords section is wired when NOTE-003/004 (#292) has merged, to avoid editing `rich_note.py` in two open PRs.
+
+**Teach-back (`keyword_candidates`):** It reads every chat in the batch and counts the one-to-three-word phrases in each, after fixing obvious typos against the more common spelling. Title words and named things are "must", the phrases this chat repeats that other chats rarely use are "should" and "optional", and anything left out, like a vague title word or the wording of a pasted role-play prompt, is listed with the reason. There is no model in it, so the same chats always give the same keywords.
+
+Checks:
+```
+tests/unit/test_keyword_candidates.py   8 passed (misspelt entity, pasted preamble, excluded title word, common phrase, order-independence, topic matching, proposals filed once)
+```
+Fix attempts: 1 (my test's "common phrase" was said once per chat, so it never ranked; and the setup exclusions were cut alphabetically instead of by count).
+
+**Next exact task:** merge the open PRs on full green, then wire keywords into the note and start NOTE-011's code checks.

@@ -933,3 +933,6 @@ extraction/model_knowledge.py (knowledge_extractor over ModelExtractor; check_ca
 
 ## 2026-10-28 13:05 NOTE-002 (#274)
 digest/contract.py (DigestAnswer extra=forbid, cited items, FIELD_PROVENANCE, resolve_digest drops an item on any bad quote and flags it). Tests: tests/unit/test_digest_contract.py (11).
+
+## 2026-10-28 14:55 NOTE-007 (#279)
+documents/keywords.py (keyword_candidates: must/should/optional with reasons, TF-IDF 1-3-grams, corpus calibration, typo canonicalisation, alias match, setup-text and general-title exclusions; propose_topics files unmatched digest topics as TAX-004 add proposals once). Tests: tests/unit/test_keyword_candidates.py (8).
