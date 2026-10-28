@@ -2963,6 +2963,25 @@ Fix attempts: 2 (my FakeProvider digest left out the required intent; the table-
 
 **Next exact task:** keywords into the note (NOTE-007 wiring), then NOTE-008.
 
+### 17:30 — NOTE-018: a suggested category instead of "unclassified", and a reviewer session
+
+The first real score found four notes saying "unclassified": the classifier answered every segment of those chats, but each answer was unsure, so all of them went to review and none became a label. A reader got nothing from that.
+
+Now, when a chat has no settled category, the note shows the classifier's best candidate beside the word: "unclassified; suggested: Home and garden › Raised beds (waiting for review)", and the category section names the segments it came from. Candidates are weighed like settled labels, by the messages in their segments. It is never a label: the front-matter `category` stays unclassified until a review settles it.
+
+**`ke classify review --taxonomy tax-1 --run-id review-1`** sends the review queue to a separate reviewer session through request files. Each request carries the segment, the first answer and what was wrong with it, under the same rules as the classifier. A clean answer is stored with `record_review`, naming the session (`session:<ref>`), for each flagged field; reviews already outrank machine labels, so the category settles. An answer that is unsure too, or breaks a rule, records nothing and the segment waits for a person. A reviewed segment leaves the queue, so a second run asks for nothing.
+
+**Teach-back (`review_session.py`):** It takes every segment the classifier was unsure about and asks a second Claude session to label it, showing it the first answer and what was wrong. If that answer is clean, it's saved as a review with the session's name on it, and reviews beat machine labels, so the chat gets its category. If the second session is unsure too, nothing is saved and a person decides.
+
+Checks:
+```
+tests/integration/test_note_suggested_review.py   3 passed (all-review chat: suggestion shown, label unset; reviewer files settle it, named reviewer, no repeat requests; unsure reviewer records nothing)
+tests/integration/test_note_categories.py         unchanged, pass
+```
+Fix attempts: 0.
+
+**Next exact task:** the Notes page shows the suggestion too, once NOTE-012 (#302) is merged.
+
 ### 15:25 — #288: the "import didn't finish" page that lied
 
 I was sent to build the integration tickets (INT-001..003), but they were already merged, so I took the one open integration-test problem nobody had claimed: a browser-import test that failed once on Windows + Python 3.12 and passed on the re-run.

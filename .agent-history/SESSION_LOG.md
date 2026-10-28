@@ -951,3 +951,6 @@ documents/categories.py (category_shares: domain terms by share of labelled mess
 
 ## 2026-10-28 15:30 NOTE-011 code checks (#283)
 evaluation/note_checks.py (check_note: citations_real, claims_cited, decisions_user_held, tensions_next_steps (warn), empty_sections, budget; reads the rendered Markdown), `ke docs rubric [chats] [--all]`. Tests: tests/integration/test_note_checks.py (7).
+
+## 2026-10-28 17:30 NOTE-018 (#309)
+documents/categories.py suggested_category (best primary domain candidate from review_required rows, weighed by segment messages; only when no settled share); rich note card "unclassified; suggested: X (waiting for review)" and a category-section line, front matter unchanged; classification/review_session.py review_flagged (review queue -> request files -> record_review per flagged field, reviewer "session:<ref>"; unsure or rule-breaking answers record nothing); store.flagged_fields made public; `ke classify review --taxonomy --run-id`. Tests: tests/integration/test_note_suggested_review.py (3).
