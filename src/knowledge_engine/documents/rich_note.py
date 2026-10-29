@@ -28,6 +28,10 @@ How evidence is shown, and why (the old v2 notes drowned in it):
 * hashes, record IDs and stage keys go to a JSON sidecar in
   ``Knowledge/.meta/`` instead of the reader's way.
 
+Each action item says where it stands: open, reported done or dropped,
+from the user's own later words, citing the message that decided it
+(EXT-009), and what it waits for when a dependency link stands (EXT-010).
+
 Where a model extraction (NOTE-005) has finished for a segment, the older
 rule-extractor records of that segment are left out of the note (NOTE-022):
 they repeat what the model found and pick up pasted instructions and drafted
@@ -59,7 +63,7 @@ from sqlalchemy.orm import Session
 
 from knowledge_engine.classification.store import effective_labels
 from knowledge_engine.digest.contract import ConversationDigest, DigestItem
-from knowledge_engine.digest.stage import has_quotable_text
+from knowledge_engine.digest.stage import chat_messages, has_quotable_text
 from knowledge_engine.documents.categories import (
     Suggestion,
     category_shares,
@@ -71,12 +75,14 @@ from knowledge_engine.documents.model import DocItem, DocumentKind, build_docume
 from knowledge_engine.documents.notes import _branches, _images, _links, knowledge_path
 from knowledge_engine.documents.render import transcript_stem
 from knowledge_engine.domain.models import EvidenceRef
+from knowledge_engine.extraction.action_status import ActionStatus, action_status
 from knowledge_engine.extraction.records import KnowledgeRecord
 from knowledge_engine.extraction.runner import DONE as RUN_DONE
 from knowledge_engine.extraction.runner import ExtractionRunRow
 from knowledge_engine.extraction.store import KnowledgeRecordRow
 from knowledge_engine.importer.records import ConversationRow
 from knowledge_engine.reconciliation.equivalence import Basis, find_candidates
+from knowledge_engine.reconciliation.relations import LinkState, Predicate, links_of
 from knowledge_engine.relationships.view import RelatedLink, related_links
 from knowledge_engine.rendering.markdown import (
     Block,
@@ -417,6 +423,38 @@ def _sort(items: Sequence[_Item]) -> _Sorted:
         else:  # requirement, preference, fact
             out.stated.append(it)
     return out
+
+
+_ACTION_STATUS = {
+    ActionStatus.OPEN: "Open",
+    ActionStatus.REPORTED_DONE: "Reported done",
+    ActionStatus.DROPPED: "Dropped",
+}
+
+
+def _action_note(session: Session, it: _Item, citer: Citer, actions: Sequence[_Item] = ()) -> str:
+    """The action's status, citing the message that decided it, and what it waits for."""
+    messages = chat_messages(citer.chat)
+    cited = {e.revision_id for e in it.record.evidence}
+    positions = [n for n, m in enumerate(messages) if m.revision_id in cited]
+    later = messages[max(positions) + 1 :] if positions else []
+    found = action_status(it.record, later, others=[a.record for a in actions])
+    note = _ACTION_STATUS[found.status]
+    if found.evidence is not None:
+        where = citer.revision(found.evidence.revision_id)
+        if where:
+            note += f" {where}"
+    waits = []
+    for link in links_of(session, it.record.record_id, (LinkState.CANDIDATE, LinkState.ACCEPTED)):
+        if link.predicate != Predicate.DEPENDS_ON.value or link.from_record != it.record.record_id:
+            continue
+        row = session.get(KnowledgeRecordRow, link.to_record)
+        if row is not None:
+            target = KnowledgeRecord.model_validate_json(row.record_json)
+            waits.append(f"“{escape_text(' '.join(target.assertion.split()))}”")
+    if waits:
+        note += ". Waits for " + ", ".join(waits)
+    return note
 
 
 def _section(title: str, provenance: str, blocks: list[Block], empty: str) -> list[Block]:
@@ -844,7 +882,13 @@ def rich_conversation_note(
     blocks += _section(
         "Action items",
         "From the chat: things the user said they would do",
-        [b for it in sorted_.actions for b in _item_blocks(session, it, citer)],
+        [
+            b
+            for it in sorted_.actions
+            for b in _item_blocks(
+                session, it, citer, _action_note(session, it, citer, sorted_.actions)
+            )
+        ],
         "None in this chat.",
     )
     blocks += _section(
