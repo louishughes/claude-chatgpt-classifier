@@ -18,9 +18,14 @@ rules a person can read:
    uncovered segments, then the alphabetically first. A word that covered
    chats use too ("weekend") has a lower lift than one only the subject's
    own chats use ("cooking"), so it can't glue two subjects together.
-   Stop words, words in more than half of all answered segments, and
-   words that look like a name (every use capitalised mid-sentence) never
-   count.
+   These never count:
+   - stop words, and words in more than half of all answered segments;
+   - words that look like a name: used mid-sentence, and always
+     capitalised there;
+   - *bridge* words, which join subjects that other words already tell
+     apart. "Weekend" is a bridge when "cooking" and "garden" each mark
+     enough of its segments, barely overlap, and together cover two
+     thirds of them.
 3. **One proposal per subject**: the best word with at least
    ``min_segments`` (default 3) uncovered segments becomes **one** TAX-004
    ``add`` proposal for a new domain. Its evidence is segment IDs, one
@@ -28,9 +33,9 @@ rules a person can read:
    and the version. Those segments then leave the pool, and the next best
    word is tried.
 4. **Never twice**: a word is passed over, without taking its segments,
-   when its label already names an approved domain, waits as an open
-   proposal or was rejected. The same goes for a group made of mostly the
-   same segments as an open or rejected proposal (at least half of the
+   when its label already names an approved domain, or an open, rejected
+   or approved proposal. The same goes for a group made of mostly the
+   same segments as such a proposal (at least half of the
    group, and more than half of that proposal's segments). So a re-run
    adds nothing, and a rejected subject stays rejected even when a few
    new chats join it or another word names it.
@@ -83,9 +88,9 @@ from knowledge_engine.taxonomy.registry import (
     TaxonomySnapshot,
     normalise_alias,
 )
-from knowledge_engine.taxonomy.review import OPEN, REJECTED, Operation, propose
+from knowledge_engine.taxonomy.review import APPROVED, OPEN, REJECTED, Operation, propose
 
-GAP_VERSION = "tax-009-v2"
+GAP_VERSION = "tax-009-v3"
 GAP_PROPOSER = "tax-009-domain-gaps"
 MIN_SEGMENTS = 3
 COMMON_SHARE = 0.5
@@ -105,6 +110,7 @@ class GapReport:
         waiting: Words (or groups) already waiting as open proposals.
         rejected: Words (or groups) a reviewer already turned down.
         names: Words passed over because they look like a name.
+        bridges: Words passed over because they join two or more subjects.
         leftover: Uncovered segments in no new proposal.
     """
 
@@ -115,6 +121,7 @@ class GapReport:
     waiting: list[str] = field(default_factory=list)
     rejected: list[str] = field(default_factory=list)
     names: int = 0
+    bridges: list[str] = field(default_factory=list)
     leftover: int = 0
 
 
@@ -125,6 +132,8 @@ def domain_status(session: Session, version: str) -> tuple[set[str], set[str]]:
     chosen domain covers the segment, "none fits" uncovers it. Without one,
     the newest machine answer decides: ``done`` with a domain label covers.
     A segment whose newest answer is still ``pending`` is not answered.
+    Only answers and reviews made under ``version`` count: a decision taken
+    against an older vocabulary doesn't carry forward.
     """
     domain = Dimension.DOMAIN.value
     newest: dict[str, ClassificationRow] = {}
@@ -136,8 +145,14 @@ def domain_status(session: Session, version: str) -> tuple[set[str], set[str]]:
         newest[row.segment_id] = row
     with_domain = set(
         session.scalars(
-            select(ClassificationLabelRow.classification_id).where(
-                ClassificationLabelRow.field == domain
+            select(ClassificationLabelRow.classification_id)
+            .join(
+                ClassificationRow,
+                ClassificationRow.classification_id == ClassificationLabelRow.classification_id,
+            )
+            .where(
+                ClassificationLabelRow.field == domain,
+                ClassificationRow.taxonomy_version == version,
             )
         )
     )
@@ -148,7 +163,10 @@ def domain_status(session: Session, version: str) -> tuple[set[str], set[str]]:
     latest: dict[str, ClassificationReviewRow] = {}
     for review in session.scalars(
         select(ClassificationReviewRow)
-        .where(ClassificationReviewRow.field == domain)
+        .where(
+            ClassificationReviewRow.field == domain,
+            ClassificationReviewRow.taxonomy_version == version,
+        )
         .order_by(ClassificationReviewRow.sequence)
     ):
         latest[review.segment_id] = review
@@ -163,7 +181,7 @@ def domain_status(session: Session, version: str) -> tuple[set[str], set[str]]:
 
 @dataclass(frozen=True)
 class _Earlier:
-    """An open or rejected domain proposal: its label and its segments."""
+    """An open, rejected or approved domain proposal: its label and its segments."""
 
     status: str
     label: str
@@ -175,7 +193,7 @@ def _earlier(session: Session) -> list[_Earlier]:
     for row in session.scalars(
         select(TaxonomyProposalRow)
         .where(
-            TaxonomyProposalRow.status.in_((OPEN, REJECTED)),
+            TaxonomyProposalRow.status.in_((OPEN, REJECTED, APPROVED)),
             TaxonomyProposalRow.operation == Operation.ADD.value,
         )
         .order_by(TaxonomyProposalRow.created_at, TaxonomyProposalRow.proposal_id)
@@ -218,13 +236,48 @@ def _uses(
 
 
 def _looks_like_a_name(uses: Sequence[tuple[str, str, int, int]]) -> bool:
-    """True when every use is capitalised and not at a sentence start ("Priya", "Bramble")."""
+    """True when the word is used mid-sentence and always capitalised there ("Bramble").
 
-    def mid_sentence_capital(text: str, start: int) -> bool:
+    A use at the start of a sentence says nothing either way, so it is
+    ignored: "...times. Bramble can visit" is still a name.
+    """
+
+    def mid_sentence(text: str, start: int) -> bool:
         before = text[:start].rstrip(" \t\"'(")
-        return text[start].isupper() and bool(before) and before[-1] not in _SENTENCE_END
+        return bool(before) and before[-1] not in _SENTENCE_END
 
-    return bool(uses) and all(mid_sentence_capital(text, start) for _, text, start, _ in uses)
+    mid = [text[start] for _, text, start, _ in uses if mid_sentence(text, start)]
+    return bool(mid) and all(first.isupper() for first in mid)
+
+
+def _bridges(
+    word: str,
+    group: Sequence[int],
+    bags: Sequence[frozenset[str]],
+    counts: Counter[str],
+    min_segments: int,
+    passed: set[str],
+) -> bool:
+    """True when ``word`` only joins subjects that other words already tell apart.
+
+    "Weekend" in three cooking and three garden chats: "cooking" and
+    "garden" each mark at least ``min_segments`` of its segments, they
+    barely overlap (at most a third of the smaller one), and together they
+    cover at least two thirds of them. Two or more such words mean ``word``
+    is a bridge between subjects, not a subject.
+    """
+    mine = set(group)
+    parts: list[set[int]] = []
+    for other, _ in sorted(counts.items(), key=lambda pair: (-pair[1], pair[0])):
+        if other == word or other in passed:
+            continue
+        inside = {i for i in mine if other in bags[i]}
+        if len(inside) < min_segments or inside == mine:
+            continue
+        if all(3 * len(inside & part) <= min(len(inside), len(part)) for part in parts):
+            parts.append(inside)
+    covered: set[int] = set().union(*parts)
+    return len(parts) >= 2 and 3 * len(covered) >= 2 * len(mine)
 
 
 def propose_domains(
@@ -287,7 +340,11 @@ def propose_domains(
             continue
         match = next((e for e in earlier if e.label == norm or _same_group(ids, e.segments)), None)
         if match is not None:
-            (report.waiting if match.status == OPEN else report.rejected).append(label)
+            bucket = {OPEN: report.waiting, REJECTED: report.rejected, APPROVED: report.known}
+            bucket[match.status].append(label)
+            continue
+        if _bridges(word, group, bags, counts, min_segments, passed):
+            report.bridges.append(label)
             continue
         if _looks_like_a_name(uses):
             report.names += 1

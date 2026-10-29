@@ -324,3 +324,73 @@ def test_a_recurring_name_never_becomes_a_label(tmp_path: Path) -> None:
     report = propose_domains(world.session, world.tax1, world.items())
     assert report.proposed == [] and report.names == 1
     world.session.close()
+
+
+def _subjects(*kinds: str) -> dict[str, str]:
+    words = {
+        "cook": ("cooking {} this weekend", ("pasta", "curry", "rice")),
+        "gard": ("garden {} this weekend", ("pruning", "weeding", "mulching")),
+        "trav": ("travel to {} this weekend", ("lisbon", "porto", "madrid")),
+    }
+    return {
+        f"c-{kind}-{k}": words[kind][0].format(item)
+        for kind in kinds
+        for k, item in enumerate(words[kind][1], 1)
+    }
+
+
+@pytest.mark.parametrize("kinds", [("cook", "gard"), ("cook", "gard", "trav")])
+def test_a_bridge_word_no_covered_chat_uses_is_never_a_subject(
+    tmp_path: Path, kinds: tuple[str, ...]
+) -> None:
+    """Every subject's chats say "weekend" and no covered chat does: still separate."""
+    world = _build(tmp_path, {**_subjects(*kinds), **_python(10)})
+    report = propose_domains(world.session, world.tax1, world.items())
+    expected = {"cook": "Cooking", "gard": "Garden", "trav": "Travel"}
+    assert set(_open_domains(world.session)) == {expected[k] for k in kinds}
+    assert report.bridges == ["Weekend"]
+    world.session.close()
+
+
+@pytest.mark.parametrize("label", [None, "Food"])
+def test_an_approved_subject_is_not_proposed_again(world: World, label: str | None) -> None:
+    from knowledge_engine.taxonomy.review import approve
+
+    session = world.session
+    propose_domains(session, world.tax1, world.items())
+    [cooking] = [r.proposal_id for r in proposals(session, OPEN)
+                 if json.loads(r.payload_json)["label"] == "Cooking"]  # fmt: skip
+    approve(session, cooking, reviewer="reviewer-b", label=label)
+    session.commit()
+    after = propose_domains(session, world.tax1, world.items())
+    # "Recipe" names the approved cooking chats under another word: still nothing.
+    assert after.proposed == [] and set(_open_domains(session)) == {"Makeover"}
+
+
+def test_reviews_under_another_version_do_not_count(world: World) -> None:
+    from knowledge_engine.taxonomy.domain_gaps import domain_status
+
+    session = world.session
+    code = world.segment_of("c-code-1")
+    record_review(session, world.tax1, code, "domain", primary=None, reviewer="reviewer-d")
+    tax2 = TaxonomyRegistry(session).publish("tax-2", author="owner")
+    save(session, SegmentClassifier(tax2).classify(world.items()))
+    tax3 = TaxonomyRegistry(session).publish("tax-3", author="owner")
+    session.commit()
+    _, covered = domain_status(session, tax2.version)
+    assert code in covered  # tax-1's "none fits" doesn't carry into tax-2
+    answered, _ = domain_status(session, tax3.version)
+    assert answered == set()  # nothing classified or reviewed under tax-3
+
+
+def test_a_name_at_a_sentence_start_is_still_a_name(tmp_path: Path) -> None:
+    chats = {
+        "c-name-1": "notes for Bramble about the lease",
+        "c-name-2": "a card that Bramble will like",
+        "c-name-3": "the train times. Bramble can visit",
+        **_python(4),
+    }
+    world = _build(tmp_path, chats)
+    report = propose_domains(world.session, world.tax1, world.items())
+    assert report.proposed == [] and report.names == 1
+    world.session.close()
