@@ -120,6 +120,7 @@ def apply_conversation(
     account_namespace: str,
     import_id: str,
     snapshot_id: str,
+    native_id: str | None = None,
 ) -> ConversationDelta:
     """Insert what's new for one conversation and report the delta.
 
@@ -130,6 +131,9 @@ def apply_conversation(
         account_namespace: The raw root's account label.
         import_id: The running batch.
         snapshot_id: Snapshot of the file the conversation came from.
+        native_id: Use this ID instead of the export's own. Only for an
+            identity candidate a person accepted (IMP-009), whose own ID is
+            missing or taken.
 
     Returns:
         The delta.
@@ -137,7 +141,8 @@ def apply_conversation(
     Raises:
         MissingNativeIdError: If the conversation has no native ID.
     """
-    native_id = native_conversation_id(native)
+    if native_id is None:
+        native_id = native_conversation_id(native)
     if native_id is None:
         raise MissingNativeIdError("conversation has no native ID")
     conv_key = conversation_id(

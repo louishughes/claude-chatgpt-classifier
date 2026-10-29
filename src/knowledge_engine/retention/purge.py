@@ -396,6 +396,8 @@ def _plan(db: sqlite3.Connection, conversations: list[str], segments: set[str]) 
     candidates += take(
         "identity_candidates", "native_conversation_id", ids["native_conversation"], "snapshot_id"
     )
+    # An accepted candidate (IMP-009) points at the chat it became.
+    candidates += take("identity_candidates", "assigned_conversation_id", convs, "snapshot_id")
     snapshots |= {s for (s,) in candidates if s}
     take("segment_overrides", "conversation_id", convs)
     take("override_anchors", "conversation_id", convs)

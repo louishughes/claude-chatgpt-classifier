@@ -236,6 +236,86 @@ def _imports_report(settings: Settings, args: argparse.Namespace) -> CommandResu
     return CommandResult("imports report", data=data, message=message)
 
 
+def _imports_candidates(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """List identity candidates, or decide one (IMP-009). Hashes and positions only, no text."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.importer.identity import (
+        CandidateAction,
+        CandidateDecidedError,
+        decide,
+        list_candidates,
+    )
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+
+    reviewing = getattr(args, "candidates_command", None) == "review"
+    name = "imports candidates review" if reviewing else "imports candidates"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            if reviewing:
+                try:
+                    row = decide(
+                        session,
+                        args.candidate,
+                        CandidateAction(args.decision),
+                        reviewer=args.reviewer,
+                    )
+                except KeyError:
+                    return CommandResult(
+                        name,
+                        ExitCode.USAGE,
+                        message="no such candidate",
+                        error_code="unknown_candidate",
+                    )
+                except CandidateDecidedError as error:
+                    return CommandResult(
+                        name, ExitCode.ERROR, message=str(error), error_code="already_decided"
+                    )
+                session.commit()
+                data = _candidate_data(row)
+                message = (
+                    "Accepted: the next import of that export brings the chat in as "
+                    f"{row.assigned_conversation_id}"
+                    if row.status == "accepted"
+                    else "Rejected: later imports leave the chat out"
+                )
+                return CommandResult(name, data=data, message=message)
+            rows = list_candidates(session, status=args.status)
+            listed = [_candidate_data(row) for row in rows]
+    finally:
+        engine.dispose()
+    waiting = sum(1 for c in listed if c["status"] == "review_required")
+    return CommandResult(
+        name,
+        data={"candidates": listed},
+        message=f"{len(listed)} candidate(s), {waiting} waiting for review",
+    )
+
+
+def _candidate_data(row: Any) -> dict[str, Any]:
+    # IDs, hashes and positions only: a candidate's title or words never print.
+    return {
+        "candidate_id": row.candidate_id,
+        "reason": row.reason,
+        "status": row.status,
+        "account_namespace": row.account_namespace,
+        "snapshot_id": row.snapshot_id,
+        "source_index": row.source_index,
+        "conversation_hash": row.conversation_hash,
+        "existing_conversation_id": row.existing_conversation_id,
+        "assigned_conversation_id": row.assigned_conversation_id,
+        "decided_by": row.decided_by,
+        "decided_at": row.decided_at.isoformat() if row.decided_at else None,
+        "first_import_id": row.first_import_id,
+    }
+
+
 def _import(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Import one export and print its report (ING-003, wired in UI-002)."""
     from knowledge_engine.importer import import_source
@@ -3965,6 +4045,23 @@ def build_parser() -> argparse.ArgumentParser:
         "which", nargs="?", default="latest", help="`latest` (default) or an import ID"
     )
     report.set_defaults(handler=_imports_report)
+    candidates = imports_commands.add_parser(
+        "candidates", help="chats whose ID is missing or taken, waiting for a decision"
+    )
+    candidates.add_argument(
+        "--status", choices=["review_required", "accepted", "rejected"], help="only this status"
+    )
+    candidates.set_defaults(handler=_imports_candidates)
+    candidates_commands = candidates.add_subparsers(
+        dest="candidates_command", metavar="ACTION", parser_class=_Parser
+    )
+    cand_review = candidates_commands.add_parser(
+        "review", help="accept (import under an ID made from its content) or reject"
+    )
+    cand_review.add_argument("candidate", help="the candidate ID")
+    cand_review.add_argument("decision", choices=["accept", "reject"])
+    cand_review.add_argument("--reviewer", required=True, help="who decided")
+    cand_review.set_defaults(handler=_imports_candidates)
 
     inspect = commands.add_parser(
         "inspect",
