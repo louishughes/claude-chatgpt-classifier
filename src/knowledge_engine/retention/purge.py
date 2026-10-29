@@ -157,6 +157,8 @@ class PurgePlan:
     snapshot_hashes: set[str] = field(default_factory=set)
     images: set[tuple[str, str | None]] = field(default_factory=set)  # (sha256, media type)
     other_conversations_in_files: int = 0
+    # identity_candidates rows kept, whose existing_conversation_id is cleared.
+    unlinked_candidates: set[int] = field(default_factory=set)
 
     @property
     def token(self) -> str:
@@ -392,13 +394,23 @@ def _plan(db: sqlite3.Connection, conversations: list[str], segments: set[str]) 
     rels = take("conversation_relationships", "from_conversation_id", convs, "relationship_id")
     rels += take("conversation_relationships", "to_conversation_id", convs, "relationship_id")
     take("relationship_reviews", "relationship_id", {r for (r,) in rels})
-    candidates = take("identity_candidates", "existing_conversation_id", convs, "snapshot_id")
-    candidates += take(
-        "identity_candidates", "native_conversation_id", ids["native_conversation"], "snapshot_id"
+    cols = "rowid, snapshot_id, assigned_conversation_id"
+    candidates = _rows(db, "identity_candidates", cols, "existing_conversation_id", convs)
+    candidates += _rows(
+        db, "identity_candidates", cols, "native_conversation_id", ids["native_conversation"]
     )
     # An accepted candidate (IMP-009) points at the chat it became.
-    candidates += take("identity_candidates", "assigned_conversation_id", convs, "snapshot_id")
-    snapshots |= {s for (s,) in candidates if s}
+    candidates += _rows(db, "identity_candidates", cols, "assigned_conversation_id", convs)
+    for rowid, snapshot, assigned in candidates:
+        if assigned is not None and assigned not in convs:
+            # An accepted chat that collided with a purged one is its own chat
+            # and stays, with its decision; only the pointer to the purged
+            # chat is cleared.
+            plan.unlinked_candidates.add(rowid)
+            continue
+        rows["identity_candidates"].add(rowid)
+        if snapshot:
+            snapshots.add(snapshot)
     take("segment_overrides", "conversation_id", convs)
     take("override_anchors", "conversation_id", convs)
 
@@ -651,6 +663,12 @@ def _delete(db: sqlite3.Connection, plan: PurgePlan) -> None:
     # Append-only guards are lifted for this transaction only (see the module notes).
     for name, _ in triggers:
         db.execute(f'DROP TRIGGER "{name}"')
+    for chunk in _chunks(plan.unlinked_candidates):
+        db.execute(
+            "UPDATE identity_candidates SET existing_conversation_id = NULL "
+            f"WHERE rowid IN ({','.join('?' * len(chunk))})",
+            chunk,
+        )
     for table in DELETE_ORDER:
         for chunk in _chunks(plan.rows.get(table, ())):
             db.execute(

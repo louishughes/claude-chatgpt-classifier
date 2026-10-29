@@ -259,6 +259,13 @@ def _imports_candidates(settings: Settings, args: argparse.Namespace) -> Command
     try:
         with Session(engine) as session:
             if reviewing:
+                if not args.reviewer.strip() or len(args.reviewer) > 100:
+                    return CommandResult(
+                        name,
+                        ExitCode.USAGE,
+                        message="--reviewer needs a name of 1 to 100 characters",
+                        error_code="bad_reviewer",
+                    )
                 try:
                     row = decide(
                         session,

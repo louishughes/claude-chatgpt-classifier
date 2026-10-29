@@ -189,3 +189,62 @@ def test_accepted_collision_stays_a_separate_chat(
     assert data["conversations"].get("unchanged") == 1
     assert data["conversations"].get("new") == 1
     assert collision["existing_conversation_id"] != collision.get("assigned_conversation_id")
+
+
+def test_accepted_collision_is_never_merged_when_the_export_is_reordered(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Review finding: the decision used to depend on which chat came first.
+    monkeypatch.setenv("KE_WORKSPACE_ROOT", str(tmp_path / "ws3"))
+    root = FIXTURES / "id_collision" / "export"
+    _ke(capsys, "import", str(root))
+    collision = next(c for c in _candidates(capsys) if c["reason"] == "id_collision")
+    _ke(
+        capsys,
+        "imports",
+        "candidates",
+        "review",
+        str(collision["candidate_id"]),
+        "accept",
+        "--reviewer",
+        "owner",
+    )
+    _ke(capsys, "import", str(root))
+    reordered = tmp_path / "reordered"
+    reordered.mkdir()
+    chats = json.loads((root / "conversations.json").read_text(encoding="utf-8"))
+    (reordered / "conversations.json").write_text(json.dumps(chats[::-1]), encoding="utf-8")
+
+    _, out = _ke(capsys, "import", str(reordered))
+
+    data = out["data"]
+    assert isinstance(data, dict)
+    assert data["conversations"].get("unchanged") == 2
+    assert "revised" not in data["conversations"]
+    assert data["candidate_matches"] == {"missing_native_id": 1}
+
+
+def test_a_purged_accepted_chat_does_not_come_back_as_a_candidate(
+    capsys: pytest.CaptureFixture[str], export: Path
+) -> None:
+    _ke(capsys, "import", str(export))
+    candidate_id = str(_candidates(capsys)[0]["candidate_id"])
+    _, out = _ke(
+        capsys, "imports", "candidates", "review", candidate_id, "accept", "--reviewer", "owner"
+    )
+    decided = out["data"]
+    assert isinstance(decided, dict)
+    conversation = str(decided["assigned_conversation_id"])
+    _ke(capsys, "import", str(export))
+    _, plan = _ke(capsys, "purge", "plan", conversation)
+    token = plan["data"]["token"]
+    code, _ = _ke(capsys, "purge", "run", conversation, "--confirm", token, "--reason", "test")
+    assert code == ExitCode.OK
+
+    _, again = _ke(capsys, "import", str(export))
+
+    data = again["data"]
+    assert isinstance(data, dict)
+    assert data["conversations"].get("purged") == 1
+    assert data["candidate_matches"] == {}
+    assert _candidates(capsys) == []

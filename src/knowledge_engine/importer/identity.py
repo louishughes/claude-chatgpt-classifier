@@ -25,6 +25,10 @@ review``:
   It is never merged into the chat it collided with.
 * ``reject`` keeps it out of every later import.
 
+The lookup is by exact content hash, so a chat with no ID whose words
+change in a later export is a *new* candidate (and, if accepted, a new
+logical chat). Nothing guesses that the two are the same chat.
+
 Who decided and when are stored on the row. A decision is final: an
 accepted chat may already be imported, so flipping it to rejected would
 leave records behind that the row says shouldn't exist.

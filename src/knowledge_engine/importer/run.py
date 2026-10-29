@@ -278,19 +278,45 @@ def _run(
                 # out; accepted comes in under its content-derived ID.
                 override: str | None = None
                 decided = _decision(
-                    session,
-                    workspace_id,
-                    account_ns,
-                    digest,
-                    missing=native_id is None,
-                    colliding=native_id is not None and seen.get(native_id, digest) != digest,
+                    session, workspace_id, account_ns, digest, missing=native_id is None
                 )
+                unsafe = (
+                    decided is not None
+                    or native_id is None
+                    or seen.get(native_id, digest) != digest
+                )
+                if unsafe and is_purged(
+                    session,
+                    TombstoneKind.CONVERSATION,
+                    conversation_key(
+                        conversation_id(
+                            workspace_id,
+                            SourceSystem.CHATGPT.value,
+                            account_ns,
+                            content_native_id(digest),
+                        )
+                    ),
+                ):
+                    # Accepted, imported, then purged on purpose (OPS-004): the
+                    # purge removed its candidate row too, so this tombstone is
+                    # what keeps it from coming back as a new candidate.
+                    conversations["purged"] += 1
+                    tally.conversations["purged"] += 1
+                    continue
                 if decided == CandidateStatus.REJECTED.value:
                     conversations["rejected_candidate"] += 1
                     tally.conversations["rejected_candidate"] += 1
                     continue
                 if decided == CandidateStatus.ACCEPTED.value:
                     override = native_id = content_native_id(digest)
+                elif decided == CandidateStatus.REVIEW_REQUIRED.value and native_id is not None:
+                    # A known collision still waiting for review stays parked
+                    # even when it comes first in this export, so a reordered
+                    # export can't import it in place of the chat it collided with.
+                    candidates[CandidateReason.ID_COLLISION.value] += 1
+                    conversations[DeltaCategory.CANDIDATE_DUPLICATE.value] += 1
+                    tally.conversations["candidate"] += 1
+                    continue
                 if native_id is None:
                     # Keying it without a native ID would be a guess, so it
                     # isn't imported: it waits for review as a candidate.
@@ -484,17 +510,15 @@ def _decision(
     digest: str,
     *,
     missing: bool,
-    colliding: bool,
 ) -> str | None:
     """Return the review status of this chat's candidate, or None if it isn't one.
 
-    Only a chat whose identity is unsafe right now can be a candidate: one
-    with no native ID, or one whose native ID this import already saw on a
-    different chat. A chat with a good ID is never looked up, so a decision
-    can't change how ordinary chats are imported.
+    The lookup is by exact content hash, never by title or similarity. It
+    doesn't depend on the order of the export either: a chat that once
+    collided is found as that candidate even if a later export lists it
+    first, or lists it without the chat it collided with. A chat that never
+    became a candidate has no row, so ordinary chats import as before.
     """
-    if not (missing or colliding):
-        return None
     reason = CandidateReason.MISSING_NATIVE_ID if missing else CandidateReason.ID_COLLISION
     row = find_candidate(
         session,
