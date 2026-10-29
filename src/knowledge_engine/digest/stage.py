@@ -44,13 +44,17 @@ from knowledge_engine.digest.contract import (
     DIGEST_SCHEMA_VERSION,
     ConversationDigest,
     DigestAnswer,
+    DigestFlag,
     DigestItem,
     DigestItemAnswer,
+    ResolvedQuestion,
     resolve_digest,
+    resolve_item,
 )
 from knowledge_engine.digest.ending import ending_questions, questions_keep_open, settle_status
+from knowledge_engine.digest.questions import QUESTIONS_VERSION, Reconciled, reconcile_parts
 from knowledge_engine.domain.enums import Role
-from knowledge_engine.extraction.text import ExtractionMessage, exchanges_of
+from knowledge_engine.extraction.text import ExtractionMessage, exchanges_of, quote
 from knowledge_engine.orchestration.stage_keys import stage_key
 from knowledge_engine.providers.base import ModelRequest, quote_untrusted
 from knowledge_engine.providers.ledger import ModelOutputRow, ModelStageRunner
@@ -58,6 +62,9 @@ from knowledge_engine.rendering.transcript import StoredConversation
 from knowledge_engine.segmentation.segmenter import SegmenterSettings, split_parts
 
 STAGE_ID = "digest.conversation.v1"
+# The merge and post-checks run in code on stored answers, so changing them
+# needs no new request: the version is recorded in the flags they write.
+MERGE_VERSION = "note-033-v1"
 STAGE_VERSION = "note-003-v1"
 # v2 (NOTE-019): the status rule for chats that end on an assistant offer.
 # v3 (NOTE-017): a part of a long chat is described as the chat, never as
@@ -167,19 +174,26 @@ def branch_summary(conversation: StoredConversation) -> str:
     return "\n".join(lines)
 
 
+def digest_parts(
+    conversation: StoredConversation, max_characters: int = SegmenterSettings().max_characters
+) -> list[tuple[str, ...]]:
+    """The message IDs of each part the chat is asked in; none with no text."""
+    if not has_quotable_text(conversation):
+        return []
+    parts = split_parts(exchanges_of(chat_messages(conversation)), max_characters)
+    return [tuple(part.messages) for part in parts]
+
+
 def digest_requests(
     conversation: StoredConversation, max_characters: int = SegmenterSettings().max_characters
 ) -> list[ModelRequest]:
     """The requests for one chat: one, or one per part of a long chat; none with no text."""
-    if not has_quotable_text(conversation):
-        return []
-    messages = chat_messages(conversation)
+    parts = digest_parts(conversation, max_characters)
+    by_id = {m.native_id: m for m in chat_messages(conversation)}
     branches = branch_summary(conversation)
-    parts = split_parts(exchanges_of(messages), max_characters)
-    by_id = {m.native_id: m for m in messages}
     return [
         _request(
-            [by_id[i] for i in part.messages],
+            [by_id[i] for i in part],
             branches,
             part_label=f"Part {n} of {len(parts)}" if len(parts) > 1 else None,
         )
@@ -263,8 +277,8 @@ class DigestStage:
             failed |= set(later.review_required)
         return [self._outcome(chat, requests, outputs, failed) for chat, requests in asked]
 
-    @staticmethod
     def _outcome(
+        self,
         conversation: StoredConversation,
         requests: Sequence[ModelRequest],
         outputs: Mapping[str, BaseModel],
@@ -283,7 +297,8 @@ class DigestStage:
             answer = outputs[request_id]
             assert isinstance(answer, DigestAnswer)
             answers.append(answer)
-        digest = _checked(merge_answers(answers), conversation)
+        parts = digest_parts(conversation, self.max_characters)
+        digest = _checked(answers, conversation, parts)
         return DigestOutcome(cid, "done" if digest.usable else "review_required", digest, ids)
 
 
@@ -308,16 +323,115 @@ def stored_digest(
         if row is None:
             return None
         answers.append(DigestAnswer.model_validate_json(row.output_json))
-    digest = _checked(merge_answers(answers), conversation)
+    digest = _checked(answers, conversation, digest_parts(conversation, max_characters))
     return digest if digest.usable else None
 
 
-def _checked(answer: DigestAnswer, conversation: StoredConversation) -> ConversationDigest:
-    """Check every quote against the chat, then the status and open questions against its end."""
+def _checked(
+    answers: Sequence[DigestAnswer],
+    conversation: StoredConversation,
+    parts: Sequence[tuple[str, ...]] = (),
+) -> ConversationDigest:
+    """Merge the parts' answers and check them against the chat.
+
+    The parts' open questions are reconciled across parts first (NOTE-032),
+    then every quote is checked, then the status and open questions against
+    how the chat ends, then the summary's repeats and its ending (NOTE-033).
+    """
     messages = chat_messages(conversation)
-    digest = settle_status(resolve_digest(answer, messages), messages, conversation)
+    good_last = _surviving_last(answers, messages)
+    reconciled = reconcile_parts(answers, parts, messages)
+    resolved = resolve_digest(merge_answers(reconciled.answers, good_last), messages)
+    resolved = _record_reconciled(resolved, reconciled, messages)
+    digest = settle_status(resolved, messages, conversation)
     digest = ending_questions(digest, messages, conversation)
-    return tidy_summary(questions_keep_open(digest, messages, conversation))
+    digest = tidy_summary(questions_keep_open(digest, messages, conversation))
+    return ending_summarised(digest, answers, good_last)
+
+
+def _surviving_last(
+    answers: Sequence[DigestAnswer], messages: Sequence[ExtractionMessage]
+) -> frozenset[int]:
+    """The last part's summary sentences whose quotes are all in the chat."""
+    if len(answers) < 2:
+        return frozenset()
+    last = answers[-1].summary
+    return frozenset(
+        i
+        for i, item in enumerate(last)
+        if resolve_item("summary", item.text, item.quotes, messages)
+    )
+
+
+def _record_reconciled(
+    digest: ConversationDigest, reconciled: Reconciled, messages: Sequence[ExtractionMessage]
+) -> ConversationDigest:
+    """The answered questions and their replies kept on the digest, each change flagged."""
+    if not reconciled.joined and not reconciled.answered:
+        return digest
+    flags: list[DigestFlag] = []
+    texts = [q.text for q in digest.open_questions]
+    for text, count in reconciled.joined.items():
+        unparted = without_part_wording(text)
+        if unparted in texts:
+            flags.append(
+                DigestFlag(
+                    field="open_questions",
+                    index=texts.index(unparted),
+                    reason=f"joined {count} repeat(s) from other parts ({QUESTIONS_VERSION})",
+                )
+            )
+    resolved: list[ResolvedQuestion] = []
+    for found in reconciled.answered:
+        item = resolve_item(
+            "open_questions",
+            without_part_wording(found.question.text),
+            found.question.quotes,
+            messages,
+        )
+        if item is None:
+            continue  # its own quotes fail, so it would not have been shown anyway
+        resolved.append(ResolvedQuestion(question=item, resolved_by=quote(found.reply, found.span)))
+        flags.append(
+            DigestFlag(
+                field="resolved_questions",
+                index=len(resolved) - 1,
+                reason=f"answered by the user in {found.reply.native_id}, in a later part "
+                f"({QUESTIONS_VERSION})",
+            )
+        )
+    return digest.model_copy(
+        update={"resolved_questions": tuple(resolved), "flags": (*digest.flags, *flags)}
+    )
+
+
+def ending_summarised(
+    digest: ConversationDigest,
+    answers: Sequence[DigestAnswer],
+    good_last: frozenset[int] = frozenset(),
+) -> ConversationDigest:
+    """A long chat's digest marked when its last part's sentences all failed (NOTE-033).
+
+    ``merge_answers`` always picks a sentence from the last part, but the
+    quote check can still drop it. The note then says how the chat ended
+    isn't summarised, rather than letting an earlier part read as the end.
+    """
+    if len(answers) < 2 or not digest.summary:
+        return digest
+    final = len(answers) - 1
+    picks = _summary_picks(answers, good_last)
+    from_last = {n for n, (p, _) in enumerate(picks) if p == final}
+    dropped = {f.index for f in digest.flags if f.field == "summary"}
+    if not from_last <= dropped:
+        return digest
+    flag = DigestFlag(
+        field="summary",
+        index=max(from_last),
+        reason=f"no summary sentence from the last part survived ({MERGE_VERSION})",
+    )
+    return digest.model_copy(
+        update={"ending_unsummarised": len(answers), "flags": (*digest.flags, flag)}
+    )
 
 
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
@@ -402,7 +516,42 @@ def _unparted(item: DigestItemAnswer) -> DigestItemAnswer:
     return item.model_copy(update={"text": without_part_wording(item.text)})
 
 
-def merge_answers(answers: Sequence[DigestAnswer]) -> DigestAnswer:
+def _summary_picks(
+    answers: Sequence[DigestAnswer], good_last: frozenset[int] = frozenset()
+) -> list[tuple[int, int]]:
+    """The (part, sentence) positions the merged summary keeps, in chat order.
+
+    ``good_last`` holds the last part's sentences that pass the quote check.
+    When none of the last part's picked sentences does, the latest one that
+    does takes a picked one's place (NOTE-033).
+    """
+    if len(answers) == 1:
+        return [(0, i) for i in range(len(answers[0].summary))]
+    cap = next(
+        int(m.max_length)
+        for m in DigestAnswer.model_fields["summary"].metadata
+        if hasattr(m, "max_length")
+    )
+    chosen: list[tuple[int, int]] = []
+    for round_ in range(max(len(a.summary) for a in answers)):
+        chosen.extend((p, round_) for p, a in enumerate(answers) if round_ < len(a.summary))
+    picked = chosen[:cap]
+    final = len(answers) - 1
+    mine = [i for p, i in picked if p == final]
+    if not mine:
+        # NOTE-033: how the chat ended must be in the summary. The last part's
+        # closing sentence takes the place of the latest-picked earlier one.
+        mine = [len(answers[final].summary) - 1]
+        picked[-1] = (final, mine[0])
+    if good_last and not good_last & set(mine):
+        # The picked sentence fails its quote check: use the latest that passes.
+        picked[picked.index((final, mine[-1]))] = (final, max(good_last))
+    return sorted(picked)
+
+
+def merge_answers(
+    answers: Sequence[DigestAnswer], good_last: frozenset[int] = frozenset()
+) -> DigestAnswer:
     """Combine the answers for the parts of one long chat into one, in order.
 
     Purpose and intent come from the first part (how it started); outcome
@@ -410,7 +559,8 @@ def merge_answers(answers: Sequence[DigestAnswer]) -> DigestAnswer:
     represented within the four sentences allowed: sentences are *chosen*
     round-robin (each part's first, then each part's second...), then put
     back in **chat order** (part 1's before part 2's), so the summary reads
-    in the order things happened (NOTE-017). Every text loses its "this
+    in the order things happened (NOTE-017). With more parts than sentences,
+    the last part's closing sentence always gets a place (NOTE-033). Every text loses its "this
     part" wording. Lists keep their first occurrence of each text and are
     cut to their schema maximum. One answer is returned unchanged.
     """
@@ -436,11 +586,7 @@ def merge_answers(answers: Sequence[DigestAnswer]) -> DigestAnswer:
                     kept.append(item)
         return kept[: limit(name)]
 
-    chosen: list[tuple[int, int]] = []  # (part, sentence) positions
-    for round_ in range(max(len(a.summary) for a in answers)):
-        chosen.extend((p, round_) for p, a in enumerate(answers) if round_ < len(a.summary))
-    in_order = sorted(chosen[: limit("summary")])
-    summary = [_unparted(answers[p].summary[i]) for p, i in in_order]
+    summary = [_unparted(answers[p].summary[i]) for p, i in _summary_picks(answers, good_last)]
     return DigestAnswer(
         summary=summary,
         purpose=_unparted(first.purpose) if first.purpose else None,
