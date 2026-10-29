@@ -55,7 +55,7 @@ from knowledge_engine.extraction.text import ExtractionMessage
 from knowledge_engine.graph.offsets import Span
 from knowledge_engine.reconciliation.equivalence import STOP_WORDS
 
-QUESTIONS_VERSION = "note-032-v3"
+QUESTIONS_VERSION = "note-032-v4"
 # A reply naming one of several offers must share this many of its words.
 NAMED_SHARED = 2
 
@@ -69,6 +69,15 @@ _HEDGE = re.compile(
     r"\?|\b(?:but|if|after|later|unless|when|maybe|actually|wait|yeah,? right)\b",
     re.IGNORECASE,
 )
+# A sentence that offers to do something ("Want me to draft it?").
+_OFFER = re.compile(
+    r"\b(?:want me to|would you like|do you want|shall i|should i|i can|i could|"
+    r"let me know if)\b|\?\s*$",
+    re.IGNORECASE,
+)
+_SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
+_CHOICE = re.compile(r"\bor\b", re.IGNORECASE)
+_ARTICLES = frozenset({"a", "an", "the"})
 _CUE_WORDS = frozenset("yes please go ahead do it let's lets that no thanks thank you need".split())
 
 
@@ -79,8 +88,16 @@ def _token(word: str) -> str:
     return word
 
 
-def question_key(text: str) -> frozenset[str]:
-    """Every word of a question but filler, digits in any script read as numbers."""
+def question_key(text: str) -> tuple[str, ...]:
+    """A question's words in order, lowercased, digits in any script read as numbers.
+
+    Only articles are left out: pronouns, modals, "this"/"that", "and"/"or"
+    and word order all change what is asked.
+    """
+    return tuple(t for t in map(_token, _WORD.findall(text)) if t not in _ARTICLES)
+
+
+def _words(text: str) -> frozenset[str]:
     return frozenset(t for t in map(_token, _WORD.findall(text)) if t not in STOP_WORDS)
 
 
@@ -108,7 +125,7 @@ class _Kept:
     part: int  # the first part that listed it; it stays in that part's answer
     last: int  # the last part that listed it
     item: DigestItemAnswer
-    key: frozenset[str]
+    key: tuple[str, ...]
     role: Role | None
     joined: int = 0
 
@@ -116,6 +133,26 @@ class _Kept:
 def _latest(item: DigestItemAnswer, order: dict[str, int]) -> int | None:
     cited = [order[q.message_id] for q in item.quotes if q.message_id in order]
     return max(cited) if cited else None
+
+
+def _role(
+    item: DigestItemAnswer, order: dict[str, int], messages: Sequence[ExtractionMessage]
+) -> Role | None:
+    """The assistant's question only when every citation is an assistant message."""
+    roles = {messages[order[q.message_id]].role for q in item.quotes if q.message_id in order}
+    if not roles:
+        return None
+    return Role.ASSISTANT if roles == {Role.ASSISTANT} else Role.USER
+
+
+def _offers(window: Sequence[ExtractionMessage]) -> list[str]:
+    """The offer sentences in the assistant messages a reply answers."""
+    return [
+        sentence
+        for m in window
+        for sentence in _SENTENCE_END.split(m.text.strip())
+        if _OFFER.search(sentence)
+    ]
 
 
 def _reply_span(reply: str, asked: frozenset[str], *, several: bool) -> Span | None:
@@ -131,6 +168,32 @@ def _reply_span(reply: str, asked: frozenset[str], *, several: bool) -> Span | N
     return Span(found.start(1), found.end(1))
 
 
+def _answers(
+    kept: _Kept,
+    latest: int,
+    reply: ExtractionMessage,
+    messages: Sequence[ExtractionMessage],
+    order: dict[str, int],
+    listed_at: Sequence[int | None],
+) -> Span | None:
+    """Where ``reply`` answers this offer, or None.
+
+    The reply answers everything the assistant said since the user last
+    spoke, so every offer in that stretch counts: with more than one, or an
+    offer of a choice ("this or that?"), a bare yes or no answers none.
+    """
+    start = max((i for i in range(latest) if messages[i].role is Role.USER), default=-1) + 1
+    end = order[reply.native_id]
+    window = [m for m in messages[start:end] if m.role is Role.ASSISTANT]
+    offers = _offers(window)
+    asked = _words(kept.item.text)
+    if not any(asked & _words(o) for o in offers):
+        return None  # the question isn't one of the offers made
+    listed = sum(1 for i in listed_at if i is not None and start <= i < end)
+    several = max(len(offers), listed) > 1 or any(_CHOICE.search(o) for o in offers)
+    return _reply_span(reply.text, asked, several=several)
+
+
 def _join(
     answers: Sequence[DigestAnswer],
     order: dict[str, int],
@@ -139,8 +202,7 @@ def _join(
     kept: list[_Kept] = []
     for p, answer in enumerate(answers):
         for item in answer.open_questions:
-            latest = _latest(item, order)
-            role = messages[latest].role if latest is not None else None
+            role = _role(item, order, messages)
             key = question_key(item.text)
             home = next(
                 (
@@ -184,11 +246,7 @@ def reconcile_parts(
         return Reconciled(list(answers), {}, [])  # parts of some other chat: leave it be
     kept = _join(answers, order, messages)
     ends = [max(order[i] for i in part) for part in parts]
-    offers_in: dict[int, int] = {}
-    for k in kept:
-        latest = _latest(k.item, order)
-        if latest is not None:
-            offers_in[latest] = offers_in.get(latest, 0) + 1
+    listed_at = [_latest(k.item, order) for k in kept]
 
     answered: list[Answered] = []
     still: list[_Kept] = []
@@ -197,9 +255,7 @@ def reconcile_parts(
         if k.role is Role.ASSISTANT and latest is not None:
             reply = next((m for m in messages[latest + 1 :] if m.role is Role.USER), None)
             if reply is not None and order[reply.native_id] > ends[k.last]:
-                offer = messages[latest]
-                several = offers_in[latest] > 1 or offer.text.count("?") > 1
-                span = _reply_span(reply.text, question_key(k.item.text), several=several)
+                span = _answers(k, latest, reply, messages, order, listed_at)
                 if span is not None:
                     answered.append(Answered(k.part, k.item, reply, span))
                     continue

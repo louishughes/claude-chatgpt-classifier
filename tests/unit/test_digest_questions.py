@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from knowledge_engine.digest.contract import DigestAnswer
+from knowledge_engine.digest.contract import DigestAnswer, DigestQuote
 from knowledge_engine.digest.questions import Reconciled, question_key, reconcile_parts
 from knowledge_engine.domain.enums import Role
 from knowledge_engine.extraction.text import ExtractionMessage
@@ -135,7 +135,7 @@ def test_a_reply_about_another_offer_does_not_answer_this_one() -> None:
         ("u", "Synthetic sales."),
         ("a", "Want a chart of sales?"),
         ("a", "Also want me to email the board?"),
-        ("u", "No thanks to the chart."),
+        ("u", "No thanks to the sales chart."),
     ]
     asked = [("Should the assistant email the board?", 2), ("Should the assistant chart sales?", 1)]
     result = _run(turns, [asked, []], [range(0, 3), range(2, 4)])
@@ -277,3 +277,113 @@ def test_odd_text_and_mismatched_parts_never_crash_or_drop() -> None:
     for parts in ([(), ()], [("zz",), ("yy",)]):
         result = reconcile_parts([asked, _answer(messages, [])], parts, messages)
         assert _open(result) == ["Should the assistant book the hotel?"], parts
+
+
+MOVING = [("u", "Synthetic: I'm moving flat and the landlord is slow about the deposit.")]
+SPLIT = [range(0, 4), range(3, 6)]
+
+
+def test_word_order_pronouns_modals_and_conjunctions_keep_questions_apart() -> None:
+    turns = [
+        *MOVING,
+        ("a", "Here's a plan."),
+        ("u", "Q one?"),
+        ("a", "Depends."),
+        ("u", "Q two?"),
+        ("a", "Ok."),
+    ]
+    pairs = [
+        (
+            "Should I move money from savings to checking?",
+            "Should I move money from checking to savings?",
+        ),
+        ("Should I call the letting agent?", "Should they call the letting agent?"),
+        ("Can I cancel the tenancy early?", "Should I cancel the tenancy early?"),
+        ("Should I use this removal company?", "Should I use that removal company?"),
+        (
+            "Should I pay the deposit and the first month?",
+            "Should I pay the deposit or the first month?",
+        ),
+        ("Was the deposit protected?", "Will the deposit be protected?"),
+    ]
+    for a, b in pairs:
+        result = _run(turns, [[(a, 2)], [(b, 4)]], SPLIT)
+        assert _open(result) == [a, b] and result.joined == {}, (a, b)
+    assert question_key("Should the user sell a car?") == question_key("should user sell car")
+
+
+def test_a_yes_after_two_assistant_messages_answers_neither_offer() -> None:
+    turns = [
+        *MOVING,
+        ("a", "Want me to draft the email to your landlord about the deposit?"),
+        ("a", "Or I could look up the deposit protection rules. Should I check those?"),
+        ("u", "Yes please."),
+    ]
+    asked = [
+        ("Should the assistant draft the email to the landlord?", 1),
+        ("Should the assistant check the deposit protection rules?", 2),
+    ]
+    result = _run(turns, [asked, []], [range(0, 3), range(2, 4)])
+    assert len(_open(result)) == 2 and result.answered == []
+
+
+def test_an_offer_of_a_choice_is_not_closed_by_a_bare_yes() -> None:
+    turns = [
+        *MOVING,
+        ("a", "I can draft the email to your landlord, or I can write a formal letter instead?"),
+        ("u", "Yes please."),
+    ]
+    asked = [("Should the assistant draft the email to the landlord?", 1)]
+    assert len(_open(_run(turns, [asked, []], [range(0, 2), range(1, 3)]))) == 1
+
+
+def test_a_users_own_question_is_never_closed_by_a_yes() -> None:
+    turns = [
+        *MOVING,
+        ("u", "Is my deposit legally protected? I never got a certificate."),
+        ("a", "Not sure. Want me to explain how to check?"),
+        ("u", "Yes"),
+    ]
+    # Cited only at the assistant's reply, but it isn't the offer that was made.
+    only_assistant = [("Is the deposit legally protected?", 2)]
+    assert len(_open(_run(turns, [only_assistant, []], [range(0, 3), range(2, 4)]))) == 1
+    # Cited at the user's own message as well: it is the user's question.
+    messages = _messages(turns)
+    both = _answer(messages, [("Should the assistant explain how to check?", 2)])
+    item = both.open_questions[0]
+    mixed = item.model_copy(
+        update={"quotes": [*item.quotes, DigestQuote(message_id="m1", text="Is")]}
+    )
+    both = both.model_copy(update={"open_questions": [mixed]})
+    parts = [tuple(m.native_id for m in messages[:3]), tuple(m.native_id for m in messages[2:])]
+    result = reconcile_parts([both, _answer(messages, [])], parts, messages)
+    assert _open(result) == ["Should the assistant explain how to check?"]
+
+
+def test_a_single_offer_is_closed_by_a_plain_yes() -> None:
+    offer = (
+        "a",
+        "The deposit is due back within 10 days. Would you like me to draft a polite email "
+        "to your landlord asking for it?",
+    )
+    asked = [("Should the assistant draft an email to the landlord?", 1)]
+    for reply in (
+        "Yes, please do that.",
+        "Yes please",
+        "Yes - draft it.",
+        "Do it, landlord email.",
+    ):
+        result = _run([*MOVING, offer, ("u", reply)], [asked, []], [range(0, 2), range(1, 3)])
+        assert _open(result) == [], reply
+    for reply in (
+        "Sure, go for it.",
+        "Yeah do it",
+        "Ok",
+        "Yep, that would be great thanks!",
+        "Yes please, that would be really helpful.",
+        "Yes, not the landlord though.",
+        "No thanks, I'll draft the email to the landlord myself.",
+        "Yes yes I know, the email to the landlord is overdue.",
+    ):
+        result = _run([*MOVING, offer, ("u", reply)], [asked, []], [range(0, 2), range(1, 3)])
+        assert _open(result) != [], reply
