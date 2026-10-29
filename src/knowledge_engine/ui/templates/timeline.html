@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "macros.html" import where, empty %}
+{% block title %}Timeline · Knowledge Engine{% endblock %}
+{% macro record_link(record_id, shown) -%}
+{% if record_id in shown %}<a href="#{{ record_id }}"><code>{{ record_id }}</code></a>{% else %}<code>{{ record_id }}</code>{% endif %}
+{%- endmacro %}
+{% block main %}
+<header class="page-head">
+  <p class="eyebrow">Your archive</p>
+  <h1>Timeline{% if view and view.project_label %}: {{ view.project_label }}{% endif %}</h1>
+  <p class="lede">What you decided, required, preferred or rejected. What holds now is at the top; anything replaced later is at the bottom, linked to what replaced it.</p>
+</header>
+{% if problem %}
+{{ empty(problem) }}
+{% elif not view.groups and view.project_id %}
+{{ empty("No stored decision, requirement, preference or rejection names this project.", "") }}
+<p class="muted"><a href="/timeline">Show every project</a>.</p>
+{% elif not view.groups %}
+{{ empty("No decisions, requirements, preferences or rejections are stored yet.", "Run ke timeline --build after extraction to work out how they moved.") }}
+{% else %}
+{% if view.project_id %}<p class="muted">Only records naming this project. <a href="/timeline">Show every project</a>.</p>{% endif %}
+{% for group in view.groups %}
+<section aria-label="{{ group.words }}">
+  <h2>{{ group.words }} ({{ group.records | length }})</h2>
+  {% for item in group.records %}
+  <article class="message" id="{{ item.record_id }}">
+    <p class="who">{{ where(item.place) }} <span class="muted">· {{ item.record_type }}</span></p>
+    <div class="text">{{ item.assertion }}</div>
+    {% if item.superseded_by %}<p class="muted">Replaced by {% for other in item.superseded_by %}{{ record_link(other, view.shown) }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+    {% if item.conflicts_with %}<p class="muted">In conflict with {% for other in item.conflicts_with %}{{ record_link(other, view.shown) }}{% if not loop.last %}, {% endif %}{% endfor %}.</p>{% endif %}
+    {% if item.events %}<ol class="events muted">
+    {% for event in item.events %}<li>{% if event.when %}{{ event.when | when }}: {% endif %}{% if event.outgoing %}this {{ event.words }}{% if event.other %} {{ record_link(event.other, view.shown) }}{% endif %}{% else %}{{ record_link(event.other, view.shown) }} {{ event.words }} this{% endif %}{% if event.revoked %} (withdrawn){% endif %}</li>
+    {% endfor %}</ol>{% endif %}
+  </article>
+  {% endfor %}
+</section>
+{% endfor %}
+{% endif %}
+{% endblock %}
