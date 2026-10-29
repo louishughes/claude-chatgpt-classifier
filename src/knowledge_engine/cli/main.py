@@ -1846,8 +1846,10 @@ def _taxonomy_refresh(settings: Settings, args: argparse.Namespace) -> CommandRe
     """
     from dataclasses import asdict
 
+    from sqlalchemy import select
     from sqlalchemy.orm import Session
 
+    from knowledge_engine.classification.store import ClassificationRow
     from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
     from knowledge_engine.rendering.transcript import load_conversation
     from knowledge_engine.segmentation.inventory import corpus_inventory
@@ -1884,10 +1886,19 @@ def _taxonomy_refresh(settings: Settings, args: argparse.Namespace) -> CommandRe
                 proposed = refresh.collect_topics(
                     session, current, (load_conversation(session, cid) for cid in queued)
                 )
-                # TAX-009: queued segments that no domain fits, grouped by
-                # subject, become one new-domain proposal per group.
+                # TAX-009: segments no domain fits, grouped by subject, become
+                # one new-domain proposal per group. Word shares are measured
+                # against every chat classified under the version, not only
+                # the queue, or a queue that is mostly one subject would
+                # make that subject look like filler.
+                classified = session.scalars(
+                    select(ClassificationRow.conversation_id)
+                    .where(ClassificationRow.taxonomy_version == current.version)
+                    .distinct()
+                    .order_by(ClassificationRow.conversation_id)
+                ).all()
                 pairs = []
-                for cid in queued:
+                for cid in classified:
                     chat = load_conversation(session, cid)
                     pairs += [(chat, seg) for seg in load_segments(session, chat)]
                 domains = propose_domains(

@@ -40,9 +40,9 @@ from knowledge_engine.taxonomy.review import OPEN, proposals, reject
 
 T0 = 1704067200.0
 CHATS = {
-    "c-cook-1": "cooking pasta for dinner tonight",
-    "c-cook-2": "cooking a curry from scratch",
-    "c-cook-3": "cooking rice in a heavy pot",
+    "c-cook-1": "cooking a pasta recipe for dinner tonight",
+    "c-cook-2": "cooking a curry recipe from scratch",
+    "c-cook-3": "cooking a rice recipe in a heavy pot",
     "c-make-1": "garden makeover with raised planters",
     "c-make-2": "room makeover with paint colours",
     "c-make-3": "bedroom makeover and a woven rug",
@@ -103,14 +103,9 @@ class World:
         return segment
 
 
-@pytest.fixture
-def world(tmp_path: Path) -> Iterator[World]:
-    export = tmp_path / "export"
-    export.mkdir()
-    body = [_chat(cid, text, day) for day, (cid, text) in enumerate(CHATS.items())]
-    (export / "conversations.json").write_text(json.dumps(body), encoding="utf-8")
+def _build(tmp_path: Path, chats: dict[str, str]) -> World:
     settings = Settings(workspace_root=tmp_path / "ws")
-    run_import(export, "acct", format_id=None, settings=settings)
+    _import(tmp_path / "export", settings, chats)
     session = Session(create_sqlite_engine(database_path(settings)))
     registry = TaxonomyRegistry(session)
     term = registry.add_term(Dimension.DOMAIN, "Programming", status=TermStatus.APPROVED)
@@ -119,8 +114,25 @@ def world(tmp_path: Path) -> Iterator[World]:
     world = World(settings, session, tax1)
     save(session, SegmentClassifier(tax1).classify(world.items()))  # the run, frozen at tax-1
     session.commit()
+    return world
+
+
+def _import(root: Path, settings: Settings, chats: dict[str, str]) -> None:
+    root.mkdir(parents=True)
+    body = [_chat(cid, text, day) for day, (cid, text) in enumerate(chats.items())]
+    (root / "conversations.json").write_text(json.dumps(body), encoding="utf-8")
+    run_import(root, "acct", format_id=None, settings=settings)
+
+
+def _python(n: int, extra: str = "") -> dict[str, str]:
+    return {f"c-code-{k}": f"python task {extra}".strip() for k in range(1, n + 1)}
+
+
+@pytest.fixture
+def world(tmp_path: Path) -> Iterator[World]:
+    world = _build(tmp_path, CHATS)
     yield world
-    session.close()
+    world.session.close()
 
 
 def _open_domains(session: Session) -> dict[str, dict[str, Any]]:
@@ -150,7 +162,7 @@ def test_each_uncovered_subject_becomes_one_proposal_with_anchors(world: World) 
             [chat] = [c for c, s in world.items() if s.segment_id == anchor["segment_id"]]
             text = chats[chat.conversation_id].messages[anchor["message_id"]].text
             assert text[anchor["start"] : anchor["end"]].lower() == label.lower()
-        assert "text" not in json.dumps(evidence)  # IDs and spans only
+        assert "text" not in json.dumps(evidence) and "keywords" not in evidence  # IDs, spans
 
 
 def test_the_vocabulary_stays_frozen(world: World) -> None:
@@ -169,7 +181,7 @@ def test_a_rerun_and_a_rejection_add_nothing(world: World) -> None:
     first = propose_domains(session, world.tax1, world.items())
     session.commit()
     again = propose_domains(session, world.tax1, world.items())
-    assert again.proposed == [] and sorted(again.waiting) == ["Cooking", "Makeover"]
+    assert again.proposed == [] and {"Cooking", "Makeover"} <= set(again.waiting)
 
     [cooking] = [
         r.proposal_id
@@ -180,7 +192,7 @@ def test_a_rerun_and_a_rejection_add_nothing(world: World) -> None:
     reject(session, cooking, reviewer="reviewer-b", note="too narrow for a domain")
     session.commit()
     after = propose_domains(session, world.tax1, world.items())
-    assert after.proposed == [] and after.rejected == ["Cooking"]
+    assert after.proposed == [] and after.rejected == ["Cooking", "Recipe"]  # word, then group
     assert set(_open_domains(session)) == {"Makeover"}
 
 
@@ -211,3 +223,104 @@ def test_cli_refresh_files_the_domain_proposals(
     assert json.loads(capsys.readouterr().out)["data"]["domains_proposed"] == 0
     capsys.readouterr()
     assert main(["--json", "taxonomy", "refresh", "--min-segments", "4"]) == 0
+
+
+def test_a_word_covered_chats_share_does_not_merge_two_subjects(tmp_path: Path) -> None:
+    """The review's probe: cooking and garden chats that all say "weekend"."""
+    chats = {
+        **{f"c-cook-{k}": f"cooking {dish} this weekend" for k, dish in
+           enumerate(("pasta", "curry", "rice"), 1)},
+        **{f"c-gard-{k}": f"garden {job} this weekend" for k, job in
+           enumerate(("pruning", "weeding", "mulching"), 1)},
+        **{f"c-code-{k}": "python task" for k in range(1, 8)},
+        "c-code-8": "python task this weekend",
+    }  # fmt: skip
+    world = _build(tmp_path, chats)
+    report = propose_domains(world.session, world.tax1, world.items())
+    assert set(_open_domains(world.session)) == {"Cooking", "Garden"}
+    assert len(report.proposed) == 2 and report.leftover == 0
+    world.session.close()
+
+
+def test_a_rejected_subject_stays_rejected_when_a_new_chat_joins_it(world: World) -> None:
+    session = world.session
+    propose_domains(session, world.tax1, world.items())
+    [cooking] = [r.proposal_id for r in proposals(session, OPEN)
+                 if json.loads(r.payload_json)["label"] == "Cooking"]  # fmt: skip
+    reject(session, cooking, reviewer="reviewer-b", note="not a domain")
+    session.commit()
+    _import(world.settings.workspace_root.parent / "export-2", world.settings,
+            {**CHATS, "c-cook-4": "cooking a stew recipe"})  # fmt: skip
+    session.commit()
+    save(session, SegmentClassifier(world.tax1).classify(world.items()))
+    session.commit()
+    after = propose_domains(session, world.tax1, world.items())
+    # "Recipe" names the same four chats, three of them already rejected.
+    assert after.proposed == [] and "Recipe" in after.rejected
+
+
+def test_cli_measures_word_shares_against_every_classified_chat(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from knowledge_engine.segmentation.inventory import corpus_inventory
+    from knowledge_engine.taxonomy.refresh import build_refresh_pack, record_pack
+
+    chats = {k: v for k, v in CHATS.items() if not k.startswith("c-make")}
+    world = _build(tmp_path, {**chats, **_python(4)})
+    session = world.session
+    pack = build_refresh_pack(session, world.tax1, list(corpus_inventory(session)), size=5,
+                              seed="t")  # fmt: skip
+    record_pack(session, pack)
+    session.commit()
+    # Only the three cooking chats are queued: all of them say "cooking", which
+    # a queue-only share would call filler.
+    monkeypatch.setenv("KE_WORKSPACE_ROOT", str(world.settings.workspace_root))
+    capsys.readouterr()
+    assert main(["--json", "taxonomy", "refresh"]) == 0
+    assert json.loads(capsys.readouterr().out)["data"]["domains_proposed"] == 1
+    assert set(_open_domains(session)) == {"Cooking"}
+    session.close()
+
+
+def test_the_latest_review_decides_and_pending_is_not_uncovered(world: World) -> None:
+    from dataclasses import replace
+
+    from knowledge_engine.classification.classifier import PENDING
+    from knowledge_engine.taxonomy.domain_gaps import domain_status
+
+    session = world.session
+    [programming] = world.tax1.dimension(Dimension.DOMAIN)
+    code, cook = world.segment_of("c-code-1"), world.segment_of("c-cook-1")
+    record_review(session, world.tax1, cook, "domain", primary=programming.term_id,
+                  reviewer="reviewer-c")  # fmt: skip
+    record_review(session, world.tax1, cook, "domain", primary=None, reviewer="reviewer-d")
+    record_review(session, world.tax1, code, "domain", primary=None, reviewer="reviewer-d")
+    session.commit()
+    answered, covered = domain_status(session, "tax-1")
+    assert cook in answered and cook not in covered  # "none fits" came last
+    assert code in answered and code not in covered  # it overrides the machine's domain
+
+    _import(world.settings.workspace_root.parent / "export-2", world.settings,
+            {**CHATS, "c-cook-4": "cooking a soup recipe"})  # fmt: skip
+    session.commit()
+    new = [(c, s) for c, s in world.items() if s.segment_id == world.segment_of("c-cook-4")]
+    [result] = SegmentClassifier(world.tax1).classify(new)
+    save(session, [replace(result, state=PENDING, answer=None, stage_key="stg_" + "p" * 64)])
+    session.commit()
+    answered, covered = domain_status(session, "tax-1")
+    assert world.segment_of("c-cook-4") not in answered
+    report = propose_domains(session, world.tax1, world.items())
+    assert report.uncovered == 7  # the six subject chats, plus the Python chat a reviewer reset
+
+
+def test_a_recurring_name_never_becomes_a_label(tmp_path: Path) -> None:
+    chats = {
+        "c-name-1": "notes for Bramble about the cottage lease",
+        "c-name-2": "a birthday card that Bramble will like",
+        "c-name-3": "the train times so Bramble can visit",
+        **_python(4),
+    }
+    world = _build(tmp_path, chats)
+    report = propose_domains(world.session, world.tax1, world.items())
+    assert report.proposed == [] and report.names == 1
+    world.session.close()
