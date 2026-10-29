@@ -263,3 +263,136 @@ def history(session: Session, relationship: str) -> list[RelationshipReviewRow]:
             .order_by(RelationshipReviewRow.review_id)
         )
     )
+
+
+# The kinds a person may state by hand (REL-006). "quotes" and "references"
+# are facts about the text that a detector can check; these three are
+# judgements, which is exactly what a person adds.
+HUMAN_KINDS = frozenset({RelationKind.CONTINUES, RelationKind.FORKED_FROM, RelationKind.RELATED_TO})
+HUMAN_DETECTOR = "human-v1"
+
+
+class RelationshipError(ValueError):
+    """A hand-made link the store refuses."""
+
+
+def add_human(
+    session: Session,
+    *,
+    from_conversation_id: str,
+    kind: RelationKind,
+    to_conversation_id: str,
+    reviewer: str,
+    note: str | None = None,
+    replaces: str | None = None,
+) -> ConversationRelationshipRow:
+    """Store a link a person stated, already accepted (REL-006). The caller commits.
+
+    The link is evidence class ``human`` with confidence 1.0: no score made
+    it, a person did. Its history starts with that person's ``accept``, so
+    "who said B continues A, and when" is answered like any other review.
+
+    Args:
+        session: A write session.
+        from_conversation_id: The chat the link starts from ("B" in "B continues A").
+        kind: ``continues``, ``forked_from`` or ``related_to``.
+        to_conversation_id: The chat it points to.
+        reviewer: Who said so.
+        note: Why, optionally.
+        replaces: The ``rel_`` ID this link retypes, if any (kept in its evidence).
+
+    Raises:
+        KeyError: A chat doesn't exist.
+        RelationshipError: Another kind, a chat linked to itself, no reviewer,
+            or the same hand-made link is already stored (in any state: a
+            rejected or replaced hand-made link is reviewed again, not re-added,
+            so its history stays in one place).
+    """
+    from knowledge_engine.importer.records import ConversationRow
+
+    if kind not in HUMAN_KINDS:
+        raise RelationshipError("a hand-made link is continues, forked_from or related_to")
+    if from_conversation_id == to_conversation_id:
+        raise RelationshipError("a chat can't be linked to itself")
+    if not reviewer.strip():
+        raise RelationshipError("a hand-made link needs a named reviewer")
+    for conversation_id in (from_conversation_id, to_conversation_id):
+        if session.get(ConversationRow, conversation_id) is None:
+            raise KeyError("no such conversation")
+    key = relationship_id(from_conversation_id, kind.value, to_conversation_id, HUMAN_DETECTOR)
+    if session.get(ConversationRelationshipRow, key) is not None:
+        raise RelationshipError("that link is already recorded; review it instead")
+    evidence: dict[str, Any] = {"stated_by": reviewer}
+    if replaces is not None:
+        evidence["replaces"] = replaces
+    row = ConversationRelationshipRow(
+        relationship_id=key,
+        from_conversation_id=from_conversation_id,
+        kind=kind.value,
+        to_conversation_id=to_conversation_id,
+        evidence_class=EvidenceClass.HUMAN.value,
+        confidence=1.0,
+        review_state=ReviewState.ACCEPTED.value,
+        detector=HUMAN_DETECTOR,
+        evidence_json=json.dumps(evidence, sort_keys=True),
+        first_import_id=None,
+    )
+    session.add(row)
+    session.add(
+        RelationshipReviewRow(
+            relationship_id=key,
+            action=ReviewAction.ACCEPT.value,
+            from_state=ReviewState.CANDIDATE.value,
+            to_state=ReviewState.ACCEPTED.value,
+            reviewer=reviewer,
+            note=note,
+        )
+    )
+    session.flush()
+    return row
+
+
+def retype(
+    session: Session,
+    relationship: str,
+    kind: RelationKind,
+    *,
+    reverse: bool,
+    reviewer: str,
+    note: str | None = None,
+) -> ConversationRelationshipRow:
+    """Accept a link as another kind or the other way round (REL-006). The caller commits.
+
+    The old row is never edited: its kind and direction are part of its ID.
+    It is marked ``superseded`` (with this reviewer and note in its history)
+    and a new hand-made link records what the person said instead, naming
+    the old one in its evidence. Readers then show only the new link.
+
+    Raises:
+        KeyError: No such relationship.
+        RelationshipError: See ``add_human``; also when nothing would change,
+            or the old link is already rejected or superseded.
+    """
+    old = session.get(ConversationRelationshipRow, relationship)
+    if old is None:
+        raise KeyError("no such relationship")
+    # A rejection sticks and a superseded link already has its replacement:
+    # only an open or accepted link can be restated.
+    if old.review_state not in (ReviewState.CANDIDATE.value, ReviewState.ACCEPTED.value):
+        raise RelationshipError(f"the link is {old.review_state}; it can't be retyped")
+    start, end = old.from_conversation_id, old.to_conversation_id
+    if reverse:
+        start, end = end, start
+    if kind.value == old.kind and not reverse:
+        raise RelationshipError("same kind and direction: accept it instead")
+    new = add_human(
+        session,
+        from_conversation_id=start,
+        kind=kind,
+        to_conversation_id=end,
+        reviewer=reviewer,
+        note=note,
+        replaces=relationship,
+    )
+    review(session, relationship, ReviewAction.SUPERSEDE, reviewer=reviewer, note=note)
+    return new
