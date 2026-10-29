@@ -108,6 +108,7 @@ DELETE_ORDER = (
     "transcript_snapshots",
     "youtube_videos",
     "link_targets",
+    "account_reviews",
     "account_mentions",
     "account_aliases",
     "social_accounts",
@@ -387,6 +388,10 @@ def _plan(db: sqlite3.Connection, conversations: list[str], segments: set[str]) 
     accounts = {a for _, a in mentions if a}
     kept = _still_used(db, "account_mentions", "account_id", "mention_id", accounts, mention_ids)
     plan.kept_shared["accounts_mentioned_elsewhere"] += len(kept)
+    # SOC-004 review history: a link decision goes with its mention, and an
+    # account's whole history goes with the account.
+    take("account_reviews", "mention_id", mention_ids)
+    take("account_reviews", "account_id", accounts - kept)
     take("account_aliases", "account_id", accounts - kept)
     take("social_accounts", "account_id", accounts - kept)
 

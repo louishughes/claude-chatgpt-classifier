@@ -14,4 +14,8 @@
   {% for m in account.mentions %}<tr><td>{{ where(m.place) }}</td><td class="wrap"><code>{{ m.written }}</code></td></tr>{% endfor %}
   </tbody>
 </table></div>
+{% if account.history %}
+<h2>Review history</h2>
+<ul>{% for r in account.history %}<li>{{ r.at }}: {{ r.reviewer }} {{ r.action }}ed ({{ r.from_state }} → {{ r.to_state }}){% if r.note %}: {{ r.note }}{% endif %}</li>{% endfor %}</ul>
+{% endif %}
 {% endblock %}

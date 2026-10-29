@@ -201,7 +201,7 @@ def video_page(session: Session, video_id: str) -> dict[str, Any] | None:
 
 def account_page(session: Session, account_id: str) -> dict[str, Any] | None:
     """Return one registry account, its aliases and every mention, or None."""
-    from knowledge_engine.links.social_store import AccountAliasRow
+    from knowledge_engine.links.social_store import AccountAliasRow, account_history
 
     account = session.get(SocialAccountRow, account_id)
     if account is None:
@@ -222,4 +222,15 @@ def account_page(session: Session, account_id: str) -> dict[str, Any] | None:
         "identity_status": account.identity_status,
         "aliases": [(a.kind, a.alias) for a in aliases],
         "mentions": [{"place": where.get(m.revision_id), "written": m.raw_text} for m in mentions],
+        "history": [
+            {
+                "action": r.action,
+                "from_state": r.from_state,
+                "to_state": r.to_state,
+                "reviewer": r.reviewer,
+                "note": r.note,
+                "at": r.at.isoformat(timespec="seconds"),
+            }
+            for r in account_history(session, account_id)
+        ],
     }

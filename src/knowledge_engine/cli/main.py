@@ -675,32 +675,82 @@ def _transcript_data(session: Any, transcript_id: str) -> dict[str, Any]:
 
 
 def _accounts(settings: Settings, args: argparse.Namespace) -> CommandResult:
-    """List the social account registry (SOC-002): read-only."""
+    """List the social account registry (SOC-002), or record a review (SOC-004)."""
     from sqlalchemy.orm import Session
 
     from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
     from knowledge_engine.links.social_store import account_summaries, ambiguous_handles
 
+    action = getattr(args, "accounts_command", None)
+    name = f"accounts {action}" if action else "accounts"
     db = database_path(settings)
     if not db.exists():
         return CommandResult(
-            "accounts", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
         )
     engine = create_sqlite_engine(db)
     try:
         with Session(engine) as session:
+            if action is not None:
+                return _accounts_review(session, name, args)
             if args.ambiguous:
                 return CommandResult(
                     "accounts",
                     data={"ambiguous": ambiguous_handles(session)},
-                    message="Bare @handles (no platform; never linked to an account)",
+                    message="Bare @handles (no platform; linked only by `ke accounts link`)",
                 )
-            accounts_list = account_summaries(session, platform=args.platform)
+            accounts_list = account_summaries(
+                session, platform=args.platform, include_rejected=args.all
+            )
     finally:
         engine.dispose()
     return CommandResult(
         "accounts", data={"accounts": accounts_list}, message="Social accounts (never contacted)"
     )
+
+
+def _accounts_review(session: Any, name: str, args: argparse.Namespace) -> CommandResult:
+    """Confirm, reject or link inside one transaction; the history is append-only."""
+    from knowledge_engine.links.social_store import (
+        AccountAction,
+        AccountReviewError,
+        link_mention,
+        review_account,
+    )
+
+    try:
+        if args.accounts_command == "link":
+            entry = link_mention(
+                session, args.mention, args.account, reviewer=args.reviewer, note=args.note
+            )
+            message = "Linked: the mention now counts toward the account"
+        else:
+            entry = review_account(
+                session,
+                args.account,
+                AccountAction(args.decision),
+                reviewer=args.reviewer,
+                note=args.note,
+            )
+            message = f"Account {entry.to_state}"
+    except KeyError as error:
+        # An unknown ID is a usage mistake (exit 2), like a bad argument.
+        return CommandResult(
+            name, ExitCode.USAGE, message=str(error.args[0]), error_code="not_found"
+        )
+    except AccountReviewError as error:
+        return CommandResult(name, ExitCode.USAGE, message=str(error), error_code="refused")
+    session.commit()
+    data = {
+        "account_id": entry.account_id,
+        "mention_id": entry.mention_id,
+        "action": entry.action,
+        "from_state": entry.from_state,
+        "to_state": entry.to_state,
+        "reviewer": entry.reviewer,
+        "at": entry.at.isoformat(),
+    }
+    return CommandResult(name, data=data, message=message)
 
 
 def _segments(settings: Settings, args: argparse.Namespace) -> CommandResult:
@@ -4260,7 +4310,27 @@ def build_parser() -> argparse.ArgumentParser:
     accounts.add_argument(
         "--ambiguous", action="store_true", help="list bare @handles with no platform instead"
     )
+    accounts.add_argument("--all", action="store_true", help="include rejected accounts")
     accounts.set_defaults(handler=_accounts)
+    accounts_commands = accounts.add_subparsers(
+        dest="accounts_command", metavar="ACTION", parser_class=_Parser
+    )
+    acct_review = accounts_commands.add_parser(
+        "review", help="confirm or reject who an account is (kept in its history)"
+    )
+    acct_review.add_argument("account", help="the acct_ ID")
+    acct_review.add_argument("decision", choices=["confirm", "reject"])
+    acct_review.add_argument("--reviewer", required=True, help="who decided")
+    acct_review.add_argument("--note", help="why")
+    acct_review.set_defaults(handler=_accounts)
+    acct_link = accounts_commands.add_parser(
+        "link", help="file an ambiguous @handle mention under an account"
+    )
+    acct_link.add_argument("mention", help="the amen_ ID (from `ke accounts --ambiguous`)")
+    acct_link.add_argument("account", help="the acct_ ID")
+    acct_link.add_argument("--reviewer", required=True, help="who decided")
+    acct_link.add_argument("--note", help="why")
+    acct_link.set_defaults(handler=_accounts)
 
     segments = commands.add_parser("segments", help="a chat's topic segments (no text shown)")
     segments.add_argument("conversation", help="the conv_ ID")

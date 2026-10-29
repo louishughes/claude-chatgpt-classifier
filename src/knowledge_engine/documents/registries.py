@@ -47,6 +47,7 @@ from knowledge_engine.importer.records import ConversationRow
 from knowledge_engine.links.social_store import (
     AccountAliasRow,
     SocialAccountRow,
+    account_history,
     account_mentions,
     account_summaries,
     ambiguous_handles,
@@ -70,7 +71,7 @@ from knowledge_engine.rendering.markdown import (
     safe_relative_path,
 )
 
-REGISTRY_NOTES_VERSION = "ytb-003+soc-003-v1"
+REGISTRY_NOTES_VERSION = "ytb-003+soc-004-v2"
 VIDEOS_DIR = "Videos"
 ACCOUNTS_DIR = "Accounts"
 REGISTRY_TITLE = "Account registry"
@@ -407,9 +408,15 @@ def account_registry_note(session: Session) -> DocumentModel:
         ),
     ]
     if rejected:
+        # SOC-004: a rejected account drops out of the registry. Each one's
+        # own note keeps its mentions and review history.
         blocks += [
             Heading("Rejected", 2),
-            BulletList(tuple(_summary_line(s) for s in rejected), True),
+            Paragraph(
+                f"{len(rejected)} account(s) a person rejected are left out. "
+                "`ke accounts --all` lists them.",
+                True,
+            ),
         ]
     properties: dict[str, PropertyValue] = {
         "ke_type": "account_registry",
@@ -467,6 +474,21 @@ def account_note(session: Session, account_id: str) -> DocumentModel:
             tuple(_chat_links(session, {m.conversation_id for m in mentions}) or ["none"]), True
         ),
     ]
+    history = account_history(session, account_id)
+    if history:
+        blocks += [
+            Heading("Review history", 2),
+            BulletList(
+                tuple(
+                    # Reviewer and note are typed by a person: code spans keep
+                    # them from turning into Markdown links or headings.
+                    f"{r.at.isoformat(timespec='seconds')}: `{_code(r.reviewer)}` {r.action} "
+                    f"({r.from_state} to {r.to_state})" + (f": `{_code(r.note)}`" if r.note else "")
+                    for r in history
+                ),
+                True,
+            ),
+        ]
     properties: dict[str, PropertyValue] = {
         "ke_type": "social_account",
         "account_id": account_id,
