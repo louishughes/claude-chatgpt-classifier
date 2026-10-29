@@ -78,6 +78,7 @@ class MediaRef:
         rule: The resolution rule from the evidence, if recorded.
         blob_sha256: The bytes' fingerprint, when available.
         media_type: From the file header, when available.
+        asset_id: The logical file it points at, when the pointer names one.
     """
 
     pointer: str
@@ -86,6 +87,7 @@ class MediaRef:
     rule: str | None = None
     blob_sha256: str | None = None
     media_type: str | None = None
+    asset_id: str | None = None
 
 
 def attachment_path(blob_sha256: str, media_type: str | None) -> PurePosixPath:
@@ -167,6 +169,7 @@ def load_media_refs(session: Session, revision_ids: Iterable[str]) -> dict[str, 
                 rule=evidence.get("rule"),
                 blob_sha256=sha if available else None,
                 media_type=media_type if available else None,
+                asset_id=occurrence.asset_id,
             )
         )
     return refs

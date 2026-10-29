@@ -1,7 +1,7 @@
 """Data for the links, videos, accounts and search pages (UI-004).
 
 Every list here is a registry the importer already keeps: one row per URL,
-video or account, and every mention pointing back to the exact message it
+video, account or image (UI-010), and every mention pointing back to the exact message it
 came from. These functions only read; the pages link each mention to its
 message on the chat page (``/chats/<id>#<anchor>``).
 
@@ -12,6 +12,7 @@ Talking points:
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -222,4 +223,110 @@ def account_page(session: Session, account_id: str) -> dict[str, Any] | None:
         "identity_status": account.identity_status,
         "aliases": [(a.kind, a.alias) for a in aliases],
         "mentions": [{"place": where.get(m.revision_id), "written": m.raw_text} for m in mentions],
+    }
+
+
+def asset_page(session: Session, asset_id: str) -> dict[str, Any] | None:
+    """Return one image or file and every message that uses it, or None (UI-010).
+
+    An asset is the export's logical file; each use of it in a message is a
+    separate occurrence (CLAUDE.md §2A). The same picture sent in three
+    messages is one asset with three rows here, and every row links to its
+    message. Each occurrence keeps its own availability, because a later
+    export may supply bytes that an earlier one lacked.
+    """
+    from knowledge_engine.importer.media import AssetOccurrenceRow, MediaAssetRow, MediaBlobRow
+    from knowledge_engine.rendering.media import REASONS
+
+    asset = session.get(MediaAssetRow, asset_id)
+    if asset is None:
+        return None
+    blob = session.get(MediaBlobRow, asset.blob_sha256) if asset.blob_sha256 else None
+    rows = session.scalars(
+        select(AssetOccurrenceRow)
+        .where(AssetOccurrenceRow.asset_id == asset_id)
+        .order_by(AssetOccurrenceRow.revision_id, AssetOccurrenceRow.part_index)
+    ).all()
+    # One row per *message*, not per stored revision. Re-importing a chat
+    # whose message was edited adds a new revision of the same message; the
+    # chat page shows the newest one (``load_conversation``), so this page
+    # counts only uses in each message's newest revision. Uses that exist
+    # only in an older version are counted separately, never dropped.
+    node_of = dict(
+        session.execute(
+            select(MessageRevisionRow.revision_id, MessageRevisionRow.node_key).where(
+                MessageRevisionRow.revision_id.in_({row.revision_id for row in rows})
+            )
+        )
+        .tuples()
+        .all()
+    )
+    newest: dict[str, str] = {}
+    for revision_id, node_key in session.execute(
+        select(MessageRevisionRow.revision_id, MessageRevisionRow.node_key)
+        .where(MessageRevisionRow.node_key.in_(set(node_of.values())))
+        .order_by(MessageRevisionRow.created_at, MessageRevisionRow.revision_id)
+    ).tuples():
+        newest[node_key] = revision_id  # later rows win, as on the chat page
+    # A revision with no stored message can't be placed; it is kept (shown as
+    # "message not found") rather than silently dropped.
+    current = [
+        row
+        for row in rows
+        if row.revision_id not in node_of or newest.get(node_of[row.revision_id]) == row.revision_id
+    ]
+    earlier = len(
+        {node_of[row.revision_id] for row in rows if row.revision_id in node_of}
+        - {node_of[r.revision_id] for r in current if r.revision_id in node_of}
+    )
+    rows = current
+    where = places(session, (row.revision_id for row in rows))
+
+    def oldest_first(row: AssetOccurrenceRow) -> tuple[bool, datetime]:
+        # A message with no time (or not found) goes last.
+        place = where.get(row.revision_id)
+        when = place.when if place is not None else None
+        return (when is None, when or datetime.min.replace(tzinfo=UTC))
+
+    occurrences = []
+    chats = set()
+    for row in sorted(rows, key=oldest_first):
+        place = where.get(row.revision_id)
+        if place is not None:
+            chats.add(place.conversation_id)
+        evidence = json.loads(row.evidence_json) if row.evidence_json else {}
+        occurrences.append(
+            {
+                "occurrence_id": row.occurrence_id,
+                "revision_id": row.revision_id,
+                "place": place,
+                "availability": row.availability,
+                "reason": REASONS.get(evidence.get("rule") or "", "no reason recorded"),
+            }
+        )
+    shared = 0
+    if blob is not None:
+        # Other logical files with identical bytes (a re-upload under a new
+        # file ID): the same picture, kept as its own asset, never merged.
+        shared = int(
+            session.scalar(
+                select(func.count())
+                .select_from(MediaAssetRow)
+                .where(
+                    MediaAssetRow.blob_sha256 == blob.blob_sha256,
+                    MediaAssetRow.asset_id != asset_id,
+                )
+            )
+            or 0
+        )
+    return {
+        "asset_id": asset.asset_id,
+        "blob_sha256": blob.blob_sha256 if blob else None,
+        "media_type": blob.media_type if blob else None,
+        "width": blob.width if blob else None,
+        "height": blob.height if blob else None,
+        "chats": len(chats),
+        "same_bytes_elsewhere": shared,
+        "only_in_earlier_versions": earlier,
+        "occurrences": occurrences,
     }

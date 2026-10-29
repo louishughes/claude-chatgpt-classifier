@@ -351,6 +351,8 @@ def conversation_page(session: Session, conversation_id: str) -> dict[str, Any] 
                     "reason": REASONS.get(ref.rule or "", "no reason recorded"),
                     "url": f"/media/{ref.blob_sha256}" if available else None,
                     "inline": bool(available) and ref.media_type in _IMAGE_TYPES,
+                    # Every message using the same file is listed on this page.
+                    "asset": f"/assets/{ref.asset_id}" if ref.asset_id else None,
                 }
             )
         return {
