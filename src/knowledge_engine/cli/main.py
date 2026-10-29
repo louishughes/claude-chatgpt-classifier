@@ -1652,6 +1652,74 @@ def _backup(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _bundle(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Export one project as a ZIP bundle, or check and count one (DOC-007, DOC-008)."""
+    from knowledge_engine.documents.bundle import BundleError, export_bundle, verify_bundle
+
+    command = f"bundle {args.bundle_command}"
+    if args.bundle_command == "export":
+        from sqlalchemy.orm import Session
+
+        from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+
+        db = database_path(settings)
+        if not db.exists():
+            return CommandResult(
+                command, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+            )
+        engine = create_sqlite_engine(db)
+        try:
+            with Session(engine) as session:
+                summary = export_bundle(
+                    session, args.project, args.to, with_transcripts=args.with_transcripts
+                )
+        except BundleError as error:
+            return CommandResult(command, ExitCode.USAGE, message=str(error), error_code="refused")
+        finally:
+            engine.dispose()
+        return CommandResult(
+            command,
+            data={
+                "records": summary.records,
+                "chats": summary.chats,
+                "transcripts": summary.transcripts,
+                "sha256": summary.sha256,
+            },
+            message=f"bundle written: {summary.records} record(s) from {summary.chats} chat(s)"
+            + (f", {summary.transcripts} transcript(s)" if summary.transcripts else ""),
+        )
+    check = verify_bundle(args.file, settings.limits)
+    by_type = dict(sorted(check.by_type.items()))
+    by_status = dict(sorted(check.by_status.items()))
+    data: dict[str, Any] = {
+        "ok": check.ok,
+        "problems": check.problems,
+        "members": check.members,
+        "records": check.records,
+        "by_type": by_type,
+        "by_status": by_status,
+    }
+    if not check.ok:
+        return CommandResult(
+            command,
+            ExitCode.ERROR,
+            data=data,
+            message="PROBLEMS: " + "; ".join(check.problems),
+            error_code="bad_bundle",
+        )
+    if args.bundle_command == "verify":
+        return CommandResult(
+            command,
+            data=data,
+            message=f"sound: {check.members} member(s) and {check.records} record(s) match",
+        )
+    counts = ", ".join(f"{n} {k}" for k, n in by_type.items()) or "no records"
+    states = ", ".join(f"{n} {k}" for k, n in by_status.items())
+    return CommandResult(
+        command, data=data, message=f"{counts}" + (f" ({states})" if states else "")
+    )
+
+
 def _gold_schema(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """The golden-set JSON Schema (EVAL-001)."""
     from knowledge_engine.evaluation.gold import gold_schema
@@ -4232,6 +4300,24 @@ def build_parser() -> argparse.ArgumentParser:
     backup_restore.add_argument("folder", type=Path, help="the backup folder")
     backup_restore.add_argument("--to", type=Path, required=True, help="an empty folder")
     backup_restore.set_defaults(handler=_backup)
+    bundle = commands.add_parser("bundle", help="export one project as a ZIP, or check one")
+    bundle_commands = bundle.add_subparsers(dest="bundle_command", required=True)
+    bundle_export = bundle_commands.add_parser(
+        "export", help="write a project's notes, records and evidence to one ZIP"
+    )
+    bundle_export.add_argument("project", help="an approved project ID")
+    bundle_export.add_argument("--to", type=Path, required=True, help="the .zip file to write")
+    bundle_export.add_argument(
+        "--with-transcripts", action="store_true", help="also include the chats' full text"
+    )
+    bundle_export.set_defaults(handler=_bundle)
+    for action, text in (
+        ("verify", "check every member and quote hash and the member names"),
+        ("show", "count a bundle's records by type and status (no text)"),
+    ):
+        bundle_action = bundle_commands.add_parser(action, help=text)
+        bundle_action.add_argument("file", type=Path, help="the bundle .zip")
+        bundle_action.set_defaults(handler=_bundle)
     digest = commands.add_parser(
         "digest", help="summarise chats through request files a Claude session answers"
     )
