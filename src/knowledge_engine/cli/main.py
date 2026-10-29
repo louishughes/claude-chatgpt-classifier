@@ -1201,7 +1201,8 @@ def _digest(settings: Settings, args: argparse.Namespace) -> CommandResult:
                 )
                 for conversation_id, outcome in zip(ids, outcomes, strict=True):
                     counts[outcome.state] += 1
-                    if outcome.state == "done" and args.vault is not None:
+                    # A chat with no text still gets its note, saying so (NOTE-031).
+                    if outcome.state in ("done", "no_content") and args.vault is not None:
                         write_rich_note(
                             session,
                             conversation_id,
@@ -1222,13 +1223,17 @@ def _digest(settings: Settings, args: argparse.Namespace) -> CommandResult:
     finally:
         engine.dispose()
     data = {k: counts.get(k, 0) for k in ("done", "pending", "review_required", "notes")}
+    if counts["no_content"]:  # NOTE-031: only shown when a chat had no text
+        data["no_content"] = counts["no_content"]
     data["chats"] = len(ids)
     return CommandResult(
         name,
         data=data,
         message=(
             f"{data['done']} done, {data['pending']} waiting for answers, "
-            f"{data['review_required']} need review, {data['notes']} note(s) written"
+            f"{data['review_required']} need review, "
+            + (f"{data['no_content']} with no text to summarise, " if "no_content" in data else "")
+            + f"{data['notes']} note(s) written"
             + (f" (labels under {version})" if data["notes"] and version else "")
         ),
     )

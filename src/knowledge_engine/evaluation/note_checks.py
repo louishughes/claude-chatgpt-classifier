@@ -48,7 +48,7 @@ from sqlalchemy.orm import Session
 from knowledge_engine.digest.stage import PART_WORDING
 from knowledge_engine.documents.model import DocumentKind, build_document
 from knowledge_engine.documents.render import transcript_stem
-from knowledge_engine.documents.rich_note import WAITING, body_budget, body_of
+from knowledge_engine.documents.rich_note import NO_CONTENT, WAITING, body_budget, body_of
 from knowledge_engine.domain.enums import Role
 from knowledge_engine.extraction.records import KnowledgeRecord
 from knowledge_engine.extraction.store import KnowledgeRecordRow
@@ -192,7 +192,7 @@ def _claims_cited(body: str, sections: dict[str, str]) -> Finding:
         if line.startswith("> ") and not line.startswith("> [!")
     ]
     for n, line in enumerate(summary, start=1):
-        if line.strip() != WAITING and not _cited(line):
+        if line.strip() not in (WAITING, NO_CONTENT) and not _cited(line):
             problems.append(f"summary sentence {n} cites no message")
     for title in CLAIM_SECTIONS:
         for n, line in enumerate(_bullets(sections.get(title, "")), start=1):
@@ -200,7 +200,11 @@ def _claims_cited(body: str, sections: dict[str, str]) -> Finding:
                 problems.append(f"{title}: item {n} cites no message")
     for row in ("Purpose", "Outcome"):
         match = re.search(rf"^\| \*\*{row}\*\* \| (.*) \|$", body, re.MULTILINE)
-        if match and match.group(1) not in ("not written yet", "not stated"):
+        if match and match.group(1) not in (
+            "not written yet",
+            "not stated",
+            "nothing to summarise",
+        ):
             if not _cited(match.group(1)):
                 problems.append(f"card {row} cites no message")
     return _finding("claims_cited", problems)
