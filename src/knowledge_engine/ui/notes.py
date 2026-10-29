@@ -31,7 +31,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from knowledge_engine.digest.stage import stored_digest
+from knowledge_engine.digest.stage import has_quotable_text, stored_digest
 from knowledge_engine.documents.categories import suggested_category
 from knowledge_engine.documents.notes import knowledge_path
 from knowledge_engine.documents.render import transcript_stem
@@ -201,7 +201,13 @@ def note_view(session: Session, conversation_id: str) -> NoteView:
     return NoteView(
         html=note_html(body, here, notes),
         taxonomy_version=taxonomy.version if taxonomy else None,
-        digest="not written yet" if digest is None else "generated, not scored",
+        digest=(
+            "generated, not scored"
+            if digest is not None
+            else "not written yet"
+            if has_quotable_text(chat)
+            else "not needed: nothing to summarise"  # NOTE-031
+        ),
     )
 
 
@@ -242,6 +248,7 @@ def notes_index(session: Session, *, offset: int, limit: int) -> dict[str, Any]:
                 "suggested": suggestion.label if suggestion else None,
                 "status": (digest.status.value if digest and digest.status else None),
                 "digest": digest is not None,
+                "no_content": digest is None and not has_quotable_text(chat),
                 "open_questions": len(digest.open_questions) if digest else None,
             }
         )

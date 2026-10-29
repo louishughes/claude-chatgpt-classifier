@@ -412,3 +412,15 @@ blockquote.quote {
 .note .callout p { margin: .25rem 0; }
 .note a.cite { font-family: var(--mono); font-size: .85em; padding: 0 .2em; border-radius: 4px; background: var(--accent-soft); text-decoration: none; }
 .note-card td:first-child { white-space: nowrap; width: 1%; }
+
+/* Ask page (UI-007): numbered citation chips after each answer sentence. */
+.answer .sentence { margin: .5rem 0; }
+.chip { display: inline-block; padding: 0 .3rem; border-radius: 3px; background: var(--accent-soft); font-size: .85em; text-decoration: none; }
+.sources li { margin: .25rem 0; }
+
+/* Timeline page (UI-008): each record's events, oldest first. */
+.events { margin: .4rem 0 0; padding-left: 1.2rem; font-size: .9em; }
+
+/* Chat and search filters (UI-009): date, speaker and category side by side. */
+.filters { display: flex; flex-wrap: wrap; gap: .4rem .8rem; align-items: center; border: 0; padding: 0; margin: .6rem 0 0; }
+.filters select, .filters input[type="date"] { font: inherit; }
