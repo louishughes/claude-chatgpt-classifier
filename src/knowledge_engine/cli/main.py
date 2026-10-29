@@ -1851,8 +1851,10 @@ def _taxonomy_refresh(settings: Settings, args: argparse.Namespace) -> CommandRe
     from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
     from knowledge_engine.rendering.transcript import load_conversation
     from knowledge_engine.segmentation.inventory import corpus_inventory
+    from knowledge_engine.segmentation.overrides import load_segments
     from knowledge_engine.taxonomy import refresh
     from knowledge_engine.taxonomy.bootstrap import pack_sha256
+    from knowledge_engine.taxonomy.domain_gaps import propose_domains
     from knowledge_engine.taxonomy.registry import TaxonomyRegistry
 
     command = "taxonomy refresh"
@@ -1875,16 +1877,27 @@ def _taxonomy_refresh(settings: Settings, args: argparse.Namespace) -> CommandRe
             # NOTE-007: the queued chats' digest topics that match no term
             # become proposals for a reviewer (never labels).
             current = refresh.latest_version(session)
-            proposed = []
+            proposed: list[str] = []
+            domains: list[str] = []
             if current is not None:
                 queued = sorted(refresh.queued_chats(session, current))
                 proposed = refresh.collect_topics(
                     session, current, (load_conversation(session, cid) for cid in queued)
                 )
+                # TAX-009: queued segments that no domain fits, grouped by
+                # subject, become one new-domain proposal per group.
+                pairs = []
+                for cid in queued:
+                    chat = load_conversation(session, cid)
+                    pairs += [(chat, seg) for seg in load_segments(session, chat)]
+                domains = propose_domains(
+                    session, current, pairs, min_segments=args.min_segments
+                ).proposed
                 session.commit()
             status = refresh.refresh_status(session)
             counts = {k: v for k, v in asdict(status).items() if k != "last_pack_at"}
             counts["topics_proposed"] = len(proposed)
+            counts["domains_proposed"] = len(domains)
             counts["last_pack_at"] = (
                 status.last_pack_at.isoformat() if status.last_pack_at else None
             )
@@ -1893,7 +1906,8 @@ def _taxonomy_refresh(settings: Settings, args: argparse.Namespace) -> CommandRe
                 f"{status.version}, {status.review_chats} wait for review, "
                 f"{status.new_chats} are new since the last pack; "
                 f"{status.candidates} proposal(s) wait for a reviewer "
-                f"({len(proposed)} new from chat topics)"
+                f"({len(proposed)} new from chat topics, "
+                f"{len(domains)} new domain(s) for chats no domain fits)"
             )
             if out is None:
                 return CommandResult(command, data=counts, message=words)
@@ -4353,6 +4367,12 @@ def build_parser() -> argparse.ArgumentParser:
     tax_refresh.add_argument("--taxonomy", help="the version to refresh (default: newest)")
     tax_refresh.add_argument("--sample", type=int, default=150, help="segments to sample")
     tax_refresh.add_argument("--seed", default="refresh", help="same seed, same sample")
+    tax_refresh.add_argument(
+        "--min-segments",
+        type=int,
+        default=3,
+        help="segments with no domain that must share a subject before a new domain is proposed",
+    )
     tax_refresh.set_defaults(handler=_taxonomy_refresh)
     tax_relabel = taxonomy_commands.add_parser(
         "relabel", help="after a publish: relabel only what the new version changes"
