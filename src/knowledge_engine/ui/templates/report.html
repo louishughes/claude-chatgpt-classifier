@@ -9,6 +9,17 @@
   <li class="{{ tone }}">{{ sentence }}</li>
 {% endfor %}
 </ul>
+{% if report.timings %}
+<h2>How long it took</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Stage</th><th>Seconds</th></tr></thead>
+  <tbody>
+  {% for stage, seconds in report.timings.items() %}
+  <tr><td>{{ stage | replace("_", " ") }}</td><td class="num">{{ "%.3f" | format(seconds) }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endif %}
 {% if report.warnings %}
 <h2>Warnings</h2>
 <div class="table-wrap"><table>
@@ -25,7 +36,7 @@
   <div class="table-wrap"><table>
     <tbody>
     {% for key, value in report | dictsort %}
-    {% if key not in ("warnings",) %}
+    {% if key not in ("warnings", "timings") %}
     <tr><th>{{ key }}</th><td>{% if value is mapping %}{% for k, v in value | dictsort %}{{ k }}: {{ v }}{% if not loop.last %}, {% endif %}{% endfor %}{% else %}{{ value }}{% endif %}</td></tr>
     {% endif %}
     {% endfor %}

@@ -227,7 +227,13 @@ def _imports_report(settings: Settings, args: argparse.Namespace) -> CommandResu
         **json.loads(batch.counts_json or "{}"),
         "warnings": json.loads(batch.warnings_json or "{}"),
     }
-    return CommandResult("imports report", data=data, message=f"Import report ({batch.status})")
+    message = f"Import report ({batch.status})"
+    timings = data.get("timings") or {}
+    if timings:
+        message += "\nHow long it took: " + ", ".join(
+            f"{stage.replace('_', ' ')} {seconds:.3f}s" for stage, seconds in timings.items()
+        )
+    return CommandResult("imports report", data=data, message=message)
 
 
 def _import(settings: Settings, args: argparse.Namespace) -> CommandResult:
@@ -2120,6 +2126,12 @@ def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
 
     from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
     from knowledge_engine.infrastructure.workspace import WorkspaceRow
+    from knowledge_engine.retrieval.filters import (
+        BadFilterDate,
+        BadFilterRole,
+        UnknownFilterTerm,
+        build_filters,
+    )
     from knowledge_engine.retrieval.lexical import (
         LexicalIndex,
         SearchMode,
@@ -2135,7 +2147,26 @@ def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
     engine = create_sqlite_engine(db)
     try:
         with Session(engine) as session, LexicalIndex(search_index_path(settings)) as index:
+            try:
+                filters = build_filters(
+                    session,
+                    since=args.since,
+                    until=args.until,
+                    role=args.role,
+                    term=args.term,
+                    taxonomy=args.taxonomy,
+                )
+            except (BadFilterDate, BadFilterRole) as error:
+                return CommandResult(
+                    "search", ExitCode.USAGE, message=str(error), error_code="bad_filter"
+                )
+            except UnknownFilterTerm as error:
+                return CommandResult(
+                    "search", ExitCode.USAGE, message=str(error), error_code="unknown_term"
+                )
             added = sync_index(session, index)
+            workspaces = list(session.scalars(select(WorkspaceRow.workspace_id)))
+            mode = SearchMode(args.mode)
             hits = [
                 {
                     "conversation_id": hit.conversation_id,
@@ -2144,21 +2175,38 @@ def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
                     "role": hit.role,
                     "snippet": hit.snippet,
                 }
-                for workspace_id in session.scalars(select(WorkspaceRow.workspace_id))
+                for workspace_id in workspaces
                 for hit in index.search(
                     args.query,
                     workspace_id=workspace_id,
-                    mode=SearchMode(args.mode),
+                    mode=mode,
                     limit=args.limit,
                     conversation_id=args.conversation,
+                    filters=filters,
                 )
             ][: args.limit]
+            undated = sum(
+                index.undated(
+                    args.query,
+                    workspace_id=workspace_id,
+                    mode=mode,
+                    conversation_id=args.conversation,
+                    filters=filters,
+                )
+                for workspace_id in workspaces
+            )
     finally:
         engine.dispose()
+    data: dict[str, object] = {"mode": args.mode, "hits": hits, "newly_indexed": added}
+    message = f"{len(hits)} matching message(s)"
+    if filters is not None and filters.dated:
+        data["undated_left_out"] = undated
+        if undated:
+            message += f"; {undated} more match but have no date, so a date filter leaves them out"
     return CommandResult(
         "search",
-        data={"mode": args.mode, "hits": hits, "newly_indexed": added},
-        message=f"{len(hits)} matching message(s)",
+        data=data,
+        message=message,
     )
 
 
@@ -3731,6 +3779,38 @@ def _eval_review_reasons(settings: Settings, args: argparse.Namespace) -> Comman
     )
 
 
+def _eval_tokens(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Estimated tokens per stage from the model ledger (OPS-010); counts only, no calls."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.providers.ledger import token_estimates
+
+    name = "eval tokens"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            data = token_estimates(session)
+    finally:
+        engine.dispose()
+    lines = [
+        f"{family}: {n['requests']} requests ({n['cached']} answered, so re-runs are free), "
+        f"~{n['input_tokens']} input and ~{n['output_tokens']} output tokens"
+        for family, n in data.items()
+        if n["requests"] or family != "other"
+    ]
+    return CommandResult(
+        name,
+        data=data,
+        message="Estimated tokens (characters / 4, not a bill):\n" + "\n".join(lines),
+    )
+
+
 def _eval_semantic(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Run the EVAL-011 semantic smoke test on a scratch copy, never the real database."""
     import sqlite3
@@ -3951,6 +4031,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     reasons.add_argument("--limit", type=int, help="the run's conversation count (default all)")
     reasons.set_defaults(handler=_eval_review_reasons)
+    eval_commands.add_parser(
+        "tokens", help="estimated tokens per stage from the model ledger (no calls)"
+    ).set_defaults(handler=_eval_tokens)
     relationships_eval = eval_commands.add_parser(
         "relationships",
         help="score proposed links between chats against an independent answer key",
@@ -4377,6 +4460,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     search.add_argument("--limit", type=int, default=20, help="at most this many hits")
     search.add_argument("--conversation", help="only this conv_ ID")
+    search.add_argument("--since", help="only messages on or after this day (YYYY-MM-DD, UTC)")
+    search.add_argument("--until", help="only messages on or before this day (YYYY-MM-DD, UTC)")
+    search.add_argument(
+        "--role", choices=["user", "assistant", "tool", "system"], help="only this speaker"
+    )
+    search.add_argument(
+        "--term", help="only messages in segments labelled with this term_ or project ID"
+    )
+    search.add_argument(
+        "--taxonomy", help="the published version --term is checked in (default: the newest)"
+    )
     search.set_defaults(handler=_search)
 
     similar = commands.add_parser("similar", help="find messages close in meaning (local)")
