@@ -9,40 +9,43 @@ rules a person can read:
 1. **Answered and uncovered**: only segments with an answer under the
    run's taxonomy version count (a ``pending`` one has none yet). An
    answered segment is *uncovered* when it has no domain: its latest
-   reviewer decision on the domain is "none fits", or nobody reviewed the
-   domain and its newest machine answer isn't ``done`` with a domain.
-2. **Telling words**: a word counts for a subject only if it is *more
-   common among the uncovered segments than among all answered ones*.
-   Its *lift* is its share of the uncovered segments divided by its share
-   of all answered segments; the highest lift wins, then the word in more
-   uncovered segments, then the alphabetically first. A word that covered
-   chats use too ("weekend") has a lower lift than one only the subject's
-   own chats use ("cooking"), so it can't glue two subjects together.
-   These never count:
-   - stop words, and words in more than half of all answered segments;
-   - words that look like a name: used mid-sentence, and always
-     capitalised there;
-   - *bridge* words, which join subjects that other words already tell
-     apart. "Weekend" is a bridge when "cooking" and "garden" each mark
-     enough of its segments, barely overlap, and together cover two
-     thirds of them.
-3. **One proposal per subject**: the best word with at least
-   ``min_segments`` (default 3) uncovered segments becomes **one** TAX-004
-   ``add`` proposal for a new domain. Its evidence is segment IDs, one
-   quote anchor per segment (message ID and character span, never text)
-   and the version. Those segments then leave the pool, and the next best
-   word is tried.
-4. **Never twice**: a word is passed over, without taking its segments,
-   when its label already names an approved domain, or an open, rejected
-   or approved proposal. The same goes for a group made of mostly the
-   same segments as such a proposal (at least half of the
-   group, and more than half of that proposal's segments). So a re-run
-   adds nothing, and a rejected subject stays rejected even when a few
-   new chats join it or another word names it.
+   reviewer decision on the domain, under this version, is "none fits",
+   or nobody reviewed it and its newest machine answer isn't ``done``
+   with a domain.
+2. **Each segment's words**: its tokens (letters and digits kept whole,
+   so ``covid19`` is one word), minus stop words, words in more than half
+   of all answered segments ("help", "thanks"), and words no other
+   uncovered segment uses (they can't connect anything; they only dilute).
+   At most ``SIGNATURE`` words are kept, the most widely shared first.
+3. **Groups by whole-segment similarity**: two uncovered segments are
+   connected when their word sets' Jaccard similarity (shared words over
+   all words) is at least ``LINK`` (0.4). A group is a connected set; one
+   of at least ``min_segments`` (default 3) becomes **one** TAX-004 ``add``
+   proposal for a new domain. A filler word such as "weekend" shared by
+   cooking and garden chats is one word out of three in each, so it
+   doesn't link them; cooking chats that share "cooking" and "recipe" do
+   link, whether they bake or grill.
+4. **A label, after the group exists**: the group's word with the highest
+   *lift* (its share of the group over its share of all answered
+   segments), among words in at least half of the group, that doesn't look
+   like a name. A word looks like a name when most of its mid-sentence uses
+   are capitalised, or when it is never written in lower case. If no word
+   qualifies, the label is "Unnamed group N" and the reviewer names it.
+5. **Never twice**: a group is passed over when its label already names
+   an approved domain or an open, rejected or approved proposal, or when
+   it is mostly the same segments as such a proposal (at least half of the
+   group, and more than half of that proposal's segments). The comparison
+   uses each proposal's full member list, not the capped display list.
 
-When no segment has a domain at all, no word is more typical of the
-uncovered ones than of the rest, so nothing is proposed: that is the first
-vocabulary's job (NOTE-006), not this one.
+Evidence is IDs and spans only: the full member list (and its SHA-256),
+a capped display list, and one anchor per displayed segment (message ID
+and character span of the label word, never text).
+
+Grid-like cases are ambiguous by nature: three chats each about "cooking
+bake ..." and three about "cooking grill ..." look exactly like three
+"cooking ... weekend" and three "garden ... weekend" chats. With only one
+shared word in three, both come out as two groups; one more shared word
+("recipe") joins the cooking chats.
 
 The vocabulary never moves here: the only rows written are proposals. A
 new domain exists only after a separate reviewer approves it and the owner
@@ -50,19 +53,20 @@ publishes the next version (NOTE-014).
 
 Talking points:
     - "Chats my vocabulary didn't cover don't just sit unlabelled: when
-      three or more share a subject, a reviewer gets one suggestion, with
-      the exact places it came from."
-    - "A word only counts if it's typical of the uncovered chats, so
-      'weekend' can't lump cooking and gardening together."
+      three or more are alike, a reviewer gets one suggestion, with the
+      exact places it came from."
+    - "Chats are grouped by how much of their wording they share, so one
+      common word like 'weekend' can't lump cooking and gardening together."
     - "Suggesting never changes the vocabulary mid-run. A person approves,
       and the next version picks it up."
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
@@ -90,11 +94,16 @@ from knowledge_engine.taxonomy.registry import (
 )
 from knowledge_engine.taxonomy.review import APPROVED, OPEN, REJECTED, Operation, propose
 
-GAP_VERSION = "tax-009-v3"
+GAP_VERSION = "tax-009-v4"
 GAP_PROPOSER = "tax-009-domain-gaps"
 MIN_SEGMENTS = 3
 COMMON_SHARE = 0.5
-_WORD = re.compile(r"[^\W\d_]{3,}")
+SIGNATURE = 20
+LINK = 0.4
+UNNAMED = "Unnamed group"
+# One tokenizer for words, signatures and anchors, so an anchor always
+# points at a word that was counted. Letters and digits stay together.
+_TOKEN = re.compile(r"[^\W_]{3,}")
 _SENTENCE_END = frozenset(".!?\n")
 
 
@@ -106,11 +115,10 @@ class GapReport:
         answered: Segments with an answer under the version.
         uncovered: Answered segments with no domain.
         proposed: New proposal IDs.
-        known: Words that already name an approved domain.
-        waiting: Words (or groups) already waiting as open proposals.
-        rejected: Words (or groups) a reviewer already turned down.
-        names: Words passed over because they look like a name.
-        bridges: Words passed over because they join two or more subjects.
+        known: Groups whose label or segments match an approved domain or proposal.
+        waiting: Groups that match an open proposal.
+        rejected: Groups that match a rejected proposal.
+        unnamed: New proposals with no usable label word.
         leftover: Uncovered segments in no new proposal.
     """
 
@@ -120,8 +128,7 @@ class GapReport:
     known: list[str] = field(default_factory=list)
     waiting: list[str] = field(default_factory=list)
     rejected: list[str] = field(default_factory=list)
-    names: int = 0
-    bridges: list[str] = field(default_factory=list)
+    unnamed: int = 0
     leftover: int = 0
 
 
@@ -181,7 +188,7 @@ def domain_status(session: Session, version: str) -> tuple[set[str], set[str]]:
 
 @dataclass(frozen=True)
 class _Earlier:
-    """An open, rejected or approved domain proposal: its label and its segments."""
+    """An open, rejected or approved domain proposal: its label and all its segments."""
 
     status: str
     label: str
@@ -201,83 +208,84 @@ def _earlier(session: Session) -> list[_Earlier]:
         payload = json.loads(row.payload_json)
         if payload.get("dimension") == Dimension.DOMAIN.value:
             evidence = json.loads(row.evidence_json or "{}")
+            # "members" is the full list; other proposers only have "segments".
+            members = evidence.get("members", evidence.get("segments", ()))
             found.append(
-                _Earlier(
-                    row.status,
-                    normalise_alias(payload.get("label", "")),
-                    frozenset(evidence.get("segments", ())),
-                )
+                _Earlier(row.status, normalise_alias(payload.get("label", "")), frozenset(members))
             )
     return found
 
 
-def _same_group(group: set[str], earlier: frozenset[str]) -> bool:
+def _same_group(group: frozenset[str], earlier: frozenset[str]) -> bool:
     """Mostly the same segments: at least half of the group, more than half of the earlier one."""
     shared = len(group & earlier)
     return bool(earlier) and 2 * shared >= len(group) and 2 * shared > len(earlier)
 
 
-def _words(conversation: StoredConversation, segment: Segment) -> frozenset[str]:
-    return frozenset(
-        w.casefold() for m in segment_messages(conversation, segment) for w in _WORD.findall(m.text)
-    )
+def members_sha256(segment_ids: Sequence[str]) -> str:
+    """A stable fingerprint of a group: the SHA-256 of its sorted segment IDs."""
+    return hashlib.sha256("\n".join(sorted(segment_ids)).encode("utf-8")).hexdigest()
 
 
-def _uses(
-    conversation: StoredConversation, segment: Segment, word: str
-) -> list[tuple[str, str, int, int]]:
-    """Every use of ``word`` in the segment: (message ID, text, start, end)."""
-    pattern = re.compile(rf"(?<!\w){re.escape(word)}(?!\w)", re.IGNORECASE)
-    return [
-        (m.message_id, m.text, found.start(), found.end())
-        for m in segment_messages(conversation, segment)
-        for found in pattern.finditer(m.text)
-    ]
+_Token = tuple[str, str, str, int, int]
 
 
-def _looks_like_a_name(uses: Sequence[tuple[str, str, int, int]]) -> bool:
-    """True when the word is used mid-sentence and always capitalised there ("Bramble").
+def _tokens(conversation: StoredConversation, segment: Segment) -> list[_Token]:
+    """Every counted word: (folded word, message ID, message text, start, end)."""
+    found = []
+    for message in segment_messages(conversation, segment):
+        for match in _TOKEN.finditer(message.text):
+            word = match.group().casefold()
+            if not word.isdigit():
+                found.append((word, message.message_id, message.text, match.start(), match.end()))
+    return found
 
-    A use at the start of a sentence says nothing either way, so it is
-    ignored: "...times. Bramble can visit" is still a name.
+
+def _looks_like_a_name(uses: Sequence[tuple[str, str, int]]) -> bool:
+    """True when most mid-sentence uses are capitalised, or it is never written in lower case.
+
+    ``uses`` are (message ID, text, start). A capital at a sentence start
+    says nothing, so it only decides when there are no other uses.
     """
 
     def mid_sentence(text: str, start: int) -> bool:
         before = text[:start].rstrip(" \t\"'(")
         return bool(before) and before[-1] not in _SENTENCE_END
 
-    mid = [text[start] for _, text, start, _ in uses if mid_sentence(text, start)]
-    return bool(mid) and all(first.isupper() for first in mid)
+    mid = [text[start].isupper() for _, text, start in uses if mid_sentence(text, start)]
+    if mid:
+        return 2 * sum(mid) > len(mid)
+    return bool(uses) and all(text[start].isupper() for _, text, start in uses)
 
 
-def _bridges(
-    word: str,
-    group: Sequence[int],
-    bags: Sequence[frozenset[str]],
-    counts: Counter[str],
-    min_segments: int,
-    passed: set[str],
-) -> bool:
-    """True when ``word`` only joins subjects that other words already tell apart.
+def _components(signatures: dict[int, frozenset[str]]) -> list[list[int]]:
+    """Connected groups of segments whose word sets overlap by at least ``LINK`` (Jaccard)."""
+    parent = {i: i for i in signatures}
 
-    "Weekend" in three cooking and three garden chats: "cooking" and
-    "garden" each mark at least ``min_segments`` of its segments, they
-    barely overlap (at most a third of the smaller one), and together they
-    cover at least two thirds of them. Two or more such words mean ``word``
-    is a bridge between subjects, not a subject.
-    """
-    mine = set(group)
-    parts: list[set[int]] = []
-    for other, _ in sorted(counts.items(), key=lambda pair: (-pair[1], pair[0])):
-        if other == word or other in passed:
-            continue
-        inside = {i for i in mine if other in bags[i]}
-        if len(inside) < min_segments or inside == mine:
-            continue
-        if all(3 * len(inside & part) <= min(len(inside), len(part)) for part in parts):
-            parts.append(inside)
-    covered: set[int] = set().union(*parts)
-    return len(parts) >= 2 and 3 * len(covered) >= 2 * len(mine)
+    def root(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    by_word: dict[str, list[int]] = defaultdict(list)
+    for i, words in signatures.items():
+        for word in words:
+            by_word[word].append(i)
+    checked: set[tuple[int, int]] = set()
+    for members in by_word.values():
+        for x, a in enumerate(members):
+            for b in members[x + 1 :]:
+                if (a, b) in checked:
+                    continue
+                checked.add((a, b))
+                one, two = signatures[a], signatures[b]
+                if len(one & two) >= LINK * len(one | two):
+                    parent[root(b)] = root(a)
+    groups: dict[int, list[int]] = defaultdict(list)
+    for i in sorted(signatures):
+        groups[root(i)].append(i)
+    return sorted(groups.values(), key=lambda g: (-len(g), g[0]))
 
 
 def propose_domains(
@@ -288,7 +296,7 @@ def propose_domains(
     min_segments: int = MIN_SEGMENTS,
     proposer: str = GAP_PROPOSER,
 ) -> GapReport:
-    """File one new-domain proposal per subject that uncovered segments share.
+    """File one new-domain proposal per group of alike uncovered segments.
 
     Args:
         session: The caller commits. Only proposal rows are written.
@@ -304,58 +312,56 @@ def propose_domains(
     """
     answered, covered = domain_status(session, snapshot.version)
     pairs = [(c, s) for c, s in items if s.segment_id in answered]
-    bags = [_words(c, s) for c, s in pairs]
+    tokens = [_tokens(c, s) for c, s in pairs]
+    bags = [frozenset(t[0] for t in found) for found in tokens]
     spread: Counter[str] = Counter()
     for bag in bags:
         spread.update(bag)
     total = len(pairs)
     usable = {w for w, df in spread.items() if df <= total * COMMON_SHARE and w not in STOP_WORDS}
-    remaining = {i for i, (_, s) in enumerate(pairs) if s.segment_id not in covered}
-    report = GapReport(answered=total, uncovered=len(remaining))
+    uncovered = [i for i, (_, s) in enumerate(pairs) if s.segment_id not in covered]
+    report = GapReport(answered=total, uncovered=len(uncovered))
+    pool: Counter[str] = Counter()
+    for i in uncovered:
+        pool.update(bags[i] & usable)
+    signatures = {}
+    for i in uncovered:
+        shared = sorted((w for w in bags[i] & usable if pool[w] >= 2), key=lambda w: (-pool[w], w))
+        if shared:
+            signatures[i] = frozenset(shared[:SIGNATURE])
     known = _approved_aliases(session, Dimension.DOMAIN)
     earlier = _earlier(session)
-    passed: set[str] = set()
-    while remaining:
-        counts: Counter[str] = Counter()
-        for index in remaining:
-            counts.update(bags[index] & usable)
-        pool = len(remaining)
-        scored = [
-            (-((u / pool) / (spread[w] / total)), -u, w)
-            for w, u in counts.items()
-            if u >= min_segments and w not in passed
-        ]
-        best = min(scored, default=None)
-        if best is None or -best[0] <= 1:  # no word is more typical of the uncovered ones
-            break
-        word = best[2]
-        passed.add(word)
-        group = sorted(i for i in remaining if word in bags[i])
-        ids = {pairs[i][1].segment_id for i in group}
-        label = word.capitalize()
-        norm = normalise_alias(label)
-        uses = [use for i in group for use in _uses(*pairs[i], word)]
-        if norm in known:
+    taken: set[int] = set()
+    for group in _components(signatures):
+        if len(group) < min_segments:
+            continue
+        ids = frozenset(pairs[i][1].segment_id for i in group)
+        word = _label_word(group, bags, tokens, spread, total)
+        label = word.capitalize() if word else f"{UNNAMED} {report.unnamed + 1}"
+        norm = normalise_alias(label) if word else None
+        if norm is not None and norm in known:
             report.known.append(label)
             continue
-        match = next((e for e in earlier if e.label == norm or _same_group(ids, e.segments)), None)
+        match = next(
+            (
+                e
+                for e in earlier
+                if (norm is not None and e.label == norm) or _same_group(ids, e.segments)
+            ),
+            None,
+        )
         if match is not None:
             bucket = {OPEN: report.waiting, REJECTED: report.rejected, APPROVED: report.known}
             bucket[match.status].append(label)
             continue
-        if _bridges(word, group, bags, counts, min_segments, passed):
-            report.bridges.append(label)
-            continue
-        if _looks_like_a_name(uses):
-            report.names += 1
-            continue
         members = sorted(group, key=lambda i: pairs[i][1].segment_id)
-        anchors = []
-        for i in members:
-            first = _uses(*pairs[i], word)[0]
-            anchors.append({"segment_id": pairs[i][1].segment_id, "message_id": first[0],
-                            "start": first[2], "end": first[3]})  # fmt: skip
         segment_ids = [pairs[i][1].segment_id for i in members]
+        anchors = []
+        for i in members[:MAX_EVIDENCE] if word else ():
+            hit = next((t for t in tokens[i] if t[0] == word), None)
+            if hit is not None:
+                anchors.append({"segment_id": pairs[i][1].segment_id, "message_id": hit[1],
+                                "start": hit[3], "end": hit[4]})  # fmt: skip
         row = propose(
             session,
             Operation.ADD,
@@ -364,13 +370,42 @@ def propose_domains(
             evidence={
                 "rule": GAP_VERSION,
                 "taxonomy_version": snapshot.version,
-                "size": len(members),
+                "size": len(segment_ids),
+                "members": segment_ids,
+                "members_sha256": members_sha256(segment_ids),
                 "segments": segment_ids[:MAX_EVIDENCE],
-                "anchors": anchors[:MAX_EVIDENCE],
+                "anchors": anchors,
             },
         )
-        earlier.append(_Earlier(OPEN, norm, frozenset(segment_ids)))
+        if word is None:
+            report.unnamed += 1
+        earlier.append(_Earlier(OPEN, norm or "", ids))
         report.proposed.append(row.proposal_id)
-        remaining.difference_update(group)
-    report.leftover = len(remaining)
+        taken.update(group)
+    report.leftover = len(uncovered) - len(taken)
     return report
+
+
+def _label_word(
+    group: Sequence[int],
+    bags: Sequence[frozenset[str]],
+    tokens: Sequence[list[_Token]],
+    spread: Counter[str],
+    total: int,
+) -> str | None:
+    """The group's highest-lift word in at least half of it that isn't name-like, or None."""
+    inside: Counter[str] = Counter()
+    for i in group:
+        inside.update(w for w in bags[i] if w not in STOP_WORDS)
+    ranked = sorted(
+        (
+            (-(n / len(group)) / (spread[w] / total), -n, w)
+            for w, n in inside.items()
+            if 2 * n >= len(group) and spread[w] <= total * COMMON_SHARE
+        ),
+    )
+    for _, _, word in ranked:
+        uses = [(t[1], t[2], t[3]) for i in group for t in tokens[i] if t[0] == word]
+        if not _looks_like_a_name(uses):
+            return word
+    return None

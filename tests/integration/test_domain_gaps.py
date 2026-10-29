@@ -192,7 +192,7 @@ def test_a_rerun_and_a_rejection_add_nothing(world: World) -> None:
     reject(session, cooking, reviewer="reviewer-b", note="too narrow for a domain")
     session.commit()
     after = propose_domains(session, world.tax1, world.items())
-    assert after.proposed == [] and after.rejected == ["Cooking", "Recipe"]  # word, then group
+    assert after.proposed == [] and after.rejected == ["Cooking"]
     assert set(_open_domains(session)) == {"Makeover"}
 
 
@@ -255,8 +255,8 @@ def test_a_rejected_subject_stays_rejected_when_a_new_chat_joins_it(world: World
     save(session, SegmentClassifier(world.tax1).classify(world.items()))
     session.commit()
     after = propose_domains(session, world.tax1, world.items())
-    # "Recipe" names the same four chats, three of them already rejected.
-    assert after.proposed == [] and "Recipe" in after.rejected
+    # The four cooking chats are one group again, labelled as before.
+    assert after.proposed == [] and after.rejected == ["Cooking"]
 
 
 def test_cli_measures_word_shares_against_every_classified_chat(
@@ -317,12 +317,13 @@ def test_a_recurring_name_never_becomes_a_label(tmp_path: Path) -> None:
     chats = {
         "c-name-1": "notes for Bramble about the cottage lease",
         "c-name-2": "a birthday card that Bramble will like",
-        "c-name-3": "the train times so Bramble can visit",
+        "c-name-3": "the train times so bramble can visit",  # once in lower case
         **_python(4),
     }
     world = _build(tmp_path, chats)
     report = propose_domains(world.session, world.tax1, world.items())
-    assert report.proposed == [] and report.names == 1
+    # The three chats are alike only through the name: the reviewer names the group.
+    assert set(_open_domains(world.session)) == {"Unnamed group 1"} and report.unnamed == 1
     world.session.close()
 
 
@@ -345,10 +346,9 @@ def test_a_bridge_word_no_covered_chat_uses_is_never_a_subject(
 ) -> None:
     """Every subject's chats say "weekend" and no covered chat does: still separate."""
     world = _build(tmp_path, {**_subjects(*kinds), **_python(10)})
-    report = propose_domains(world.session, world.tax1, world.items())
+    propose_domains(world.session, world.tax1, world.items())
     expected = {"cook": "Cooking", "gard": "Garden", "trav": "Travel"}
     assert set(_open_domains(world.session)) == {expected[k] for k in kinds}
-    assert report.bridges == ["Weekend"]
     world.session.close()
 
 
@@ -383,14 +383,97 @@ def test_reviews_under_another_version_do_not_count(world: World) -> None:
     assert answered == set()  # nothing classified or reviewed under tax-3
 
 
-def test_a_name_at_a_sentence_start_is_still_a_name(tmp_path: Path) -> None:
-    chats = {
-        "c-name-1": "notes for Bramble about the lease",
-        "c-name-2": "a card that Bramble will like",
-        "c-name-3": "the train times. Bramble can visit",
-        **_python(4),
-    }
-    world = _build(tmp_path, chats)
-    report = propose_domains(world.session, world.tax1, world.items())
-    assert report.proposed == [] and report.names == 1
+@pytest.mark.parametrize(
+    "texts",
+    [
+        ("notes for Bramble about the lease", "a card that Bramble will like",
+         "the train times. Bramble can visit"),
+        ("lease notes. Bramble asked about it", "card ideas. Bramble will like one",
+         "train times. Bramble can visit"),
+    ],
+)  # fmt: skip
+def test_a_name_at_a_sentence_start_is_still_a_name(
+    tmp_path: Path, texts: tuple[str, str, str]
+) -> None:
+    chats = {f"c-name-{k}": text for k, text in enumerate(texts, 1)}
+    world = _build(tmp_path, {**chats, **_python(4)})
+    propose_domains(world.session, world.tax1, world.items())
+    assert "Bramble" not in _open_domains(world.session)
     world.session.close()
+
+
+def test_chats_that_share_their_cooking_words_stay_one_group(tmp_path: Path) -> None:
+    """Bake and grill chats share "cooking" and "recipe": one subject, not two."""
+    chats = {f"c-b-{i}": f"cooking recipe bake {x} tonight" for i, x in
+             enumerate(("bread", "cake", "pie"))}  # fmt: skip
+    chats |= {f"c-g-{i}": f"cooking recipe grill {x} tonight" for i, x in
+              enumerate(("steak", "fish", "corn"))}  # fmt: skip
+    world = _build(tmp_path, {**chats, **_python(10, "tonight")})
+    propose_domains(world.session, world.tax1, world.items())
+    assert {k: v["size"] for k, v in _open_domains(world.session).items()} == {"Cooking": 6}
+    world.session.close()
+
+
+def test_four_subjects_that_all_say_weekend_stay_apart(tmp_path: Path) -> None:
+    subjects = {"cook": "cooking", "gard": "garden", "trav": "travel", "fit": "workout"}
+    chats = {
+        f"c-{kind}-{k}": f"{word} {kind}{k} this weekend"
+        for kind, word in subjects.items()
+        for k in ("one", "two", "three")
+    }
+    world = _build(tmp_path, {**chats, **_python(14)})
+    propose_domains(world.session, world.tax1, world.items())
+    assert set(_open_domains(world.session)) == {"Cooking", "Garden", "Travel", "Workout"}
+    world.session.close()
+
+
+def test_a_word_with_digits_is_one_word_and_anchors_resolve(tmp_path: Path) -> None:
+    chats = {
+        f"c-t-{k}": f"covid19 rules for {x}" for k, x in enumerate(("spain", "italy", "japan"))
+    }
+    world = _build(tmp_path, {**chats, **_python(6)})
+    propose_domains(world.session, world.tax1, world.items())
+    found = _open_domains(world.session)
+    [(label, evidence)] = found.items()
+    assert label == "Covid19" and len(evidence["anchors"]) == 3
+    chats_by_id = {c.conversation_id: c for c, _ in world.items()}
+    for anchor in evidence["anchors"]:
+        [chat] = [c for c, s in world.items() if s.segment_id == anchor["segment_id"]]
+        text = chats_by_id[chat.conversation_id].messages[anchor["message_id"]].text
+        assert text[anchor["start"] : anchor["end"]] == "covid19"
+    world.session.close()
+
+
+def test_a_rejected_group_larger_than_the_display_cap_stays_rejected(tmp_path: Path) -> None:
+    from knowledge_engine.taxonomy.domain_gaps import members_sha256
+
+    chats = {f"c-cook-{k}": f"cooking a dish{k} recipe" for k in range(1, 111)}
+    world = _build(tmp_path, {**chats, **_python(120)})
+    session = world.session
+    propose_domains(session, world.tax1, world.items())
+    [row] = proposals(session, OPEN)
+    evidence = json.loads(row.evidence_json)
+    assert evidence["size"] == 110 and len(evidence["members"]) == 110
+    assert len(evidence["segments"]) == 50 and len(evidence["anchors"]) == 50
+    assert evidence["members_sha256"] == members_sha256(evidence["members"])
+    reject(session, row.proposal_id, reviewer="reviewer-b", note="not a domain")
+    session.commit()
+    after = propose_domains(session, world.tax1, world.items())
+    assert after.proposed == [] and after.rejected == ["Cooking"]
+    session.close()
+
+
+def test_a_rerun_after_more_chats_join_or_a_new_version_adds_nothing(world: World) -> None:
+    session = world.session
+    propose_domains(session, world.tax1, world.items())
+    session.commit()
+    more = {f"c-cook-{k}": f"cooking a dish{k} recipe" for k in range(4, 12)}
+    _import(world.settings.workspace_root.parent / "export-2", world.settings, {**CHATS, **more})
+    session.commit()
+    save(session, SegmentClassifier(world.tax1).classify(world.items()))
+    session.commit()
+    assert propose_domains(session, world.tax1, world.items()).proposed == []
+    tax2 = TaxonomyRegistry(session).publish("tax-2", author="owner")
+    save(session, SegmentClassifier(tax2).classify(world.items()))
+    session.commit()
+    assert propose_domains(session, tax2, world.items()).proposed == []
