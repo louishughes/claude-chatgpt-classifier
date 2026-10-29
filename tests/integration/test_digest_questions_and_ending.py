@@ -172,8 +172,9 @@ def test_an_offer_accepted_in_a_later_part_is_set_aside_with_the_reply(session: 
     reply = next(m for m in messages if m.text.startswith("Yes, go ahead"))
 
     def listed(tags: list[tuple[str, str, str]]) -> list[dict[str, Any]]:
-        if not any(t[0] == offer.native_id for t in tags):
-            return []
+        shown = {t[0] for t in tags}
+        if offer.native_id not in shown or reply.native_id in shown:
+            return []  # a part that saw the "yes" doesn't list the offer as open
         quoted = [{"message_id": offer.native_id, "text": "Want"}]
         return [{"text": "Should the assistant draft the planting plan?", "quotes": quoted}]
 

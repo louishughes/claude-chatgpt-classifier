@@ -1,9 +1,9 @@
 """NOTE-032: open questions reconciled across the parts of a long chat.
 
-Each case is a synthetic chat split into parts by hand. The clean review's
-probes are kept here as regression cases: a hedged "yes, but", a bare
-"perfect" or "ok", a reply about another offer, and questions that differ
-only by a number or a negation.
+Each case is a synthetic chat split into parts by hand. The two clean
+reviews' probes are kept here as regression cases: hedged, sarcastic or
+off-topic replies, a part that saw the reply and still listed the question,
+and questions that differ by a negation, stance, action or number.
 """
 
 from __future__ import annotations
@@ -142,7 +142,7 @@ def test_a_reply_about_another_offer_does_not_answer_this_one() -> None:
     assert _open(result) == ["Should the assistant email the board?"]
 
 
-def test_a_later_reply_needs_two_shared_words() -> None:
+def test_only_the_very_next_user_turn_can_answer() -> None:
     turns = [
         ("u", "Synthetic tenancy."),
         ("a", "Want me to email the landlord about the deposit?"),
@@ -186,3 +186,94 @@ def test_questions_within_one_part_are_not_joined() -> None:
     asked = [("Book the hotel?", 1), ("Book the hotel?", 1)]
     result = _run(turns, [asked, []], TWO[:1] + [range(1, 2)])
     assert len(_open(result)) == 2
+
+
+KEEP_REPLIES = [
+    "Yeah right.",
+    "Yeah right, book the hotel, as if.",
+    "Yeah, right, like I'd trust you to book the hotel.",
+    "Yes, the hotel is too expensive.",
+    "Yes the hotel looks nice in the photos.",
+    "Yes, I love that hotel's pool.",
+    "No, the hotel can wait while I think.",
+    "Yep, hotel.",
+    "Yes, I'll book the hotel myself later maybe.",
+    "Do it later, hotel first needs thinking.",
+    "Not now, hotel.",
+    "Yes. Wait, actually no.",
+    "Yes, after I check the hotel reviews.",
+    "Yes, if the hotel is cheap.",
+    "Yes, unless it rains.",
+    "Yes when you can.",
+    "Yesterday I booked it.",
+]
+
+
+def test_only_a_plain_yes_or_no_closes_an_offer() -> None:
+    question = [[("Should the assistant book the hotel?", 1)], []]
+    for reply in KEEP_REPLIES:
+        assert _open(_run([*HOTEL, ("u", reply)], question, TWO)) != [], reply
+    for reply in ("Yes!", "yes.", "Yes please.", "Yes — the hotel.", "No thanks.", "Go ahead."):
+        assert _open(_run([*HOTEL, ("u", reply)], question, TWO)) == [], reply
+
+
+def test_a_part_that_saw_the_reply_and_still_listed_the_question_wins() -> None:
+    q = "Should the assistant book the hotel?"
+    turns = [
+        ("u", "Plan trip."),
+        ("a", "Want me to book the hotel?"),
+        ("u", "Other topic."),
+        ("a", "Want me to book the hotel?"),
+        ("u", "Yes, book the hotel."),
+    ]
+    result = _run(turns, [[(q, 1)], [(q, 3)]], [range(0, 2), range(1, 5)])
+    assert _open(result) == [q] and result.answered == [] and result.joined == {q: 1}
+
+
+def test_a_reply_in_the_listing_parts_overlap_is_left_to_that_part() -> None:
+    q = "Should the assistant book the hotel?"
+    turns = [*HOTEL, ("u", "Yes, go ahead."), ("a", "Booked.")]
+    assert _open(_run(turns, [[], [(q, 1)]], [range(0, 1), range(1, 4)])) == [q]
+
+
+DIFFERENT = [
+    ("Can the app run offline?", "Can't the app run offline?"),
+    (
+        "Does the synthetic script delete old backups?",
+        "Doesn't the synthetic script delete old backups?",
+    ),
+    ("Do you prefer the toll road route?", "Do you avoid the toll road route?"),
+    (
+        "Should the assistant draft the synthetic letter to the council about the hedge?",
+        "Should the assistant send the synthetic letter to the council about the hedge?",
+    ),
+    ("Use port ٨٠٨٠ for the server?", "Use port ٩٠٩٠ for the server?"),
+    ("Use two replicas for the database cluster?", "Use three replicas for the database cluster?"),
+    ("Is nothing left in the synthetic budget?", "Is something left in the synthetic budget?"),
+    ("Keep the old API?", "Remove the old API?"),
+]
+
+
+def test_questions_join_only_on_identical_keys() -> None:
+    for a, b in DIFFERENT:
+        result = _run(
+            [("u", "Synthetic."), ("a", f"{a} {b}")], [[(a, 1)], [(b, 1)]], [range(0, 2)] * 2
+        )
+        assert result.joined == {}, (a, b)
+    assert question_key("Use port ٨٠٨٠?") == question_key("Use port 8080?")
+
+
+def test_odd_text_and_mismatched_parts_never_crash_or_drop() -> None:
+    turns = [
+        ("u", "Synthetic 🙂."),
+        ("a", "Want me to book the hotel? 的问题？"),
+        ("u", "Yes, book the hotel."),
+    ]
+    for text in ("?", "...", "的问题？", "¿Reservar el hotel?", "🙂?"):
+        result = _run(turns, [[(text, 1)], [(text, 1)]], TWO)
+        assert _open(result), text
+    messages = _messages([*HOTEL, ("u", "Yes, book the hotel.")])
+    asked = _answer(messages, [("Should the assistant book the hotel?", 1)])
+    for parts in ([(), ()], [("zz",), ("yy",)]):
+        result = reconcile_parts([asked, _answer(messages, [])], parts, messages)
+        assert _open(result) == ["Should the assistant book the hotel?"], parts

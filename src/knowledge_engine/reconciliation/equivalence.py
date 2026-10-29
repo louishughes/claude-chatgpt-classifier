@@ -75,6 +75,8 @@ _NEGATIONS = frozenset(
     "no not never none nothing without don't doesn't didn't won't can't shouldn't isn't "
     "aren't dont doesnt didnt wont cant shouldnt isnt arent".split()
 )
+# The words that carry no claim, shared with other modules (NOTE-032).
+STOP_WORDS = _STOP
 
 
 class Basis(StrEnum):
