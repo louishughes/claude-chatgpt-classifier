@@ -194,7 +194,9 @@ def review_account(
     """Confirm or reject one account, and add the decision to its history.
 
     A person may change their mind later (reject, then confirm); each step
-    is a new history row, and the account shows the latest one.
+    is a new history row, and the account shows the latest one. Rejecting
+    an account also puts any @handles a person linked to it back into
+    review; confirming it again doesn't re-link them.
 
     Args:
         session: A write session.
@@ -208,13 +210,19 @@ def review_account(
 
     Raises:
         KeyError: If there is no such account.
-        AccountReviewError: If the action is ``link`` (use ``link_mention``).
+        AccountReviewError: If the action is ``link`` (use ``link_mention``),
+            the account already has that status, or the reviewer is blank.
     """
     if action not in _ACCOUNT_RESULT:
         raise AccountReviewError("use link_mention to link a mention")
+    _check_reviewer(reviewer)
     account = session.get(SocialAccountRow, account_id)
     if account is None:
         raise KeyError("no such account")
+    if account.identity_status == _ACCOUNT_RESULT[action]:
+        raise AccountReviewError(f"account is already {account.identity_status}")
+    if action is AccountAction.REJECT:
+        _unlink_reviewed_mentions(session, account_id)
     entry = AccountReviewRow(
         account_id=account_id,
         action=action.value,
@@ -227,6 +235,36 @@ def review_account(
     session.add(entry)
     session.flush()
     return entry
+
+
+def _check_reviewer(reviewer: str) -> None:
+    # Like every other review store: a decision always names who made it,
+    # and the name fits its column on every database.
+    if not reviewer.strip() or len(reviewer) > 100:
+        raise AccountReviewError("the reviewer needs a name of 1 to 100 characters")
+
+
+def _unlink_reviewed_mentions(session: Session, account_id: str) -> None:
+    """Put the @handles a person filed under this account back into review.
+
+    Rejecting the account says those links were wrong too. Without this,
+    a bare @name linked to an account that is then rejected would vanish
+    from every review list. Only mentions linked by a review move; ones
+    the text itself resolved (a profile URL, a named platform) stay. The
+    old ``link`` rows stay in the history.
+    """
+    linked = select(AccountReviewRow.mention_id).where(
+        AccountReviewRow.account_id == account_id,
+        AccountReviewRow.action == AccountAction.LINK.value,
+    )
+    for mention in session.scalars(
+        select(AccountMentionRow).where(
+            AccountMentionRow.account_id == account_id,
+            AccountMentionRow.mention_id.in_(linked),
+        )
+    ):
+        mention.account_id = None
+        mention.resolution = AMBIGUOUS
 
 
 def link_mention(
@@ -258,6 +296,7 @@ def link_mention(
         AccountReviewError: If the mention isn't ambiguous, or the account
             was rejected.
     """
+    _check_reviewer(reviewer)
     mention = session.get(AccountMentionRow, mention_id)
     if mention is None:
         raise KeyError("no such mention")

@@ -197,3 +197,92 @@ def test_history_is_append_only(
             db.execute("DELETE FROM account_reviews")
     finally:
         db.close()
+
+
+def _page(settings: Settings, path: str) -> tuple[str, str]:
+    import io
+
+    from knowledge_engine.ui.app import make_app
+
+    captured: dict[str, Any] = {}
+
+    def start_response(status: str, headers: list[tuple[str, str]]) -> None:
+        captured["status"] = status
+
+    environ: dict[str, Any] = {
+        "REQUEST_METHOD": "GET",
+        "PATH_INFO": path,
+        "QUERY_STRING": "",
+        "HTTP_HOST": "127.0.0.1:8765",
+        "CONTENT_LENGTH": "0",
+        "wsgi.input": io.BytesIO(b""),
+    }
+    body = make_app(settings)(environ, start_response)
+    return captured["status"], b"".join(body).decode("utf-8")
+
+
+def test_rejected_account_leaves_the_accounts_page_and_its_page_keeps_history(
+    capsys: pytest.CaptureFixture[str], workspace: tuple[Settings, Path]
+) -> None:
+    settings, _ = workspace
+    other = _accounts(capsys)["synth-other"]
+    _ke(capsys, "accounts", "review", other["account_id"], "reject", "--reviewer", "owner")
+
+    _, listing = _page(settings, "/accounts")
+    status, detail = _page(settings, f"/accounts/{other['account_id']}")
+
+    assert f"/accounts/{other['account_id']}" not in listing
+    assert "@synth-octo" in listing
+    assert status == "200 OK"
+    assert "Review history" in detail and "probable → rejected" in detail
+
+
+def test_linked_mention_counts_in_the_registry_note(
+    capsys: pytest.CaptureFixture[str], workspace: tuple[Settings, Path]
+) -> None:
+    settings, _ = workspace
+    octo = _accounts(capsys)["synth-octo"]
+    _, out = _ke(capsys, "accounts", "--ambiguous")
+    [mention_id] = out["data"]["ambiguous"][0]["mention_ids"]
+    assert "`synth-octo` (probable): 1 mention(s)" in _registry(settings)
+
+    _ke(capsys, "accounts", "link", mention_id, octo["account_id"], "--reviewer", "owner")
+
+    assert "`synth-octo` (probable): 2 mention(s)" in _registry(settings)
+
+
+def test_rejecting_a_linked_account_puts_the_handle_back_into_review(
+    capsys: pytest.CaptureFixture[str], workspace: tuple[Settings, Path]
+) -> None:
+    settings, _ = workspace
+    octo = _accounts(capsys)["synth-octo"]
+    other = _accounts(capsys)["synth-other"]
+    _, out = _ke(capsys, "accounts", "--ambiguous")
+    [mention_id] = out["data"]["ambiguous"][0]["mention_ids"]
+    _ke(capsys, "accounts", "link", mention_id, other["account_id"], "--reviewer", "owner")
+
+    _ke(capsys, "accounts", "review", other["account_id"], "reject", "--reviewer", "owner")
+
+    _, out = _ke(capsys, "accounts", "--ambiguous")
+    assert out["data"]["ambiguous"][0]["mention_ids"] == [mention_id]
+    assert "nothing to review" not in _registry(settings).split("## Needs review", 1)[1]
+    # Linking to a rejected account is refused; to the right one works.
+    code, out = _ke(
+        capsys, "accounts", "link", mention_id, other["account_id"], "--reviewer", "owner"
+    )
+    assert code == ExitCode.USAGE and out["error"] == {"code": "refused"}
+    code, _ = _ke(capsys, "accounts", "link", mention_id, octo["account_id"], "--reviewer", "owner")
+    assert code == ExitCode.OK
+
+
+def test_blank_reviewer_and_repeat_decisions_are_refused(
+    capsys: pytest.CaptureFixture[str], workspace: tuple[Settings, Path]
+) -> None:
+    octo = _accounts(capsys)["synth-octo"]
+    code, out = _ke(capsys, "accounts", "review", octo["account_id"], "confirm", "--reviewer", " ")
+    assert code == ExitCode.USAGE and out["error"] == {"code": "refused"}
+    _ke(capsys, "accounts", "review", octo["account_id"], "confirm", "--reviewer", "owner")
+    code, out = _ke(
+        capsys, "accounts", "review", octo["account_id"], "confirm", "--reviewer", "owner"
+    )
+    assert code == ExitCode.USAGE and out["error"] == {"code": "refused"}

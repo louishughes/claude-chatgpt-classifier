@@ -1,7 +1,7 @@
 """Add the append-only history of social account reviews (SOC-004).
 
 Revision ID: 0034_account_reviews
-Revises: 0033_identity_candidate_decisions
+Revises: 0033_candidate_decisions
 Create Date: 2026-10-29
 """
 
@@ -14,7 +14,7 @@ from knowledge_engine.infrastructure.dialects import run_triggers
 from knowledge_engine.links.social_store import APPEND_ONLY_TRIGGERS
 
 revision: str = "0034_account_reviews"
-down_revision: str | None = "0033_identity_candidate_decisions"
+down_revision: str | None = "0033_candidate_decisions"
 branch_labels: str | None = None
 depends_on: str | None = None
 

@@ -1,6 +1,6 @@
 """Record who accepted or rejected an identity candidate, and when (IMP-009).
 
-Revision ID: 0033_identity_candidate_decisions
+Revision ID: 0033_candidate_decisions
 Revises: 0032_record_link_depends_on
 Create Date: 2026-10-29
 """
@@ -10,7 +10,7 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "0033_identity_candidate_decisions"
+revision: str = "0033_candidate_decisions"
 down_revision: str | None = "0032_record_link_depends_on"
 branch_labels: str | None = None
 depends_on: str | None = None

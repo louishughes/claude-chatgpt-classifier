@@ -3490,6 +3490,197 @@ def _duplicates(settings: Settings, args: argparse.Namespace) -> CommandResult:
     )
 
 
+def _conflicts(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """List and review records that cannot both hold (REC-008); IDs only, no text.
+
+    ``ke reconcile`` finds conflicts and stores them unresolved; this is how a
+    person works through them. A dismissed or resolved conflict stops making
+    its records "conflicted" in ``ke state``, the timeline and answers.
+    """
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.reconciliation.conflicts import (
+        ConflictError,
+        ConflictState,
+        RecordConflictReviewRow,
+        conflicts,
+        review_conflict,
+    )
+
+    name = f"conflicts {args.conflicts_command}"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            if args.conflicts_command == "review":
+                # "reopen" is the person's word for going back to unresolved.
+                to_state = {
+                    "dismiss": ConflictState.DISMISSED,
+                    "resolve": ConflictState.RESOLVED,
+                    "reopen": ConflictState.UNRESOLVED,
+                }[args.decision]
+                try:
+                    entry = review_conflict(
+                        session, args.conflict, to_state, reviewer=args.reviewer, note=args.note
+                    )
+                except KeyError:
+                    return CommandResult(
+                        name,
+                        ExitCode.USAGE,
+                        message="no such conflict",
+                        error_code="unknown_conflict",
+                    )
+                except ConflictError as error:
+                    return CommandResult(
+                        name, ExitCode.USAGE, message=str(error), error_code="refused"
+                    )
+                data = {
+                    "conflict_id": args.conflict,
+                    "from_state": entry.from_state,
+                    "to_state": entry.to_state,
+                }
+                session.commit()
+                return CommandResult(name, data=data, message="Review recorded")
+            states = [ConflictState(args.state)] if args.state else list(ConflictState)
+            listed = []
+            for row in conflicts(session, states):
+                reviews = session.scalars(
+                    select(RecordConflictReviewRow)
+                    .where(RecordConflictReviewRow.conflict_id == row.conflict_id)
+                    .order_by(RecordConflictReviewRow.review_id)
+                )
+                listed.append(
+                    {
+                        "conflict_id": row.conflict_id,
+                        "records": [row.record_a, row.record_b],
+                        "kinds": json.loads(row.kinds_json),
+                        "scope": json.loads(row.scope_json),
+                        "evidence": json.loads(row.evidence_json),
+                        "state": row.state,
+                        # The note is the reviewer's own words, not chat text.
+                        "history": [
+                            {
+                                "from_state": r.from_state,
+                                "to_state": r.to_state,
+                                "reviewer": r.reviewer,
+                                "note": r.note,
+                                "at": r.at.isoformat(),
+                            }
+                            for r in reviews
+                        ],
+                    }
+                )
+    finally:
+        engine.dispose()
+    return CommandResult(
+        name,
+        data={"conflicts": listed},
+        message="Records that cannot both hold (review: dismiss, resolve or reopen)",
+    )
+
+
+def _record_links(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """List and review typed links between knowledge records (REC-008); IDs only, no text.
+
+    ``ke reconcile`` proposes these links (creates, references, elaborates,
+    same_project, depends_on) as candidates. A rejected link drops out of the
+    notes and is only followed by ``ke walk --include-closed``.
+    """
+    from sqlalchemy import or_, select
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.reconciliation.relations import (
+        LinkError,
+        LinkState,
+        RecordLinkReviewRow,
+        RecordLinkRow,
+        review_link,
+    )
+
+    name = f"links {args.links_command}"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            if args.links_command == "review":
+                to_state = LinkState.ACCEPTED if args.decision == "accept" else LinkState.REJECTED
+                try:
+                    entry = review_link(
+                        session, args.link, to_state, reviewer=args.reviewer, note=args.note
+                    )
+                except KeyError:
+                    return CommandResult(
+                        name, ExitCode.USAGE, message="no such link", error_code="unknown_link"
+                    )
+                except LinkError as error:
+                    return CommandResult(
+                        name, ExitCode.USAGE, message=str(error), error_code="refused"
+                    )
+                data = {
+                    "link_id": args.link,
+                    "from_state": entry.from_state,
+                    "to_state": entry.to_state,
+                }
+                session.commit()
+                return CommandResult(name, data=data, message="Review recorded")
+            query = select(RecordLinkRow).order_by(RecordLinkRow.predicate, RecordLinkRow.link_id)
+            if args.state:
+                query = query.where(RecordLinkRow.state == args.state)
+            if args.record:
+                query = query.where(
+                    or_(
+                        RecordLinkRow.from_record == args.record,
+                        RecordLinkRow.to_record == args.record,
+                    )
+                )
+            listed = []
+            for row in session.scalars(query):
+                reviews = session.scalars(
+                    select(RecordLinkReviewRow)
+                    .where(RecordLinkReviewRow.link_id == row.link_id)
+                    .order_by(RecordLinkReviewRow.review_id)
+                )
+                listed.append(
+                    {
+                        "link_id": row.link_id,
+                        "from": row.from_record,
+                        "predicate": row.predicate,
+                        "to": row.to_record,
+                        "detector": row.detector,
+                        "evidence": json.loads(row.evidence_json),
+                        "state": row.state,
+                        "history": [
+                            {
+                                "from_state": r.from_state,
+                                "to_state": r.to_state,
+                                "reviewer": r.reviewer,
+                                "note": r.note,
+                                "at": r.at.isoformat(),
+                            }
+                            for r in reviews
+                        ],
+                    }
+                )
+    finally:
+        engine.dispose()
+    return CommandResult(
+        name,
+        data={"links": listed},
+        message="Links between records (read as: from <predicate> to)",
+    )
+
+
 def _related_list(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """List conversation relationships with their evidence and history (REL-002)."""
     from sqlalchemy import or_, select
@@ -3557,24 +3748,66 @@ def _related_review(settings: Settings, args: argparse.Namespace) -> CommandResu
     from sqlalchemy.orm import Session
 
     from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
-    from knowledge_engine.relationships.store import ReviewAction, review
+    from knowledge_engine.relationships.store import (
+        ConversationRelationshipRow,
+        RelationKind,
+        RelationshipError,
+        ReviewAction,
+        retype,
+        review,
+    )
 
     db = database_path(settings)
     if not db.exists():
         return CommandResult(
             "related review", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
         )
+    retyping = args.as_kind is not None or args.reverse
+    if retyping and args.action != "accept":
+        return CommandResult(
+            "related review",
+            ExitCode.USAGE,
+            message="--as and --reverse only go with accept",
+            error_code="usage",
+        )
     engine = create_sqlite_engine(db)
     try:
         with Session(engine) as session, session.begin():
             try:
-                entry = review(
-                    session,
-                    args.relationship,
-                    ReviewAction(args.action),
-                    reviewer=args.reviewer,
-                    note=args.note,
-                )
+                if retyping:
+                    old = session.get(ConversationRelationshipRow, args.relationship)
+                    kind = RelationKind(args.as_kind or (old.kind if old else "related_to"))
+                    new = retype(
+                        session,
+                        args.relationship,
+                        kind,
+                        reverse=args.reverse,
+                        reviewer=args.reviewer,
+                        note=args.note,
+                    )
+                    data = {
+                        "relationship_id": args.relationship,
+                        "to_state": "superseded",
+                        "replaced_by": new.relationship_id,
+                        "new": {
+                            "from": new.from_conversation_id,
+                            "kind": new.kind,
+                            "to": new.to_conversation_id,
+                        },
+                    }
+                else:
+                    entry = review(
+                        session,
+                        args.relationship,
+                        ReviewAction(args.action),
+                        reviewer=args.reviewer,
+                        note=args.note,
+                    )
+                    data = {
+                        "relationship_id": args.relationship,
+                        "from_state": entry.from_state,
+                        "to_state": entry.to_state,
+                    }
             except KeyError:
                 return CommandResult(
                     "related review",
@@ -3582,14 +3815,65 @@ def _related_review(settings: Settings, args: argparse.Namespace) -> CommandResu
                     message="no such relationship",
                     error_code="unknown_relationship",
                 )
-            data = {
-                "relationship_id": args.relationship,
-                "from_state": entry.from_state,
-                "to_state": entry.to_state,
-            }
+            except RelationshipError as error:
+                # Refused before anything was written, so leaving the block is safe.
+                return CommandResult(
+                    "related review", ExitCode.USAGE, message=str(error), error_code="refused"
+                )
     finally:
         engine.dispose()
     return CommandResult("related review", data=data, message="Review recorded")
+
+
+def _related_add(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Store a link a person states by hand, already accepted (REL-006); IDs only."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.relationships.store import RelationKind, RelationshipError, add_human
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "related add", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            try:
+                row = add_human(
+                    session,
+                    from_conversation_id=args.from_conversation,
+                    kind=RelationKind(args.kind),
+                    to_conversation_id=args.to_conversation,
+                    reviewer=args.reviewer,
+                    note=args.note,
+                )
+            except KeyError:
+                return CommandResult(
+                    "related add",
+                    ExitCode.ERROR,
+                    message="no such conversation",
+                    error_code="unknown_conversation",
+                )
+            except RelationshipError as error:
+                return CommandResult(
+                    "related add", ExitCode.USAGE, message=str(error), error_code="refused"
+                )
+            data = {
+                "relationship_id": row.relationship_id,
+                "from": row.from_conversation_id,
+                "kind": row.kind,
+                "to": row.to_conversation_id,
+                "evidence_class": row.evidence_class,
+                "review_state": row.review_state,
+            }
+            session.commit()
+    finally:
+        engine.dispose()
+    return CommandResult(
+        "related add", data=data, message="Link recorded as accepted (read as: from <kind> to)"
+    )
 
 
 def _related_detect(settings: Settings, args: argparse.Namespace) -> CommandResult:
@@ -4848,7 +5132,27 @@ def build_parser() -> argparse.ArgumentParser:
     decide.add_argument("action", choices=["accept", "reject", "supersede"])
     decide.add_argument("--note", help="why (kept in the history)")
     decide.add_argument("--reviewer", default="owner", help="who decided (default: owner)")
+    decide.add_argument(
+        "--as",
+        dest="as_kind",
+        choices=["continues", "forked_from", "related_to"],
+        help="with accept: accept it as this kind instead (the old link is superseded)",
+    )
+    decide.add_argument(
+        "--reverse",
+        action="store_true",
+        help="with accept: the link points the other way (the old link is superseded)",
+    )
     decide.set_defaults(handler=_related_review)
+    add_link = related_commands.add_parser(
+        "add", help="state a link yourself, e.g. 'B continues A' (stored as accepted)"
+    )
+    add_link.add_argument("from_conversation", metavar="FROM", help="the conv_ ID it starts from")
+    add_link.add_argument("kind", choices=["continues", "forked_from", "related_to"])
+    add_link.add_argument("to_conversation", metavar="TO", help="the conv_ ID it points to")
+    add_link.add_argument("--reviewer", default="owner", help="who said so (default: owner)")
+    add_link.add_argument("--note", help="why (kept in the history)")
+    add_link.set_defaults(handler=_related_add)
     rerun = related_commands.add_parser(
         "detect", help="run the link detectors again (imports already do this)"
     )
@@ -4862,6 +5166,43 @@ def build_parser() -> argparse.ArgumentParser:
     commands.add_parser(
         "reconcile", help="propose repeated claims, record links and conflicts"
     ).set_defaults(handler=_reconcile)
+    conflicts_cmd = commands.add_parser(
+        "conflicts", help="records that cannot both hold: list and review (no text shown)"
+    )
+    conflicts_commands = conflicts_cmd.add_subparsers(
+        dest="conflicts_command", metavar="ACTION", parser_class=_Parser
+    )
+    conflicts_list = conflicts_commands.add_parser("list", help="stored conflicts and reviews")
+    conflicts_list.add_argument(
+        "--state", choices=["unresolved", "dismissed", "resolved"], help="only this state"
+    )
+    conflicts_list.set_defaults(handler=_conflicts)
+    conflicts_review = conflicts_commands.add_parser(
+        "review", help="dismiss (not a real conflict), resolve, or reopen a conflict"
+    )
+    conflicts_review.add_argument("conflict", help="the kcf_ ID")
+    conflicts_review.add_argument("decision", choices=["dismiss", "resolve", "reopen"])
+    conflicts_review.add_argument("--reviewer", required=True, help="who decided")
+    conflicts_review.add_argument("--note", required=True, help="why (kept in the history)")
+    conflicts_review.set_defaults(handler=_conflicts)
+    links_cmd = commands.add_parser(
+        "links", help="links between records (creates, references...): list and review"
+    )
+    links_commands = links_cmd.add_subparsers(
+        dest="links_command", metavar="ACTION", parser_class=_Parser
+    )
+    links_list = links_commands.add_parser("list", help="proposed and reviewed record links")
+    links_list.add_argument(
+        "--state", choices=["candidate", "accepted", "rejected"], help="only this state"
+    )
+    links_list.add_argument("--record", help="only links to or from this krec_ ID")
+    links_list.set_defaults(handler=_record_links)
+    links_review = links_commands.add_parser("review", help="accept or reject a record link")
+    links_review.add_argument("link", help="the krl_ ID")
+    links_review.add_argument("decision", choices=["accept", "reject"])
+    links_review.add_argument("--reviewer", required=True, help="who decided")
+    links_review.add_argument("--note", help="why, optionally (kept in the history)")
+    links_review.set_defaults(handler=_record_links)
     state = commands.add_parser("state", help="what holds now or on a date (no text shown)")
     state.add_argument("--as-of", help="only what the chats said by this date (ISO 8601)")
     state.add_argument("--known-at", help="as it was understood at this date (ISO 8601)")
