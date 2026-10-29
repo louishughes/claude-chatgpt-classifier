@@ -4,7 +4,8 @@ The same retrieval as ``ke search``, ``ke find``, ``ke ask`` and
 ``ke timeline``, as JSON. Each request first brings the word and meaning
 indexes up to date (a cheap step when nothing changed), then reads.
 
-* ``GET /search``: words in messages (exact, phrase or tokens).
+* ``GET /search``: words in messages (exact, phrase or tokens), optionally
+  narrowed by day, speaker and vocabulary term (RET-009).
 * ``GET /find``: the planner picks the route (structured records, exact
   words or hybrid) and returns records and message hits.
 * ``POST /answers``: an answer where every sentence cites stored text, or
@@ -45,6 +46,12 @@ from knowledge_engine.infrastructure.workspace import WorkspaceRow
 from knowledge_engine.reconciliation.timeline import DecisionEventRow, timeline
 from knowledge_engine.retrieval.answers import answer, to_json
 from knowledge_engine.retrieval.embeddings import LocalHashEmbedder
+from knowledge_engine.retrieval.filters import (
+    BadFilterDate,
+    BadFilterRole,
+    UnknownFilterTerm,
+    build_filters,
+)
 from knowledge_engine.retrieval.hybrid import HybridRetriever
 from knowledge_engine.retrieval.lexical import (
     LexicalIndex,
@@ -117,27 +124,59 @@ def search(
     mode: SearchMode = SearchMode.TOKENS,
     conversation_id: Annotated[str | None, Query(max_length=100)] = None,
     limit: Limit = 20,
+    since: Annotated[str | None, Query(max_length=10, description="YYYY-MM-DD, UTC")] = None,
+    until: Annotated[str | None, Query(max_length=10, description="YYYY-MM-DD, UTC")] = None,
+    role: Annotated[str | None, Query(max_length=20)] = None,
+    term: Annotated[str | None, Query(max_length=100)] = None,
+    taxonomy: Annotated[str | None, Query(max_length=100)] = None,
 ) -> dict[str, Any]:
-    """Messages containing the words, with a short snippet and their anchors."""
-    with sessions.transaction(write=False) as session, _indexes(settings, session) as ix:
-        hits = [
-            {
-                "conversation_id": hit.conversation_id,
-                "native_node_id": hit.native_node_id,
-                "revision_id": hit.revision_id,
-                "role": hit.role,
-                "snippet": hit.snippet,
-            }
-            for workspace_id in ix.workspaces
-            for hit in ix.lexical.search(
-                q,
-                workspace_id=workspace_id,
-                mode=mode,
-                limit=limit,
-                conversation_id=conversation_id,
+    """Messages containing the words, with a short snippet and their anchors.
+
+    ``since``/``until``/``role``/``term`` narrow the search (RET-009), with the
+    same checks as ``ke search``. An unapproved ``term`` is refused, never ignored.
+    """
+    with sessions.transaction(write=False) as session:
+        try:
+            filters = build_filters(
+                session, since=since, until=until, role=role, term=term, taxonomy=taxonomy
             )
-        ][:limit]
-    return {"mode": mode.value, "hits": hits}
+        except (BadFilterDate, BadFilterRole) as error:
+            raise ApiError(400, "bad_filter", str(error)) from None
+        except UnknownFilterTerm as error:
+            raise ApiError(400, "unknown_term", str(error)) from None
+        with _indexes(settings, session) as ix:
+            hits = [
+                {
+                    "conversation_id": hit.conversation_id,
+                    "native_node_id": hit.native_node_id,
+                    "revision_id": hit.revision_id,
+                    "role": hit.role,
+                    "snippet": hit.snippet,
+                }
+                for workspace_id in ix.workspaces
+                for hit in ix.lexical.search(
+                    q,
+                    workspace_id=workspace_id,
+                    mode=mode,
+                    limit=limit,
+                    conversation_id=conversation_id,
+                    filters=filters,
+                )
+            ][:limit]
+            undated = sum(
+                ix.lexical.undated(
+                    q,
+                    workspace_id=workspace_id,
+                    mode=mode,
+                    conversation_id=conversation_id,
+                    filters=filters,
+                )
+                for workspace_id in ix.workspaces
+            )
+    body: dict[str, Any] = {"mode": mode.value, "hits": hits}
+    if filters is not None and filters.dated:
+        body["undated_left_out"] = undated
+    return body
 
 
 @router.get("/find", tags=["retrieval"])
