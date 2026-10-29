@@ -17,9 +17,12 @@ fixed order with a fixed timestamp, so a bundle's own hash says whether
 anything changed.
 
 ``verify_bundle`` and ``show_bundle`` read a bundle as **untrusted input**:
-member names must pass the importer's ``safe_member_name`` check, member
-count and sizes stay inside the OPS-002 limits, every member must match
-its manifest hash, and every quote must match its own hash. Nothing in a
+member names must pass the importer's ``safe_member_name`` check; member
+count, each member's size and the unpacked total stay inside the OPS-002
+limits (members are hashed as a stream, and only the manifest and records
+are held); a damaged or encrypted member is a problem, not a crash; every
+member must match its manifest hash; and every quote must match its own
+hash. Problems name members by a hash of the path, never the path. Nothing in a
 bundle is ever imported into a workspace: its records were checked
 against another workspace's sources, not this one's.
 
@@ -32,10 +35,13 @@ Talking points:
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import os
+import tempfile
 import zipfile
+import zlib
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -48,11 +54,12 @@ from knowledge_engine import __version__
 from knowledge_engine.documents.model import DocumentKind, build_document, chats_of
 from knowledge_engine.documents.notes import conversation_note, knowledge_path
 from knowledge_engine.documents.render import project_master, project_path
-from knowledge_engine.extraction.records import KnowledgeRecord
+from knowledge_engine.extraction.records import KnowledgeRecord, RecordType, Trust
 from knowledge_engine.extraction.store import KnowledgeRecordRow
 from knowledge_engine.graph.offsets import quote_hash
 from knowledge_engine.importer.records import ConversationRow
 from knowledge_engine.ingestion.source import safe_member_name, sha256_of
+from knowledge_engine.reconciliation.projection import Status
 from knowledge_engine.rendering.markdown import render_note
 from knowledge_engine.rendering.transcript import (
     load_conversation,
@@ -208,9 +215,15 @@ def export_bundle(
         raise BundleError("the target's folder does not exist")
     members = bundle_members(session, project_id, with_transcripts=with_transcripts)
     data = _zip_bytes(members)
-    partial = target.with_name(target.name + ".partial")
-    partial.write_bytes(data)
-    os.replace(partial, target)
+    # A fresh, exclusively created temp name: a planted link can't redirect the write.
+    handle, temp = tempfile.mkstemp(prefix=".bundle-", suffix=".partial", dir=target.parent)
+    try:
+        with os.fdopen(handle, "wb") as out:
+            out.write(data)
+        os.replace(temp, target)
+    except BaseException:
+        Path(temp).unlink(missing_ok=True)
+        raise
     manifest = json.loads(members[MANIFEST])
     counts = manifest["counts"]
     return BundleSummary(
@@ -234,60 +247,127 @@ class BundleCheck:
         return not self.problems
 
 
-def _read(path: Path, limits: Limits, check: BundleCheck) -> dict[str, bytes] | None:
+# Members whose bytes are kept for reading; every other member is only hashed.
+_KEPT = frozenset({MANIFEST, RECORDS})
+_CHUNK = 1 << 20
+_STATUSES = frozenset(
+    {s.value for s in Status} | {t.value for t in Trust} | {"accepted", "rejected", "open"}
+)
+_TYPES = frozenset(t.value for t in RecordType)
+
+
+def member_label(name: str) -> str:
+    """How a problem names a member: its path holds a chat title, so a short hash."""
+    if name in _KEPT:
+        return name
+    return "member " + hashlib.sha256(name.encode("utf-8", "replace")).hexdigest()[:12]
+
+
+def _read(
+    path: Path, limits: Limits, check: BundleCheck
+) -> tuple[dict[str, str], dict[str, bytes], set[str]] | None:
+    """Hash every member as a stream; keep only the manifest and records.
+
+    Returns the hashes, the kept bytes and the names already reported.
+    """
     try:
         archive = zipfile.ZipFile(path)
     except (OSError, zipfile.BadZipFile):
         check.problems.append("not a readable ZIP file")
         return None
+    hashes: dict[str, str] = {}
+    kept: dict[str, bytes] = {}
+    reported: set[str] = set()
+    total = 0
     with archive:
         infos = archive.infolist()
         if len(infos) > limits.max_archive_entries:
             check.problems.append(f"too many members ({len(infos)})")
             return None
-        members: dict[str, bytes] = {}
+        # Names and declared sizes first, so every one of those is reported
+        # even if the unpacked total later stops the reading.
+        readable, seen = [], set()
         for info in infos:
+            label = member_label(info.filename)
+            reported.add(info.filename)
             if not safe_member_name(info.filename):
-                check.problems.append(f"unsafe member name: {info.filename!r}")
+                check.problems.append(f"unsafe member name: {label}")
+            elif info.file_size > limits.max_source_file_bytes:
+                check.problems.append(f"member too large: {label}")
+            elif info.filename in seen:
+                check.problems.append(f"member listed twice: {label}")
+            else:
+                readable.append(info)
+            seen.add(info.filename)
+        for info in readable:
+            label = member_label(info.filename)
+            digest, held = hashlib.sha256(), bytearray()
+            try:
+                with archive.open(info) as stream:
+                    while chunk := stream.read(_CHUNK):
+                        total += len(chunk)
+                        if total > limits.max_source_file_bytes:
+                            check.problems.append("bundle too large when unpacked")
+                            return None
+                        digest.update(chunk)
+                        if info.filename in _KEPT:
+                            held += chunk
+            except (zipfile.BadZipFile, zlib.error, EOFError):
+                check.problems.append(f"member damaged: {label}")
                 continue
-            if info.file_size > limits.max_source_file_bytes:
-                check.problems.append(f"member too large: {info.filename}")
+            except RuntimeError:  # zipfile's error for an encrypted member
+                check.problems.append(f"member encrypted: {label}")
                 continue
-            if info.filename in members:
-                check.problems.append(f"member listed twice: {info.filename}")
+            except NotImplementedError:
+                check.problems.append(f"member uses unsupported compression: {label}")
                 continue
-            members[info.filename] = archive.read(info)
-    return members
+            reported.discard(info.filename)
+            hashes[info.filename] = digest.hexdigest()
+            if info.filename in _KEPT:
+                kept[info.filename] = bytes(held)
+    return hashes, kept, reported
 
 
 def verify_bundle(path: Path, limits: Limits | None = None) -> BundleCheck:
     """Check a bundle without trusting it: names, sizes, hashes and every quote.
 
-    Problems name the member or record, never its text.
+    Problems name a member by a short hash of its path (``member_label``)
+    or a record by its ID, never by path or text: paths hold chat titles.
     """
     limits = limits or Limits()
     check = BundleCheck()
-    members = _read(path, limits, check)
-    if members is None:
+    read = _read(path, limits, check)
+    if read is None:
         return check
-    check.members = len(members)
+    hashes, kept, reported = read
+    check.members = len(hashes)
     try:
-        manifest: dict[str, Any] = json.loads(members[MANIFEST])
+        manifest: Any = json.loads(kept[MANIFEST])
     except (KeyError, ValueError):
         check.problems.append("no readable manifest.json")
         return check
-    if manifest.get("format") != BUNDLE_FORMAT:
-        check.problems.append(f"unknown bundle format: {manifest.get('format')!r}")
+    if not isinstance(manifest, dict):
+        check.problems.append("manifest.json is not an object")
         return check
-    listed: dict[str, str] = manifest.get("members") or {}
-    for name in sorted(set(listed) | (set(members) - {MANIFEST})):
-        if name not in members:
-            check.problems.append(f"missing member: {name}")
+    if manifest.get("format") != BUNDLE_FORMAT:
+        check.problems.append("unknown bundle format")
+        return check
+    listed = manifest.get("members")
+    if not isinstance(listed, dict) or not all(isinstance(v, str) for v in listed.values()):
+        check.problems.append("manifest.json members is not a name-to-hash map")
+        return check
+    if RECORDS not in hashes and RECORDS not in reported:
+        check.problems.append(f"missing member: {RECORDS}")
+    for name in sorted(set(listed) | (set(hashes) - {MANIFEST})):
+        label = member_label(name)
+        if name not in hashes:
+            if name != RECORDS and name not in reported:
+                check.problems.append(f"missing member: {label}")
         elif name not in listed:
-            check.problems.append(f"member not in the manifest: {name}")
-        elif sha256_of(members[name]) != listed[name]:
-            check.problems.append(f"member changed: {name}")
-    _check_records(members.get(RECORDS, b""), check)
+            check.problems.append(f"member not in the manifest: {label}")
+        elif hashes[name] != listed[name]:
+            check.problems.append(f"member changed: {label}")
+    _check_records(kept.get(RECORDS, b""), check)
     return check
 
 
@@ -301,13 +381,20 @@ def _check_records(data: bytes, check: BundleCheck) -> None:
             check.problems.append(f"records.jsonl line {number} is not a record")
             continue
         check.records += 1
-        check.by_type[str(entry.get("record_type"))] += 1
-        check.by_status[str(entry.get("status"))] += 1
+        # Only known words are counted by name: the bundle is untrusted text.
+        kind, status = entry.get("record_type"), entry.get("status")
+        check.by_type[kind if kind in _TYPES else "other"] += 1
+        check.by_status[status if status in _STATUSES else "other"] += 1
         for cited in quotes:
-            text = cited.get("text") if isinstance(cited, dict) else None
+            if not isinstance(cited, dict):
+                check.problems.append(f"a quote is not an object: {record_id}")
+                continue
+            text = cited.get("text")
             if text is None:
+                if cited.get("problem") is None:
+                    check.problems.append(f"a quote has no text and no problem: {record_id}")
                 continue  # not resolvable when exported; its problem is recorded
-            if quote_hash(text) != cited.get("quote_sha256"):
+            if not isinstance(text, str) or quote_hash(text) != cited.get("quote_sha256"):
                 check.problems.append(f"quote does not match its hash: {record_id}")
 
 

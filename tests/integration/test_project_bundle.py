@@ -11,6 +11,8 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
+import sys
 import zipfile
 from collections.abc import Iterator
 from pathlib import Path
@@ -24,6 +26,7 @@ from knowledge_engine.documents.bundle import (
     RECORDS,
     BundleError,
     export_bundle,
+    member_label,
     verify_bundle,
 )
 from knowledge_engine.extraction import decisions
@@ -146,11 +149,13 @@ def test_each_kind_of_tampering_fails_with_its_own_reason(
 
     changed = tmp_path / "changed.zip"
     _rezip(changed, {**members, note: members[note] + b"\nSynthetic edit.\n"})
-    assert verify_bundle(changed).problems == [f"member changed: {note}"]
+    assert verify_bundle(changed).problems == [f"member changed: {member_label(note)}"]
 
     escaping = tmp_path / "escaping.zip"
     _rezip(escaping, {**members, "../outside.md": b"Synthetic"})
-    assert verify_bundle(escaping).problems == ["unsafe member name: '../outside.md'"]
+    assert verify_bundle(escaping).problems == [
+        f"unsafe member name: {member_label('../outside.md')}"
+    ]
 
     small = Limits(max_source_file_bytes=len(members[RECORDS]) - 1)
     assert f"member too large: {RECORDS}" in verify_bundle(good, small).problems
@@ -188,4 +193,139 @@ def test_cli_exports_verifies_and_shows(
     assert "Synthetic" not in shown["message"]  # counts, never text
     target.write_bytes(b"not a zip")
     assert main(["--json", "bundle", "verify", str(target)]) == 1
+    assert json.loads(capsys.readouterr().out)["error"]["code"] == "bad_bundle"
+
+
+def _bundle_of(path: Path, content: dict[str, bytes], **manifest: object) -> None:
+    """A synthetic bundle whose manifest lists ``content`` (or what ``manifest`` says)."""
+    listed = {n: hashlib.sha256(d).hexdigest() for n, d in content.items()}
+    body = {"format": "bundle-v1", "members": listed, **manifest}
+    _rezip(path, {MANIFEST: json.dumps(body).encode(), **content})
+
+
+def test_an_unpacked_total_over_the_limit_is_refused(tmp_path: Path) -> None:
+    # Each member is under the per-member limit; together they are not.
+    zeros = b"\0" * 400_000
+    bomb = tmp_path / "bomb.zip"
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr(MANIFEST, json.dumps({"format": "bundle-v1", "members": {}}))
+        for n in range(4):
+            archive.writestr(f"Knowledge/{n}.md", zeros)
+    bomb.write_bytes(buffer.getvalue())
+    assert bomb.stat().st_size < 50_000
+    check = verify_bundle(bomb, Limits(max_source_file_bytes=1_000_000))
+    assert check.problems == ["bundle too large when unpacked"]
+
+
+def test_damaged_or_misshapen_bundles_are_problems_not_crashes(tmp_path: Path) -> None:
+    good = {RECORDS: b"", "Knowledge/Synthetic private title.md": b"Synthetic note " * 200}
+
+    damaged = tmp_path / "damaged.zip"
+    _bundle_of(damaged, good)
+    data = bytearray(damaged.read_bytes())
+    at = data.index(b"Synthetic note")  # stored uncompressed by _rezip: flip a byte
+    data[at] ^= 0xFF
+    damaged.write_bytes(bytes(data))
+    note = "Knowledge/Synthetic private title.md"
+    assert verify_bundle(damaged).problems == [f"member damaged: {member_label(note)}"]
+
+    deflated = tmp_path / "deflated.zip"
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("Knowledge/x.md", b"Synthetic " * 500)
+    data = bytearray(buffer.getvalue())
+    for at in range(40, 60):  # inside the deflate stream
+        data[at] ^= 0xFF
+    deflated.write_bytes(bytes(data))
+    problems = verify_bundle(deflated).problems
+    assert problems and all("damaged" in p or "readable" in p for p in problems), problems
+
+    array = tmp_path / "array.zip"
+    _rezip(array, {MANIFEST: b"[]", RECORDS: b""})
+    assert verify_bundle(array).problems == ["manifest.json is not an object"]
+
+    listed = tmp_path / "listed.zip"
+    _bundle_of(listed, {RECORDS: b""}, members=[RECORDS])
+    assert verify_bundle(listed).problems == ["manifest.json members is not a name-to-hash map"]
+
+
+def test_a_bundle_without_records_fails(tmp_path: Path) -> None:
+    empty = tmp_path / "empty.zip"
+    _bundle_of(empty, {})
+    assert verify_bundle(empty).problems == [f"missing member: {RECORDS}"]
+
+
+def test_problems_never_print_a_member_path(tmp_path: Path) -> None:
+    title = "Knowledge/Synthetic private title.md"
+    bad = tmp_path / "bad.zip"
+    _bundle_of(bad, {RECORDS: b"", title: b"Synthetic"})
+    members = _members(bad)
+    _rezip(bad, {**members, title: b"Synthetic changed", "../Synthetic secret.md": b"x"})
+    problems = verify_bundle(bad).problems
+    assert len(problems) == 2
+    assert not any("Synthetic" in p for p in problems), problems
+
+
+def test_quotes_that_are_not_objects_or_lack_text_are_problems(tmp_path: Path) -> None:
+    lines = [
+        {"record_id": "krec_a", "record_type": "decision", "status": "current", "quotes": ["x"]},
+        {
+            "record_id": "krec_b",
+            "record_type": "Synthetic",
+            "status": "Synthetic",
+            "quotes": [{"text": None, "problem": None}],
+        },
+    ]
+    records = "".join(json.dumps(x) + "\n" for x in lines).encode()
+    path = tmp_path / "quotes.zip"
+    _bundle_of(path, {RECORDS: records})
+    check = verify_bundle(path)
+    assert check.problems == [
+        "a quote is not an object: krec_a",
+        "a quote has no text and no problem: krec_b",
+    ]
+    assert dict(check.by_type) == {"decision": 1, "other": 1}  # untrusted words aren't echoed
+    assert dict(check.by_status) == {"current": 1, "other": 1}
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="symlinks need extra rights on Windows")
+def test_export_never_follows_a_planted_partial_link(
+    project: tuple[Settings, Session], tmp_path: Path
+) -> None:
+    _, session = project
+    outside = tmp_path / "outside.txt"
+    outside.write_text("Synthetic untouched")
+    target = tmp_path / "out" / "p.zip"
+    target.parent.mkdir()
+    os.symlink(outside, target.with_name(target.name + ".partial"))
+    export_bundle(session, PROJECT, target)
+    assert outside.read_text() == "Synthetic untouched"
+    assert verify_bundle(target).ok
+    assert sorted(p.name for p in target.parent.iterdir()) == ["p.zip", "p.zip.partial"]
+
+
+def test_export_leaves_no_partial_file_when_the_write_fails(
+    project: tuple[Settings, Session], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, session = project
+
+    def fail(*_: object) -> None:
+        raise OSError("synthetic failure")
+
+    monkeypatch.setattr(os, "replace", fail)
+    with pytest.raises(OSError, match="synthetic"):
+        export_bundle(session, PROJECT, tmp_path / "p.zip")
+    assert list(tmp_path.iterdir()) == [tmp_path / "ws"]
+
+
+def test_cli_show_fails_on_a_bad_bundle(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from knowledge_engine.cli.main import main
+
+    monkeypatch.setenv("KE_WORKSPACE_ROOT", str(tmp_path / "ws"))
+    bad = tmp_path / "bad.zip"
+    _bundle_of(bad, {})
+    assert main(["--json", "bundle", "show", str(bad)]) == 1
     assert json.loads(capsys.readouterr().out)["error"]["code"] == "bad_bundle"
