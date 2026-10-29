@@ -21,6 +21,9 @@ Three modes:
 * ``exact``: like ``phrase``, then the hit must also contain the query
   character for character, case included. Use it for codes and IDs.
 
+Each row also keeps the message's own time, so a search can be narrowed by
+date, speaker and vocabulary term (RET-009, ``retrieval/filters.py``).
+
 ``tokens`` and ``phrase`` ignore case and accents (``cafe`` finds ``café``).
 The query is never passed to FTS5 as syntax: each word is quoted, so
 ``AND``, ``NOT``, quotes or brackets in a query are just text.
@@ -41,6 +44,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -49,9 +53,12 @@ from knowledge_engine.graph.nodes import canonical_node
 from knowledge_engine.importer.records import ConversationRow, MessageNodeRow, MessageRevisionRow
 from knowledge_engine.settings import Settings
 
+if TYPE_CHECKING:  # filters.py reads segments and labels; no import cycle at runtime
+    from knowledge_engine.retrieval.filters import SearchFilters
+
 # Bump when the schema or tokenizer changes: an index built by another
 # version is dropped and rebuilt, never half-used.
-SEARCH_INDEX_VERSION = "ret-001-v1"
+SEARCH_INDEX_VERSION = "ret-009-v1"  # adds create_time
 _WORD = re.compile(r"\w+")
 _BATCH = 500
 
@@ -65,6 +72,7 @@ _SCHEMA = (
         node_key TEXT NOT NULL,
         native_node_id TEXT NOT NULL,
         role TEXT,
+        create_time REAL,
         text TEXT NOT NULL
     )""",
     "CREATE INDEX IF NOT EXISTS documents_scope ON documents (workspace_id, conversation_id)",
@@ -103,6 +111,7 @@ class Passage:
     native_node_id: str
     role: str | None
     text: str
+    create_time: float | None = None  # the message's own time (RET-009 date filters)
 
 
 @dataclass(frozen=True)
@@ -217,7 +226,7 @@ class LexicalIndex:
         before = self._count()
         self._db.executemany(
             "INSERT OR IGNORE INTO documents (revision_id, workspace_id, conversation_id, "
-            "node_key, native_node_id, role, text) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            "node_key, native_node_id, role, create_time, text) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 (
                     p.revision_id,
@@ -226,6 +235,7 @@ class LexicalIndex:
                     p.node_key,
                     p.native_node_id,
                     p.role,
+                    p.create_time,
                     p.text,
                 )
                 for p in passages
@@ -245,6 +255,7 @@ class LexicalIndex:
         mode: SearchMode = SearchMode.TOKENS,
         limit: int = 20,
         conversation_id: str | None = None,
+        filters: SearchFilters | None = None,
     ) -> list[SearchHit]:
         """Find message revisions matching ``query``, best first.
 
@@ -254,29 +265,15 @@ class LexicalIndex:
             mode: ``tokens``, ``phrase`` or ``exact``.
             limit: At most this many hits.
             conversation_id: Only this conversation, optionally.
+            filters: Dates, speaker and term (RET-009), optionally.
 
         Returns:
             The hits; empty if the query has no words.
         """
-        expression = match_expression(query, mode)
-        if expression is None or limit <= 0:
+        if limit <= 0:
             return []
-        sql = (
-            "SELECT d.revision_id, d.conversation_id, d.node_key, d.native_node_id, d.role, "
-            "snippet(documents_fts, 0, '[', ']', '…', 12), rank, d.text "
-            "FROM documents_fts JOIN documents d ON d.doc_id = documents_fts.rowid "
-            "WHERE documents_fts MATCH ? AND d.workspace_id = ?"
-        )
-        params: list[object] = [expression, workspace_id]
-        if conversation_id is not None:
-            sql += " AND d.conversation_id = ?"
-            params.append(conversation_id)
-        sql += " ORDER BY rank, d.revision_id"
         hits: list[SearchHit] = []
-        # Exact mode filters after FTS, so read rows lazily until enough pass.
-        for row in self._db.execute(sql, params):
-            if mode is SearchMode.EXACT and query.strip() not in row[7]:
-                continue
+        for row in self._matches(query, workspace_id, mode, conversation_id, filters, False):
             hits.append(
                 SearchHit(
                     revision_id=row[0],
@@ -291,6 +288,72 @@ class LexicalIndex:
             if len(hits) >= limit:
                 break
         return hits
+
+    def undated(
+        self,
+        query: str,
+        *,
+        workspace_id: str,
+        mode: SearchMode = SearchMode.TOKENS,
+        conversation_id: str | None = None,
+        filters: SearchFilters | None = None,
+    ) -> int:
+        """How many matching messages a date filter left out for having no time.
+
+        Zero when ``filters`` sets no date. Every other filter still applies,
+        so the count is "would have matched, if it had a date".
+        """
+        if filters is None or not filters.dated:
+            return 0
+        return sum(
+            1 for _ in self._matches(query, workspace_id, mode, conversation_id, filters, True)
+        )
+
+    def _matches(
+        self,
+        query: str,
+        workspace_id: str,
+        mode: SearchMode,
+        conversation_id: str | None,
+        filters: SearchFilters | None,
+        undated_only: bool,
+    ) -> Iterator[tuple[Any, ...]]:
+        expression = match_expression(query, mode)
+        if expression is None:
+            return
+        sql = (
+            "SELECT d.revision_id, d.conversation_id, d.node_key, d.native_node_id, d.role, "
+            "snippet(documents_fts, 0, '[', ']', '…', 12), rank, d.text "
+            "FROM documents_fts JOIN documents d ON d.doc_id = documents_fts.rowid "
+            "WHERE documents_fts MATCH ? AND d.workspace_id = ?"
+        )
+        params: list[object] = [expression, workspace_id]
+        if conversation_id is not None:
+            sql += " AND d.conversation_id = ?"
+            params.append(conversation_id)
+        if filters is not None:
+            if filters.role is not None:
+                sql += " AND d.role = ?"
+                params.append(filters.role)
+            if undated_only:
+                sql += " AND d.create_time IS NULL"
+            else:
+                if filters.since is not None:
+                    sql += " AND d.create_time >= ?"
+                    params.append(filters.since)
+                if filters.until is not None:
+                    sql += " AND d.create_time < ?"
+                    params.append(filters.until)
+        sql += " ORDER BY rank, d.revision_id"
+        # Exact mode and the term filter check rows after FTS, so rows are
+        # read lazily until enough pass.
+        for row in self._db.execute(sql, params):
+            if mode is SearchMode.EXACT and query.strip() not in row[7]:
+                continue
+            if filters is not None and filters.node_keys is not None:
+                if row[2] not in filters.node_keys:
+                    continue
+            yield row
 
 
 def sync_index(session: Session, index: LexicalIndex) -> int:
@@ -358,4 +421,4 @@ def _passages(session: Session, skip: set[str]) -> Iterator[Passage]:
             continue
         # Image-only messages are indexed with empty text: they never match,
         # but they're recorded, so the next sync doesn't parse them again.
-        yield Passage(revision, workspace, conversation, node_key, native, role, node.text)
+        yield Passage(revision, workspace, conversation, node_key, native, role, node.text, created)
