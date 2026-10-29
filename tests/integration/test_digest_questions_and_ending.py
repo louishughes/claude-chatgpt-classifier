@@ -46,6 +46,24 @@ CHATS: dict[str, list[tuple[str, str]]] = {
         ("user", "Which tool trims a hedge best?"),
         ("assistant", "Synthetic shears work well for a small hedge."),
     ],
+    "offered": [
+        turn
+        for step in range(1, 7)
+        for turn in (
+            (
+                "user",
+                "Yes, go ahead with the planting plan."
+                if step == 4
+                else f"Synthetic step {step}: what should happen with the garden bed now?",
+            ),
+            (
+                "assistant",
+                "Mulch it today. Want me to draft a synthetic planting plan for the bed?"
+                if step == 3
+                else f"Synthetic step {step}: water the garden bed and add mulch today.",
+            ),
+        )
+    ],
     "long": [
         turn
         for step in range(1, 10)
@@ -141,46 +159,52 @@ def _digest(
     return outcome.digest
 
 
-def test_a_question_asked_twice_is_listed_once_with_both_citations(session: Session) -> None:
-    def user_question(tags: list[tuple[str, str, str]]) -> list[dict[str, Any]]:
-        first = {"text": "Which tool trims a hedge best?", "quotes": _cite(tags[2])}
-        again = {"text": "Which tool trims a hedge best", "quotes": _cite(tags[0])}
-        return [first, again]
-
-    digest = _digest(session, "ignored", _answer(user_question))
-    [question] = digest.open_questions
-    assert len(question.message_ids) == 2 and len(question.evidence) == 2
-    assert any("repeated question" in f.reason for f in digest.flags)
-
-
-def test_an_offer_the_user_accepts_later_is_no_longer_open(session: Session) -> None:
+def test_a_one_part_chat_keeps_its_questions_as_written(session: Session) -> None:
+    # Reconciling is only across parts (NOTE-032): one part saw the whole chat.
     digest = _digest(session, "accepted", _answer(_offer_twice))
-    chat = _load(session, "accepted")
-    yes = chat_messages(chat)[2]
+    assert len(digest.open_questions) == 2 and digest.resolved_questions == ()
 
-    assert digest.open_questions == ()
+
+def test_an_offer_accepted_in_a_later_part_is_set_aside_with_the_reply(session: Session) -> None:
+    chat = _load(session, "offered")
+    messages = chat_messages(chat)
+    offer = next(m for m in messages if "planting plan" in m.text)
+    reply = next(m for m in messages if m.text.startswith("Yes, go ahead"))
+
+    def listed(tags: list[tuple[str, str, str]]) -> list[dict[str, Any]]:
+        if not any(t[0] == offer.native_id for t in tags):
+            return []
+        quoted = [{"message_id": offer.native_id, "text": "Want"}]
+        return [{"text": "Should the assistant draft the planting plan?", "quotes": quoted}]
+
+    runner = ModelStageRunner(session, FakeProvider(_answer(listed)), EgressPolicy(text_llm=True))
+    budget = max(len(m.text) for m in messages) * 4
+    parts = digest_parts(chat, budget)
+    first = next(p for p in parts if offer.native_id in p)
+    assert reply.native_id not in first  # the part that asked never saw the yes
+
+    outcome = DigestStage(runner, max_characters=budget).run(chat)
+    digest = outcome.digest
+    assert digest is not None and digest.open_questions == ()
     [resolved] = digest.resolved_questions
-    assert resolved.resolved_by.revision_id == yes.revision_id
-    assert yes.text[resolved.resolved_by.start : resolved.resolved_by.end] == "Yes"
-    assert any("answered later" in f.reason for f in digest.flags)
+    assert resolved.resolved_by.revision_id == reply.revision_id
+    assert any(f.field == "resolved_questions" and f.index == 0 for f in digest.flags)
 
 
-def test_an_offer_the_user_never_answers_stays_open(session: Session) -> None:
-    digest = _digest(session, "ignored", _answer(_offer_twice))
-    assert len(digest.open_questions) == 1  # the repeat joined, the question kept
-    assert digest.resolved_questions == ()
-
-
-def _long_answer(broken_last: bool) -> Callable[[ModelRequest], Any]:
+def _long_answer(broken_last: bool, closing_only: bool = False) -> Callable[[ModelRequest], Any]:
     def answer(request: ModelRequest) -> dict[str, Any]:
         tags = _TAG.findall(request.input_text)
         part = int(re.search(r"^Part (\d+) of (\d+)", request.input_text, re.M).group(1))  # type: ignore[union-attr]
         total = int(re.search(r"^Part \d+ of (\d+)", request.input_text, re.M).group(1))  # type: ignore[union-attr]
         cited = _cite(tags[-1])
-        if broken_last and part == total:
+        if (broken_last or closing_only) and part == total:
             cited = [{"message_id": tags[-1][0], "text": "words nobody wrote"}]
+        summary = [{"text": f"Synthetic event number {part} happened.", "quotes": cited}]
+        if closing_only and part == total:
+            # The closing sentence fails its quote; an earlier one of this part holds.
+            summary.insert(0, {"text": "Synthetic late event happened.", "quotes": _cite(tags[-2])})
         return {
-            "summary": [{"text": f"Synthetic event number {part} happened.", "quotes": cited}],
+            "summary": summary,
             "status": {"value": "settled", "quotes": _cite(tags[-1])},
             "intent": {"value": "plan", "text": "Plan the bed.", "quotes": _cite(tags[0])},
         }
@@ -219,6 +243,16 @@ def test_a_last_part_with_no_surviving_sentence_is_said_in_the_note(session: Ses
     assert digest is not None and digest.ending_unsummarised == len(parts)
     text = render_note(rich_conversation_note(session, chat.conversation_id, digest=digest).model)
     assert f"How it ended: not summarised (see part {len(parts)})." in text
+
+
+def test_a_failed_closing_sentence_gives_way_to_the_last_parts_other_one(
+    session: Session,
+) -> None:
+    stage = _long_stage(session, _long_answer(broken_last=False, closing_only=True))
+    outcome = stage.run(_load(session, "long"))
+    digest = outcome.digest
+    assert digest is not None and digest.ending_unsummarised is None
+    assert digest.summary[-1].text == "Synthetic late event happened."
 
 
 def test_a_single_part_chat_is_unchanged(session: Session) -> None:

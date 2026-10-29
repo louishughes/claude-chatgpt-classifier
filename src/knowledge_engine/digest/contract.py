@@ -257,6 +257,13 @@ def _resolve_item(
     return _Resolved(item, None)
 
 
+def resolve_item(
+    field: str, text: str, quotes: Sequence[DigestQuote], messages: Sequence[ExtractionMessage]
+) -> DigestItem | None:
+    """One item checked like ``resolve_digest`` checks it: None if any quote fails."""
+    return _resolve_item(field, text, quotes, {m.native_id: m for m in messages}).item
+
+
 def resolve_digest(
     answer: DigestAnswer, messages: Sequence[ExtractionMessage]
 ) -> ConversationDigest:
