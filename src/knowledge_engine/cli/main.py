@@ -3832,6 +3832,7 @@ def _inspect(settings: Settings, args: argparse.Namespace) -> CommandResult:
         load_conversation,
         write_transcript,
     )
+    from knowledge_engine.ui.registries import asset_page
 
     db = database_path(settings)
     if not db.exists():
@@ -3864,6 +3865,36 @@ def _inspect(settings: Settings, args: argparse.Namespace) -> CommandResult:
                     "inspect",
                     data={"conversations": listing, "count": len(listing)},
                     message="Stored conversations (IDs and counts only)",
+                )
+            if args.conversation.startswith("asset_"):
+                # UI-010: one image or file and every message using it.
+                found = asset_page(session, args.conversation)
+                if found is None:
+                    return CommandResult(
+                        "inspect",
+                        ExitCode.USAGE,
+                        message="no such image or file",
+                        error_code="not_found",
+                    )
+                # IDs and places only: chat titles are private.
+                return CommandResult(
+                    "inspect",
+                    data={
+                        **{k: v for k, v in found.items() if k != "occurrences"},
+                        "occurrences": [
+                            {
+                                "occurrence_id": o["occurrence_id"],
+                                "revision_id": o["revision_id"],
+                                "conversation_id": o["place"].conversation_id
+                                if o["place"]
+                                else None,
+                                "anchor": o["place"].anchor if o["place"] else None,
+                                "availability": o["availability"],
+                            }
+                            for o in found["occurrences"]
+                        ],
+                    },
+                    message="One image or file and every message using it (IDs only)",
                 )
             conversation_id = find_conversation(session, args.conversation)
             if conversation_id is None:
@@ -4260,7 +4291,10 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     inspect.add_argument(
-        "conversation", nargs="?", help="a conv_ ID or the export's conversation ID"
+        "conversation",
+        nargs="?",
+        help="a conv_ ID, the export's conversation ID, or an asset_ ID (one image or file "
+        "and every message using it)",
     )
     inspect.add_argument(
         "--redact",

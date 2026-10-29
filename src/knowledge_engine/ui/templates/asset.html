@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "macros.html" import where %}
+{% block title %}Image or file · Knowledge Engine{% endblock %}
+{% block main %}
+<p class="back"><a href="/chats">← All chats</a></p>
+<h1>Image or file <code>{{ asset.asset_id }}</code></h1>
+{% if asset.blob_sha256 %}
+<p class="muted">{{ asset.media_type or "unknown type" }}{% if asset.width and asset.height %} · {{ asset.width }} × {{ asset.height }}{% endif %} · fingerprint <code>{{ asset.blob_sha256[:12] }}</code>{% if asset.same_bytes_elsewhere %} · the same bytes are also stored as {{ asset.same_bytes_elsewhere }} other file{{ "" if asset.same_bytes_elsewhere == 1 else "s" }}{% endif %}</p>
+{% if asset.media_type in ("image/png", "image/jpeg", "image/gif", "image/webp") %}
+<p><a href="/media/{{ asset.blob_sha256 }}"><img src="/media/{{ asset.blob_sha256 }}" alt="This image" loading="lazy"></a></p>
+{% else %}
+<p><a href="/media/{{ asset.blob_sha256 }}">Download the file</a></p>
+{% endif %}
+{% else %}
+<p class="error">The file itself isn't in any export imported so far, so only the messages that point at it are listed.</p>
+{% endif %}
+<h2>Used in {{ asset.occurrences | length }} message{{ "" if asset.occurrences | length == 1 else "s" }} across {{ asset.chats }} chat{{ "" if asset.chats == 1 else "s" }}</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Where</th><th>State</th></tr></thead>
+  <tbody>
+  {% for o in asset.occurrences %}
+  <tr>
+    <td>{{ where(o.place) }}</td>
+    <td>{% if o.availability == "available" %}available{% else %}<span class="error">{{ o.availability }}</span> <span class="muted">({{ o.reason }})</span>{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% if asset.only_in_earlier_versions %}<p class="muted">Also in an earlier version of {{ asset.only_in_earlier_versions }} message{{ "" if asset.only_in_earlier_versions == 1 else "s" }} that a later export changed.</p>{% endif %}
+{% endblock %}

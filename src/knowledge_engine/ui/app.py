@@ -228,6 +228,15 @@ def _route(
         account_id = path.removeprefix("/accounts/")
         if _IMPORT_ID_RE.fullmatch(account_id):
             return _one(settings, "account.html", "account", registries.account_page, account_id)
+    if path.startswith("/assets/"):
+        asset_id = path.removeprefix("/assets/")
+        if _IMPORT_ID_RE.fullmatch(asset_id):
+            found = _read(settings, lambda s: registries.asset_page(s, asset_id))
+            if found is None:
+                return Page(
+                    "404 Not Found", "error.html", {"message": "No image or file with that ID."}
+                )
+            return Page("200 OK", "asset.html", {"asset": found})
     if path.startswith("/imports/"):
         import_id = path.removeprefix("/imports/")
         if _IMPORT_ID_RE.fullmatch(import_id):

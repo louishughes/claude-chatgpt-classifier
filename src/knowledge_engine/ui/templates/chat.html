@@ -13,6 +13,7 @@
     {% else %}
     <p class="error">Image {{ item.state }}: <code>{{ item.pointer }}</code> ({{ item.reason }})</p>
     {% endif %}
+    {% if item.asset %}<p class="muted"><a href="{{ item.asset }}">Every message using this file</a></p>{% endif %}
   {% endfor %}
 </article>
 {% endmacro %}
