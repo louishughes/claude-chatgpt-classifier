@@ -227,7 +227,13 @@ def _imports_report(settings: Settings, args: argparse.Namespace) -> CommandResu
         **json.loads(batch.counts_json or "{}"),
         "warnings": json.loads(batch.warnings_json or "{}"),
     }
-    return CommandResult("imports report", data=data, message=f"Import report ({batch.status})")
+    message = f"Import report ({batch.status})"
+    timings = data.get("timings") or {}
+    if timings:
+        message += "\nHow long it took: " + ", ".join(
+            f"{stage.replace('_', ' ')} {seconds:.3f}s" for stage, seconds in timings.items()
+        )
+    return CommandResult("imports report", data=data, message=message)
 
 
 def _import(settings: Settings, args: argparse.Namespace) -> CommandResult:
@@ -3663,6 +3669,38 @@ def _eval_review_reasons(settings: Settings, args: argparse.Namespace) -> Comman
     )
 
 
+def _eval_tokens(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Estimated tokens per stage from the model ledger (OPS-010); counts only, no calls."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.providers.ledger import token_estimates
+
+    name = "eval tokens"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            data = token_estimates(session)
+    finally:
+        engine.dispose()
+    lines = [
+        f"{family}: {n['requests']} requests ({n['cached']} answered, so re-runs are free), "
+        f"~{n['input_tokens']} input and ~{n['output_tokens']} output tokens"
+        for family, n in data.items()
+        if n["requests"] or family != "other"
+    ]
+    return CommandResult(
+        name,
+        data=data,
+        message="Estimated tokens (characters / 4, not a bill):\n" + "\n".join(lines),
+    )
+
+
 def _eval_semantic(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Run the EVAL-011 semantic smoke test on a scratch copy, never the real database."""
     import sqlite3
@@ -3883,6 +3921,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     reasons.add_argument("--limit", type=int, help="the run's conversation count (default all)")
     reasons.set_defaults(handler=_eval_review_reasons)
+    eval_commands.add_parser(
+        "tokens", help="estimated tokens per stage from the model ledger (no calls)"
+    ).set_defaults(handler=_eval_tokens)
     relationships_eval = eval_commands.add_parser(
         "relationships",
         help="score proposed links between chats against an independent answer key",

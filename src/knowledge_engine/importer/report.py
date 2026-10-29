@@ -20,6 +20,17 @@ from typing import Any
 
 from knowledge_engine.domain.enums import ImportBatchStatus
 
+# The stages an import is timed in (IMP-008), in the order they run.
+TIMING_STAGES = (
+    "archive",
+    "parse",
+    "identity_revisions",
+    "media",
+    "links_mentions",
+    "relationships",
+    "total",
+)
+
 
 @dataclass(frozen=True)
 class ImportReport:
@@ -58,6 +69,10 @@ class ImportReport:
         corrections: IMP-006's standing of human corrections after this
             import (``kept``, ``review_required``, ``unanchored``); empty
             when nothing changed.
+        timings: IMP-008's seconds per stage (``TIMING_STAGES``), 3
+            decimals. Kept out of ``to_dict`` because they differ from run
+            to run, and ``to_dict`` is what idempotency checks compare;
+            ``to_stored`` adds them for the ledger and the report pages.
     """
 
     import_id: str
@@ -84,6 +99,7 @@ class ImportReport:
     search_indexed: int = 0
     corrections: Mapping[str, int] = field(default_factory=dict)
     extra: Mapping[str, Any] = field(default_factory=dict)
+    timings: Mapping[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         """Return a JSON-ready dict with sorted, stable content."""
@@ -110,6 +126,13 @@ class ImportReport:
             "search_indexed": self.search_indexed,
             "corrections": dict(sorted(self.corrections.items())),
             "summary": self.summary(),
+        }
+
+    def to_stored(self) -> dict[str, Any]:
+        """``to_dict`` plus the stage timings: what the ledger keeps and the pages show."""
+        return {
+            **self.to_dict(),
+            "timings": {k: self.timings[k] for k in TIMING_STAGES if k in self.timings},
         }
 
     def summary(self) -> dict[str, Any]:

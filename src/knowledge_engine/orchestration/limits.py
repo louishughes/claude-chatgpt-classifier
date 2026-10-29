@@ -38,8 +38,21 @@ CHARS_PER_TOKEN = 4
 
 
 def estimated_tokens(characters: int) -> int:
-    """A cautious token estimate for a request of ``characters`` characters."""
+    """A cautious token estimate for a request of ``characters`` characters.
+
+    The one rule (characters / 4, rounded up) behind ``estimate_tokens``;
+    this form takes a length the caller already has, as the size check does.
+    """
     return math.ceil(characters / CHARS_PER_TOKEN)
+
+
+def estimate_tokens(text: str) -> int:
+    """The token estimate for a text (OPS-010): characters / 4, rounded up.
+
+    An estimate for planning, not a billing figure: real tokenisers differ
+    by model and language. The run budget's size check uses the same rule.
+    """
+    return estimated_tokens(len(text))
 
 
 @dataclass
