@@ -8,6 +8,8 @@ Owner goal (2026-10-28 22:40 UTC): work up through all 1,158 chats in passes of 
 |---|---|---|---|---|---|---|
 | Gold | 40 | 85 segments (review: 14 of 18 settled) | 233 records | 40 | 40, rubric 32/40 (size only) | 15 (four scorings, see NOTE-011_REAL.md) |
 | Step 2 | 50 | 65 segments, 50 chats (review: 24 settled) | 158 records | 48 + 2 oversize (now handled) | 50, rubric 46/50 (size only); 3 unclassified | 10 |
+| Pass 1 | 100 | 136 segments (review: 37 of 39 settled) | 340 records | 97 + 2 oversize + 1 empty | 100, rubric 94/100 (size only); 10 unclassified | 10 |
+| Pass 2 | 100 | 152 segments (review in progress) | 439 records | 97 + 2 oversize + 1 no text | rendering | pending |
 
 ## Step 2 score (10 chats, scorer `claude-session-note-scorer-g`, references by a separate session)
 
@@ -31,3 +33,23 @@ Owner goal (2026-10-28 22:40 UTC): work up through all 1,158 chats in passes of 
    - An oversize request stopped the whole run (now review_required, and the run continues).
    - Pending requests whose batch files were gone blocked a stage (requests now remember their run; migration 0031).
 4. **Open:** an empty chat still gets a digest request that can't be answered. Taxonomy gaps found by reviewers (food and cooking, home and garden) go to the NOTE-014 refresh loop.
+
+## Pass 1 score (10 chats, scorer `claude-session-note-scorer-h`, separate reference session)
+
+| Measure | Result |
+|---|---|
+| Summary | 18/20 |
+| Category exact / top only / miss / unclassified | 6 / 2 / 2 / 0 (both misses are on chats the reference calls contested) |
+| Status matches | **3/10** |
+| Decisions found | 13 of 21, 0 fabricated |
+| Open questions found | **2 of 8** (the notes list 17; 15 are wrong) |
+| Key points | 28/45 |
+| Unsupported claims | 14 (10 in one long multi-part chat) |
+| Noise lines | 9 |
+| Readability | 18/20 |
+
+**Compared with step 2,** status and open questions got worse. In 7 of 10 notes the status is wrong in both directions: chats left open marked "settled", and finished chats marked "open". One long multi-part chat accounts for most of the invented open questions and unsupported claims, because its parts ask about things later parts answer. These are the same two tickets already raised (reconcile open questions across parts; take status from the end of the whole chat, not from each part). The build thread should check its NOTE-028 status rule against these results before more passes are rendered.
+
+Other findings:
+- The Decisions section is empty in 9 of 10 notes. The user's choices are filed under requirements and preferences, and a few things the user asked for are filed as assistant suggestions.
+- Keyword lists still pick up names from the pasted custom-instruction profile.
