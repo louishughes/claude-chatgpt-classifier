@@ -4234,6 +4234,8 @@ def build_parser() -> argparse.ArgumentParser:
     Returns:
         The configured parser (it raises instead of exiting on errors).
     """
+    from knowledge_engine.taxonomy.domain_gaps import MIN_SEGMENTS as GAP_MIN_SEGMENTS
+
     parser = _Parser(
         prog="ke", description="Knowledge Engine: local, provenance-first chat archive."
     )
@@ -4756,7 +4758,7 @@ def build_parser() -> argparse.ArgumentParser:
     tax_refresh.add_argument(
         "--min-segments",
         type=int,
-        default=3,
+        default=GAP_MIN_SEGMENTS,
         help="segments with no domain that must share a subject before a new domain is proposed",
     )
     tax_refresh.set_defaults(handler=_taxonomy_refresh)

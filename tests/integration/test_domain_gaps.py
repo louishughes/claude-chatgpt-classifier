@@ -10,7 +10,7 @@ the same suggestion back.
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -50,7 +50,10 @@ CHATS = {
 }
 
 
-def _chat(cid: str, text: str, day: int) -> dict[str, Any]:
+Text = str | tuple[str, str]  # a subject for the template, or (user, assistant)
+
+
+def _chat(cid: str, text: Text, day: int) -> dict[str, Any]:
     def node(n: str, parent: str, role: str, body: str, t: float) -> dict[str, Any]:
         return {
             "id": f"{cid}-{n}",
@@ -66,8 +69,13 @@ def _chat(cid: str, text: str, day: int) -> dict[str, Any]:
         }
 
     start = T0 + day * 86400
-    user = node("u", "root", "user", f"Please help with {text}. " * 5, start)
-    reply = node("a", f"{cid}-u", "assistant", f"Here is advice about {text}.", start + 60)
+    asked, answer = (
+        text
+        if isinstance(text, tuple)
+        else (f"Please help with {text}. " * 5, f"Here is advice about {text}.")
+    )
+    user = node("u", "root", "user", asked, start)
+    reply = node("a", f"{cid}-u", "assistant", answer, start + 60)
     user["children"] = [reply["id"]]
     mapping = {
         "root": {"id": "root", "parent": None, "children": [user["id"]], "message": None},
@@ -103,7 +111,7 @@ class World:
         return segment
 
 
-def _build(tmp_path: Path, chats: dict[str, str]) -> World:
+def _build(tmp_path: Path, chats: Mapping[str, Text]) -> World:
     settings = Settings(workspace_root=tmp_path / "ws")
     _import(tmp_path / "export", settings, chats)
     session = Session(create_sqlite_engine(database_path(settings)))
@@ -117,7 +125,7 @@ def _build(tmp_path: Path, chats: dict[str, str]) -> World:
     return world
 
 
-def _import(root: Path, settings: Settings, chats: dict[str, str]) -> None:
+def _import(root: Path, settings: Settings, chats: Mapping[str, Text]) -> None:
     root.mkdir(parents=True)
     body = [_chat(cid, text, day) for day, (cid, text) in enumerate(chats.items())]
     (root / "conversations.json").write_text(json.dumps(body), encoding="utf-8")
@@ -477,3 +485,154 @@ def test_a_rerun_after_more_chats_join_or_a_new_version_adds_nothing(world: Worl
     save(session, SegmentClassifier(tax2).classify(world.items()))
     session.commit()
     assert propose_domains(session, tax2, world.items()).proposed == []
+
+
+# Realistic chats: several sentences each, the user's own wording, and the
+# stock lines ChatGPT and its users add to any subject.
+CLOSER = " Let me know if you'd like a printable checklist for this."
+SIGN_OFF = (
+    " Honestly I really don't know what I'm doing here, so any tips would be great."
+    " Cheers in advance!"
+)
+REAL: dict[str, tuple[str, str]] = {
+    "gard1": (
+        "My tomato plants have yellow leaves at the bottom. I water them every day in the garden "
+        "and they get lots of sun. I think it might be the soil.",
+        "Yellow lower leaves on tomato plants often mean overwatering or a lack of nitrogen. Feed "
+        "the soil and water the plants less often.",
+    ),
+    "gard2": (
+        "When should I prune roses? I have a climbing rose on the garden fence that has got really"
+        " out of hand. I don't want to kill it.",
+        "Prune climbing roses in late winter. Cut out dead stems and tie the new growth to the "
+        "fence horizontally for more flowers.",
+    ),
+    "gard3": (
+        "Slugs are eating all my lettuce seedlings in the vegetable patch. Is there a good way to "
+        "stop them without poisoning the birds in the garden?",
+        "Try copper tape, beer traps or a night-time hunt with a torch. Raised beds and gritty "
+        "soil around the seedlings also help.",
+    ),
+    "gard4": (
+        "What can I plant in a shady corner of the garden? The soil is quite heavy clay and it "
+        "stays damp. I really want some colour there.",
+        "Ferns, hostas and hellebores like shade and damp clay soil. Add compost when you plant to"
+        " improve the drainage.",
+    ),
+    "cook1": (
+        "I'm trying to make a lasagne for my family this weekend and I really don't know how long "
+        "to bake it. Should I cover it with foil?",
+        "Bake the lasagne covered with foil for about 25 minutes, then uncover it so the cheese "
+        "browns. Let it rest before slicing.",
+    ),
+    "cook2": (
+        "How do I stop rice going sticky? Every time I cook rice it turns into a mush in the pan. "
+        "Any good tips?",
+        "Rinse the rice until the water runs clear, use the right ratio of water, and let it steam"
+        " off the heat with the lid on.",
+    ),
+    "trav1": (
+        "I'm planning a trip to Lisbon in April. Is it worth getting a travel card for the trams "
+        "and metro, and which area is best to stay in for a first visit?",
+        "A rechargeable travel card covers trams and metro. For a first trip, stay in Baixa or "
+        "Chiado so you can walk to most sights.",
+    ),
+    "trav2": (
+        "We have a long layover in Singapore airport, about nine hours. Is it worth leaving the "
+        "airport, and do I need a visa for a short trip into the city?",
+        "Many passports get a visa-free entry. Nine hours is enough for a quick trip to Marina "
+        "Bay, but leave time for security on the way back to the airport.",
+    ),
+    "trav3": (
+        "What should I pack for a week of hiking in Scotland in October? I'm flying with only hand"
+        " luggage and the weather looks unpredictable for the trip.",
+        "Pack waterproof layers, a warm fleece and broken-in boots. For hand luggage only, wear "
+        "the boots on the flight and pack light layers.",
+    ),
+    "money1": (
+        "I have about five thousand pounds in savings. Should I pay off my credit card first or "
+        "put money into an ISA? The card has twenty percent interest.",
+        "Pay off the credit card first: twenty percent interest costs more than an ISA will earn. "
+        "Then start saving into the ISA.",
+    ),
+    "money2": (
+        "How do I make a monthly budget that actually works? I always run out of money before "
+        "payday even though my salary should be enough.",
+        "List your fixed bills, set a weekly spending limit, and move savings out on payday.",
+    ),
+    "money3": (
+        "Is it better to overpay my mortgage or invest the extra money in an index fund? My "
+        "mortgage rate is four percent and I have a pension already.",
+        "With a four percent mortgage rate an index fund may earn more over time, but overpaying "
+        "is a guaranteed return.",
+    ),
+    "code1": (
+        "My python script crashes when it reads a large CSV file. How do I read it in chunks?",
+        "Use pandas read_csv with chunksize, or the csv module to stream rows.",
+    ),
+    "code2": (
+        "How do I write a python unit test for a function that calls an API?",
+        "Use unittest.mock to patch the API call in python, and return a fake response.",
+    ),
+}
+
+
+def _members(world: World) -> dict[str, list[str]]:
+    natives = {cid: native for native, cid in world.chats().items()}
+    segment_chat = {s.segment_id: natives[c.conversation_id] for c, s in world.items()}
+    found = {}
+    for row in proposals(world.session, OPEN):
+        evidence = json.loads(row.evidence_json)
+        label = json.loads(row.payload_json)["label"]
+        found[label] = sorted(segment_chat[m] for m in evidence["members"])
+    return found
+
+
+def test_realistic_chats_group_by_subject_and_nothing_else(tmp_path: Path) -> None:
+    world = _build(tmp_path, REAL)
+    propose_domains(world.session, world.tax1, world.items())
+    groups = _members(world)
+    assert groups["Garden"] == ["gard1", "gard2", "gard3", "gard4"]
+    assert groups["Money"] == ["money1", "money2", "money3"]
+    # No group mixes subjects.
+    for members in groups.values():
+        assert len({m.rstrip("0123456789") for m in members}) == 1
+    world.session.close()
+
+
+def test_stock_closers_and_sign_offs_do_not_merge_subjects(tmp_path: Path) -> None:
+    chats: dict[str, Text] = {
+        native: (asked + SIGN_OFF, answer + CLOSER)
+        for native, (asked, answer) in REAL.items()
+        if native[:4] in ("cook", "gard")
+    }
+    chats |= {f"c-code-{k}": f"python script number {k}" for k in range(1, 9)}
+    world = _build(tmp_path, chats)
+    report = propose_domains(world.session, world.tax1, world.items())
+    groups = _members(world)
+    assert "Checklist" not in groups and "Advance" not in groups and "Cheers" not in groups
+    for members in groups.values():
+        assert len({m.rstrip("0123456789") for m in members}) == 1
+    assert groups.get("Garden") == ["gard1", "gard2", "gard3", "gard4"]
+    assert report.uncovered == 6
+    world.session.close()
+
+
+def test_linking_two_thousand_segments_is_quick() -> None:
+    import random
+    import time
+
+    from knowledge_engine.taxonomy.domain_gaps import _components
+
+    rng = random.Random(2)
+    words = [f"w{k}x" for k in range(400)]
+    vectors = {i: {w: 1.0 for w in rng.sample(words[(i % 4) * 100 : (i % 4) * 100 + 100], 15)}
+               for i in range(2000)}  # fmt: skip
+    users = {i: set(v) for i, v in vectors.items()}
+    started = time.perf_counter()
+    groups = _components(vectors, users)
+    assert time.perf_counter() - started < 2.0
+    # Four subjects of 500; a few random signatures overlap too little to link.
+    big = [g for g in groups if len(g) > 1]
+    assert len(big) == 4 and sum(map(len, big)) > 1900
+    assert all(len({i % 4 for i in g}) == 1 for g in big)
