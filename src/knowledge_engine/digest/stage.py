@@ -105,7 +105,7 @@ a list empty rather than pad it. If the input is one part of a longer chat \
 the chat; never write "this part" or "this section"."""
 
 
-DigestState = Literal["done", "pending", "review_required"]
+DigestState = Literal["done", "pending", "review_required", "no_content"]
 
 
 @dataclass(frozen=True)
@@ -116,7 +116,8 @@ class DigestOutcome:
         conversation_id: The ``conv_`` ID.
         state: ``done``; ``pending`` (an answer is still awaited); or
             ``review_required`` (an answer failed twice, or no summary
-            sentence survived the quote check).
+            sentence survived the quote check); or ``no_content`` (the chat
+            has no user or assistant text, so nothing was asked; NOTE-031).
         digest: The checked digest when every part has answered.
         request_ids: The stage keys asked, one per part.
     """
@@ -143,6 +144,16 @@ def chat_messages(conversation: StoredConversation) -> list[ExtractionMessage]:
     return found
 
 
+def has_quotable_text(conversation: StoredConversation) -> bool:
+    """Whether the active path has any user or assistant text to cite (NOTE-031).
+
+    A digest must cite at least one quote, so a chat with only empty or
+    system messages has no valid answer: asking would only wait until the
+    request timed out.
+    """
+    return any(m.role in (Role.USER, Role.ASSISTANT) for m in chat_messages(conversation))
+
+
 def branch_summary(conversation: StoredConversation) -> str:
     """One line per fork: where it is, its kind, and how many other versions."""
     lines = []
@@ -157,7 +168,9 @@ def branch_summary(conversation: StoredConversation) -> str:
 def digest_requests(
     conversation: StoredConversation, max_characters: int = SegmenterSettings().max_characters
 ) -> list[ModelRequest]:
-    """The requests for one chat: one, or one per part of a long chat."""
+    """The requests for one chat: one, or one per part of a long chat; none with no text."""
+    if not has_quotable_text(conversation):
+        return []
     messages = chat_messages(conversation)
     branches = branch_summary(conversation)
     parts = split_parts(exchanges_of(messages), max_characters)
@@ -236,6 +249,8 @@ class DigestStage:
         """
         asked = [(chat, self.requests(chat)) for chat in conversations]
         everything = [r for _, requests in asked for r in requests]
+        if not everything:  # only empty chats: nothing to send, so no egress check either
+            return [self._outcome(chat, (), {}, set()) for chat, _ in asked]
         first = self.runner.submit(everything)
         outputs = dict(first.outputs)
         failed = set(first.review_required)
@@ -254,6 +269,8 @@ class DigestStage:
     ) -> DigestOutcome:
         ids = tuple(r.request_id for r in requests)
         cid = conversation.conversation_id
+        if not ids:
+            return DigestOutcome(cid, "no_content", None, ids)
         if failed & set(ids):
             return DigestOutcome(cid, "review_required", None, ids)
         if any(i not in outputs for i in ids):
@@ -280,7 +297,10 @@ def stored_digest(
     the quote check) gets None, so the note says the digest isn't written.
     """
     answers = []
-    for request in digest_requests(conversation, max_characters):
+    requests = digest_requests(conversation, max_characters)
+    if not requests:
+        return None
+    for request in requests:
         row = session.get(ModelOutputRow, request.request_id)
         if row is None:
             return None

@@ -169,6 +169,7 @@ Live ticket status for the build. The original ticket list is `docs/TICKETS.csv`
 | NOTE-028 Digest status follows its own open questions (#347) | VERIFIED (synthetic; the PC re-score is next) | sessions/2026-10-28-NOTE-028-029 |
 | NOTE-029 Each summary sentence said once (#348) | VERIFIED (synthetic; identical lines join under NOTE-030) | sessions/2026-10-28-NOTE-028-029 |
 | NOTE-030 Identical summary lines join into one (#354) | VERIFIED (synthetic; owner-approved test change) | sessions/2026-10-28-NOTE-030 |
+| NOTE-031 Chats with no text are never sent for a digest (#370) | VERIFIED (synthetic; zero requests, note says "Nothing to summarise") | sessions/2026-10-29-NOTE-031 |
 | NOTE-022 Rule records hidden where a model extraction ran (#321) | VERIFIED (fixture chat; the PC re-score is next) | SESSION_LOG 2026-10-28 NOTE-022 |
 | EVAL-014 Per-chat answer key into a golden set (#317) | VERIFIED (synthetic key; the PC run against v2 is pending) | SESSION_LOG 2026-10-28 EVAL-014 |
 | NOTE-007 Keyword and topic candidates (#279) | VERIFIED (unit tests on synthetic chats; shown in the note later, with NOTE-008) | SESSION_LOG 2026-10-28 NOTE-007 |

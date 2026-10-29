@@ -59,6 +59,7 @@ from sqlalchemy.orm import Session
 
 from knowledge_engine.classification.store import effective_labels
 from knowledge_engine.digest.contract import ConversationDigest, DigestItem
+from knowledge_engine.digest.stage import has_quotable_text
 from knowledge_engine.documents.categories import (
     Suggestion,
     category_shares,
@@ -122,6 +123,8 @@ BUDGET_MAX = 40_000
 # enough to say what the chat is about without crowding the page.
 SHOWN_SHOULD = 8
 WAITING = "Not written yet: the digest step hasn't run for this chat."
+# NOTE-031: a chat with no user or assistant text is never sent for a digest.
+NO_CONTENT = "Nothing to summarise: the chat has no text."
 
 
 def body_budget(messages: int) -> int:
@@ -735,6 +738,8 @@ def rich_conversation_note(
     image_blocks, refs = _images(chat)
     urls, videos, accounts = _links(session, chat)
     messages = len(chat.graph.active_messages)
+    empty = digest is None and not has_quotable_text(chat)
+    waiting = NO_CONTENT if empty else WAITING
 
     category = labels.category or "unclassified"
     where = category if labels.subcategory is None else f"{category} › {labels.subcategory}"
@@ -763,7 +768,8 @@ def rich_conversation_note(
 
     card = ["| | |", "|---|---|"]
     if digest is None:
-        card += ["| **Purpose** | not written yet |", "| **Outcome** | not written yet |"]
+        missing = "nothing to summarise" if empty else "not written yet"
+        card += [f"| **Purpose** | {missing} |", f"| **Outcome** | {missing} |"]
     else:
         # A digest that found no purpose or outcome leaves the row out: an
         # empty "not stated" row reads as a claim about the chat (NOTE-024).
@@ -786,7 +792,7 @@ def rich_conversation_note(
         f"branch(es), {len(refs)} image(s), {len(urls)} link(s) |",
     ]
 
-    summary = tuple(_digest_line(item, citer) for item in digest.summary) if digest else (WAITING,)
+    summary = tuple(_digest_line(item, citer) for item in digest.summary) if digest else (waiting,)
     blocks: list[Block] = [
         Callout(
             "summary",
@@ -866,7 +872,7 @@ def rich_conversation_note(
     )
     for title, name in generated:
         if digest is None:
-            blocks += _section(title, provenance, [], WAITING)
+            blocks += _section(title, provenance, [], waiting)
         else:
             items_ = getattr(digest, name)
             blocks += _section(
@@ -901,7 +907,7 @@ def rich_conversation_note(
         "Keywords and topics",
         "Candidates; only approved terms become tags",
         [BulletList(tuple(topics), trusted=True)] if topics else [],
-        WAITING if digest is None and keywords is None else "None suggested.",
+        waiting if digest is None and keywords is None else "None suggested.",
     )
     blocks += _section(
         "Related chats",
@@ -921,7 +927,9 @@ def rich_conversation_note(
         Paragraph(
             f"Full transcript: [[{stem}]]. Built from stored records by {TEMPLATE_VERSION}; "
             + (
-                "no summary has been written or scored yet."
+                "the chat has no text, so no summary was asked for."
+                if empty
+                else "no summary has been written or scored yet."
                 if digest is None
                 else f"summary and generated sections from a {digest.schema_version} digest, "
                 "not yet scored."
@@ -956,7 +964,11 @@ def rich_conversation_note(
         "related": related_notes,
         "transcript": f"[[{stem}]]",
         "taxonomy_version": taxonomy.version if taxonomy else "none",
-        "digest": "not written" if digest is None else "generated, not scored",
+        "digest": "no_content"
+        if empty
+        else "not written"
+        if digest is None
+        else "generated, not scored",
         "status": digest.status.value if digest and digest.status else None,
         "generator": TEMPLATE_VERSION,
     }
