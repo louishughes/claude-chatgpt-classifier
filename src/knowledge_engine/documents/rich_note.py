@@ -130,7 +130,7 @@ BUDGET_MAX = 40_000
 SHOWN_SHOULD = 8
 WAITING = "Not written yet: the digest step hasn't run for this chat."
 # NOTE-031: a chat with no user or assistant text is never sent for a digest.
-NO_CONTENT = "Nothing to summarise: the chat has no text."
+NO_CONTENT = "Nothing to summarise: the chat has no user or assistant text on its selected path."
 
 
 def body_budget(messages: int) -> int:
@@ -971,7 +971,7 @@ def rich_conversation_note(
         Paragraph(
             f"Full transcript: [[{stem}]]. Built from stored records by {TEMPLATE_VERSION}; "
             + (
-                "the chat has no text, so no summary was asked for."
+                "the selected path has no user or assistant text, so no summary was asked for."
                 if empty
                 else "no summary has been written or scored yet."
                 if digest is None

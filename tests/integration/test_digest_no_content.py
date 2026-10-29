@@ -5,8 +5,9 @@ Every chat here is synthetic and written by the test.
 
 from __future__ import annotations
 
+import io
 import json
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 
@@ -26,16 +27,19 @@ from knowledge_engine.providers.ledger import ModelRequestRow, ModelStageRunner
 from knowledge_engine.rendering.markdown import render_note
 from knowledge_engine.rendering.transcript import StoredConversation, load_conversation
 from knowledge_engine.settings import EgressPolicy, Settings, load_settings
+from knowledge_engine.ui.app import make_app
+from knowledge_engine.ui.notes import note_view, notes_index
 
 
-def _node(cid: str, n: int, role: str, text: str, parent: str) -> dict[str, Any]:
+def _node(cid: str, n: int, role: str, text: str | dict[str, Any], parent: str) -> dict[str, Any]:
+    content = text if isinstance(text, dict) else {"content_type": "text", "parts": [text]}
     return {
         "id": f"{cid}-{n}",
         "message": {
             "id": f"{cid}-{n}",
             "author": {"role": role, "name": None, "metadata": {}},
             "create_time": 1704067200.0 + n,
-            "content": {"content_type": "text", "parts": [text]},
+            "content": content,
             "status": "finished_successfully",
             "metadata": {},
         },
@@ -44,7 +48,7 @@ def _node(cid: str, n: int, role: str, text: str, parent: str) -> dict[str, Any]
     }
 
 
-def _chat(cid: str, title: str, messages: list[tuple[str, str]]) -> dict[str, Any]:
+def _chat(cid: str, title: str, messages: list[tuple[str, str | dict[str, Any]]]) -> dict[str, Any]:
     root = f"{cid}-root"
     mapping: dict[str, Any] = {root: {"id": root, "message": None, "parent": None, "children": []}}
     parent = root
@@ -69,6 +73,32 @@ EMPTY = _chat(
     "Synthetic empty chat",
     [("system", ""), ("system", "Synthetic system setup."), ("user", ""), ("assistant", "  ")],
 )
+IMAGE_ONLY = _chat(
+    "c0310000-0000-4000-8000-000000000003",
+    "Synthetic image-only chat",
+    [
+        (
+            "user",
+            {
+                "content_type": "multimodal_text",
+                "parts": [
+                    {
+                        "content_type": "image_asset_pointer",
+                        "asset_pointer": "file-service://file-SYN0310",
+                        "size_bytes": 0,
+                        "width": 4,
+                        "height": 4,
+                    }
+                ],
+            },
+        )
+    ],
+)
+TOOL_ONLY = _chat(
+    "c0310000-0000-4000-8000-000000000004",
+    "Synthetic tool-only chat",
+    [("system", ""), ("tool", "Synthetic tool output: 42 rows.")],
+)
 SPOKEN = _chat(
     "c0310000-0000-4000-8000-000000000002",
     "Synthetic one-line chat",
@@ -80,7 +110,9 @@ SPOKEN = _chat(
 def chats(tmp_path: Path) -> Iterator[tuple[Session, dict[str, StoredConversation]]]:
     export = tmp_path / "export"
     export.mkdir()
-    (export / "conversations.json").write_text(json.dumps([EMPTY, SPOKEN]), encoding="utf-8")
+    (export / "conversations.json").write_text(
+        json.dumps([EMPTY, IMAGE_ONLY, TOOL_ONLY, SPOKEN]), encoding="utf-8"
+    )
     settings = Settings(workspace_root=tmp_path / "ws")
     import_source(export, "fixture", settings=settings)
     engine = create_sqlite_engine(database_path(settings))
@@ -123,6 +155,59 @@ def test_a_chat_with_no_text_is_no_content_with_zero_requests(
     assert off.run(found["Synthetic empty chat"]).state == "no_content"
     assert _rows(session) == 0
     assert stored_digest(session, found["Synthetic empty chat"]) is None
+
+
+@pytest.mark.parametrize("title", ["Synthetic image-only chat", "Synthetic tool-only chat"])
+def test_image_only_and_tool_only_chats_are_no_content(
+    chats: tuple[Session, dict[str, StoredConversation]], title: str
+) -> None:
+    session, found = chats
+    provider = FakeProvider(_good)
+    stage = DigestStage(ModelStageRunner(session, provider, EgressPolicy(text_llm=True)))
+
+    assert stage.run(found[title]).state == "no_content"
+    assert provider.submitted == [] and _rows(session) == 0
+    text = render_note(rich_conversation_note(session, found[title].conversation_id).model)
+    assert NO_CONTENT in text
+
+
+def _get(settings: Settings, path: str) -> tuple[str, str]:
+    captured: dict[str, str] = {}
+
+    def start_response(status: str, headers: list[tuple[str, str]]) -> None:
+        captured["status"] = status
+
+    environ = {
+        "REQUEST_METHOD": "GET",
+        "PATH_INFO": path,
+        "QUERY_STRING": "",
+        "HTTP_HOST": "127.0.0.1:8765",
+        "CONTENT_LENGTH": "0",
+        "wsgi.input": io.BytesIO(b""),
+    }
+    body: Iterable[bytes] = make_app(settings)(environ, start_response)
+    return captured["status"], b"".join(body).decode("utf-8")
+
+
+def test_the_pages_say_there_is_nothing_to_summarise(
+    chats: tuple[Session, dict[str, StoredConversation]], tmp_path: Path
+) -> None:
+    session, found = chats
+    empty = found["Synthetic empty chat"].conversation_id
+    spoken = found["Synthetic one-line chat"].conversation_id
+
+    assert note_view(session, empty).digest == "not needed: nothing to summarise"
+    assert note_view(session, spoken).digest == "not written yet"
+    rows = {
+        row["conversation_id"]: row
+        for group in notes_index(session, offset=0, limit=10)["categories"]
+        for row in group["chats"]
+    }
+    assert rows[empty]["no_content"] is True and rows[spoken]["no_content"] is False
+    status, page = _get(Settings(workspace_root=tmp_path / "ws"), "/notes")
+    assert status.startswith("200") and "nothing to summarise" in page
+    _, chat_page = _get(Settings(workspace_root=tmp_path / "ws"), f"/chats/{empty}")
+    assert "digest not needed: nothing to summarise" in chat_page
 
 
 def test_a_chat_with_one_user_sentence_is_still_asked(
@@ -182,6 +267,7 @@ def test_digest_run_counts_empty_chats_apart_and_writes_their_note(
         "notes": 1,
         "chats": 1,
     }
+    assert "1 with no text to summarise" in payload["message"]
     assert not list((tmp_path / "private" / "model-batches").rglob("*.request.jsonl"))
     [note] = (vault / "Knowledge").glob("*.md")
     assert NO_CONTENT in note.read_text("utf-8")

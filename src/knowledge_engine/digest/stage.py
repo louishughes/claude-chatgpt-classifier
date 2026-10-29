@@ -116,8 +116,10 @@ class DigestOutcome:
         conversation_id: The ``conv_`` ID.
         state: ``done``; ``pending`` (an answer is still awaited); or
             ``review_required`` (an answer failed twice, or no summary
-            sentence survived the quote check); or ``no_content`` (the chat
-            has no user or assistant text, so nothing was asked; NOTE-031).
+            sentence survived the quote check); or ``no_content`` (the
+            selected path has no user or assistant text, so nothing was
+            asked; NOTE-031). ``no_content`` needs no egress, so it is
+            returned even with ``text_llm`` off.
         digest: The checked digest when every part has answered.
         request_ids: The stage keys asked, one per part.
     """
@@ -236,7 +238,8 @@ class DigestStage:
 
         Raises:
             EgressDisabledError: If the ``text_llm`` switch is off; nothing
-                has been sent or written.
+                has been sent or written. A chat with no text to quote is
+                ``no_content`` instead, since nothing would be sent.
         """
         [outcome] = self.run_all([conversation])
         return outcome

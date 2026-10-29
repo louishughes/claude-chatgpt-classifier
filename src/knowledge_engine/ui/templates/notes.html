@@ -17,7 +17,7 @@
   <tr>
     <td><a href="/chats/{{ row.conversation_id }}">{{ row.title }}</a></td>
     <td>{% if row.suggested %}<span class="muted">suggested: {{ row.suggested }} (waiting for review)</span>{% else %}{{ row.subcategory or "" }}{% endif %}</td>
-    <td>{% if row.digest %}{{ row.status or "not stated" }}{% else %}<span class="muted">no digest yet</span>{% endif %}</td>
+    <td>{% if row.digest %}{{ row.status or "not stated" }}{% elif row.no_content %}<span class="muted">nothing to summarise</span>{% else %}<span class="muted">no digest yet</span>{% endif %}</td>
     <td class="num">{% if row.open_questions is none %}<span class="muted">–</span>{% else %}{{ row.open_questions }}{% endif %}</td>
   </tr>
   {% endfor %}
