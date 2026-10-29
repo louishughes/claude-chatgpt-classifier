@@ -1,7 +1,7 @@
 """Typed links between knowledge records, each citing its sources (REC-002).
 
 REC-001 asks "do these two records say the same thing?". This asks "how are
-these two different records connected?". Only four kinds of link exist,
+these two different records connected?". Only five kinds of link exist,
 and each only between the record types it makes sense for:
 
 =================  ==========================================  =============
@@ -15,6 +15,8 @@ Predicate          From -> to                                  Direction
                    kind, person, direction and projects        -> the claim
 ``same_project``   a record -> a record in another chat that   later ->
                    shares a project *and* a topic              earlier
+``depends_on``     action -> action, same chat (EXT-010)        waits for ->
+                                                               prerequisite
 =================  ==========================================  =============
 
 ``allowed`` enforces that table: anything else is refused before it is
@@ -35,6 +37,9 @@ How each is detected, deterministically, from stored records only:
 * **same_project**: records in different chats that share an approved
   project ID and a taxonomy term. Sharing a project alone is not enough:
   every record of a big project would link to every other.
+* **depends_on**: one user sentence in the chat names two of its actions
+  with "after", "once", "before" or "first ... then"
+  (``extraction/action_status.py``); the sentence is the evidence.
 
 Every link stores the source message revisions of both records (its
 citation) and is a ``candidate`` until a named reviewer accepts or rejects
@@ -42,7 +47,7 @@ it. Reviews are append-only; a re-run never changes a reviewed link. The
 records themselves are never edited.
 
 Talking points:
-    - "Only four typed links, each only between record kinds where it makes
+    - "Only five typed links, each only between record kinds where it makes
       sense, and the code refuses anything else."
     - "Every link points at the messages behind both records, and it's a
       candidate until a reviewer says yes."
@@ -80,6 +85,7 @@ class Predicate(StrEnum):
     REFERENCES = "references"
     ELABORATES = "elaborates"
     SAME_PROJECT = "same_project"
+    DEPENDS_ON = "depends_on"
 
 
 class LinkState(StrEnum):
@@ -90,6 +96,7 @@ class LinkState(StrEnum):
     REJECTED = "rejected"
 
 
+PREDICATES = ",".join(f"'{p.value}'" for p in Predicate)
 REQUESTS = frozenset(
     {RecordType.ACTION, RecordType.DECISION, RecordType.PROPOSAL, RecordType.RECOMMENDATION}
 )
@@ -105,7 +112,7 @@ class RecordLinkRow(Base):
     __tablename__ = "record_links"
     __table_args__ = (
         CheckConstraint(
-            "predicate IN ('creates','references','elaborates','same_project')",
+            f"predicate IN ({PREDICATES})",
             name="predicate_valid",
         ),
         CheckConstraint("state IN ('candidate','accepted','rejected')", name="state_valid"),
@@ -180,19 +187,19 @@ class LinkCandidate:
         to_record: Where it points.
         evidence: IDs backing it (no text): both records' source revisions
             and what the detector matched on.
+        detector: Which detector proposed it (part of the link ID).
     """
 
     from_record: str
     predicate: Predicate
     to_record: str
     evidence: dict[str, object]
+    detector: str = DETECTOR_VERSION
 
     @property
     def link_id(self) -> str:
         """``krl_`` + hash of the ends, the predicate and the detector."""
-        key = "\x00".join(
-            (self.from_record, self.predicate.value, self.to_record, DETECTOR_VERSION)
-        )
+        key = "\x00".join((self.from_record, self.predicate.value, self.to_record, self.detector))
         return "krl_" + hashlib.sha256(key.encode()).hexdigest()[:32]
 
 
@@ -207,6 +214,8 @@ def allowed(predicate: Predicate, source: KnowledgeRecord, target: KnowledgeReco
             source.record_type is not RecordType.REFERENCE
             and target.record_type is RecordType.REFERENCE
         )
+    if predicate is Predicate.DEPENDS_ON:
+        return source.record_type is RecordType.ACTION and target.record_type is RecordType.ACTION
     if predicate is Predicate.ELABORATES:
         return (
             source.record_type is target.record_type
@@ -444,12 +453,62 @@ def store_link(session: Session, candidate: LinkCandidate) -> bool:
             from_record=candidate.from_record,
             predicate=candidate.predicate.value,
             to_record=candidate.to_record,
-            detector=DETECTOR_VERSION,
+            detector=candidate.detector,
             evidence_json=json.dumps(candidate.evidence, sort_keys=True),
         )
     )
     session.flush()
     return True
+
+
+def dependency_links(session: Session, items: Sequence[Placed]) -> list[LinkCandidate]:
+    """``depends_on`` proposals from each chat's own user sentences (EXT-010)."""
+    # Imported here: the transcript loader is heavy and this module is also
+    # loaded by a migration.
+    from knowledge_engine.digest.stage import chat_messages
+    from knowledge_engine.extraction.action_status import DEPENDENCY_VERSION, propose_dependencies
+    from knowledge_engine.rendering.transcript import load_conversation
+
+    by_chat: dict[str, list[Placed]] = defaultdict(list)
+    for item in items:
+        record = item.record
+        if (
+            item.conversation_id is not None
+            and item.revisions
+            and record.record_type is RecordType.ACTION
+            and record.trust is not Trust.REJECTED
+        ):
+            by_chat[item.conversation_id].append(item)
+    found = []
+    for chat_id in sorted(by_chat):
+        members = by_chat[chat_id]
+        if len(members) < 2:
+            continue
+        placed = {m.record.record_id: m for m in members}
+        messages = chat_messages(load_conversation(session, chat_id))
+        for proposal in propose_dependencies([m.record for m in members], messages):
+            later, first = placed[proposal.dependent], placed[proposal.prerequisite]
+            sentence = proposal.evidence
+            found.append(
+                LinkCandidate(
+                    later.record.record_id,
+                    Predicate.DEPENDS_ON,
+                    first.record.record_id,
+                    _evidence(
+                        later,
+                        first,
+                        cue=proposal.cue,
+                        sentence={
+                            "revision_id": sentence.revision_id,
+                            "start": sentence.start,
+                            "end": sentence.end,
+                            "quote_sha256": sentence.quote_sha256,
+                        },
+                    ),
+                    detector=DEPENDENCY_VERSION,
+                )
+            )
+    return found
 
 
 def propose_links(session: Session) -> LinkReport:
@@ -458,7 +517,8 @@ def propose_links(session: Session) -> LinkReport:
     records = [KnowledgeRecord.model_validate_json(row.record_json) for row in rows]
     added, known = [], []
     counts: dict[str, int] = defaultdict(int)
-    for candidate in find_links(place(session, records)):
+    placed = place(session, records)
+    for candidate in [*find_links(placed), *dependency_links(session, placed)]:
         if store_link(session, candidate):
             added.append(candidate.link_id)
             counts[candidate.predicate.value] += 1
