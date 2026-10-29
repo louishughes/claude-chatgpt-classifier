@@ -831,6 +831,8 @@ def rich_conversation_note(
     ]
 
     summary = tuple(_digest_line(item, citer) for item in digest.summary) if digest else (waiting,)
+    if digest and digest.ending_unsummarised:
+        summary += (f"How it ended: not summarised (see part {digest.ending_unsummarised}).",)
     blocks: list[Block] = [
         Callout(
             "summary",

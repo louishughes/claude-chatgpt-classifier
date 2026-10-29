@@ -175,6 +175,18 @@ class DigestFlag(BaseModel):
     reason: str
 
 
+class ResolvedQuestion(BaseModel):
+    """An open question a later user message answered (NOTE-032).
+
+    Kept, not deleted, so a reviewer can see why the note no longer lists it.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    question: DigestItem
+    resolved_by: EvidenceRef
+
+
 class ConversationDigest(BaseModel):
     """The checked digest of one chat.
 
@@ -200,6 +212,11 @@ class ConversationDigest(BaseModel):
     next_steps: tuple[DigestItem, ...]
     flags: tuple[DigestFlag, ...]
     schema_version: str = DIGEST_SCHEMA_VERSION
+    # NOTE-032: open questions a later user message answered, with that answer.
+    resolved_questions: tuple[ResolvedQuestion, ...] = ()
+    # NOTE-033: the part number of a long chat's last part when no summary
+    # sentence from it survived, so the note can say the ending isn't summarised.
+    ending_unsummarised: int | None = None
 
     @property
     def usable(self) -> bool:
