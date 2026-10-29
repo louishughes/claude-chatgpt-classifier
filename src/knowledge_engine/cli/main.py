@@ -3548,24 +3548,66 @@ def _related_review(settings: Settings, args: argparse.Namespace) -> CommandResu
     from sqlalchemy.orm import Session
 
     from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
-    from knowledge_engine.relationships.store import ReviewAction, review
+    from knowledge_engine.relationships.store import (
+        ConversationRelationshipRow,
+        RelationKind,
+        RelationshipError,
+        ReviewAction,
+        retype,
+        review,
+    )
 
     db = database_path(settings)
     if not db.exists():
         return CommandResult(
             "related review", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
         )
+    retyping = args.as_kind is not None or args.reverse
+    if retyping and args.action != "accept":
+        return CommandResult(
+            "related review",
+            ExitCode.USAGE,
+            message="--as and --reverse only go with accept",
+            error_code="usage",
+        )
     engine = create_sqlite_engine(db)
     try:
         with Session(engine) as session, session.begin():
             try:
-                entry = review(
-                    session,
-                    args.relationship,
-                    ReviewAction(args.action),
-                    reviewer=args.reviewer,
-                    note=args.note,
-                )
+                if retyping:
+                    old = session.get(ConversationRelationshipRow, args.relationship)
+                    kind = RelationKind(args.as_kind or (old.kind if old else "related_to"))
+                    new = retype(
+                        session,
+                        args.relationship,
+                        kind,
+                        reverse=args.reverse,
+                        reviewer=args.reviewer,
+                        note=args.note,
+                    )
+                    data = {
+                        "relationship_id": args.relationship,
+                        "to_state": "superseded",
+                        "replaced_by": new.relationship_id,
+                        "new": {
+                            "from": new.from_conversation_id,
+                            "kind": new.kind,
+                            "to": new.to_conversation_id,
+                        },
+                    }
+                else:
+                    entry = review(
+                        session,
+                        args.relationship,
+                        ReviewAction(args.action),
+                        reviewer=args.reviewer,
+                        note=args.note,
+                    )
+                    data = {
+                        "relationship_id": args.relationship,
+                        "from_state": entry.from_state,
+                        "to_state": entry.to_state,
+                    }
             except KeyError:
                 return CommandResult(
                     "related review",
@@ -3573,14 +3615,65 @@ def _related_review(settings: Settings, args: argparse.Namespace) -> CommandResu
                     message="no such relationship",
                     error_code="unknown_relationship",
                 )
-            data = {
-                "relationship_id": args.relationship,
-                "from_state": entry.from_state,
-                "to_state": entry.to_state,
-            }
+            except RelationshipError as error:
+                # Refused before anything was written, so leaving the block is safe.
+                return CommandResult(
+                    "related review", ExitCode.USAGE, message=str(error), error_code="refused"
+                )
     finally:
         engine.dispose()
     return CommandResult("related review", data=data, message="Review recorded")
+
+
+def _related_add(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Store a link a person states by hand, already accepted (REL-006); IDs only."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.relationships.store import RelationKind, RelationshipError, add_human
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            "related add", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            try:
+                row = add_human(
+                    session,
+                    from_conversation_id=args.from_conversation,
+                    kind=RelationKind(args.kind),
+                    to_conversation_id=args.to_conversation,
+                    reviewer=args.reviewer,
+                    note=args.note,
+                )
+            except KeyError:
+                return CommandResult(
+                    "related add",
+                    ExitCode.ERROR,
+                    message="no such conversation",
+                    error_code="unknown_conversation",
+                )
+            except RelationshipError as error:
+                return CommandResult(
+                    "related add", ExitCode.USAGE, message=str(error), error_code="refused"
+                )
+            data = {
+                "relationship_id": row.relationship_id,
+                "from": row.from_conversation_id,
+                "kind": row.kind,
+                "to": row.to_conversation_id,
+                "evidence_class": row.evidence_class,
+                "review_state": row.review_state,
+            }
+            session.commit()
+    finally:
+        engine.dispose()
+    return CommandResult(
+        "related add", data=data, message="Link recorded as accepted (read as: from <kind> to)"
+    )
 
 
 def _related_detect(settings: Settings, args: argparse.Namespace) -> CommandResult:
@@ -4802,7 +4895,27 @@ def build_parser() -> argparse.ArgumentParser:
     decide.add_argument("action", choices=["accept", "reject", "supersede"])
     decide.add_argument("--note", help="why (kept in the history)")
     decide.add_argument("--reviewer", default="owner", help="who decided (default: owner)")
+    decide.add_argument(
+        "--as",
+        dest="as_kind",
+        choices=["continues", "forked_from", "related_to"],
+        help="with accept: accept it as this kind instead (the old link is superseded)",
+    )
+    decide.add_argument(
+        "--reverse",
+        action="store_true",
+        help="with accept: the link points the other way (the old link is superseded)",
+    )
     decide.set_defaults(handler=_related_review)
+    add_link = related_commands.add_parser(
+        "add", help="state a link yourself, e.g. 'B continues A' (stored as accepted)"
+    )
+    add_link.add_argument("from_conversation", metavar="FROM", help="the conv_ ID it starts from")
+    add_link.add_argument("kind", choices=["continues", "forked_from", "related_to"])
+    add_link.add_argument("to_conversation", metavar="TO", help="the conv_ ID it points to")
+    add_link.add_argument("--reviewer", default="owner", help="who said so (default: owner)")
+    add_link.add_argument("--note", help="why (kept in the history)")
+    add_link.set_defaults(handler=_related_add)
     rerun = related_commands.add_parser(
         "detect", help="run the link detectors again (imports already do this)"
     )
