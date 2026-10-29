@@ -117,7 +117,7 @@ def term_node_keys(session: Session, term_id: str, snapshot: TaxonomySnapshot) -
     """
     known = {t.term_id for t in snapshot.terms} | set(snapshot.project_ids())
     if term_id not in known:
-        raise UnknownFilterTerm(f"that term or project ID is not approved in {snapshot.version}")
+        raise UnknownFilterTerm("that term or project ID is not approved in that vocabulary")
     found: set[str] = set()
     for conversation_id in session.scalars(
         select(ConversationRow.conversation_id).order_by(ConversationRow.conversation_id)
@@ -173,3 +173,29 @@ def build_filters(
             raise UnknownFilterTerm("no such published taxonomy version")
         keys = term_node_keys(session, term, registry.snapshot(version))
     return SearchFilters(since=start, until=end, role=role, node_keys=keys)
+
+
+def chats_by_label(session: Session, snapshot: TaxonomySnapshot) -> dict[str, frozenset[str]]:
+    """Approved term or project ID -> the chats with a segment carrying it (UI-009).
+
+    One pass over every segment, so a page can show each category with its
+    chat count without asking once per term. Labels in force, as above.
+    """
+    found: dict[str, set[str]] = {}
+    for conversation_id in session.scalars(
+        select(ConversationRow.conversation_id).order_by(ConversationRow.conversation_id)
+    ):
+        chat = load_conversation(session, conversation_id)
+        for segment in load_segments(session, chat):
+            for labels in effective_labels(session, segment.segment_id, snapshot).values():
+                for label in (labels.primary, *labels.secondary):
+                    if label is not None:
+                        found.setdefault(label, set()).add(conversation_id)
+    return {label: frozenset(chats) for label, chats in found.items()}
+
+
+def newest_snapshot(session: Session) -> TaxonomySnapshot | None:
+    """The newest published vocabulary, or None if nothing is published yet."""
+    registry = TaxonomyRegistry(session)
+    published = registry.versions()
+    return registry.snapshot(published[-1]) if published else None
