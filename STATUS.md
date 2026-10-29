@@ -184,6 +184,7 @@ Live ticket status for the build. The original ticket list is `docs/TICKETS.csv`
 | UI-008 Timeline page: what holds now above what was replaced (#362) | VERIFIED (UI tests on engine_switch; every message link followed) | sessions/2026-10-28-UI-008 |
 | UI-009 Chat and search filters by category and date in the browser (#363) | VERIFIED (UI tests on fixture chats) | sessions/2026-10-28-UI-009 |
 | REC-008 Review conflicts and record links from the command line (#379) | VERIFIED (CLI tests on extraction_rules fixture) | sessions/2026-10-29-0103-REC-008 |
+| REL-006 A person adds or retypes a conversation link (continues, forked_from, related_to) (#382) | VERIFIED (CLI and note tests on copied_prefix) | sessions/2026-10-29-0110-REL-006 |
 | IMP-009 List, accept or reject identity candidates (#380) | VERIFIED (CLI tests on a synthetic chat with no ID and the id_collision fixture) | sessions/2026-10-29-0130-IMP-009 |
 | SOC-004 Confirm or reject a social account, link a bare @handle (#381) | VERIFIED (CLI and note tests on a synthetic chat) | sessions/2026-10-29-0215-SOC-004 |
 

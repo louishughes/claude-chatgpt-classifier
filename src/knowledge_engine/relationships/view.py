@@ -6,6 +6,7 @@ web pages all agree:
 
 * **rejected links are hidden** (their history stays in
   ``relationship_reviews`` and ``ke related list --state rejected``);
+* a link a person **retyped** (REL-006) is replaced by the new one;
 * every other link keeps its **stored direction** (``from`` -> ``to``), so
   "B continues A" never turns into "A continues B";
 * each carries its **reasons** (``because``, REL-003) and the **message
@@ -45,6 +46,7 @@ class RelatedLink:
         review_state: Candidate, accepted or superseded.
         because: Plain reasons, when the detector gave any.
         revisions: Message revisions the evidence cites, either chat.
+        replaces: The link a person retyped into this one (REL-006), if any.
     """
 
     relationship_id: str
@@ -56,6 +58,7 @@ class RelatedLink:
     review_state: str
     because: tuple[str, ...] = ()
     revisions: tuple[str, ...] = ()
+    replaces: str | None = None
 
     def other(self, conversation_id: str) -> str:
         """The chat at the far end, seen from ``conversation_id``."""
@@ -105,6 +108,7 @@ def _link(row: ConversationRelationshipRow) -> RelatedLink:
         row.review_state,
         tuple(str(b) for b in because),
         tuple(dict.fromkeys(revision_ids_in(evidence))),
+        evidence.get("replaces") if isinstance(evidence, dict) else None,
     )
 
 
@@ -112,6 +116,7 @@ def related_links(session: Session, conversation_ids: Iterable[str]) -> list[Rel
     """Links touching any of the chats, either direction, except rejected ones."""
     wanted = sorted(set(conversation_ids))
     found: dict[str, RelatedLink] = {}
+    replaced: set[str] = set()
     for start in range(0, len(wanted), 500):
         chunk = wanted[start : start + 500]
         for row in session.scalars(
@@ -120,11 +125,19 @@ def related_links(session: Session, conversation_ids: Iterable[str]) -> list[Rel
                     ConversationRelationshipRow.from_conversation_id.in_(chunk),
                     ConversationRelationshipRow.to_conversation_id.in_(chunk),
                 ),
-                ConversationRelationshipRow.review_state != ReviewState.REJECTED.value,
             )
         ):
-            found[row.relationship_id] = _link(row)
-    return [found[key] for key in sorted(found)]
+            link = _link(row)
+            if link.replaces:
+                replaced.add(link.replaces)
+            if row.review_state != ReviewState.REJECTED.value:
+                found[row.relationship_id] = link
+    # A link a person retyped (REL-006) is shown once, as what they said: the
+    # old one stays in the history, not next to its replacement. Rejected
+    # replacements count too, so rejecting "B continues A" doesn't bring back
+    # the "B forked_from A" the person had already overruled. Both rows touch
+    # the same two chats, so the replacement is always in this query.
+    return [found[key] for key in sorted(found) if key not in replaced]
 
 
 def related_by_conversation(
