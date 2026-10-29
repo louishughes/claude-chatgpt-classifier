@@ -10,8 +10,25 @@
   <label for="q">Find by title</label>
   <input id="q" name="q" type="text" value="{{ q }}">
   <button type="submit">Search</button>
+  <fieldset class="filters">
+    <legend class="muted">Narrow the list</legend>
+    {% if categories %}
+    <label for="category">Category</label>
+    <select id="category" name="category">
+      <option value="">Any</option>
+      {% for c in categories %}<option value="{{ c.id }}"{% if c.id == category %} selected{% endif %}>{{ c.dimension }}: {{ c.label }} ({{ c.chats }})</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+    <label for="since">Started on or after</label>
+    <input id="since" name="since" type="date" value="{{ since }}">
+    <label for="until">Started on or before</label>
+    <input id="until" name="until" type="date" value="{{ until }}">
+  </fieldset>
 </form>
-<p class="muted">{{ total }} chat{{ "" if total == 1 else "s" }}{% if q %} with "{{ q }}" in the title{% endif %}.</p>
+{% for problem in problems %}<p class="status partial">{{ problem }}</p>
+{% endfor %}
+<p class="muted">{{ total }} chat{{ "" if total == 1 else "s" }}{% if q %} with "{{ q }}" in the title{% endif %}{% if by_category or by_date %}, filtered{% if by_date %} (chats with no start date are left out){% endif %}{% endif %}.</p>
 {% if rows %}
 <div class="table-wrap"><table class="chat-list">
   <thead><tr><th>Title</th><th>Started</th><th class="num">Messages</th><th></th></tr></thead>
@@ -28,12 +45,12 @@
 </table></div>
 {% if pages > 1 %}
 <p>
-  {% if page > 1 %}<a href="/chats?q={{ q | urlencode }}&amp;page={{ page - 1 }}">← Newer</a>{% endif %}
+  {% if page > 1 %}<a href="/chats?{% if keep %}{{ keep }}&amp;{% endif %}page={{ page - 1 }}">← Newer</a>{% endif %}
   Page {{ page }} of {{ pages }}
-  {% if page < pages %}<a href="/chats?q={{ q | urlencode }}&amp;page={{ page + 1 }}">Older →</a>{% endif %}
+  {% if page < pages %}<a href="/chats?{% if keep %}{{ keep }}&amp;{% endif %}page={{ page + 1 }}">Older →</a>{% endif %}
 </p>
 {% endif %}
-{% elif total == 0 and not q %}
+{% elif total == 0 and not q and not category and not since and not until %}
 <div class="empty"><p class="what">No chats yet.</p><p class="next"><a href="/import">Import your ChatGPT export</a> to fill this list.</p></div>
 {% endif %}
 {% endblock %}

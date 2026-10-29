@@ -18,9 +18,31 @@
       {% if m == "tokens" %}all the words, any order{% elif m == "phrase" %}the words in this order{% else %}exactly, case included (codes, IDs){% endif %}</label>
     {% endfor %}
   </fieldset>
+  <fieldset class="filters">
+    <legend class="muted">Narrow the search</legend>
+    <label for="since">On or after</label>
+    <input id="since" name="since" type="date" value="{{ since }}">
+    <label for="until">On or before</label>
+    <input id="until" name="until" type="date" value="{{ until }}">
+    <label for="role">Said by</label>
+    <select id="role" name="role">
+      <option value="">Anyone</option>
+      {% for r in roles %}<option value="{{ r }}"{% if r == role %} selected{% endif %}>{{ r }}</option>
+      {% endfor %}
+    </select>
+    {% if categories %}
+    <label for="term">Category</label>
+    <select id="term" name="term">
+      <option value="">Any</option>
+      {% for c in categories %}<option value="{{ c.id }}"{% if c.id == term %} selected{% endif %}>{{ c.dimension }}: {{ c.label }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+  </fieldset>
 </form>
+{% if problem %}<p class="status partial">{{ problem }}</p>{% endif %}
 {% if hits is not none %}
-<p class="muted">{{ hits | length }} message{{ "" if hits | length == 1 else "s" }}{% if hits | length >= 100 %} (the best 100){% endif %}.</p>
+<p class="muted">{{ hits | length }} message{{ "" if hits | length == 1 else "s" }}{% if hits | length >= 100 %} (the best 100){% endif %}.{% if undated %} {{ undated }} more match but have no date, so the date filter leaves them out.{% endif %}</p>
 {% for item in hits %}
 <article class="message">
   <p class="who">{{ where(item.place) }}</p>
