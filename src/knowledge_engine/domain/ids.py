@@ -65,6 +65,10 @@ PREFIXES = {
     "social_account": "acct",
     "account_mention": "amen",
     "relationship": "rel",
+    "document": "doc",
+    "document_revision": "docrev",
+    "document_block": "docblk",
+    "document_link": "doclnk",
 }
 
 
@@ -463,3 +467,67 @@ def relationship_id(from_conversation: str, kind: str, to_conversation: str, det
         _require_prefixed(to_conversation, "conversation"),
         _require_native(detector, "detector"),
     )
+
+
+def document_id(workspace_id: str, path_fingerprint: str) -> str:
+    """ID of an imported note or text file (ING-012), by where it lives.
+
+    Args:
+        workspace_id: The workspace it was imported into.
+        path_fingerprint: SHA-256 of the file's resolved path.
+
+    Returns:
+        A ``doc_`` ID.
+    """
+    return _stable_id(
+        "document",
+        _require_native(workspace_id, "workspace_id"),
+        _require_sha256(path_fingerprint, "path_fingerprint"),
+    )
+
+
+def document_revision_id(document: str, file_sha256: str) -> str:
+    """ID of one version of a document: the same bytes, the same ID.
+
+    Args:
+        document: The ``doc_`` ID.
+        file_sha256: SHA-256 of that version's bytes.
+
+    Returns:
+        A ``docrev_`` ID.
+    """
+    return _stable_id(
+        "document_revision",
+        _require_native(document, "document"),
+        _require_sha256(file_sha256, "file_sha256"),
+    )
+
+
+def document_block_id(revision: str, index: int) -> str:
+    """ID of one located block (paragraph, heading...) of a document version.
+
+    Args:
+        revision: The ``docrev_`` ID.
+        index: The block's position, from 0.
+
+    Returns:
+        A ``docblk_`` ID.
+    """
+    if index < 0:
+        raise ValueError("index must be >= 0")
+    return _stable_id("document_block", _require_native(revision, "revision"), index)
+
+
+def document_link_id(revision: str, start: int, end: int) -> str:
+    """ID of one URL mention at an exact place in a document version.
+
+    Args:
+        revision: The ``docrev_`` ID.
+        start: Start offset in the document's text (inclusive).
+        end: End offset (exclusive).
+
+    Returns:
+        A ``doclnk_`` ID.
+    """
+    _require_offsets(start, end)
+    return _stable_id("document_link", _require_native(revision, "revision"), start, end)

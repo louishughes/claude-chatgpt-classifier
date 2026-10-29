@@ -133,6 +133,13 @@ class YouTubeMentionRow(Base):
     channel_hint: Mapped[str | None] = mapped_column(String(100), default=None)
 
 
+def ensure_video(session: Session, video_id: str, *, import_id: str) -> None:
+    """Create the video's row the first time any chat or document links to it."""
+    if session.get(YouTubeVideoRow, video_id) is None:
+        session.add(YouTubeVideoRow(video_id=video_id, first_import_id=import_id))
+        session.flush()
+
+
 def record_mention(
     session: Session, occurrence_id: str, ref: YouTubeRef, *, import_id: str
 ) -> bool:
@@ -144,9 +151,7 @@ def record_mention(
         ref: From ``parse_youtube``.
         import_id: The running batch.
     """
-    if session.get(YouTubeVideoRow, ref.video_id) is None:
-        session.add(YouTubeVideoRow(video_id=ref.video_id, first_import_id=import_id))
-        session.flush()
+    ensure_video(session, ref.video_id, import_id=import_id)
     if session.get(YouTubeMentionRow, occurrence_id) is not None:
         return False
     session.add(

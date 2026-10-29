@@ -26,6 +26,7 @@ TABLE_MODULES = (
     "knowledge_engine.importer.ledger",
     "knowledge_engine.importer.media",
     "knowledge_engine.importer.records",
+    "knowledge_engine.importer.text_documents",
     "knowledge_engine.infrastructure.jobs",
     "knowledge_engine.infrastructure.workspace",
     "knowledge_engine.links.social_store",

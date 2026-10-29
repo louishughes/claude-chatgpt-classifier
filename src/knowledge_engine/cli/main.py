@@ -323,6 +323,45 @@ def _candidate_data(row: Any) -> dict[str, Any]:
     }
 
 
+def _import_doc(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Import one Markdown or text note so it is searchable and its links are found (ING-012)."""
+    from knowledge_engine.importer.lock import ImportLockTimeoutError
+    from knowledge_engine.importer.text_documents import (
+        DocumentChangedError,
+        UnsupportedDocumentError,
+        import_document,
+    )
+
+    name = "import-doc"
+    try:
+        report = import_document(args.path, settings=settings)
+    except FileNotFoundError:
+        return CommandResult(name, ExitCode.USAGE, message="no such file", error_code="not_found")
+    except UnsupportedDocumentError as error:
+        return CommandResult(name, ExitCode.USAGE, message=str(error), error_code="unsupported")
+    except DocumentChangedError as error:
+        return CommandResult(name, ExitCode.ERROR, message=str(error), error_code="file_changed")
+    except ImportLockTimeoutError:
+        return CommandResult(
+            name, ExitCode.ERROR, message="another import is running", error_code="locked"
+        )
+    words = {
+        "new": "Imported",
+        "revised": "Imported a new version of",
+        "reverted": "Back to an earlier version of",
+        "unchanged": "Nothing new in",
+    }
+    counts = report.counts
+    return CommandResult(
+        name,
+        data=report.to_dict(),
+        message=(
+            f"{words[report.outcome]} the note: {counts['blocks']} block(s), "
+            f"{counts['links']} link(s) stored"
+        ),
+    )
+
+
 def _import(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Import one export and print its report (ING-003, wired in UI-002)."""
     from knowledge_engine.importer import import_source
@@ -2327,6 +2366,27 @@ def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
                     filters=filters,
                 )
             ][: args.limit]
+            # ING-012: blocks of imported notes, listed apart from chat hits.
+            # The filters are about messages (speaker, date, chat), so a
+            # filtered search returns no note hits rather than unfiltered ones.
+            filtered = filters is not None or args.conversation is not None
+            document_hits = (
+                []
+                if filtered
+                else [
+                    {
+                        "document_id": hit.document_id,
+                        "revision_id": hit.revision_id,
+                        "name": hit.name,
+                        "locator": hit.locator,
+                        "snippet": hit.snippet,
+                    }
+                    for workspace_id in workspaces
+                    for hit in index.search_documents(
+                        args.query, workspace_id=workspace_id, mode=mode, limit=args.limit
+                    )
+                ][: args.limit]
+            )
             undated = sum(
                 index.undated(
                     args.query,
@@ -2341,6 +2401,9 @@ def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
         engine.dispose()
     data: dict[str, object] = {"mode": args.mode, "hits": hits, "newly_indexed": added}
     message = f"{len(hits)} matching message(s)"
+    if document_hits:
+        data["document_hits"] = document_hits
+        message += f", {len(document_hits)} matching block(s) in imported notes"
     if filters is not None and filters.dated:
         data["undated_left_out"] = undated
         if undated:
@@ -4870,6 +4933,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     watch.add_argument("--once", action="store_true", help="look twice, act, then stop")
     watch.set_defaults(handler=_watch)
+    import_doc = commands.add_parser(
+        "import-doc", help="import a Markdown or text note (only read; searchable afterwards)"
+    )
+    import_doc.add_argument("path", type=Path, help="a .md, .markdown or .txt file")
+    import_doc.set_defaults(handler=_import_doc)
+
     importer = commands.add_parser("import", help="import an export (folder or ZIP; only read)")
     importer.add_argument("source", type=Path, help="export ZIP or folder")
     importer.add_argument(

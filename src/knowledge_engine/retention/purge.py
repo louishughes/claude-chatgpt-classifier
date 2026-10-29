@@ -369,10 +369,13 @@ def _plan(db: sqlite3.Connection, conversations: list[str], segments: set[str]) 
     link_ids = {o for o, _ in link_occ}
     targets = {t for _, t in link_occ}
     kept = _still_used(db, "link_occurrences", "target_id", "occurrence_id", targets, link_ids)
+    # ING-012: a link also in an imported note stays (the note isn't purged).
+    kept |= _still_used(db, "document_links", "target_id", "link_id", targets, set())
     plan.kept_shared["links_mentioned_elsewhere"] += len(kept)
     take("link_targets", "target_id", targets - kept)
     videos = {v for (v,) in take("youtube_mentions", "mention_id", link_ids, "video_id")}
     kept = _still_used(db, "youtube_mentions", "video_id", "mention_id", videos, link_ids)
+    kept |= _still_used(db, "document_links", "video_id", "link_id", videos, set())
     plan.kept_shared["videos_mentioned_elsewhere"] += len(kept)
     gone_videos = videos - kept
     take("youtube_videos", "video_id", gone_videos)

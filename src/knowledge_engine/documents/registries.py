@@ -44,6 +44,7 @@ from sqlalchemy.orm import Session
 
 from knowledge_engine.documents.render import source_links, transcript_stem
 from knowledge_engine.importer.records import ConversationRow
+from knowledge_engine.importer.text_documents import video_document_mentions
 from knowledge_engine.links.social_store import (
     AccountAliasRow,
     SocialAccountRow,
@@ -219,6 +220,14 @@ def video_note(session: Session, video_id: str) -> DocumentModel:
         extra += f", playlist `{_code(m.playlist_id)}`" if m.playlist_id else ""
         lines.append(f"{place}{extra} (by {m.actor or 'unknown'}, `{m.conversation_id}`)")
     blocks += [Heading("Mentioned in", 2), BulletList(tuple(lines or ["no mentions"]), True)]
+    # ING-012: imported notes that link to it. File names are the person's
+    # own text, so they go in code spans like every other imported string.
+    in_notes = video_document_mentions(session, video_id)
+    if in_notes:
+        blocks += [
+            Heading("In your notes", 2),
+            BulletList(tuple(f"`{_code(d['name'])}` at `{d['locator']}`" for d in in_notes), True),
+        ]
     chats = {m.conversation_id for m in mentions}
     blocks += [
         Heading("Conversations", 2),
