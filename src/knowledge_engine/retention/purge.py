@@ -108,6 +108,7 @@ DELETE_ORDER = (
     "transcript_snapshots",
     "youtube_videos",
     "link_targets",
+    "account_reviews",
     "account_mentions",
     "account_aliases",
     "social_accounts",
@@ -157,6 +158,8 @@ class PurgePlan:
     snapshot_hashes: set[str] = field(default_factory=set)
     images: set[tuple[str, str | None]] = field(default_factory=set)  # (sha256, media type)
     other_conversations_in_files: int = 0
+    # identity_candidates rows kept, whose existing_conversation_id is cleared.
+    unlinked_candidates: set[int] = field(default_factory=set)
 
     @property
     def token(self) -> str:
@@ -366,10 +369,13 @@ def _plan(db: sqlite3.Connection, conversations: list[str], segments: set[str]) 
     link_ids = {o for o, _ in link_occ}
     targets = {t for _, t in link_occ}
     kept = _still_used(db, "link_occurrences", "target_id", "occurrence_id", targets, link_ids)
+    # ING-012: a link also in an imported note stays (the note isn't purged).
+    kept |= _still_used(db, "document_links", "target_id", "link_id", targets, set())
     plan.kept_shared["links_mentioned_elsewhere"] += len(kept)
     take("link_targets", "target_id", targets - kept)
     videos = {v for (v,) in take("youtube_mentions", "mention_id", link_ids, "video_id")}
     kept = _still_used(db, "youtube_mentions", "video_id", "mention_id", videos, link_ids)
+    kept |= _still_used(db, "document_links", "video_id", "link_id", videos, set())
     plan.kept_shared["videos_mentioned_elsewhere"] += len(kept)
     gone_videos = videos - kept
     take("youtube_videos", "video_id", gone_videos)
@@ -385,6 +391,10 @@ def _plan(db: sqlite3.Connection, conversations: list[str], segments: set[str]) 
     accounts = {a for _, a in mentions if a}
     kept = _still_used(db, "account_mentions", "account_id", "mention_id", accounts, mention_ids)
     plan.kept_shared["accounts_mentioned_elsewhere"] += len(kept)
+    # SOC-004 review history: a link decision goes with its mention, and an
+    # account's whole history goes with the account.
+    take("account_reviews", "mention_id", mention_ids)
+    take("account_reviews", "account_id", accounts - kept)
     take("account_aliases", "account_id", accounts - kept)
     take("social_accounts", "account_id", accounts - kept)
 
@@ -392,11 +402,23 @@ def _plan(db: sqlite3.Connection, conversations: list[str], segments: set[str]) 
     rels = take("conversation_relationships", "from_conversation_id", convs, "relationship_id")
     rels += take("conversation_relationships", "to_conversation_id", convs, "relationship_id")
     take("relationship_reviews", "relationship_id", {r for (r,) in rels})
-    candidates = take("identity_candidates", "existing_conversation_id", convs, "snapshot_id")
-    candidates += take(
-        "identity_candidates", "native_conversation_id", ids["native_conversation"], "snapshot_id"
+    cols = "rowid, snapshot_id, assigned_conversation_id"
+    candidates = _rows(db, "identity_candidates", cols, "existing_conversation_id", convs)
+    candidates += _rows(
+        db, "identity_candidates", cols, "native_conversation_id", ids["native_conversation"]
     )
-    snapshots |= {s for (s,) in candidates if s}
+    # An accepted candidate (IMP-009) points at the chat it became.
+    candidates += _rows(db, "identity_candidates", cols, "assigned_conversation_id", convs)
+    for rowid, snapshot, assigned in candidates:
+        if assigned is not None and assigned not in convs:
+            # An accepted chat that collided with a purged one is its own chat
+            # and stays, with its decision; only the pointer to the purged
+            # chat is cleared.
+            plan.unlinked_candidates.add(rowid)
+            continue
+        rows["identity_candidates"].add(rowid)
+        if snapshot:
+            snapshots.add(snapshot)
     take("segment_overrides", "conversation_id", convs)
     take("override_anchors", "conversation_id", convs)
 
@@ -649,6 +671,12 @@ def _delete(db: sqlite3.Connection, plan: PurgePlan) -> None:
     # Append-only guards are lifted for this transaction only (see the module notes).
     for name, _ in triggers:
         db.execute(f'DROP TRIGGER "{name}"')
+    for chunk in _chunks(plan.unlinked_candidates):
+        db.execute(
+            "UPDATE identity_candidates SET existing_conversation_id = NULL "
+            f"WHERE rowid IN ({','.join('?' * len(chunk))})",
+            chunk,
+        )
     for table in DELETE_ORDER:
         for chunk in _chunks(plan.rows.get(table, ())):
             db.execute(

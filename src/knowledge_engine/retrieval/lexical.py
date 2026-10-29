@@ -24,6 +24,11 @@ Three modes:
 Each row also keeps the message's own time, so a search can be narrowed by
 date, speaker and vocabulary term (RET-009, ``retrieval/filters.py``).
 
+Imported notes (ING-012) have their own table, ``doc_blocks``, one row per
+block of each document's *current* revision, with its line locator
+(``L12-L15``). Chat hits and document hits are searched separately, so
+adding notes never changes what a chat search returns.
+
 ``tokens`` and ``phrase`` ignore case and accents (``cafe`` finds ``café``).
 The query is never passed to FTS5 as syntax: each word is quoted, so
 ``AND``, ``NOT``, quotes or brackets in a query are just text.
@@ -51,6 +56,7 @@ from sqlalchemy.orm import Session
 
 from knowledge_engine.graph.nodes import canonical_node
 from knowledge_engine.importer.records import ConversationRow, MessageNodeRow, MessageRevisionRow
+from knowledge_engine.importer.text_documents import current_blocks
 from knowledge_engine.settings import Settings
 
 if TYPE_CHECKING:  # filters.py reads segments and labels; no import cycle at runtime
@@ -58,7 +64,7 @@ if TYPE_CHECKING:  # filters.py reads segments and labels; no import cycle at ru
 
 # Bump when the schema or tokenizer changes: an index built by another
 # version is dropped and rebuilt, never half-used.
-SEARCH_INDEX_VERSION = "ret-009-v1"  # adds create_time
+SEARCH_INDEX_VERSION = "ing-012-v1"  # adds doc_blocks
 _WORD = re.compile(r"\w+")
 _BATCH = 500
 
@@ -88,6 +94,28 @@ _SCHEMA = (
     """CREATE TRIGGER IF NOT EXISTS documents_ad AFTER DELETE ON documents BEGIN
         INSERT INTO documents_fts(documents_fts, rowid, text)
         VALUES ('delete', old.doc_id, old.text);
+    END""",
+    # ING-012: blocks of imported notes, the same way.
+    """CREATE TABLE IF NOT EXISTS doc_blocks (
+        row_id INTEGER PRIMARY KEY,
+        block_id TEXT NOT NULL UNIQUE,
+        workspace_id TEXT NOT NULL,
+        document_id TEXT NOT NULL,
+        revision_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        locator TEXT NOT NULL,
+        text TEXT NOT NULL
+    )""",
+    """CREATE VIRTUAL TABLE IF NOT EXISTS doc_blocks_fts USING fts5(
+        text, content='doc_blocks', content_rowid='row_id',
+        tokenize='unicode61 remove_diacritics 2'
+    )""",
+    """CREATE TRIGGER IF NOT EXISTS doc_blocks_ai AFTER INSERT ON doc_blocks BEGIN
+        INSERT INTO doc_blocks_fts(rowid, text) VALUES (new.row_id, new.text);
+    END""",
+    """CREATE TRIGGER IF NOT EXISTS doc_blocks_ad AFTER DELETE ON doc_blocks BEGIN
+        INSERT INTO doc_blocks_fts(doc_blocks_fts, rowid, text)
+        VALUES ('delete', old.row_id, old.text);
     END""",
 )
 
@@ -133,6 +161,29 @@ class SearchHit:
     node_key: str
     native_node_id: str
     role: str | None
+    snippet: str
+    score: float
+
+
+@dataclass(frozen=True)
+class DocumentHit:
+    """One matching block of an imported note (ING-012).
+
+    Attributes:
+        document_id: The ``doc_`` ID.
+        revision_id: The ``docrev_`` ID (always the current revision).
+        block_id: The ``docblk_`` ID.
+        name: The file's name.
+        locator: Where in the file, e.g. ``L12-L15``.
+        snippet: A short extract with matches in ``[brackets]``.
+        score: BM25 rank; lower is better.
+    """
+
+    document_id: str
+    revision_id: str
+    block_id: str
+    name: str
+    locator: str
     snippet: str
     score: float
 
@@ -206,7 +257,7 @@ class LexicalIndex:
         return str(row[0]) if row else None
 
     def _drop(self) -> None:
-        for name in ("documents_fts", "documents", "meta"):
+        for name in ("doc_blocks_fts", "doc_blocks", "documents_fts", "documents", "meta"):
             self._db.execute(f"DROP TABLE IF EXISTS {name}")
         self._db.commit()
 
@@ -243,6 +294,71 @@ class LexicalIndex:
         )
         self._db.commit()
         return self._count() - before
+
+    def indexed_blocks(self) -> set[str]:
+        """Return the document block IDs already in the index."""
+        return {row[0] for row in self._db.execute("SELECT block_id FROM doc_blocks")}
+
+    def set_blocks(
+        self, rows: Iterable[tuple[str, str, str, str, str, str, str]], keep: set[str]
+    ) -> int:
+        """Add document blocks and drop any that aren't in ``keep`` any more.
+
+        Args:
+            rows: ``(block_id, workspace_id, document_id, revision_id, name,
+                locator, text)`` for blocks to add; ones present are skipped.
+            keep: Every block ID that should stay (the current revisions).
+
+        Returns:
+            How many were added.
+        """
+        gone = self.indexed_blocks() - keep
+        self._db.executemany("DELETE FROM doc_blocks WHERE block_id = ?", ((b,) for b in gone))
+        before = int(self._db.execute("SELECT count(*) FROM doc_blocks").fetchone()[0])
+        self._db.executemany(
+            "INSERT OR IGNORE INTO doc_blocks (block_id, workspace_id, document_id, "
+            "revision_id, name, locator, text) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            rows,
+        )
+        self._db.commit()
+        return int(self._db.execute("SELECT count(*) FROM doc_blocks").fetchone()[0]) - before
+
+    def search_documents(
+        self,
+        query: str,
+        *,
+        workspace_id: str,
+        mode: SearchMode = SearchMode.TOKENS,
+        limit: int = 20,
+    ) -> list[DocumentHit]:
+        """Find blocks of imported notes matching ``query``, best first.
+
+        Args:
+            query: What to look for.
+            workspace_id: Only this workspace is searched.
+            mode: ``tokens``, ``phrase`` or ``exact``.
+            limit: At most this many hits.
+
+        Returns:
+            The hits; empty if the query has no words.
+        """
+        expression = match_expression(query, mode)
+        if expression is None or limit <= 0:
+            return []
+        hits: list[DocumentHit] = []
+        for row in self._db.execute(
+            "SELECT b.document_id, b.revision_id, b.block_id, b.name, b.locator, "
+            "snippet(doc_blocks_fts, 0, '[', ']', '…', 12), rank, b.text "
+            "FROM doc_blocks_fts JOIN doc_blocks b ON b.row_id = doc_blocks_fts.rowid "
+            "WHERE doc_blocks_fts MATCH ? AND b.workspace_id = ? ORDER BY rank, b.block_id",
+            (expression, workspace_id),
+        ):
+            if mode is SearchMode.EXACT and query.strip() not in row[7]:
+                continue
+            hits.append(DocumentHit(*row[:7]))
+            if len(hits) >= limit:
+                break
+        return hits
 
     def _count(self) -> int:
         return int(self._db.execute("SELECT count(*) FROM documents").fetchone()[0])
@@ -379,7 +495,30 @@ def sync_index(session: Session, index: LexicalIndex) -> int:
             batch = []
     if batch:
         added += index.add(batch)
-    return added
+    return added + _sync_documents(session, index)
+
+
+def _sync_documents(session: Session, index: LexicalIndex) -> int:
+    # Only the current revision of each note is searchable; blocks of an
+    # older revision are removed from the index (they stay in the archive).
+    have = index.indexed_blocks()
+    current = current_blocks(session)
+    return index.set_blocks(
+        (
+            (
+                block.block_id,
+                document.workspace_id,
+                document.document_id,
+                block.revision_id,
+                document.name,
+                block.locator,
+                block.text,
+            )
+            for block, document in current
+            if block.block_id not in have
+        ),
+        {block.block_id for block, _ in current},
+    )
 
 
 def passages(session: Session, skip: set[str]) -> Iterator[Passage]:

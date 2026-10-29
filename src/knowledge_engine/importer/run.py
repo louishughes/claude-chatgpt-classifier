@@ -34,6 +34,8 @@ from dataclasses import replace
 from itertools import islice
 from pathlib import Path
 
+from sqlalchemy.orm import Session
+
 from knowledge_engine import __version__
 from knowledge_engine.domain.enums import DeltaCategory, ImportBatchStatus, SourceSystem
 from knowledge_engine.domain.ids import conversation_id
@@ -46,7 +48,14 @@ from knowledge_engine.importer.delta import (
     mark_not_seen,
     native_conversation_id,
 )
-from knowledge_engine.importer.identity import CandidateReason, conversation_hash, record_candidate
+from knowledge_engine.importer.identity import (
+    CandidateReason,
+    CandidateStatus,
+    content_native_id,
+    conversation_hash,
+    find_candidate,
+    record_candidate,
+)
 from knowledge_engine.importer.integrity import IntegrityTally
 from knowledge_engine.importer.ledger import ImportBatchRow, ImportLedger
 from knowledge_engine.importer.lock import import_lock
@@ -264,6 +273,50 @@ def _run(
                     continue
                 native_id = native_conversation_id(item.native)
                 snapshot_id = snapshots[item.locator.file]
+                digest = conversation_hash(item.native)
+                # IMP-009: a chat a person already decided on. Rejected stays
+                # out; accepted comes in under its content-derived ID.
+                override: str | None = None
+                decided = _decision(
+                    session, workspace_id, account_ns, digest, missing=native_id is None
+                )
+                unsafe = (
+                    decided is not None
+                    or native_id is None
+                    or seen.get(native_id, digest) != digest
+                )
+                if unsafe and is_purged(
+                    session,
+                    TombstoneKind.CONVERSATION,
+                    conversation_key(
+                        conversation_id(
+                            workspace_id,
+                            SourceSystem.CHATGPT.value,
+                            account_ns,
+                            content_native_id(digest),
+                        )
+                    ),
+                ):
+                    # Accepted, imported, then purged on purpose (OPS-004): the
+                    # purge removed its candidate row too, so this tombstone is
+                    # what keeps it from coming back as a new candidate.
+                    conversations["purged"] += 1
+                    tally.conversations["purged"] += 1
+                    continue
+                if decided == CandidateStatus.REJECTED.value:
+                    conversations["rejected_candidate"] += 1
+                    tally.conversations["rejected_candidate"] += 1
+                    continue
+                if decided == CandidateStatus.ACCEPTED.value:
+                    override = native_id = content_native_id(digest)
+                elif decided == CandidateStatus.REVIEW_REQUIRED.value and native_id is not None:
+                    # A known collision still waiting for review stays parked
+                    # even when it comes first in this export, so a reordered
+                    # export can't import it in place of the chat it collided with.
+                    candidates[CandidateReason.ID_COLLISION.value] += 1
+                    conversations[DeltaCategory.CANDIDATE_DUPLICATE.value] += 1
+                    tally.conversations["candidate"] += 1
+                    continue
                 if native_id is None:
                     # Keying it without a native ID would be a guess, so it
                     # isn't imported: it waits for review as a candidate.
@@ -292,7 +345,6 @@ def _run(
                     conversations["purged"] += 1
                     tally.conversations["purged"] += 1
                     continue
-                digest = conversation_hash(item.native)
                 if native_id in seen:
                     if seen[native_id] == digest:
                         # The same chat twice in one export: nothing new.
@@ -325,6 +377,7 @@ def _run(
                         account_namespace=account_ns,
                         import_id=import_id,
                         snapshot_id=snapshot_id,
+                        native_id=override,
                     )
                 conversations[delta.category.value] += 1
                 messages.update(delta.messages)
@@ -448,6 +501,33 @@ def _run(
             tree_hash=after,
         )
     return report
+
+
+def _decision(
+    session: Session,
+    workspace_id: str,
+    account_ns: str,
+    digest: str,
+    *,
+    missing: bool,
+) -> str | None:
+    """Return the review status of this chat's candidate, or None if it isn't one.
+
+    The lookup is by exact content hash, never by title or similarity. It
+    doesn't depend on the order of the export either: a chat that once
+    collided is found as that candidate even if a later export lists it
+    first, or lists it without the chat it collided with. A chat that never
+    became a candidate has no row, so ordinary chats import as before.
+    """
+    reason = CandidateReason.MISSING_NATIVE_ID if missing else CandidateReason.ID_COLLISION
+    row = find_candidate(
+        session,
+        workspace_id=workspace_id,
+        account_namespace=account_ns,
+        reason=reason,
+        digest=digest,
+    )
+    return row.status if row is not None else None
 
 
 def _groups(stream: Iterator[NativeConversation], size: int) -> Iterator[list[NativeConversation]]:

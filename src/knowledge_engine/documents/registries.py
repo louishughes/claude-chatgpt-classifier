@@ -44,9 +44,11 @@ from sqlalchemy.orm import Session
 
 from knowledge_engine.documents.render import source_links, transcript_stem
 from knowledge_engine.importer.records import ConversationRow
+from knowledge_engine.importer.text_documents import video_document_mentions
 from knowledge_engine.links.social_store import (
     AccountAliasRow,
     SocialAccountRow,
+    account_history,
     account_mentions,
     account_summaries,
     ambiguous_handles,
@@ -70,7 +72,7 @@ from knowledge_engine.rendering.markdown import (
     safe_relative_path,
 )
 
-REGISTRY_NOTES_VERSION = "ytb-003+soc-003-v1"
+REGISTRY_NOTES_VERSION = "ytb-003+soc-004-v2"
 VIDEOS_DIR = "Videos"
 ACCOUNTS_DIR = "Accounts"
 REGISTRY_TITLE = "Account registry"
@@ -218,6 +220,14 @@ def video_note(session: Session, video_id: str) -> DocumentModel:
         extra += f", playlist `{_code(m.playlist_id)}`" if m.playlist_id else ""
         lines.append(f"{place}{extra} (by {m.actor or 'unknown'}, `{m.conversation_id}`)")
     blocks += [Heading("Mentioned in", 2), BulletList(tuple(lines or ["no mentions"]), True)]
+    # ING-012: imported notes that link to it. File names are the person's
+    # own text, so they go in code spans like every other imported string.
+    in_notes = video_document_mentions(session, video_id)
+    if in_notes:
+        blocks += [
+            Heading("In your notes", 2),
+            BulletList(tuple(f"`{_code(d['name'])}` at `{d['locator']}`" for d in in_notes), True),
+        ]
     chats = {m.conversation_id for m in mentions}
     blocks += [
         Heading("Conversations", 2),
@@ -407,9 +417,15 @@ def account_registry_note(session: Session) -> DocumentModel:
         ),
     ]
     if rejected:
+        # SOC-004: a rejected account drops out of the registry. Each one's
+        # own note keeps its mentions and review history.
         blocks += [
             Heading("Rejected", 2),
-            BulletList(tuple(_summary_line(s) for s in rejected), True),
+            Paragraph(
+                f"{len(rejected)} account(s) a person rejected are left out. "
+                "`ke accounts --all` lists them.",
+                True,
+            ),
         ]
     properties: dict[str, PropertyValue] = {
         "ke_type": "account_registry",
@@ -467,6 +483,21 @@ def account_note(session: Session, account_id: str) -> DocumentModel:
             tuple(_chat_links(session, {m.conversation_id for m in mentions}) or ["none"]), True
         ),
     ]
+    history = account_history(session, account_id)
+    if history:
+        blocks += [
+            Heading("Review history", 2),
+            BulletList(
+                tuple(
+                    # Reviewer and note are typed by a person: code spans keep
+                    # them from turning into Markdown links or headings.
+                    f"{r.at.isoformat(timespec='seconds')}: `{_code(r.reviewer)}` {r.action} "
+                    f"({r.from_state} to {r.to_state})" + (f": `{_code(r.note)}`" if r.note else "")
+                    for r in history
+                ),
+                True,
+            ),
+        ]
     properties: dict[str, PropertyValue] = {
         "ke_type": "social_account",
         "account_id": account_id,

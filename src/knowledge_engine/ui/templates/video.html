@@ -20,4 +20,15 @@
   {% endfor %}
   </tbody>
 </table></div>
+{% if video.documents %}
+<h2>In your notes</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Note</th><th>Where</th><th>As written</th></tr></thead>
+  <tbody>
+  {% for d in video.documents %}
+  <tr><td>{{ d.name }}</td><td><code>{{ d.locator }}</code></td><td class="wrap"><code>{{ d.written }}</code></td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+{% endif %}
 {% endblock %}

@@ -162,11 +162,35 @@ def list_videos(session: Session) -> list[dict[str, Any]]:
             "conversations": int(c),
         }
         for video, m, c in rows
+    ] + _note_only_videos(session, {video.video_id for video, _, _ in rows})
+
+
+def _note_only_videos(session: Session, listed: set[str]) -> list[dict[str, Any]]:
+    # ING-012: a video linked only from an imported note has no chat
+    # mentions, so the join above misses it. It is still a known video.
+    from knowledge_engine.importer.text_documents import DocumentLinkRow
+
+    rows = session.execute(
+        select(YouTubeVideoRow)
+        .join(DocumentLinkRow, DocumentLinkRow.video_id == YouTubeVideoRow.video_id)
+        .group_by(YouTubeVideoRow.video_id)
+        .order_by(YouTubeVideoRow.video_id)
+    ).scalars()
+    return [
+        {
+            "video_id": video.video_id,
+            "transcript_status": video.transcript_status,
+            "mentions": 0,
+            "conversations": 0,
+        }
+        for video in rows
+        if video.video_id not in listed
     ]
 
 
 def video_page(session: Session, video_id: str) -> dict[str, Any] | None:
     """Return one video and every mention of it, or None."""
+    from knowledge_engine.importer.text_documents import video_document_mentions
     from knowledge_engine.links.video_transcripts import TranscriptSnapshotRow
 
     video = session.get(YouTubeVideoRow, video_id)
@@ -197,12 +221,14 @@ def video_page(session: Session, video_id: str) -> dict[str, Any] | None:
             }
             for mention, occurrence in rows
         ],
+        # ING-012: links to it from imported notes (current versions only).
+        "documents": video_document_mentions(session, video_id),
     }
 
 
 def account_page(session: Session, account_id: str) -> dict[str, Any] | None:
     """Return one registry account, its aliases and every mention, or None."""
-    from knowledge_engine.links.social_store import AccountAliasRow
+    from knowledge_engine.links.social_store import AccountAliasRow, account_history
 
     account = session.get(SocialAccountRow, account_id)
     if account is None:
@@ -223,6 +249,17 @@ def account_page(session: Session, account_id: str) -> dict[str, Any] | None:
         "identity_status": account.identity_status,
         "aliases": [(a.kind, a.alias) for a in aliases],
         "mentions": [{"place": where.get(m.revision_id), "written": m.raw_text} for m in mentions],
+        "history": [
+            {
+                "action": r.action,
+                "from_state": r.from_state,
+                "to_state": r.to_state,
+                "reviewer": r.reviewer,
+                "note": r.note,
+                "at": r.at.isoformat(timespec="seconds"),
+            }
+            for r in account_history(session, account_id)
+        ],
     }
 
 

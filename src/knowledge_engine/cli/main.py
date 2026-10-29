@@ -236,6 +236,132 @@ def _imports_report(settings: Settings, args: argparse.Namespace) -> CommandResu
     return CommandResult("imports report", data=data, message=message)
 
 
+def _imports_candidates(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """List identity candidates, or decide one (IMP-009). Hashes and positions only, no text."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.importer.identity import (
+        CandidateAction,
+        CandidateDecidedError,
+        decide,
+        list_candidates,
+    )
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+
+    reviewing = getattr(args, "candidates_command", None) == "review"
+    name = "imports candidates review" if reviewing else "imports candidates"
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            if reviewing:
+                if not args.reviewer.strip() or len(args.reviewer) > 100:
+                    return CommandResult(
+                        name,
+                        ExitCode.USAGE,
+                        message="--reviewer needs a name of 1 to 100 characters",
+                        error_code="bad_reviewer",
+                    )
+                try:
+                    row = decide(
+                        session,
+                        args.candidate,
+                        CandidateAction(args.decision),
+                        reviewer=args.reviewer,
+                    )
+                except KeyError:
+                    return CommandResult(
+                        name,
+                        ExitCode.USAGE,
+                        message="no such candidate",
+                        error_code="unknown_candidate",
+                    )
+                except CandidateDecidedError as error:
+                    return CommandResult(
+                        name, ExitCode.ERROR, message=str(error), error_code="already_decided"
+                    )
+                session.commit()
+                data = _candidate_data(row)
+                message = (
+                    "Accepted: the next import of that export brings the chat in as "
+                    f"{row.assigned_conversation_id}"
+                    if row.status == "accepted"
+                    else "Rejected: later imports leave the chat out"
+                )
+                return CommandResult(name, data=data, message=message)
+            rows = list_candidates(session, status=args.status)
+            listed = [_candidate_data(row) for row in rows]
+    finally:
+        engine.dispose()
+    waiting = sum(1 for c in listed if c["status"] == "review_required")
+    return CommandResult(
+        name,
+        data={"candidates": listed},
+        message=f"{len(listed)} candidate(s), {waiting} waiting for review",
+    )
+
+
+def _candidate_data(row: Any) -> dict[str, Any]:
+    # IDs, hashes and positions only: a candidate's title or words never print.
+    return {
+        "candidate_id": row.candidate_id,
+        "reason": row.reason,
+        "status": row.status,
+        "account_namespace": row.account_namespace,
+        "snapshot_id": row.snapshot_id,
+        "source_index": row.source_index,
+        "conversation_hash": row.conversation_hash,
+        "existing_conversation_id": row.existing_conversation_id,
+        "assigned_conversation_id": row.assigned_conversation_id,
+        "decided_by": row.decided_by,
+        "decided_at": row.decided_at.isoformat() if row.decided_at else None,
+        "first_import_id": row.first_import_id,
+    }
+
+
+def _import_doc(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Import one Markdown or text note so it is searchable and its links are found (ING-012)."""
+    from knowledge_engine.importer.lock import ImportLockTimeoutError
+    from knowledge_engine.importer.text_documents import (
+        DocumentChangedError,
+        UnsupportedDocumentError,
+        import_document,
+    )
+
+    name = "import-doc"
+    try:
+        report = import_document(args.path, settings=settings)
+    except FileNotFoundError:
+        return CommandResult(name, ExitCode.USAGE, message="no such file", error_code="not_found")
+    except UnsupportedDocumentError as error:
+        return CommandResult(name, ExitCode.USAGE, message=str(error), error_code="unsupported")
+    except DocumentChangedError as error:
+        return CommandResult(name, ExitCode.ERROR, message=str(error), error_code="file_changed")
+    except ImportLockTimeoutError:
+        return CommandResult(
+            name, ExitCode.ERROR, message="another import is running", error_code="locked"
+        )
+    words = {
+        "new": "Imported",
+        "revised": "Imported a new version of",
+        "reverted": "Back to an earlier version of",
+        "unchanged": "Nothing new in",
+    }
+    counts = report.counts
+    return CommandResult(
+        name,
+        data=report.to_dict(),
+        message=(
+            f"{words[report.outcome]} the note: {counts['blocks']} block(s), "
+            f"{counts['links']} link(s) stored"
+        ),
+    )
+
+
 def _import(settings: Settings, args: argparse.Namespace) -> CommandResult:
     """Import one export and print its report (ING-003, wired in UI-002)."""
     from knowledge_engine.importer import import_source
@@ -588,32 +714,82 @@ def _transcript_data(session: Any, transcript_id: str) -> dict[str, Any]:
 
 
 def _accounts(settings: Settings, args: argparse.Namespace) -> CommandResult:
-    """List the social account registry (SOC-002): read-only."""
+    """List the social account registry (SOC-002), or record a review (SOC-004)."""
     from sqlalchemy.orm import Session
 
     from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
     from knowledge_engine.links.social_store import account_summaries, ambiguous_handles
 
+    action = getattr(args, "accounts_command", None)
+    name = f"accounts {action}" if action else "accounts"
     db = database_path(settings)
     if not db.exists():
         return CommandResult(
-            "accounts", ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
         )
     engine = create_sqlite_engine(db)
     try:
         with Session(engine) as session:
+            if action is not None:
+                return _accounts_review(session, name, args)
             if args.ambiguous:
                 return CommandResult(
                     "accounts",
                     data={"ambiguous": ambiguous_handles(session)},
-                    message="Bare @handles (no platform; never linked to an account)",
+                    message="Bare @handles (no platform; linked only by `ke accounts link`)",
                 )
-            accounts_list = account_summaries(session, platform=args.platform)
+            accounts_list = account_summaries(
+                session, platform=args.platform, include_rejected=args.all
+            )
     finally:
         engine.dispose()
     return CommandResult(
         "accounts", data={"accounts": accounts_list}, message="Social accounts (never contacted)"
     )
+
+
+def _accounts_review(session: Any, name: str, args: argparse.Namespace) -> CommandResult:
+    """Confirm, reject or link inside one transaction; the history is append-only."""
+    from knowledge_engine.links.social_store import (
+        AccountAction,
+        AccountReviewError,
+        link_mention,
+        review_account,
+    )
+
+    try:
+        if args.accounts_command == "link":
+            entry = link_mention(
+                session, args.mention, args.account, reviewer=args.reviewer, note=args.note
+            )
+            message = "Linked: the mention now counts toward the account"
+        else:
+            entry = review_account(
+                session,
+                args.account,
+                AccountAction(args.decision),
+                reviewer=args.reviewer,
+                note=args.note,
+            )
+            message = f"Account {entry.to_state}"
+    except KeyError as error:
+        # An unknown ID is a usage mistake (exit 2), like a bad argument.
+        return CommandResult(
+            name, ExitCode.USAGE, message=str(error.args[0]), error_code="not_found"
+        )
+    except AccountReviewError as error:
+        return CommandResult(name, ExitCode.USAGE, message=str(error), error_code="refused")
+    session.commit()
+    data = {
+        "account_id": entry.account_id,
+        "mention_id": entry.mention_id,
+        "action": entry.action,
+        "from_state": entry.from_state,
+        "to_state": entry.to_state,
+        "reviewer": entry.reviewer,
+        "at": entry.at.isoformat(),
+    }
+    return CommandResult(name, data=data, message=message)
 
 
 def _segments(settings: Settings, args: argparse.Namespace) -> CommandResult:
@@ -2215,6 +2391,27 @@ def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
                     filters=filters,
                 )
             ][: args.limit]
+            # ING-012: blocks of imported notes, listed apart from chat hits.
+            # The filters are about messages (speaker, date, chat), so a
+            # filtered search returns no note hits rather than unfiltered ones.
+            filtered = filters is not None or args.conversation is not None
+            document_hits = (
+                []
+                if filtered
+                else [
+                    {
+                        "document_id": hit.document_id,
+                        "revision_id": hit.revision_id,
+                        "name": hit.name,
+                        "locator": hit.locator,
+                        "snippet": hit.snippet,
+                    }
+                    for workspace_id in workspaces
+                    for hit in index.search_documents(
+                        args.query, workspace_id=workspace_id, mode=mode, limit=args.limit
+                    )
+                ][: args.limit]
+            )
             undated = sum(
                 index.undated(
                     args.query,
@@ -2229,6 +2426,9 @@ def _search(settings: Settings, args: argparse.Namespace) -> CommandResult:
         engine.dispose()
     data: dict[str, object] = {"mode": args.mode, "hits": hits, "newly_indexed": added}
     message = f"{len(hits)} matching message(s)"
+    if document_hits:
+        data["document_hits"] = document_hits
+        message += f", {len(document_hits)} matching block(s) in imported notes"
     if filters is not None and filters.dated:
         data["undated_left_out"] = undated
         if undated:
@@ -4307,6 +4507,23 @@ def build_parser() -> argparse.ArgumentParser:
         "which", nargs="?", default="latest", help="`latest` (default) or an import ID"
     )
     report.set_defaults(handler=_imports_report)
+    candidates = imports_commands.add_parser(
+        "candidates", help="chats whose ID is missing or taken, waiting for a decision"
+    )
+    candidates.add_argument(
+        "--status", choices=["review_required", "accepted", "rejected"], help="only this status"
+    )
+    candidates.set_defaults(handler=_imports_candidates)
+    candidates_commands = candidates.add_subparsers(
+        dest="candidates_command", metavar="ACTION", parser_class=_Parser
+    )
+    cand_review = candidates_commands.add_parser(
+        "review", help="accept (import under an ID made from its content) or reject"
+    )
+    cand_review.add_argument("candidate", help="the candidate ID")
+    cand_review.add_argument("decision", choices=["accept", "reject"])
+    cand_review.add_argument("--reviewer", required=True, help="who decided")
+    cand_review.set_defaults(handler=_imports_candidates)
 
     inspect = commands.add_parser(
         "inspect",
@@ -4501,7 +4718,27 @@ def build_parser() -> argparse.ArgumentParser:
     accounts.add_argument(
         "--ambiguous", action="store_true", help="list bare @handles with no platform instead"
     )
+    accounts.add_argument("--all", action="store_true", help="include rejected accounts")
     accounts.set_defaults(handler=_accounts)
+    accounts_commands = accounts.add_subparsers(
+        dest="accounts_command", metavar="ACTION", parser_class=_Parser
+    )
+    acct_review = accounts_commands.add_parser(
+        "review", help="confirm or reject who an account is (kept in its history)"
+    )
+    acct_review.add_argument("account", help="the acct_ ID")
+    acct_review.add_argument("decision", choices=["confirm", "reject"])
+    acct_review.add_argument("--reviewer", required=True, help="who decided")
+    acct_review.add_argument("--note", help="why")
+    acct_review.set_defaults(handler=_accounts)
+    acct_link = accounts_commands.add_parser(
+        "link", help="file an ambiguous @handle mention under an account"
+    )
+    acct_link.add_argument("mention", help="the amen_ ID (from `ke accounts --ambiguous`)")
+    acct_link.add_argument("account", help="the acct_ ID")
+    acct_link.add_argument("--reviewer", required=True, help="who decided")
+    acct_link.add_argument("--note", help="why")
+    acct_link.set_defaults(handler=_accounts)
 
     segments = commands.add_parser("segments", help="a chat's topic segments (no text shown)")
     segments.add_argument("conversation", help="the conv_ ID")
@@ -5104,6 +5341,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     watch.add_argument("--once", action="store_true", help="look twice, act, then stop")
     watch.set_defaults(handler=_watch)
+    import_doc = commands.add_parser(
+        "import-doc", help="import a Markdown or text note (only read; searchable afterwards)"
+    )
+    import_doc.add_argument("path", type=Path, help="a .md, .markdown or .txt file")
+    import_doc.set_defaults(handler=_import_doc)
+
     importer = commands.add_parser("import", help="import an export (folder or ZIP; only read)")
     importer.add_argument("source", type=Path, help="export ZIP or folder")
     importer.add_argument(

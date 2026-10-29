@@ -452,7 +452,11 @@ def _evaluation(ctx: _Context, path: str, query: dict[str, list[str]]) -> Page:
 def _accounts(settings: Settings) -> Page:
     from knowledge_engine.links.social_store import account_summaries, ambiguous_handles
 
-    found = _read(settings, lambda s: (account_summaries(s), ambiguous_handles(s)))
+    # A rejected account (SOC-004) leaves the list; its own page keeps the history.
+    found = _read(
+        settings,
+        lambda s: (account_summaries(s, include_rejected=False), ambiguous_handles(s)),
+    )
     accounts, ambiguous = found if found is not None else ([], [])
     return Page("200 OK", "accounts.html", {"accounts": accounts, "ambiguous": ambiguous})
 

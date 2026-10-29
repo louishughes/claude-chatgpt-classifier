@@ -88,6 +88,39 @@ class LinkOccurrenceRow(Base):
     first_import_id: Mapped[str] = mapped_column(ForeignKey("import_batches.import_id"))
 
 
+def ensure_target(
+    session: Session, link: FoundLink, *, import_id: str, counts: Counter[str]
+) -> str:
+    """Return the link target for a URL, creating it the first time it's seen.
+
+    Shared by chat messages and imported documents (ING-012), so a URL
+    mentioned in both is one destination with mentions from each.
+
+    Args:
+        session: A write session.
+        link: The found URL.
+        import_id: The running batch.
+        counts: ``new_targets`` is added to when a target is created.
+
+    Returns:
+        The ``link_`` ID.
+    """
+    target_key = link_target_id(link.canonical_url)
+    if session.get(LinkTargetRow, target_key) is None:
+        session.add(
+            LinkTargetRow(
+                target_id=target_key,
+                canonical_url=link.canonical_url,
+                host=link.host,
+                first_import_id=import_id,
+            )
+        )
+        # Flush so a second mention in this batch finds the target.
+        session.flush()
+        counts["new_targets"] += 1
+    return target_key
+
+
 def record_links(
     session: Session,
     mentions: Iterable[tuple[str, str | None, FoundLink]],
@@ -109,19 +142,7 @@ def record_links(
     """
     counts: Counter[str] = Counter()
     for revision_id, actor, link in mentions:
-        target_key = link_target_id(link.canonical_url)
-        if session.get(LinkTargetRow, target_key) is None:
-            session.add(
-                LinkTargetRow(
-                    target_id=target_key,
-                    canonical_url=link.canonical_url,
-                    host=link.host,
-                    first_import_id=import_id,
-                )
-            )
-            # Flush so a second mention in this batch finds the target.
-            session.flush()
-            counts["new_targets"] += 1
+        target_key = ensure_target(session, link, import_id=import_id, counts=counts)
         key = link_occurrence_id(revision_id, link.span.start, link.span.end, link.origin)
         counts["seen_occurrences"] += 1
         if session.get(LinkOccurrenceRow, key) is None:

@@ -163,6 +163,25 @@ def search(
                     filters=filters,
                 )
             ][:limit]
+            # ING-012: note blocks, apart from chat hits; filters are about
+            # messages, so a filtered search returns none.
+            document_hits = (
+                []
+                if filters is not None or conversation_id is not None
+                else [
+                    {
+                        "document_id": hit.document_id,
+                        "revision_id": hit.revision_id,
+                        "name": hit.name,
+                        "locator": hit.locator,
+                        "snippet": hit.snippet,
+                    }
+                    for workspace_id in ix.workspaces
+                    for hit in ix.lexical.search_documents(
+                        q, workspace_id=workspace_id, mode=mode, limit=limit
+                    )
+                ][:limit]
+            )
             undated = sum(
                 ix.lexical.undated(
                     q,
@@ -174,6 +193,8 @@ def search(
                 for workspace_id in ix.workspaces
             )
     body: dict[str, Any] = {"mode": mode.value, "hits": hits}
+    if document_hits:
+        body["document_hits"] = document_hits
     if filters is not None and filters.dated:
         body["undated_left_out"] = undated
     return body
