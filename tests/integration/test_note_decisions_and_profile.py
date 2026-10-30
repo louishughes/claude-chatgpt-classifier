@@ -256,3 +256,33 @@ def test_workspace_keywords_leave_out_the_custom_instruction_profile(workspace: 
     found = workspace_keywords(workspace)
     kiln = next(v for v in found.values() if "kiln" in " ".join(_terms(v)))
     assert not {"exampleville", "zephyrwright", "synthetic person"} & _terms(kiln)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Synthetic: I haven't decided on a colour yet.",
+        "Synthetic: are we going with Postgres?",
+        "Synthetic: my boss decided to use Oracle.",
+        "Synthetic: maybe I'll go with oak.",
+        "Synthetic: I'm not going with the oak.",
+        "Synthetic: if we're using Postgres, backups matter.",
+    ],
+)
+def test_a_question_negation_hedge_or_third_party_is_not_a_users_choice(text: str) -> None:
+    said = _item(20, RecordType.PREFERENCE, Role.USER, text)
+    assert _sort([said]).decisions == []
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "Synthetic: we'll go with Postgres.",
+        "Synthetic: I opted for oak.",
+        "Synthetic: we're going to use Postgres.",
+        "Synthetic: I’ll go with the oak shelf.",
+    ],
+)
+def test_more_ways_of_stating_a_choice_are_decisions(text: str) -> None:
+    said = _item(21, RecordType.PREFERENCE, Role.USER, text)
+    assert _sort([said]).decisions == [said]
