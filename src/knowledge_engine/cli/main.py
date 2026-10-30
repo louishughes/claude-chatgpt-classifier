@@ -1778,9 +1778,17 @@ def _purge(settings: Settings, args: argparse.Namespace) -> CommandResult:
         data=data,
         message=(
             f"purged and checked (purge {result.purge_id}): {check.probes} probe(s), "
-            f"nothing found{note}"
+            f"nothing found{note}{_notes_kept(check.kept_in_notes)}"
         ),
     )
+
+
+def _notes_kept(places: list[dict[str, Any]]) -> str:
+    # ING-015: imported notes that quote the chat are kept on purpose; say so.
+    names = sorted({p["name"] for p in places})
+    if not names:
+        return ""
+    return f"; {len(names)} imported note(s) still quote it, kept on purpose: {', '.join(names)}"
 
 
 def _backup(settings: Settings, args: argparse.Namespace) -> CommandResult:

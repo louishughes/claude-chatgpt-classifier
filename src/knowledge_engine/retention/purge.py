@@ -39,6 +39,14 @@ How it runs:
    must not contain them, no table may still mention a deleted ID, and
    every planned file must be gone. The result goes in the audit event.
 
+Imported notes (ING-012) are the person's own separate files, so a purge
+never changes them, even when a note quotes the chat (ING-015, Louis's
+decision). A probe a note also holds is still searched for and still
+looked for in the vault (neither can find a note's text), but not in the
+database file's bytes, where the note's copy legitimately is. The check
+names each note holding a probe (``kept_in_notes``: ID, file name, line
+locator and version, never text) so the person can remove it if they want.
+
 Append-only tables (review logs, timeline events, document builds) refuse
 deletes by trigger. A purge is the one sanctioned exception: it lifts
 those triggers inside its own transaction and puts them back before it
@@ -136,6 +144,11 @@ KEPT_SOURCE_COLUMNS = frozenset(
         ("message_revisions", "content_json"),
         ("link_targets", "canonical_url"),
         ("link_occurrences", "original_text"),
+        # ING-015: imported notes are the person's own files and are kept.
+        ("document_blocks", "text"),
+        ("document_blocks", "heading_path_json"),
+        ("document_links", "original_text"),
+        ("source_documents", "name"),
     }
 )
 _PREFIXED_ID = re.compile(r"\b(?:conv|node|rev|seg|krec|cls|occ|lnkocc|amen|stg|asset)_[0-9a-f]+\b")
@@ -197,6 +210,9 @@ class Verification:
     files_left: int = 0
     vault_images_left: int = 0
     foreign_key_problems: int = 0
+    # Notes still holding the chats' words, kept on purpose (ING-015).
+    kept_in_notes: list[dict[str, Any]] = field(default_factory=list)
+    probes_in_notes: int = 0  # probes left out of the bytes check only
 
     @property
     def ok(self) -> bool:
@@ -224,6 +240,8 @@ class Verification:
             "files_left": self.files_left,
             "vault_images_left": self.vault_images_left,
             "foreign_key_problems": self.foreign_key_problems,
+            "kept_in_notes": self.kept_in_notes,
+            "probes_in_notes": self.probes_in_notes,
         }
 
 
@@ -609,6 +627,35 @@ def _probes(db: sqlite3.Connection, plan: PurgePlan) -> list[str]:
     return probes
 
 
+def _in_notes(
+    db: sqlite3.Connection, probes: Sequence[str]
+) -> tuple[set[str], list[dict[str, Any]]]:
+    """Which probes an imported note (any version) holds, and where (ING-015).
+
+    One scan per probe, so at most ``_MAX_PROBES`` scans. Each place is the
+    note's ID, file name, line locator, version and whether that version is
+    the current one (an old version's text is kept as evidence too).
+    """
+    if "document_blocks" not in _tables(db):
+        return set(), []  # a workspace from before ING-012
+    held: set[str] = set()
+    places: set[tuple[str, str, str, str, bool]] = set()
+    for probe in probes:
+        rows = db.execute(
+            "SELECT d.document_id, d.name, b.locator, r.revision_id, "
+            "d.current_revision_id = r.revision_id FROM document_blocks b "
+            "JOIN document_revisions r ON r.revision_id = b.revision_id "
+            "JOIN source_documents d ON d.document_id = r.document_id "
+            "WHERE instr(b.text, ?) > 0",
+            (probe,),
+        ).fetchall()
+        if rows:
+            held.add(probe)
+            places.update((i, n, loc, rev, bool(cur)) for i, n, loc, rev, cur in rows)
+    keys = ("document_id", "name", "locator", "revision_id", "current")
+    return held, [dict(zip(keys, p, strict=True)) for p in sorted(places)]
+
+
 def _forms(probe: str) -> set[str]:
     """The ways a passage can be spelled in storage: plain, or escaped inside JSON."""
     return {probe, json.dumps(probe)[1:-1], json.dumps(probe, ensure_ascii=False)[1:-1]}
@@ -740,6 +787,7 @@ def run_purge(
                 if plan.token != confirm:
                     raise PurgeError("the plan doesn't match that token; plan again")
                 probes = _probes(db, plan)
+                held, notes = _in_notes(db, probes)
                 _delete(db, plan)
                 purge_id = uuid.uuid4().hex
                 keys = [(TombstoneKind.CONVERSATION, conversation_key(c)) for c in conversations]
@@ -773,7 +821,8 @@ def run_purge(
             synced: dict[str, int] = {}
             if vault is not None:
                 synced = _sync_vault(settings, vault, taxonomy_version, plan)
-            verification = _verify(settings, db, plan, probes, vault)
+            verification = _verify(settings, db, plan, probes, vault, held)
+            verification.kept_in_notes = notes
             db.execute(
                 "UPDATE purge_events SET status = ?, verification_json = ? WHERE purge_id = ?",
                 (
@@ -882,8 +931,14 @@ def _verify(
     plan: PurgePlan,
     probes: Sequence[str],
     vault: Path | None,
+    in_notes: frozenset[str] | set[str] = frozenset(),
 ) -> Verification:
-    """Search, scan and look for every trace of the purged chats."""
+    """Search, scan and look for every trace of the purged chats.
+
+    ``in_notes`` are probes an imported note holds: they are still searched
+    for and looked for in the vault, but the database file's bytes hold the
+    note's own copy, so they are left out of that one scan (ING-015).
+    """
     from sqlalchemy.orm import Session
 
     from knowledge_engine.infrastructure.db import create_sqlite_engine
@@ -914,8 +969,10 @@ def _verify(
     finally:
         engine.dispose()
     database = database_path(settings)
+    check.probes_in_notes = len(in_notes)
     check.database_bytes_hits = _bytes_hits(
-        [database, database.with_name(database.name + "-wal")], probes
+        [database, database.with_name(database.name + "-wal")],
+        [p for p in probes if p not in in_notes],
     )
     if vault is not None and vault.is_dir():
         check.vault_hits = _bytes_hits(sorted(vault.rglob("*.md")), probes)
