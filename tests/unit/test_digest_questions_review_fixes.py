@@ -36,7 +36,7 @@ def _answer(
     messages: list[ExtractionMessage], questions: Sequence[tuple[str, str, str]]
 ) -> DigestAnswer:
     """An answer whose open questions are (text, cited message ID, quote)."""
-    first = {"message_id": messages[0].native_id, "text": messages[0].text.split()[0]}
+    first = {"message_id": messages[0].native_id, "text": " ".join(messages[0].text.split()[:4])}
     return DigestAnswer.model_validate(
         {
             "summary": [{"text": "Synthetic summary.", "quotes": [first]}],

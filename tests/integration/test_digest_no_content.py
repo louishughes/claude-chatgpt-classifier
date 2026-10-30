@@ -126,7 +126,7 @@ def chats(tmp_path: Path) -> Iterator[tuple[Session, dict[str, StoredConversatio
 
 
 def _good(request: ModelRequest) -> dict[str, Any]:
-    cite = [{"message_id": f"[m:{SPOKEN['current_node']}]", "text": "Synthetic"}]
+    cite = [{"message_id": f"[m:{SPOKEN['current_node']}]", "text": "how long do I boil an egg"}]
     return {
         "summary": [{"text": "The user asked about eggs.", "quotes": cite}],
         "status": {"value": "open", "quotes": cite},

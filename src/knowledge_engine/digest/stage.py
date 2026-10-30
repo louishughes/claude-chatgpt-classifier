@@ -413,7 +413,8 @@ def _record_reconciled(
                     field="resolved_questions",
                     index=position,  # its place among the answered, as none got a slot
                     reason=f"answered by the user in {found.reply.native_id}, but its quote "
-                    f"is not in the cited message, so it was dropped ({QUESTIONS_VERSION})",
+                    "is not in the cited message or is too short to prove anything, "
+                    f"so it was dropped ({QUESTIONS_VERSION})",
                 )
             )
             continue

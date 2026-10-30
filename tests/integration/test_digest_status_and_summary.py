@@ -106,8 +106,8 @@ def _cid(session: Session, native: str) -> str:
 def _settled_with_a_question(at: int, summary: list[str]) -> Callable[[ModelRequest], Any]:
     def answer(request: ModelRequest) -> dict[str, Any]:
         tags = _TAG.findall(request.input_text)
-        first = [{"message_id": tags[0][0], "text": tags[0][2].split()[0]}]
-        asked = [{"message_id": tags[at][0], "text": tags[at][2].split()[0]}]
+        first = [{"message_id": tags[0][0], "text": " ".join(tags[0][2].split()[:4])}]
+        asked = [{"message_id": tags[at][0], "text": " ".join(tags[at][2].split()[:4])}]
         return {
             "summary": [{"text": text, "quotes": first} for text in summary],
             "status": {"value": "settled", "quotes": first},

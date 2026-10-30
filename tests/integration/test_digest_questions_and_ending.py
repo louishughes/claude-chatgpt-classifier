@@ -123,7 +123,7 @@ def _load(session: Session, native: str) -> StoredConversation:
 
 
 def _cite(tag: tuple[str, str, str]) -> list[dict[str, str]]:
-    return [{"message_id": tag[0], "text": tag[2].split()[0]}]
+    return [{"message_id": tag[0], "text": " ".join(tag[2].split()[:4])}]
 
 
 def _answer(
@@ -175,7 +175,7 @@ def test_an_offer_accepted_in_a_later_part_is_set_aside_with_the_reply(session: 
         shown = {t[0] for t in tags}
         if offer.native_id not in shown or reply.native_id in shown:
             return []  # a part that saw the "yes" doesn't list the offer as open
-        quoted = [{"message_id": offer.native_id, "text": "Want"}]
+        quoted = [{"message_id": offer.native_id, "text": "Want me to draft"}]
         return [{"text": "Should the assistant draft the planting plan?", "quotes": quoted}]
 
     runner = ModelStageRunner(session, FakeProvider(_answer(listed)), EgressPolicy(text_llm=True))

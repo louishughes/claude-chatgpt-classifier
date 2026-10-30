@@ -42,7 +42,7 @@ def _per_part(request: ModelRequest) -> dict[str, Any]:
     part = _PART.search(request.input_text)
     n = part.group(1) if part else "1"
     message_id, _, text = _TAG.findall(request.input_text)[0]
-    cite = [{"message_id": f"[m:{message_id}]", "text": text.split()[0]}]
+    cite = [{"message_id": f"[m:{message_id}]", "text": " ".join(text.split()[:4])}]
     return {
         "summary": [
             {"text": f"In this part, step {n} begins.", "quotes": cite},
