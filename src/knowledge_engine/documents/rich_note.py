@@ -52,6 +52,7 @@ Talking points:
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
@@ -76,7 +77,7 @@ from knowledge_engine.documents.notes import _branches, _images, _links, knowled
 from knowledge_engine.documents.render import transcript_stem
 from knowledge_engine.domain.models import EvidenceRef
 from knowledge_engine.extraction.action_status import ActionStatus, action_status
-from knowledge_engine.extraction.records import KnowledgeRecord
+from knowledge_engine.extraction.records import Acceptance, KnowledgeRecord
 from knowledge_engine.extraction.runner import DONE as RUN_DONE
 from knowledge_engine.extraction.runner import ExtractionRunRow
 from knowledge_engine.extraction.store import KnowledgeRecordRow
@@ -396,17 +397,63 @@ def _collapse(items: Sequence[_Item], citer: Citer) -> tuple[list[_Item], int]:
     return kept, len(items) - len(kept)
 
 
+# The cue list and the reasons to refuse are in ``_user_choice``'s docstring.
+_CHOICE = re.compile(
+    r"\b(?:(?:i|we)['’]?ll (?:go with|use|take|stick with|pick)"
+    r"|(?:i['’]?m|we['’]?re) going (?:with|to use|to go with)"
+    r"|let['’]?s (?:go with|use|do|stick with|pick)|we['’]?re (?:doing|using)"
+    r"|(?:i|we)(?:'ve)? (?:chose|chosen|picked|decided|opted for)|i choose"
+    r"|settled on)\b",
+    re.IGNORECASE,
+)
+# A question, a negation, a hedge or a condition is not a choice made.
+_NOT_A_CHOICE = re.compile(
+    r"\?|\b(?:not|never|no|yet|maybe|perhaps|might|probably|if|unless|whether)\b"
+    r"|n't\b|n’t\b",
+    re.IGNORECASE,
+)
+
+
+def _user_choice(it: _Item) -> bool:
+    """A requirement or preference the user explicitly holds that states a choice.
+
+    Only the user's own explicitly accepted words count: an assistant's
+    suggestion never becomes a decision here, however it is worded.
+
+    Cues (NOTE-035), matched in the record's assertion:
+    "I'll / we'll go with, use, take, stick with, pick", "I'm / we're going
+    with, going to use", "let's go with, use, do, stick with, pick", "we're
+    doing, using", "I / we chose, picked, decided, opted for", "I choose",
+    "settled on". A third party's "my boss decided to" does not count.
+
+    Refused even with a cue: a question ("Are we going with Postgres?"), a
+    negation ("I haven't decided on a colour", "I'm not going with oak"), a
+    hedge ("maybe", "perhaps", "might", "probably") or a condition ("if",
+    "unless", "whether"). Such a record stays where its type puts it.
+    """
+    record = it.record
+    return (
+        it.item.record_type in ("requirement", "preference")
+        and it.item.actor == "user"
+        and record.acceptance is Acceptance.EXPLICIT
+        and _CHOICE.search(record.assertion) is not None
+        and _NOT_A_CHOICE.search(record.assertion) is None
+    )
+
+
 def _sort(items: Sequence[_Item]) -> _Sorted:
     """Place each record in exactly one section.
 
     Who holds it matters as much as its type: an assistant's task is a
     *suggestion*, not the user's action item (EXT-005), so it goes with the
-    suggestions.
+    suggestions. A user's requirement or preference that states a choice
+    (``_user_choice``) is shown once, under Decisions, not under
+    Requirements as well.
     """
     out = _Sorted([], [], [], [], [], [], [], [])
     for it in items:
         kind, actor = it.item.record_type, it.item.actor
-        if kind == "decision":
+        if kind == "decision" or _user_choice(it):
             out.decisions.append(it)
         elif kind == "rejection":
             out.ruled_out.append(it)
