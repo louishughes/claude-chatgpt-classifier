@@ -70,7 +70,7 @@ from knowledge_engine.extraction.text import ExtractionMessage
 from knowledge_engine.graph.offsets import Span, find_quote
 from knowledge_engine.reconciliation.equivalence import STOP_WORDS
 
-QUESTIONS_VERSION = "note-039-v1"
+QUESTIONS_VERSION = "note-039-v2"
 # A reply naming one of several offers must share this many of its words.
 NAMED_SHARED = 2
 # An offer sentence "is" the question when it shares at least this many of
@@ -79,13 +79,16 @@ OFFER_SHARED = 2
 OFFER_MISSING = 1
 
 _WORD = re.compile(r"[^\W_]+(?:['’][^\W_]+)?")
-# For the join key: a word, or a symbol that changes what is asked. Plain
-# sentence punctuation (",", ".", "?", quotes, brackets) is left out, except
-# a "." or "," inside a number or name ("1,500", "1.500") or starting one
-# (".NET"). Everything else ("+", "#", "$", "%", "-", "<", ">") counts.
+# For the join key: a word, or a symbol that changes what is asked. Only a
+# short list of symbols counts ("+", "#", "$", "%", "<", ">", "/", "=", ...),
+# plus a minus sign before a number ("-5"), and a "." or "," inside a number
+# or name ("1,500", "1.500") or starting one (".NET"). Everything else, such
+# as emoji, dashes, "**" bold markers and quote marks, is wording, not
+# meaning, so it is left out and the same question still joins.
 _KEY_TOKEN = re.compile(
     r"[^\W_]+(?:['’][^\W_]+)?"
-    r"|[^\w\s.,;:!?\"'’“”‘()\[\]…]"
+    r"|[+#$%<>/=&@€£¥^~|]"
+    r"|(?<!\w)-(?=\d)"
     r"|(?<=\w)[.,](?=\w)|(?<!\w)\.(?=\w)"
 )
 _ANSWER = re.compile(
@@ -107,14 +110,18 @@ _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 _CHOICE = re.compile(r"\bor\b", re.IGNORECASE)
 _ARTICLES = frozenset({"a", "an", "the"})
 _CUE_WORDS = frozenset("yes please go ahead do it let's lets that no thanks thank you need".split())
-# The digest's wording for who asks ("Should the assistant book it?"); an
-# offer says "me"/"you" instead, so these don't count when matching offers.
-_ROLE_WORDS = frozenset({"assistant", "user"})
+# The digest's wording for who asks ("Should the assistant book it?", "Does
+# the user want a summary?") and an offer's ("Do you want me to...", "Would
+# you like..."). These say who, not what, so they don't count when matching.
+_ROLE_WORDS = frozenset({"assistant", "user", "does", "do", "want", "like", "me", "you"})
 # Saying no inside a yes ("Yes, no hotel") or yes inside a no makes a reply mixed.
 _NO_WORD = re.compile(r"\b(?:no|not|never|nah|nope)\b|n['’]t\b", re.IGNORECASE)
 _DECLINE = re.compile(r"^(?:no\b)", re.IGNORECASE)
 _YES_WORD = re.compile(r"\b(?:yes|yeah|yep|sure|ok|okay|go ahead)\b", re.IGNORECASE)
-_DO_IT = re.compile(r"\b([^\W_]+)\s+(?:it|that|them)\b", re.IGNORECASE)
+# "book it" after a no is a request; "no need to book it" is not.
+_DO_IT = re.compile(
+    r"(?<!\bto )(?<!\bnot )(?<!n't )(?<!n’t )\b([^\W_]+)\s+(?:it|that|them)\b", re.IGNORECASE
+)
 
 
 def _token(word: str) -> str:
@@ -131,14 +138,15 @@ def question_key(text: str) -> tuple[str, ...]:
 
     Only articles are left out: pronouns, modals, "this"/"that", "and"/"or"
     and word order all change what is asked. Symbols that change the
-    meaning are kept (see ``_KEY_TOKEN``). An article is dropped only in
-    lower case or as the first word, so the grade "A" in "A+ or A-" stays.
+    meaning are kept (see ``_KEY_TOKEN``). Articles are dropped in any
+    case ("The"), except a capital "A" after the first word, which is a
+    grade or a name ("A+ or A-"), not an article.
     """
     tokens = _KEY_TOKEN.findall(text)
     return tuple(
         _token(t)
         for n, t in enumerate(tokens)
-        if not (t.lower() in _ARTICLES and (t.islower() or n == 0))
+        if not (t.lower() in _ARTICLES and (t != "A" or n == 0))
     )
 
 
@@ -308,7 +316,13 @@ def _join(
                 None,
             )  # fmt: skip
             if home is not None and not any(_backed(q, by_id) for q in item.quotes):
-                home = None  # a copy with no good quote stays apart, to be flagged and dropped
+                # A repeat with no good quote adds no citations (one bad quote
+                # would get the whole question dropped later), but it still
+                # shows this part listed the question: a reply this part saw
+                # must not then count as answering it.
+                home.last = p
+                home.joined += 1
+                continue
             if home is None:
                 kept.append(_Kept(p, p, item, key, role))
                 continue

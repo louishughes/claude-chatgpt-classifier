@@ -185,3 +185,65 @@ def test_an_answered_question_with_a_bad_quote_still_leaves_a_flag() -> None:
     assert digest.resolved_questions == ()
     assert [f.field for f in digest.flags] == ["resolved_questions"]
     assert "quote is not in the cited message" in digest.flags[0].reason
+
+
+# The second clean review (of this fix) found these; each is one of its probes.
+
+
+@pytest.mark.parametrize(
+    ("one", "two"),
+    [
+        ("Book the hotel? 🙂", "Book the hotel?"),
+        ("**Book the hotel?**", "Book the hotel?"),
+        ("Book hotel — today?", "Book hotel today?"),
+        ("Is it «fine»?", "Is it fine?"),
+        ("Book The Hotel?", "Book the hotel?"),
+    ],
+)
+def test_wording_that_does_not_change_the_meaning_still_joins(one: str, two: str) -> None:
+    assert question_key(one) == question_key(two)
+
+
+def test_a_repeat_with_a_bad_quote_still_counts_as_listing_the_question() -> None:
+    # Part 2 saw the user's reply and still listed the question (with a bad
+    # quote), so that reply must not close it.
+    m = _messages(
+        [
+            ("u", "Plan my synthetic trip."),
+            ("a", "Want me to book the hotel?"),
+            ("u", "Yes, book the hotel."),
+            ("a", "Before I book the hotel: which dates?"),
+            ("u", "Synthetic dates."),
+        ]
+    )
+    question = "Should the assistant book the hotel?"
+    answers = [
+        _answer(m, [(question, "m1", "book the hotel")]),
+        _answer(m, [(question, "m3", "book the villa")]),
+    ]
+    result = reconcile_parts(answers, [("m0", "m1"), ("m2", "m3", "m4")], m)
+    assert _open(result) == [question]
+    assert result.answered == []
+
+
+@pytest.mark.parametrize("reply", ["No need to book it", "No need to book the hotel"])
+def test_no_need_to_do_it_is_a_clean_decline(reply: str) -> None:
+    m = _messages(
+        [("u", "Plan my synthetic trip."), ("a", "Want me to book the hotel?"), ("u", reply)]
+    )
+    answers = [
+        _answer(m, [("Should the assistant book the hotel?", "m1", "book the hotel")]),
+        _answer(m, []),
+    ]
+    result = reconcile_parts(answers, [("m0", "m1"), ("m1", "m2")], m)
+    assert _open(result) == []
+
+
+def test_the_digest_wording_does_not_hide_an_offer() -> None:
+    m = _messages(
+        [("u", "Synthetic code."), ("a", "Would you like a Python version?"), ("u", "Yes please.")]
+    )
+    question = "Does the user want a Python version?"
+    answers = [_answer(m, [(question, "m1", "Python version")]), _answer(m, [])]
+    result = reconcile_parts(answers, [("m0", "m1"), ("m1", "m2")], m)
+    assert [a.question.text for a in result.answered] == [question]
