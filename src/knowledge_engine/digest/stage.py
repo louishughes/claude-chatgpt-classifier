@@ -398,7 +398,7 @@ def _record_reconciled(
                 )
             )
     resolved: list[ResolvedQuestion] = []
-    for found in reconciled.answered:
+    for position, found in enumerate(reconciled.answered):
         item = resolve_item(
             "open_questions",
             without_part_wording(found.question.text),
@@ -406,7 +406,17 @@ def _record_reconciled(
             messages,
         )
         if item is None:
-            continue  # its own quotes fail, so it would not have been shown anyway
+            # Its own quotes fail, so it would not have been shown anyway, but
+            # it still leaves a flag: nothing the model wrote goes silently.
+            flags.append(
+                DigestFlag(
+                    field="resolved_questions",
+                    index=position,  # its place among the answered, as none got a slot
+                    reason=f"answered by the user in {found.reply.native_id}, but its quote "
+                    f"is not in the cited message, so it was dropped ({QUESTIONS_VERSION})",
+                )
+            )
+            continue
         resolved.append(ResolvedQuestion(question=item, resolved_by=quote(found.reply, found.span)))
         flags.append(
             DigestFlag(
