@@ -11,7 +11,7 @@ worked):
   TF-IDF: said often in this chat, rare in the others;
 * **optional**: the next ones, up to 50 in all.
 
-Each candidate keeps its reasons and the messages it appears in. Four
+Each candidate keeps its reasons and the messages it appears in. Five
 things keep the list honest:
 
 1. **Corpus calibration.** A phrase found in most chats (over 65% once
@@ -24,7 +24,12 @@ things keep the list honest:
 3. **Pasted setup text.** Words found only in a pasted setup prompt ("You
    are a pirate captain...", see ``is_preamble``) describe the role-play,
    not the subject. They are listed under ``excluded`` with that reason.
-4. **Exclusions with a reason.** A title word too general to describe a
+4. **The user's profile.** Custom instructions and the profile
+   (``user_editable_context``) are context the user never typed in the
+   chat, so their names and places say nothing about the subject. They are
+   left out, and so is a paragraph of a user turn that repeats the profile
+   word for word (NOTE-036).
+5. **Exclusions with a reason.** A title word too general to describe a
    chat ("help", "question") is excluded and says why, rather than
    silently dropped.
 
@@ -57,7 +62,7 @@ from knowledge_engine.taxonomy.discovery import STOP_WORDS
 from knowledge_engine.taxonomy.registry import Dimension, TaxonomySnapshot, normalise_alias
 from knowledge_engine.taxonomy.review import OPEN, Operation, proposals, propose
 
-KEYWORDS_VERSION = "note-007-v1"
+KEYWORDS_VERSION = "note-007-v2"  # v2: the profile is never counted (NOTE-036)
 SHOULD_COUNT = 20
 MAX_KEYWORDS = 50
 # A phrase in more than this share of chats is not specific to any one,
@@ -116,12 +121,16 @@ class ChatInput:
         title: The chat's title ("" if none).
         messages: The active path's messages, in order.
         topics: Topic phrases from the digest (NOTE-002), if any.
+        profile: The text of the chat's custom-instruction and profile
+            messages (NOTE-036). Never counted, and a user paragraph that
+            repeats one of its paragraphs is not counted either.
     """
 
     conversation_id: str
     title: str
     messages: tuple[ExtractionMessage, ...]
     topics: tuple[str, ...] = ()
+    profile: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -455,9 +464,12 @@ def _phrases(
     """Phrase counts in the chat's own messages, in pasted setup text, and the title."""
     content: dict[str, _Phrase] = defaultdict(_Phrase)
     setup: dict[str, _Phrase] = defaultdict(_Phrase)
+    pasted = {_paragraph_key(p) for text in chat.profile for p in _paragraphs(text)}
+    pasted.discard("")
     for message in chat.messages:
         into = setup if is_preamble(message) else content
-        for clause in _words(message.text):
+        text = "\n\n".join(p for p in _paragraphs(message.text) if _paragraph_key(p) not in pasted)
+        for clause in _words(text):
             fixed = [spelling.get(w.casefold(), w) for w in clause]
             for phrase, written in _ngrams(fixed, clause):
                 into[phrase].seen(message.native_id, written)
@@ -468,6 +480,15 @@ def _phrases(
             if len(folded) >= 3 and folded not in STOP_WORDS:
                 title.setdefault(folded, word if word.casefold() == folded else folded)
     return dict(content), dict(setup), title
+
+
+def _paragraphs(text: str) -> list[str]:
+    return [p for p in re.split(r"\n\s*\n", text) if p.strip()]
+
+
+def _paragraph_key(paragraph: str) -> str:
+    """A paragraph compared case- and spacing-blind, so a re-pasted profile still matches."""
+    return " ".join(paragraph.casefold().split())
 
 
 def _named(
@@ -604,6 +625,7 @@ def workspace_keywords(
     from sqlalchemy import select
 
     from knowledge_engine.digest.stage import chat_messages
+    from knowledge_engine.graph.nodes import NodeFlag
     from knowledge_engine.importer.records import ConversationRow
     from knowledge_engine.rendering.transcript import load_conversation
 
@@ -614,12 +636,17 @@ def workspace_keywords(
         )
     ).all():
         chat = load_conversation(session, conversation_id)
+        context = {
+            native for native, node in chat.messages.items() if NodeFlag.CONTEXT in node.flags
+        }
+        messages = chat_messages(chat)
         chats.append(
             ChatInput(
                 conversation_id,
                 title or "",
-                tuple(chat_messages(chat)),
+                tuple(m for m in messages if m.native_id not in context),
                 tuple((topics or {}).get(conversation_id, ())),
+                profile=tuple(m.text for m in messages if m.native_id in context),
             )
         )
     resolver = AliasResolver(taxonomy) if taxonomy is not None else None

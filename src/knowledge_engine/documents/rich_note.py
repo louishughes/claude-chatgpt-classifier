@@ -52,6 +52,7 @@ Talking points:
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
@@ -76,7 +77,7 @@ from knowledge_engine.documents.notes import _branches, _images, _links, knowled
 from knowledge_engine.documents.render import transcript_stem
 from knowledge_engine.domain.models import EvidenceRef
 from knowledge_engine.extraction.action_status import ActionStatus, action_status
-from knowledge_engine.extraction.records import KnowledgeRecord
+from knowledge_engine.extraction.records import Acceptance, KnowledgeRecord
 from knowledge_engine.extraction.runner import DONE as RUN_DONE
 from knowledge_engine.extraction.runner import ExtractionRunRow
 from knowledge_engine.extraction.store import KnowledgeRecordRow
@@ -396,17 +397,46 @@ def _collapse(items: Sequence[_Item], citer: Citer) -> tuple[list[_Item], int]:
     return kept, len(items) - len(kept)
 
 
+# A user's own requirement or preference that picks one option or commits to
+# a course reads as a decision (NOTE-035): "I'll go with the oak", "let's use
+# Postgres", "we're doing the coast road".
+_CHOICE = re.compile(
+    r"\b(?:i'?ll go with|i'?m going with|i'?ll (?:use|take|stick with|pick)"
+    r"|let'?s (?:go with|use|do|stick with|pick)|we'?re (?:going with|doing|using)"
+    r"|i(?:'ve)? (?:chose|chosen|picked|decided)|i choose|decided (?:to|on)"
+    r"|settled on|going with)\b",
+    re.IGNORECASE,
+)
+
+
+def _user_choice(it: _Item) -> bool:
+    """A requirement or preference the user explicitly holds that states a choice.
+
+    Only the user's own explicitly accepted words count: an assistant's
+    suggestion never becomes a decision here, however it is worded.
+    """
+    record = it.record
+    return (
+        it.item.record_type in ("requirement", "preference")
+        and it.item.actor == "user"
+        and record.acceptance is Acceptance.EXPLICIT
+        and _CHOICE.search(record.assertion) is not None
+    )
+
+
 def _sort(items: Sequence[_Item]) -> _Sorted:
     """Place each record in exactly one section.
 
     Who holds it matters as much as its type: an assistant's task is a
     *suggestion*, not the user's action item (EXT-005), so it goes with the
-    suggestions.
+    suggestions. A user's requirement or preference that states a choice
+    (``_user_choice``) is shown once, under Decisions, not under
+    Requirements as well.
     """
     out = _Sorted([], [], [], [], [], [], [], [])
     for it in items:
         kind, actor = it.item.record_type, it.item.actor
-        if kind == "decision":
+        if kind == "decision" or _user_choice(it):
             out.decisions.append(it)
         elif kind == "rejection":
             out.ruled_out.append(it)
