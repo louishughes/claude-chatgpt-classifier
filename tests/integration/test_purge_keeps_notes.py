@@ -138,3 +138,63 @@ def test_a_note_heading_naming_the_chat_is_not_a_leftover(
 
     assert check["residual_ids"] == {}
     assert check["ok"] is True
+
+
+# From the second clean review: a note must not switch off the database check,
+# and a note kept inside the vault itself must not fail the vault check.
+
+
+def test_a_note_does_not_hide_the_chats_words_left_in_another_table(
+    workspace: tuple[Settings, str], tmp_path: Path
+) -> None:
+    settings, conversation = workspace
+    texts = _chat_text(settings, conversation)
+    _quote_note(settings, conversation, tmp_path / "quote.md")
+    # Stand-in for a row the purge missed: the chat's words, no ID, in a kept table.
+    with sqlite3.connect(settings.workspace_root / "knowledge.db") as db:
+        db.execute(
+            "INSERT INTO taxonomy_proposals (proposal_id, operation, payload_json, "
+            "evidence_json, proposer, status, created_at, decision_note) "
+            "VALUES ('tp_synthetic', 'add', '{}', '{}', 'owner', 'rejected', "
+            "datetime('now'), ?)",
+            ("\n".join(texts),),
+        )
+
+    check = _purge(settings, conversation)
+
+    assert check["text_left_outside_notes"] == {"taxonomy_proposals.decision_note": 1}
+    assert check["ok"] is False
+
+
+def test_a_note_kept_inside_the_vault_does_not_fail_the_vault_check(
+    workspace: tuple[Settings, str], tmp_path: Path
+) -> None:
+    settings, conversation = workspace
+    vault = tmp_path / "vault"
+    _quote_note(settings, conversation, vault / "my-quote.md")
+
+    check = _purge(settings, conversation, vault=vault)
+
+    assert check["vault_hits"] == 0
+    assert check["ok"] is True
+    assert {n["name"] for n in check["kept_in_notes"]} == {"my-quote.md"}
+
+
+def test_the_message_counts_notes_by_id_and_says_when_only_an_old_version_quotes(
+    workspace: tuple[Settings, str], tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    settings, conversation = workspace
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    _quote_note(settings, conversation, tmp_path / "a" / "quote.md")
+    _quote_note(settings, conversation, tmp_path / "b" / "quote.md")
+    (tmp_path / "b" / "quote.md").write_bytes(b"# Quote\n\nNothing quoted any more.\n")
+    assert main(["--json", "import-doc", str(tmp_path / "b" / "quote.md")]) == ExitCode.OK
+    capsys.readouterr()
+    plan = plan_purge(settings, [conversation])
+
+    main(["purge", "run", conversation, "--confirm", plan.token, "--reason", "synthetic"])
+
+    out = capsys.readouterr().out
+    assert "2 imported note(s) hold its words" in out
+    assert "quote.md (an older version)" in out
