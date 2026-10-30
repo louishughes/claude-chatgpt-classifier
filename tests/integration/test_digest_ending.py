@@ -105,7 +105,7 @@ def session(tmp_path: Path) -> Any:
 def _wrong(request: ModelRequest) -> dict[str, Any]:
     """A digest whose status is the opposite of the right one."""
     message_id, _, text = _TAG.findall(request.input_text)[-1]
-    cite = [{"message_id": f"[m:{message_id}]", "text": text.split()[0]}]
+    cite = [{"message_id": f"[m:{message_id}]", "text": " ".join(text.split()[:4])}]
     wrong = "settled" if "coats" in request.input_text else "open"
     return {
         "summary": [{"text": "Something was discussed.", "quotes": cite}],

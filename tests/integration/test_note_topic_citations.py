@@ -90,8 +90,8 @@ def test_topics_from_one_message_share_one_citation(tmp_path: Path) -> None:
                 "intent": {"value": "plan", "text": "Plan a build.", "quotes": [quote]},
                 "topics": [
                     _topic("raised beds", first, "raised beds"),
-                    _topic("cedar", first, "cedar"),
-                    _topic("watering", second, "water them"),
+                    _topic("cedar", first, "beds from cedar"),
+                    _topic("watering", second, "water them in summer"),
                     _topic("drainage", first, "good drainage"),
                 ],
             }

@@ -43,12 +43,16 @@ def _answer(**changes: Any) -> dict[str, Any]:
         ],
         "purpose": {"text": "Back up photos.", "quotes": [_q("m1", "photo backups")]},
         "status": {"value": "open", "quotes": [_q("m3", "Which drives are quiet enough?")]},
-        "intent": {"value": "decide", "text": "Pick hardware.", "quotes": [_q("m1", "I want")]},
-        "topics": [{"text": "NAS", "quotes": [_q("[m:m1]", "NAS")]}],
+        "intent": {
+            "value": "decide",
+            "text": "Pick hardware.",
+            "quotes": [_q("m1", "I want a cheap NAS")],
+        },
+        "topics": [{"text": "NAS", "quotes": [_q("[m:m1]", "cheap NAS")]}],
         "open_questions": [
             {"text": "Which drives are quiet?", "quotes": [_q("m3", "quiet enough")]}
         ],
-        "next_steps": [{"text": "Compare drive noise.", "quotes": [_q("m3", "drives")]}],
+        "next_steps": [{"text": "Compare drive noise.", "quotes": [_q("m3", "Which drives")]}],
     }
     data.update(changes)
     return data
@@ -86,7 +90,7 @@ def test_the_schema_refuses_invented_or_uncited_content(bad: dict[str, Any]) -> 
 def test_a_quote_not_in_the_chat_drops_the_whole_item_and_flags_it() -> None:
     insights = [
         # One good quote and one invented one: the item still goes.
-        {"text": "Noise matters.", "quotes": [_q("m3", "quiet"), _q("m3", "silent drives")]},
+        {"text": "Noise matters.", "quotes": [_q("m3", "quiet enough"), _q("m3", "silent drives")]},
         {"text": "Mirroring protects photos.", "quotes": [_q("m2", "mirrored drives")]},
     ]
     digest = resolve_digest(DigestAnswer.model_validate(_answer(insights=insights)), CHAT)

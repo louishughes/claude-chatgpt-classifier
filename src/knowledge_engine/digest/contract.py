@@ -19,6 +19,8 @@ Two shapes, like the model extractor:
   an item cites a message that is not in the chat, or words that are not
   in that message, the whole item is dropped and the drop is recorded in
   ``flags``. A digest item is either fully backed by the chat or not shown.
+  A quote that is found but too short to prove anything (one word like
+  "I" or "Yes."; NOTE-037, ``is_trivial_quote``) fails the same way.
 
 Each field's provenance is fixed here (``FIELD_PROVENANCE``), never chosen
 by the model, so the note's "From the chat" / "Generated" labels can't be
@@ -28,12 +30,16 @@ Talking points:
     - "The model can only fill the boxes we drew. An extra box, or a
       sentence with no citation, is refused before we read it."
     - "One bad quote sinks the whole sentence it was meant to support."
+    - "A one-word quote like 'I' is in every chat, so it proves nothing and
+      counts as no quote at all, unless the word is a number, a version
+      or a link."
     - "Whether a section counts as 'from the chat' or 'generated' is our
       rule, not the model's opinion."
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
@@ -44,6 +50,7 @@ from knowledge_engine.domain.models import EvidenceRef
 from knowledge_engine.extraction.text import ExtractionMessage, quote
 from knowledge_engine.graph.offsets import find_quote
 from knowledge_engine.providers.base import MessageRef
+from knowledge_engine.reconciliation.equivalence import STOP_WORDS
 
 DIGEST_SCHEMA_VERSION = "note-002-v1"
 
@@ -51,6 +58,19 @@ DIGEST_SCHEMA_VERSION = "note-002-v1"
 # for a clause, too short to paste a paragraph.
 MAX_QUOTE_CHARS = 300
 MAX_QUOTES_PER_ITEM = 5
+
+# The quote check's own version (NOTE-037). It runs in code on stored
+# answers, so it is deliberately *not* part of the request key: bumping it
+# re-checks every stored answer and asks the model nothing new. It is
+# recorded in the flag of every quote it refuses.
+QUOTE_CHECK_VERSION = "note-037-v1"
+# A quote must have at least this many content words (stop words left out)
+# OR at least this many characters. "I", "Yes." or "I want" occur in almost
+# any chat, so finding them proves nothing about the item they back; "Use
+# port 8080" (two content words) or "the nightly backup" (12+ characters)
+# point at one place. Both limits must fail for a quote to be refused.
+MIN_QUOTE_CONTENT_WORDS = 2
+MIN_QUOTE_CHARS = 12
 
 
 class Provenance(StrEnum):
@@ -224,6 +244,49 @@ class ConversationDigest(BaseModel):
         return bool(self.summary)
 
 
+_WORD = re.compile(r"[^\W_]+(?:['’][^\W_]+)?")
+# One-token quotes that are distinctive on their own, so the length rule
+# lets them through: a link, or a token with a digit next to a letter or
+# a unit sign ("v2.3", "5GB", "x86_64", "10%", "£40"). A bare number like
+# "3" is not: it is as common as "yes".
+_URL = re.compile(r"^(?:[a-z][a-z0-9+.-]*://|www\.)\S+$", re.IGNORECASE)
+_DIGIT = re.compile(r"\d")
+_UNIT_SIGN = re.compile(r"[^\W\d_]|[%°$£€¥]")
+_EDGE_PUNCTUATION = ".,;:!?\"'()[]{}<>“”‘’"
+
+
+def _is_distinctive_token(text: str) -> bool:
+    token = text.strip().strip(_EDGE_PUNCTUATION)
+    if not token or any(c.isspace() for c in token):
+        return False
+    if _URL.match(token):
+        return True
+    return bool(_DIGIT.search(token) and _UNIT_SIGN.search(token))
+
+
+def is_trivial_quote(text: str) -> bool:
+    """Whether a quote is too short to prove anything (NOTE-037).
+
+    A quote is trivial when it has fewer than ``MIN_QUOTE_CONTENT_WORDS``
+    content words (``STOP_WORDS`` left out) **and** fewer than
+    ``MIN_QUOTE_CHARS`` characters, unless it is one distinctive token: a
+    link, or a number with a unit or an identifier ("5GB", "v2.3").
+
+    Args:
+        text: The quote as the model wrote it.
+
+    Returns:
+        True if the quote should be refused like a quote that isn't found.
+    """
+    stripped = text.strip()
+    if len(stripped) >= MIN_QUOTE_CHARS:
+        return False
+    content = [w for w in _WORD.findall(stripped.lower()) if w not in STOP_WORDS]
+    if len(content) >= MIN_QUOTE_CONTENT_WORDS:
+        return False
+    return not _is_distinctive_token(stripped)
+
+
 @dataclass(frozen=True)
 class _Resolved:
     item: DigestItem | None
@@ -245,6 +308,8 @@ def _resolve_item(
         spans = find_quote(message.text, cited.text)
         if not spans:
             return _Resolved(None, "quote not found in the cited message")
+        if is_trivial_quote(cited.text):
+            return _Resolved(None, f"quote too short to prove anything ({QUOTE_CHECK_VERSION})")
         evidence.append(quote(message, spans[0]))
         if message.native_id not in message_ids:
             message_ids.append(message.native_id)
