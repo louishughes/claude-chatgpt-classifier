@@ -39,7 +39,7 @@ from typing import Any
 
 import yaml
 
-DOCUMENT_PARSER_VERSION = "ing-008-v1"
+DOCUMENT_PARSER_VERSION = "ing-013-v1"  # lines end only at CR/LF
 
 
 class BlockKind(StrEnum):
@@ -172,12 +172,17 @@ class _Line:
     text: str
 
 
+# Only these end a line (ING-013). ``str.splitlines`` also splits on a form
+# feed, U+2028 and other rare characters that an editor shows inside a
+# line, which pushed every later locator one line too far.
+_LINE = re.compile(r"[^\r\n]*(?:\r\n|\r|\n)|[^\r\n]+$")
+
+
 def _lines(text: str) -> list[_Line]:
-    found, offset = [], 0
-    for number, raw in enumerate(text.splitlines(keepends=True), start=1):
-        body = raw.rstrip("\r\n")
-        found.append(_Line(number, offset, offset + len(body), body))
-        offset += len(raw)
+    found = []
+    for number, match in enumerate(_LINE.finditer(text), start=1):
+        body = match.group().rstrip("\r\n")
+        found.append(_Line(number, match.start(), match.start() + len(body), body))
     return found
 
 

@@ -141,7 +141,11 @@ def link_page(session: Session, target_id: str) -> dict[str, Any] | None:
 
 
 def list_videos(session: Session) -> list[dict[str, Any]]:
-    """Return every YouTube video, most mentioned first, with transcript status."""
+    """Return every YouTube video, most mentioned first, with transcript status.
+
+    ``mentions`` counts chat mentions plus links from imported notes'
+    current versions (ING-014); ``conversations`` counts chats only.
+    """
     mentions = func.count(YouTubeMentionRow.mention_id)
     rows = session.execute(
         select(
@@ -152,40 +156,46 @@ def list_videos(session: Session) -> list[dict[str, Any]]:
         .join(YouTubeMentionRow, YouTubeMentionRow.video_id == YouTubeVideoRow.video_id)
         .join(LinkOccurrenceRow, LinkOccurrenceRow.occurrence_id == YouTubeMentionRow.mention_id)
         .group_by(YouTubeVideoRow.video_id)
-        .order_by(mentions.desc(), YouTubeVideoRow.video_id)
     ).all()
-    return [
+    in_notes = _note_mentions(session)
+    videos = [
         {
             "video_id": video.video_id,
             "transcript_status": video.transcript_status,
-            "mentions": int(m),
+            "mentions": int(m) + in_notes.pop(video.video_id, 0),
             "conversations": int(c),
         }
         for video, m, c in rows
-    ] + _note_only_videos(session, {video.video_id for video, _, _ in rows})
+    ]
+    # What is left in ``in_notes`` is linked only from notes.
+    for video_id, count in in_notes.items():
+        video = session.get(YouTubeVideoRow, video_id)
+        if video is not None:
+            videos.append(
+                {
+                    "video_id": video_id,
+                    "transcript_status": video.transcript_status,
+                    "mentions": count,
+                    "conversations": 0,
+                }
+            )
+    return sorted(videos, key=lambda v: (-v["mentions"], v["video_id"]))
 
 
-def _note_only_videos(session: Session, listed: set[str]) -> list[dict[str, Any]]:
-    # ING-012: a video linked only from an imported note has no chat
-    # mentions, so the join above misses it. It is still a known video.
-    from knowledge_engine.importer.text_documents import DocumentLinkRow
+def _note_mentions(session: Session) -> dict[str, int]:
+    # ING-012/014: links to each video from imported notes. Only a note's
+    # *current* version counts, the same rule as the video page, so a link
+    # removed from a note no longer keeps the video in the list. Old
+    # versions keep their link rows as history.
+    from knowledge_engine.importer.text_documents import DocumentLinkRow, DocumentRow
 
     rows = session.execute(
-        select(YouTubeVideoRow)
-        .join(DocumentLinkRow, DocumentLinkRow.video_id == YouTubeVideoRow.video_id)
-        .group_by(YouTubeVideoRow.video_id)
-        .order_by(YouTubeVideoRow.video_id)
-    ).scalars()
-    return [
-        {
-            "video_id": video.video_id,
-            "transcript_status": video.transcript_status,
-            "mentions": 0,
-            "conversations": 0,
-        }
-        for video in rows
-        if video.video_id not in listed
-    ]
+        select(DocumentLinkRow.video_id, func.count(DocumentLinkRow.link_id))
+        .join(DocumentRow, DocumentRow.current_revision_id == DocumentLinkRow.revision_id)
+        .where(DocumentLinkRow.video_id.is_not(None))
+        .group_by(DocumentLinkRow.video_id)
+    ).tuples()
+    return {video_id: int(count) for video_id, count in rows if video_id is not None}
 
 
 def video_page(session: Session, video_id: str) -> dict[str, Any] | None:
