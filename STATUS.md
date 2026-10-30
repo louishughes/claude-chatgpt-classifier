@@ -196,6 +196,7 @@ Live ticket status for the build. The original ticket list is `docs/TICKETS.csv`
 | IMP-009 List, accept or reject identity candidates (#380) | VERIFIED (CLI tests on a synthetic chat with no ID and the id_collision fixture) | sessions/2026-10-29-0130-IMP-009 |
 | SOC-004 Confirm or reject a social account, link a bare @handle (#381) | VERIFIED (CLI and note tests on a synthetic chat) | sessions/2026-10-29-0215-SOC-004 |
 | ING-012 Import a Markdown or text note: searchable, links found (#383) | VERIFIED (CLI, API and UI tests on a synthetic note) | sessions/2026-10-29-0530-ING-012 |
+| ING-015 Erasing a chat keeps a note that quotes it and names it (#405) | VERIFIED (purge tests on the EVAL-006 workspace with a synthetic note) | sessions/2026-10-30-1410-ING-015 |
 | OPS-011 Test everything with a double-click (#397) | VERIFIED (unit tests on the report; demo checklist checked against the real demo dashboard; CI on Windows and Linux) | docs/diary/entries/2026-10-30-1330-OPS-011 |
 | ING-013/014 Exact note line numbers and [url](url) links; video list follows a note's current version (#400, #401) | VERIFIED (integration tests from the clean review's probes) | sessions/2026-10-30-1345-ING-013-014 |
 | NOTE-038/039 Open questions across parts: no lost or wrongly joined question; a yes only answers its own offer (#398, #399) | VERIFIED (unit tests from the clean review's probes) | sessions/2026-10-30-1325-NOTE-038-039 |

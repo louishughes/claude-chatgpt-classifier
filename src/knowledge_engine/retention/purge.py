@@ -39,6 +39,17 @@ How it runs:
    must not contain them, no table may still mention a deleted ID, and
    every planned file must be gone. The result goes in the audit event.
 
+Imported notes (ING-012) are the person's own separate files, so a purge
+never changes them, even when a note quotes the chat (ING-015, Louis's
+decision). A probe a note also holds is still searched for and still
+looked for in the vault, except in a vault file that *is* an imported note
+(same bytes). It isn't looked for in the database file's raw bytes, where
+the note's copy legitimately is; instead every text column outside the
+note tables is checked for it, row by row (``text_left_outside_notes``),
+so a note can't hide a leftover elsewhere. The check names each note
+holding a probe (``kept_in_notes``: ID, file name, line locator and
+version, never text) so the person can remove it if they want.
+
 Append-only tables (review logs, timeline events, document builds) refuse
 deletes by trigger. A purge is the one sanctioned exception: it lifts
 those triggers inside its own transaction and puts them back before it
@@ -136,6 +147,11 @@ KEPT_SOURCE_COLUMNS = frozenset(
         ("message_revisions", "content_json"),
         ("link_targets", "canonical_url"),
         ("link_occurrences", "original_text"),
+        # ING-015: imported notes are the person's own files and are kept.
+        ("document_blocks", "text"),
+        ("document_blocks", "heading_path_json"),
+        ("document_links", "original_text"),
+        ("source_documents", "name"),
     }
 )
 _PREFIXED_ID = re.compile(r"\b(?:conv|node|rev|seg|krec|cls|occ|lnkocc|amen|stg|asset)_[0-9a-f]+\b")
@@ -197,6 +213,11 @@ class Verification:
     files_left: int = 0
     vault_images_left: int = 0
     foreign_key_problems: int = 0
+    # Notes still holding the chats' words, kept on purpose (ING-015).
+    kept_in_notes: list[dict[str, Any]] = field(default_factory=list)
+    probes_in_notes: int = 0  # probes left out of the bytes check only
+    # Those probes found in a row outside the note tables: "table.column" -> rows.
+    text_left_outside_notes: dict[str, int] = field(default_factory=dict)
 
     @property
     def ok(self) -> bool:
@@ -209,6 +230,7 @@ class Verification:
             or self.files_left
             or self.vault_images_left
             or self.foreign_key_problems
+            or self.text_left_outside_notes
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -224,6 +246,9 @@ class Verification:
             "files_left": self.files_left,
             "vault_images_left": self.vault_images_left,
             "foreign_key_problems": self.foreign_key_problems,
+            "kept_in_notes": self.kept_in_notes,
+            "probes_in_notes": self.probes_in_notes,
+            "text_left_outside_notes": self.text_left_outside_notes,
         }
 
 
@@ -609,6 +634,35 @@ def _probes(db: sqlite3.Connection, plan: PurgePlan) -> list[str]:
     return probes
 
 
+def _in_notes(
+    db: sqlite3.Connection, probes: Sequence[str]
+) -> tuple[set[str], list[dict[str, Any]]]:
+    """Which probes an imported note (any version) holds, and where (ING-015).
+
+    One scan per probe, so at most ``_MAX_PROBES`` scans. Each place is the
+    note's ID, file name, line locator, version and whether that version is
+    the current one (an old version's text is kept as evidence too).
+    """
+    if "document_blocks" not in _tables(db):
+        return set(), []  # a workspace from before ING-012
+    held: set[str] = set()
+    places: set[tuple[str, str, str, str, bool]] = set()
+    for probe in probes:
+        rows = db.execute(
+            "SELECT d.document_id, d.name, b.locator, r.revision_id, "
+            "d.current_revision_id = r.revision_id FROM document_blocks b "
+            "JOIN document_revisions r ON r.revision_id = b.revision_id "
+            "JOIN source_documents d ON d.document_id = r.document_id "
+            "WHERE instr(b.text, ?) > 0",
+            (probe,),
+        ).fetchall()
+        if rows:
+            held.add(probe)
+            places.update((i, n, loc, rev, bool(cur)) for i, n, loc, rev, cur in rows)
+    keys = ("document_id", "name", "locator", "revision_id", "current")
+    return held, [dict(zip(keys, p, strict=True)) for p in sorted(places)]
+
+
 def _forms(probe: str) -> set[str]:
     """The ways a passage can be spelled in storage: plain, or escaped inside JSON."""
     return {probe, json.dumps(probe)[1:-1], json.dumps(probe, ensure_ascii=False)[1:-1]}
@@ -740,6 +794,7 @@ def run_purge(
                 if plan.token != confirm:
                     raise PurgeError("the plan doesn't match that token; plan again")
                 probes = _probes(db, plan)
+                held, notes = _in_notes(db, probes)
                 _delete(db, plan)
                 purge_id = uuid.uuid4().hex
                 keys = [(TombstoneKind.CONVERSATION, conversation_key(c)) for c in conversations]
@@ -773,7 +828,8 @@ def run_purge(
             synced: dict[str, int] = {}
             if vault is not None:
                 synced = _sync_vault(settings, vault, taxonomy_version, plan)
-            verification = _verify(settings, db, plan, probes, vault)
+            verification = _verify(settings, db, plan, probes, vault, held)
+            verification.kept_in_notes = notes
             db.execute(
                 "UPDATE purge_events SET status = ?, verification_json = ? WHERE purge_id = ?",
                 (
@@ -882,8 +938,14 @@ def _verify(
     plan: PurgePlan,
     probes: Sequence[str],
     vault: Path | None,
+    in_notes: frozenset[str] | set[str] = frozenset(),
 ) -> Verification:
-    """Search, scan and look for every trace of the purged chats."""
+    """Search, scan and look for every trace of the purged chats.
+
+    ``in_notes`` are probes an imported note holds: they are still searched
+    for and looked for in the vault, but the database file's bytes hold the
+    note's own copy, so they are left out of that one scan (ING-015).
+    """
     from sqlalchemy.orm import Session
 
     from knowledge_engine.infrastructure.db import create_sqlite_engine
@@ -914,11 +976,22 @@ def _verify(
     finally:
         engine.dispose()
     database = database_path(settings)
+    check.probes_in_notes = len(in_notes)
     check.database_bytes_hits = _bytes_hits(
-        [database, database.with_name(database.name + "-wal")], probes
+        [database, database.with_name(database.name + "-wal")],
+        [p for p in probes if p not in in_notes],
     )
+    check.text_left_outside_notes = _text_outside_notes(db, in_notes)
     if vault is not None and vault.is_dir():
-        check.vault_hits = _bytes_hits(sorted(vault.rglob("*.md")), probes)
+        imported = _imported_note_hashes(db)
+        check.vault_hits = _bytes_hits(
+            [
+                path
+                for path in sorted(vault.rglob("*.md"))
+                if hashlib.sha256(path.read_bytes()).hexdigest() not in imported
+            ],
+            probes,
+        )
         blobs = plan.ids.get("blob", set())
         check.vault_images_left = sum(
             1
@@ -928,6 +1001,51 @@ def _verify(
             and hashlib.sha256(path.read_bytes()).hexdigest() in blobs
         )
     return check
+
+
+# Where an imported note's own text lives (ING-015). Leftovers anywhere else count.
+_NOTE_COLUMNS = frozenset(
+    {
+        ("document_blocks", "text"),
+        ("document_blocks", "heading_path_json"),
+        ("document_links", "original_text"),
+        ("source_documents", "name"),
+    }
+)
+
+
+def _text_outside_notes(db: sqlite3.Connection, held: set[str] | frozenset[str]) -> dict[str, int]:
+    """Rows outside the note tables still holding a probe a note also holds.
+
+    Those probes skip the raw-bytes scan (the note's copy would trip it), so
+    every other text column is checked for them here instead, one pass.
+    """
+    if not held:
+        return {}
+    needles = [form for probe in held for form in _forms(probe)]
+    found: Counter[str] = Counter()
+    for table in sorted(_tables(db) - {"purge_events", "purge_tombstones", "alembic_version"}):
+        columns = [
+            name
+            for _, name, kind, *_ in db.execute(f'PRAGMA table_info("{table}")')
+            if (table, name) not in _NOTE_COLUMNS
+            and (not kind or any(t in kind.upper() for t in ("CHAR", "TEXT", "CLOB")))
+        ]
+        if not columns:
+            continue
+        quoted = ", ".join(f'"{c}"' for c in columns)
+        for row in db.execute(f'SELECT {quoted} FROM "{table}"'):
+            for column, value in zip(columns, row, strict=True):
+                if isinstance(value, str) and any(n in value for n in needles):
+                    found[f"{table}.{column}"] += 1
+    return dict(sorted(found.items()))
+
+
+def _imported_note_hashes(db: sqlite3.Connection) -> set[str]:
+    """SHA-256 of every imported note version: a vault file with those bytes is the note."""
+    if "document_revisions" not in _tables(db):
+        return set()
+    return {sha for (sha,) in db.execute("SELECT sha256 FROM document_revisions")}
 
 
 def purge_log(settings: Settings) -> list[dict[str, Any]]:

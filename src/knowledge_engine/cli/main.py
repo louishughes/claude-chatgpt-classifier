@@ -1778,9 +1778,25 @@ def _purge(settings: Settings, args: argparse.Namespace) -> CommandResult:
         data=data,
         message=(
             f"purged and checked (purge {result.purge_id}): {check.probes} probe(s), "
-            f"nothing found{note}"
+            f"nothing found{note}{_notes_kept(check.kept_in_notes)}"
         ),
     )
+
+
+def _notes_kept(places: list[dict[str, Any]]) -> str:
+    # ING-015: imported notes that quote the chat are kept on purpose; say so.
+    # Counted by document ID: two notes can share a file name.
+    notes: dict[str, tuple[str, bool]] = {}
+    for p in places:
+        name, current = notes.get(p["document_id"], (p["name"], False))
+        notes[p["document_id"]] = (name, current or bool(p["current"]))
+    if not notes:
+        return ""
+    names = ", ".join(
+        f"{name}" + ("" if current else " (an older version)")
+        for name, current in sorted(notes.values())
+    )
+    return f"; {len(notes)} imported note(s) hold its words, kept on purpose: {names}"
 
 
 def _backup(settings: Settings, args: argparse.Namespace) -> CommandResult:
