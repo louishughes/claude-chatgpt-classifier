@@ -28,18 +28,10 @@ from the re-score, which found 0 of 9 open questions):
 Each of these, and an unanswered question, also becomes an open question
 in the digest, citing the closing message, when the model didn't list one.
 
-A digest can't be settled and still list open questions (NOTE-028: the
-fourth score found 6 chats marked settled whose own open questions said
-otherwise). So a settled digest with an open question raised in the
-**last exchange** (the user's last message or after) becomes **open**,
-flagged. A question raised earlier may have been answered later in the
-chat, so the model's reading stands. Also left settled: the user said
-they were done, or the only open questions cite the assistant's closing
-offer (that offer is not unfinished business, the NOTE-019 rule above).
-
-When a rule applies and the model said otherwise, the rule wins, and a flag
-records the change for a reviewer, so the correction is never silent. The
-new status cites the message that decided it.
+The status itself is decided once, for the whole chat, in
+``digest/status.py`` (NOTE-034): that module holds the rule table, which
+combines the ending read here with the open questions still open after
+the parts are reconciled (NOTE-028's "keep open" rule lives there too).
 
 Talking points:
     - "'Want me to do another?' isn't an open question. It's the assistant
@@ -67,7 +59,9 @@ from knowledge_engine.extraction.text import ExtractionMessage, quote
 from knowledge_engine.graph.offsets import find_quote
 from knowledge_engine.rendering.transcript import StoredConversation
 
-ENDING_VERSION = "note-028-v1"  # note-023-v1: drafts, report-backs; + open questions
+# note-023-v1: drafts, report-backs; note-028-v1: open questions keep a chat open;
+# note-034-v1: the status is decided once, for the whole chat (digest/status.py).
+ENDING_VERSION = "note-034-v1"
 
 # An offer of more help. Matched only in the assistant's closing sentence.
 _OFFER = re.compile(
@@ -192,7 +186,8 @@ def chat_ending(messages: list[ExtractionMessage], conversation: StoredConversat
     return ChatEnding(Ending.OTHER)
 
 
-def _status_item(status: ChatStatus, message: ExtractionMessage) -> DigestItem | None:
+def status_item(status: ChatStatus, message: ExtractionMessage) -> DigestItem | None:
+    """The status as an item citing ``message``'s last words; None if they aren't found."""
     # Cite the deciding message by its last words (where the ending is), as
     # written: a letter's last words run over line breaks ("regards,\nSam").
     starts = [m.start() for m in _WORD_START.finditer(message.text)]
@@ -205,35 +200,6 @@ def _status_item(status: ChatStatus, message: ExtractionMessage) -> DigestItem |
         provenance=FIELD_PROVENANCE["status"],
         message_ids=(message.native_id,),
         evidence=(quote(message, spans[0]),),
-    )
-
-
-def settle_status(
-    digest: ConversationDigest,
-    messages: list[ExtractionMessage],
-    conversation: StoredConversation,
-) -> ConversationDigest:
-    """The digest with its status checked against how the chat ended.
-
-    A rule that applies and disagrees with the model replaces the status,
-    with a flag saying what the model had said and why it changed.
-    """
-    found = chat_ending(messages, conversation)
-    wanted = STATUS_FOR.get(found.ending)
-    if wanted is None or found.message is None or digest.status is wanted:
-        return digest
-    item = _status_item(wanted, found.message)
-    if item is None:
-        return digest
-    said = digest.status.value if digest.status else "no status"
-    flag = DigestFlag(
-        field="status",
-        index=0,
-        reason=f"changed from {said} to {wanted.value}: the chat ends with {found.ending.value} "
-        f"({ENDING_VERSION})",
-    )
-    return digest.model_copy(
-        update={"status": wanted, "status_item": item, "flags": (*digest.flags, flag)}
     )
 
 
@@ -259,7 +225,7 @@ def ending_questions(
         return digest
     if any(found.message.native_id in q.message_ids for q in digest.open_questions):
         return digest
-    cited = _status_item(ChatStatus.OPEN, found.message)
+    cited = status_item(ChatStatus.OPEN, found.message)
     if cited is None:
         return digest
     item = DigestItem(
@@ -278,47 +244,4 @@ def ending_questions(
             "open_questions": (*digest.open_questions, item),
             "flags": (*digest.flags, flag),
         }
-    )
-
-
-def questions_keep_open(
-    digest: ConversationDigest,
-    messages: list[ExtractionMessage],
-    conversation: StoredConversation,
-) -> ConversationDigest:
-    """The digest made open when it is settled but lists open questions (NOTE-028).
-
-    Run after ``settle_status`` and ``ending_questions``. Only questions
-    citing the last exchange count. Left settled when the user said they
-    were done, or when every such question cites only the closing offer.
-    The new status cites the latest message an open question cites, and a
-    flag says what changed.
-    """
-    if digest.status is not ChatStatus.SETTLED or not digest.open_questions:
-        return digest
-    found = chat_ending(messages, conversation)
-    if found.ending is Ending.USER_DONE:
-        return digest
-    closing = found.message.native_id if found.message is not None else None
-    cited = {i for q in digest.open_questions for i in q.message_ids}
-    if found.ending is Ending.ASSISTANT_OFFER and cited <= {closing}:
-        return digest
-    order = {m.native_id: n for n, m in enumerate(messages)}
-    users = [n for n, m in enumerate(messages) if m.role is Role.USER]
-    last_exchange = users[-1] if users else 0
-    late = [i for i in cited if order.get(i, -1) >= last_exchange]
-    if not late:
-        return digest
-    latest = max(late, key=order.__getitem__)
-    item = _status_item(ChatStatus.OPEN, messages[order[latest]])
-    if item is None:
-        return digest
-    flag = DigestFlag(
-        field="status",
-        index=0,
-        reason=f"changed from settled to open: an open question cites the last exchange "
-        f"({ENDING_VERSION})",
-    )
-    return digest.model_copy(
-        update={"status": ChatStatus.OPEN, "status_item": item, "flags": (*digest.flags, flag)}
     )
