@@ -84,7 +84,7 @@ from knowledge_engine.links.store import LinkTargetRow, ensure_target
 from knowledge_engine.links.youtube import ensure_video, parse_youtube
 from knowledge_engine.settings import Settings
 
-DOCUMENT_IMPORT_VERSION = "ing-012-v1"
+DOCUMENT_IMPORT_VERSION = "ing-013-v1"  # [url](url) gives two links
 # The ledger's account label for document batches: notes aren't from a
 # chat account, and this keeps them apart from every export's namespace.
 DOCUMENT_NAMESPACE = "documents"
@@ -400,7 +400,7 @@ def _store_blocks(
         )
         counts["blocks"] += 1
         session.flush()
-        for link in find_in_text(block.text):
+        for link in find_in_text(block.text, markdown_links=True):
             # The block's text is document.text[start:end], so a span inside
             # the block plus the block's start is a span in the document.
             start = block.start + link.span.start
