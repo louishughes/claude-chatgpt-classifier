@@ -51,8 +51,9 @@ from knowledge_engine.digest.contract import (
     resolve_digest,
     resolve_item,
 )
-from knowledge_engine.digest.ending import ending_questions, questions_keep_open, settle_status
+from knowledge_engine.digest.ending import ending_questions
 from knowledge_engine.digest.questions import QUESTIONS_VERSION, Reconciled, reconcile_parts
+from knowledge_engine.digest.status import decide_status
 from knowledge_engine.domain.enums import Role
 from knowledge_engine.extraction.text import ExtractionMessage, exchanges_of, quote
 from knowledge_engine.orchestration.stage_keys import stage_key
@@ -335,18 +336,33 @@ def _checked(
     """Merge the parts' answers and check them against the chat.
 
     The parts' open questions are reconciled across parts first (NOTE-032),
-    then every quote is checked, then the status and open questions against
-    how the chat ends, then the summary's repeats and its ending (NOTE-033).
+    then every quote is checked, then the open questions the ending leaves,
+    then the status, decided once for the whole chat (NOTE-034), then the
+    summary's repeats and its ending (NOTE-033).
     """
     messages = chat_messages(conversation)
     good_last = _surviving_last(answers, messages)
     reconciled = reconcile_parts(answers, parts, messages)
     resolved = resolve_digest(merge_answers(reconciled.answers, good_last), messages)
     resolved = _record_reconciled(resolved, reconciled, messages)
-    digest = settle_status(resolved, messages, conversation)
-    digest = ending_questions(digest, messages, conversation)
-    digest = tidy_summary(questions_keep_open(digest, messages, conversation))
-    return ending_summarised(digest, answers, good_last)
+    digest = ending_questions(resolved, messages, conversation)
+    digest = decide_status(digest, messages, conversation, _still_open(reconciled, messages))
+    return ending_summarised(tidy_summary(digest), answers, good_last)
+
+
+def _still_open(reconciled: Reconciled, messages: Sequence[ExtractionMessage]) -> list[DigestItem]:
+    """Every part's open questions left after reconciling, checked against the chat.
+
+    Taken before the merge cuts the list to its maximum: that cut keeps the
+    earliest parts' questions, so the last part's (the ones about how the
+    chat ended) would otherwise be the first to go (NOTE-034).
+    """
+    found = (
+        resolve_item("open_questions", q.text, q.quotes, messages)
+        for answer in reconciled.answers
+        for q in answer.open_questions
+    )
+    return [item for item in found if item is not None]
 
 
 def _surviving_last(
