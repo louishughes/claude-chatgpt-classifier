@@ -133,6 +133,8 @@ Implement one dependency-unblocked ticket or approved vertical slice, test using
 
 ## 9. Developer setup (FND-001)
 
+**Just want to test it?** Double-click `TEST_EVERYTHING.bat` (all checks, opens a green/red report) or `OPEN_DEMO_DASHBOARD.bat` (the dashboard on made-up chats). The click-through checklist is in `docs/TESTING.md`.
+
 The package lives in `src/knowledge_engine/` and needs Python 3.12 or newer. From the project folder:
 
 ```bash
