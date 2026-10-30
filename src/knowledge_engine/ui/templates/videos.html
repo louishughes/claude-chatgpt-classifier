@@ -2,9 +2,9 @@
 {% block title %}Videos · Knowledge Engine{% endblock %}
 {% block main %}
 <header class="page-head">
-  <p class="eyebrow">Found in chats</p>
+  <p class="eyebrow">Found in chats and notes</p>
   <h1>YouTube videos</h1>
-  <p class="lede">One row per video, however its link was written. A transcript is only ever added by you (<code>ke transcript add</code>); nothing is downloaded.</p>
+  <p class="lede">One row per video, however its link was written. Mentions counts links in chats and in the current version of imported notes. A transcript is only ever added by you (<code>ke transcript add</code>); nothing is downloaded.</p>
 </header>
 {% if videos %}
 <div class="table-wrap"><table>
@@ -16,6 +16,6 @@
   </tbody>
 </table></div>
 {% else %}
-<div class="empty"><p class="what">No YouTube links found yet.</p><p class="next">Videos appear here once an imported chat links to YouTube.</p></div>
+<div class="empty"><p class="what">No YouTube links found yet.</p><p class="next">Videos appear here once an imported chat or note links to YouTube.</p></div>
 {% endif %}
 {% endblock %}
