@@ -390,7 +390,17 @@ def _record_reconciled(
             messages,
         )
         if item is None:
-            continue  # its own quotes fail, so it would not have been shown anyway
+            # Its own quotes fail, so it would not have been shown anyway, but
+            # it still leaves a flag: nothing the model wrote goes silently.
+            flags.append(
+                DigestFlag(
+                    field="resolved_questions",
+                    index=len(resolved),
+                    reason=f"answered by the user in {found.reply.native_id}, but its quote "
+                    f"is not in the cited message ({QUESTIONS_VERSION})",
+                )
+            )
+            continue
         resolved.append(ResolvedQuestion(question=item, resolved_by=quote(found.reply, found.span)))
         flags.append(
             DigestFlag(
