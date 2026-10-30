@@ -86,6 +86,18 @@ def test_an_assistant_suggestion_is_never_a_decision_however_it_is_worded() -> N
     assert proposal in sorted_.suggestions
 
 
+def test_an_accepted_suggestion_is_decided_by_the_users_own_accepting_message() -> None:
+    # Acceptance is recorded as the user's decision record (the reconciliation timeline only lets a
+    # decision ACCEPT an offer), so Decisions cites the user's message, and the
+    # suggestion itself stays under Suggestions.
+    offer = _item(7, RecordType.PROPOSAL, Role.ASSISTANT, "Synthetic: take the coast road.")
+    accept = _item(8, RecordType.DECISION, Role.USER, "Synthetic: yes, the coast road it is.")
+    sorted_ = _sort([offer, accept])
+    assert sorted_.decisions == [accept]
+    assert sorted_.suggestions == [offer]
+    assert {e.actor for e in accept.record.evidence} == {Role.USER}
+
+
 def test_a_choice_the_user_only_hedged_stays_a_preference() -> None:
     hedged = _item(
         6,
