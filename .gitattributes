@@ -1,3 +1,6 @@
 # Synthetic fixtures are compared byte for byte with freshly generated ones,
 # so Git must never convert their line endings (e.g. on Windows checkouts).
 tests/fixtures/** -text
+
+# Windows batch files need CRLF line endings, or cmd.exe can misread them.
+*.bat text eol=crlf
