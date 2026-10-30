@@ -99,19 +99,35 @@ def canonical_url(url: str) -> tuple[str, str] | None:
     return urlunsplit((scheme, netloc, parts.path or "/", parts.query, "")), host
 
 
-def find_in_text(text: str) -> list[FoundLink]:
+def find_in_text(text: str, *, markdown_links: bool = False) -> list[FoundLink]:
     """Find every http(s) URL in a message's canonical text.
 
     Args:
         text: ``CanonicalNode.text``.
+        markdown_links: Also end a URL where a Markdown link's target starts,
+            so ``[https://x](https://x)`` gives two mentions, not one long
+            wrong URL, and where a second target follows a first
+            (``(https://a)(https://b)``). The cost: a URL with a literal
+            ``](`` or ``)(`` in it is cut there (ING-013). Notes use it. Chat messages don't yet:
+            changing their mentions would add new rows on every re-import
+            of an old chat, so that needs its own repair plan.
 
     Returns:
         Mentions in order of position; each span selects exactly
         ``original`` from ``text``.
     """
     found: list[FoundLink] = []
-    for match in _URL_RE.finditer(text):
-        start, end = match.start(), _trim(text, match.start(), match.end())
+    position = 0
+    while (match := _URL_RE.search(text, position)) is not None:
+        start, end = match.start(), match.end()
+        position = end
+        if markdown_links:
+            cuts = [
+                c for c in (text.find("](", start, end), text.find(")(", start, end)) if c != -1
+            ]
+            if cuts:
+                end = position = min(cuts)  # the next search finds the link's own target
+        end = _trim(text, start, end)
         original = text[start:end]
         canonical = canonical_url(original)
         if canonical is None:
