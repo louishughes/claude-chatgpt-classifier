@@ -43,7 +43,7 @@ def branched(tmp_path: Path) -> Iterator[tuple[Session, StoredConversation]]:
 
 
 def _good(request: ModelRequest) -> dict[str, Any]:
-    """A valid digest citing the first word of the last message in the request."""
+    """A valid digest citing the first four words of the last message in the request."""
     message_id, _, text = _TAG.findall(request.input_text)[-1]
     cite = [{"message_id": f"[m:{message_id}]", "text": " ".join(text.split()[:4])}]
     return {

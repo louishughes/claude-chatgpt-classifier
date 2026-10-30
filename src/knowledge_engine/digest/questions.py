@@ -64,6 +64,7 @@ from knowledge_engine.digest.contract import (
     DigestAnswer,
     DigestItemAnswer,
     DigestQuote,
+    is_trivial_quote,
 )
 from knowledge_engine.domain.enums import Role
 from knowledge_engine.extraction.text import ExtractionMessage
@@ -249,9 +250,13 @@ def _is_offer(asked: frozenset[str], offer: str) -> bool:
 
 
 def _backed(quote: DigestQuote, by_id: dict[str, ExtractionMessage]) -> bool:
-    """Whether a quote is really in the message it cites (the later check's rule)."""
+    """Whether a quote passes the later check: in its message, and not trivial (NOTE-037)."""
     message = by_id.get(quote.message_id)
-    return message is not None and bool(find_quote(message.text, quote.text))
+    return (
+        message is not None
+        and bool(find_quote(message.text, quote.text))
+        and not is_trivial_quote(quote.text)
+    )
 
 
 def _joined_quotes(

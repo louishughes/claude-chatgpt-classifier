@@ -100,3 +100,22 @@ def test_a_missing_quote_still_says_not_found() -> None:
     digest = resolve_digest(_answer(topics=topics), CHAT)
 
     assert digest.flags[0].reason == "quote not found in the cited message"
+
+
+@pytest.mark.parametrize(
+    "quote",
+    ["yes yes", "Ok ok", "Yes, yes.", "no no"],
+)
+def test_a_repeated_word_counts_once(quote: str) -> None:
+    assert is_trivial_quote(quote)
+
+
+def test_a_trivial_repeat_from_another_part_adds_no_quote_to_a_joined_question() -> None:
+    from knowledge_engine.digest.contract import DigestQuote
+    from knowledge_engine.digest.questions import _joined_quotes
+
+    by_id = {m.native_id: m for m in CHAT}
+    order = {m.native_id: n for n, m in enumerate(CHAT)}
+    home = [DigestQuote(message_id="m1", text="Use port 8080")]
+    repeat = [DigestQuote(message_id="m2", text="Yes.")]
+    assert _joined_quotes(home, repeat, order, by_id) == home

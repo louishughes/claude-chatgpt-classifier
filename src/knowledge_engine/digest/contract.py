@@ -268,9 +268,12 @@ def is_trivial_quote(text: str) -> bool:
     """Whether a quote is too short to prove anything (NOTE-037).
 
     A quote is trivial when it has fewer than ``MIN_QUOTE_CONTENT_WORDS``
-    content words (``STOP_WORDS`` left out) **and** fewer than
+    different content words (``STOP_WORDS`` left out) **and** fewer than
     ``MIN_QUOTE_CHARS`` characters, unless it is one distinctive token: a
-    link, or a number with a unit or an identifier ("5GB", "v2.3").
+    link, or a number with a unit or an identifier ("5GB", "v2.3"). A
+    repeated word counts once, so "yes yes" is trivial. Known limit: the
+    character count includes spaces and punctuation, so padding such as
+    "OK!!!!!!!!!!!!" still passes.
 
     Args:
         text: The quote as the model wrote it.
@@ -281,7 +284,7 @@ def is_trivial_quote(text: str) -> bool:
     stripped = text.strip()
     if len(stripped) >= MIN_QUOTE_CHARS:
         return False
-    content = [w for w in _WORD.findall(stripped.lower()) if w not in STOP_WORDS]
+    content = {w for w in _WORD.findall(stripped.lower()) if w not in STOP_WORDS}
     if len(content) >= MIN_QUOTE_CONTENT_WORDS:
         return False
     return not _is_distinctive_token(stripped)
