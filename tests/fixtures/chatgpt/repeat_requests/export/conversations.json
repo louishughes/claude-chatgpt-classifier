@@ -1,0 +1,1785 @@
+[
+  {
+    "title": "Synthetic farming save",
+    "create_time": 1711843200.0,
+    "update_time": 1711843560.0,
+    "mapping": {
+      "c0000070-0000-4000-8000-000000000001-root": {
+        "id": "c0000070-0000-4000-8000-000000000001-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000070-0000-4000-8000-000000000001-sys"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000001-sys": {
+        "id": "c0000070-0000-4000-8000-000000000001-sys",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000001-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1711843260.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000001-root",
+        "children": [
+          "c0000070-0000-4000-8000-000000000001-u0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000001-u0": {
+        "id": "c0000070-0000-4000-8000-000000000001-u0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000001-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1711843320.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: how should I structure the save system for my farming game?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000001-sys",
+        "children": [
+          "c0000070-0000-4000-8000-000000000001-a0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000001-a0": {
+        "id": "c0000070-0000-4000-8000-000000000001-a0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000001-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1711843380.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: one save file per farm, versioned."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000001-u0",
+        "children": [
+          "c0000070-0000-4000-8000-000000000001-u1"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000001-u1": {
+        "id": "c0000070-0000-4000-8000-000000000001-u1",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000001-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1711843440.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: continue"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000001-a0",
+        "children": [
+          "c0000070-0000-4000-8000-000000000001-a1"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000001-a1": {
+        "id": "c0000070-0000-4000-8000-000000000001-a1",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000001-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1711843500.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: continuing."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000001-u1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000070-0000-4000-8000-000000000001-a1",
+    "plugin_ids": null,
+    "conversation_id": "c0000070-0000-4000-8000-000000000001",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000070-0000-4000-8000-000000000001"
+  },
+  {
+    "title": "Synthetic farming shop",
+    "create_time": 1712275200.0,
+    "update_time": 1712275560.0,
+    "mapping": {
+      "c0000070-0000-4000-8000-000000000002-root": {
+        "id": "c0000070-0000-4000-8000-000000000002-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000070-0000-4000-8000-000000000002-sys"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000002-sys": {
+        "id": "c0000070-0000-4000-8000-000000000002-sys",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000002-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712275260.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000002-root",
+        "children": [
+          "c0000070-0000-4000-8000-000000000002-u0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000002-u0": {
+        "id": "c0000070-0000-4000-8000-000000000002-u0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000002-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712275320.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: how should I price the items in my farming game shop?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000002-sys",
+        "children": [
+          "c0000070-0000-4000-8000-000000000002-a0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000002-a0": {
+        "id": "c0000070-0000-4000-8000-000000000002-a0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000002-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712275380.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: start from the time each item takes to grow."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000002-u0",
+        "children": [
+          "c0000070-0000-4000-8000-000000000002-u1"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000002-u1": {
+        "id": "c0000070-0000-4000-8000-000000000002-u1",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000002-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712275440.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: what's a good way to structure save data for the farming game?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000002-a0",
+        "children": [
+          "c0000070-0000-4000-8000-000000000002-a1"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000002-a1": {
+        "id": "c0000070-0000-4000-8000-000000000002-a1",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000002-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712275500.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: keep a version number in every save."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000002-u1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000070-0000-4000-8000-000000000002-a1",
+    "plugin_ids": null,
+    "conversation_id": "c0000070-0000-4000-8000-000000000002",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000070-0000-4000-8000-000000000002"
+  },
+  {
+    "title": "Synthetic save design",
+    "create_time": 1712707200.0,
+    "update_time": 1712707440.0,
+    "mapping": {
+      "c0000070-0000-4000-8000-000000000003-root": {
+        "id": "c0000070-0000-4000-8000-000000000003-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000070-0000-4000-8000-000000000003-sys"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000003-sys": {
+        "id": "c0000070-0000-4000-8000-000000000003-sys",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000003-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712707260.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000003-root",
+        "children": [
+          "c0000070-0000-4000-8000-000000000003-u0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000003-u0": {
+        "id": "c0000070-0000-4000-8000-000000000003-u0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000003-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712707320.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: help me design the save system structure for my farming game."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000003-sys",
+        "children": [
+          "c0000070-0000-4000-8000-000000000003-a0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000003-a0": {
+        "id": "c0000070-0000-4000-8000-000000000003-a0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000003-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712707380.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: here is a layout for the save system."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000003-u0",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000070-0000-4000-8000-000000000003-a0",
+    "plugin_ids": null,
+    "conversation_id": "c0000070-0000-4000-8000-000000000003",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000070-0000-4000-8000-000000000003"
+  },
+  {
+    "title": "Synthetic station design",
+    "create_time": 1711929600.0,
+    "update_time": 1711929960.0,
+    "mapping": {
+      "c0000070-0000-4000-8000-000000000004-root": {
+        "id": "c0000070-0000-4000-8000-000000000004-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000070-0000-4000-8000-000000000004-sys"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000004-sys": {
+        "id": "c0000070-0000-4000-8000-000000000004-sys",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000004-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1711929660.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000004-root",
+        "children": [
+          "c0000070-0000-4000-8000-000000000004-u0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000004-u0": {
+        "id": "c0000070-0000-4000-8000-000000000004-u0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000004-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1711929720.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: write a full game design document for the space station game."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000004-sys",
+        "children": [
+          "c0000070-0000-4000-8000-000000000004-a0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000004-a0": {
+        "id": "c0000070-0000-4000-8000-000000000004-a0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000004-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1711929780.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: here is the design document."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000004-u0",
+        "children": [
+          "c0000070-0000-4000-8000-000000000004-u1"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000004-u1": {
+        "id": "c0000070-0000-4000-8000-000000000004-u1",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000004-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1711929840.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: thanks"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000004-a0",
+        "children": [
+          "c0000070-0000-4000-8000-000000000004-a1"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000004-a1": {
+        "id": "c0000070-0000-4000-8000-000000000004-a1",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000004-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1711929900.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: you're welcome."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000004-u1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000070-0000-4000-8000-000000000004-a1",
+    "plugin_ids": null,
+    "conversation_id": "c0000070-0000-4000-8000-000000000004",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000070-0000-4000-8000-000000000004"
+  },
+  {
+    "title": "Synthetic station doc",
+    "create_time": 1712793600.0,
+    "update_time": 1712793960.0,
+    "mapping": {
+      "c0000070-0000-4000-8000-000000000005-root": {
+        "id": "c0000070-0000-4000-8000-000000000005-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000070-0000-4000-8000-000000000005-sys"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000005-sys": {
+        "id": "c0000070-0000-4000-8000-000000000005-sys",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000005-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712793660.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000005-root",
+        "children": [
+          "c0000070-0000-4000-8000-000000000005-u0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000005-u0": {
+        "id": "c0000070-0000-4000-8000-000000000005-u0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000005-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712793720.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: create a complete game design document for the space station game."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000005-sys",
+        "children": [
+          "c0000070-0000-4000-8000-000000000005-a0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000005-a0": {
+        "id": "c0000070-0000-4000-8000-000000000005-a0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000005-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712793780.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: here is a complete design document."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000005-u0",
+        "children": [
+          "c0000070-0000-4000-8000-000000000005-u1"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000005-u1": {
+        "id": "c0000070-0000-4000-8000-000000000005-u1",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000005-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712793840.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: draw a logo for the space station game."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000005-a0",
+        "children": [
+          "c0000070-0000-4000-8000-000000000005-a1"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000005-a1": {
+        "id": "c0000070-0000-4000-8000-000000000005-a1",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000005-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712793900.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: here is a logo idea."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000005-u1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000070-0000-4000-8000-000000000005-a1",
+    "plugin_ids": null,
+    "conversation_id": "c0000070-0000-4000-8000-000000000005",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000070-0000-4000-8000-000000000005"
+  },
+  {
+    "title": "Synthetic haggis tickets",
+    "create_time": 1712016000.0,
+    "update_time": 1712016240.0,
+    "mapping": {
+      "c0000070-0000-4000-8000-000000000006-root": {
+        "id": "c0000070-0000-4000-8000-000000000006-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000070-0000-4000-8000-000000000006-sys"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000006-sys": {
+        "id": "c0000070-0000-4000-8000-000000000006-sys",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000006-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712016060.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000006-root",
+        "children": [
+          "c0000070-0000-4000-8000-000000000006-u0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000006-u0": {
+        "id": "c0000070-0000-4000-8000-000000000006-u0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000006-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712016120.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: break the haggis prototype into implementation tickets with acceptance tests."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000006-sys",
+        "children": [
+          "c0000070-0000-4000-8000-000000000006-a0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000006-a0": {
+        "id": "c0000070-0000-4000-8000-000000000006-a0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000006-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712016180.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: here are the tickets."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000006-u0",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000070-0000-4000-8000-000000000006-a0",
+    "plugin_ids": null,
+    "conversation_id": "c0000070-0000-4000-8000-000000000006",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000070-0000-4000-8000-000000000006"
+  },
+  {
+    "title": "Synthetic haggis plan",
+    "create_time": 1712880000.0,
+    "update_time": 1712880360.0,
+    "mapping": {
+      "c0000070-0000-4000-8000-000000000007-root": {
+        "id": "c0000070-0000-4000-8000-000000000007-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000070-0000-4000-8000-000000000007-sys"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000007-sys": {
+        "id": "c0000070-0000-4000-8000-000000000007-sys",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000007-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712880060.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000007-root",
+        "children": [
+          "c0000070-0000-4000-8000-000000000007-u0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000007-u0": {
+        "id": "c0000070-0000-4000-8000-000000000007-u0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000007-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712880120.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: split the haggis prototype into implementation tickets, each with acceptance tests."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000007-sys",
+        "children": [
+          "c0000070-0000-4000-8000-000000000007-a0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000007-a0": {
+        "id": "c0000070-0000-4000-8000-000000000007-a0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000007-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712880180.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: here is the split."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000007-u0",
+        "children": [
+          "c0000070-0000-4000-8000-000000000007-u1"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000007-u1": {
+        "id": "c0000070-0000-4000-8000-000000000007-u1",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000007-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712880240.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: Unity crashes when I open the status effect window."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000007-a0",
+        "children": [
+          "c0000070-0000-4000-8000-000000000007-a1"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000007-a1": {
+        "id": "c0000070-0000-4000-8000-000000000007-a1",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000007-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712880300.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: check the editor log first."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000007-u1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000070-0000-4000-8000-000000000007-a1",
+    "plugin_ids": null,
+    "conversation_id": "c0000070-0000-4000-8000-000000000007",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000070-0000-4000-8000-000000000007"
+  },
+  {
+    "title": "Synthetic modifiers",
+    "create_time": 1712102400.0,
+    "update_time": 1712102640.0,
+    "mapping": {
+      "c0000070-0000-4000-8000-000000000008-root": {
+        "id": "c0000070-0000-4000-8000-000000000008-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000070-0000-4000-8000-000000000008-sys"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000008-sys": {
+        "id": "c0000070-0000-4000-8000-000000000008-sys",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000008-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712102460.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000008-root",
+        "children": [
+          "c0000070-0000-4000-8000-000000000008-u0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000008-u0": {
+        "id": "c0000070-0000-4000-8000-000000000008-u0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000008-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712102520.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: how do I stack status effect speed modifiers in Unity?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000008-sys",
+        "children": [
+          "c0000070-0000-4000-8000-000000000008-a0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000008-a0": {
+        "id": "c0000070-0000-4000-8000-000000000008-a0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000008-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712102580.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: multiply them, then clamp."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000008-u0",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000070-0000-4000-8000-000000000008-a0",
+    "plugin_ids": null,
+    "conversation_id": "c0000070-0000-4000-8000-000000000008",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000070-0000-4000-8000-000000000008"
+  },
+  {
+    "title": "Synthetic modifiers again",
+    "create_time": 1712966400.0,
+    "update_time": 1712966760.0,
+    "mapping": {
+      "c0000070-0000-4000-8000-000000000009-root": {
+        "id": "c0000070-0000-4000-8000-000000000009-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000070-0000-4000-8000-000000000009-sys"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000009-sys": {
+        "id": "c0000070-0000-4000-8000-000000000009-sys",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000009-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712966460.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000009-root",
+        "children": [
+          "c0000070-0000-4000-8000-000000000009-u0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000009-u0": {
+        "id": "c0000070-0000-4000-8000-000000000009-u0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000009-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712966520.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: what's the best way to stack speed modifiers from status effects in Unity?"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000009-sys",
+        "children": [
+          "c0000070-0000-4000-8000-000000000009-a0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000009-a0": {
+        "id": "c0000070-0000-4000-8000-000000000009-a0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000009-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712966580.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: multiply the modifiers."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000009-u0",
+        "children": [
+          "c0000070-0000-4000-8000-000000000009-u1"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000009-u1": {
+        "id": "c0000070-0000-4000-8000-000000000009-u1",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000009-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712966640.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: continue"
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000009-a0",
+        "children": [
+          "c0000070-0000-4000-8000-000000000009-a1"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000009-a1": {
+        "id": "c0000070-0000-4000-8000-000000000009-a1",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000009-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712966700.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: continuing."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000009-u1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000070-0000-4000-8000-000000000009-a1",
+    "plugin_ids": null,
+    "conversation_id": "c0000070-0000-4000-8000-000000000009",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000070-0000-4000-8000-000000000009"
+  },
+  {
+    "title": "Synthetic CV",
+    "create_time": 1712188800.0,
+    "update_time": 1712189040.0,
+    "mapping": {
+      "c0000070-0000-4000-8000-000000000010-root": {
+        "id": "c0000070-0000-4000-8000-000000000010-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000070-0000-4000-8000-000000000010-sys"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000010-sys": {
+        "id": "c0000070-0000-4000-8000-000000000010-sys",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000010-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712188860.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000010-root",
+        "children": [
+          "c0000070-0000-4000-8000-000000000010-u0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000010-u0": {
+        "id": "c0000070-0000-4000-8000-000000000010-u0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000010-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712188920.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: rewrite my CV summary for a junior Python developer role."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000010-sys",
+        "children": [
+          "c0000070-0000-4000-8000-000000000010-a0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000010-a0": {
+        "id": "c0000070-0000-4000-8000-000000000010-a0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000010-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712188980.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: here is a new CV summary."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000010-u0",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000070-0000-4000-8000-000000000010-a0",
+    "plugin_ids": null,
+    "conversation_id": "c0000070-0000-4000-8000-000000000010",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000070-0000-4000-8000-000000000010"
+  },
+  {
+    "title": "Synthetic CV again",
+    "create_time": 1713052800.0,
+    "update_time": 1713053160.0,
+    "mapping": {
+      "c0000070-0000-4000-8000-000000000011-root": {
+        "id": "c0000070-0000-4000-8000-000000000011-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000070-0000-4000-8000-000000000011-sys"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000011-sys": {
+        "id": "c0000070-0000-4000-8000-000000000011-sys",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000011-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1713052860.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000011-root",
+        "children": [
+          "c0000070-0000-4000-8000-000000000011-u0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000011-u0": {
+        "id": "c0000070-0000-4000-8000-000000000011-u0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000011-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1713052920.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: improve the summary on my CV for junior Python developer roles."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000011-sys",
+        "children": [
+          "c0000070-0000-4000-8000-000000000011-a0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000011-a0": {
+        "id": "c0000070-0000-4000-8000-000000000011-a0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000011-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1713052980.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: here is an improved summary."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000011-u0",
+        "children": [
+          "c0000070-0000-4000-8000-000000000011-u1"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000011-u1": {
+        "id": "c0000070-0000-4000-8000-000000000011-u1",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000011-u1",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1713053040.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: write a cover letter for a junior Python developer role."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000011-a0",
+        "children": [
+          "c0000070-0000-4000-8000-000000000011-a1"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000011-a1": {
+        "id": "c0000070-0000-4000-8000-000000000011-a1",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000011-a1",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1713053100.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: here is a cover letter."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000011-u1",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000070-0000-4000-8000-000000000011-a1",
+    "plugin_ids": null,
+    "conversation_id": "c0000070-0000-4000-8000-000000000011",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000070-0000-4000-8000-000000000011"
+  },
+  {
+    "title": "Synthetic river poem",
+    "create_time": 1712361600.0,
+    "update_time": 1712361960.0,
+    "mapping": {
+      "c0000070-0000-4000-8000-000000000012-root": {
+        "id": "c0000070-0000-4000-8000-000000000012-root",
+        "message": null,
+        "parent": null,
+        "children": [
+          "c0000070-0000-4000-8000-000000000012-sys"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000012-sys": {
+        "id": "c0000070-0000-4000-8000-000000000012-sys",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000012-sys",
+          "author": {
+            "role": "system",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712361660.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              ""
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000012-root",
+        "children": [
+          "c0000070-0000-4000-8000-000000000012-u0",
+          "c0000070-0000-4000-8000-000000000012-u0b"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000012-u0": {
+        "id": "c0000070-0000-4000-8000-000000000012-u0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000012-u0",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712361720.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: write a short poem about rivers in spring."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000012-sys",
+        "children": [
+          "c0000070-0000-4000-8000-000000000012-a0"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000012-a0": {
+        "id": "c0000070-0000-4000-8000-000000000012-a0",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000012-a0",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712361780.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: a poem."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000012-u0",
+        "children": []
+      },
+      "c0000070-0000-4000-8000-000000000012-u0b": {
+        "id": "c0000070-0000-4000-8000-000000000012-u0b",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000012-u0b",
+          "author": {
+            "role": "user",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712361840.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: write a little poem about rivers in the spring."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": null,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000012-sys",
+        "children": [
+          "c0000070-0000-4000-8000-000000000012-a0b"
+        ]
+      },
+      "c0000070-0000-4000-8000-000000000012-a0b": {
+        "id": "c0000070-0000-4000-8000-000000000012-a0b",
+        "message": {
+          "id": "c0000070-0000-4000-8000-000000000012-a0b",
+          "author": {
+            "role": "assistant",
+            "name": null,
+            "metadata": {}
+          },
+          "create_time": 1712361900.0,
+          "update_time": null,
+          "content": {
+            "content_type": "text",
+            "parts": [
+              "Synthetic: another poem."
+            ]
+          },
+          "status": "finished_successfully",
+          "end_turn": true,
+          "weight": 1.0,
+          "metadata": {},
+          "recipient": "all",
+          "channel": null
+        },
+        "parent": "c0000070-0000-4000-8000-000000000012-u0b",
+        "children": []
+      }
+    },
+    "moderation_results": [],
+    "current_node": "c0000070-0000-4000-8000-000000000012-a0b",
+    "plugin_ids": null,
+    "conversation_id": "c0000070-0000-4000-8000-000000000012",
+    "conversation_template_id": null,
+    "gizmo_id": null,
+    "is_archived": false,
+    "safe_urls": [],
+    "default_model_slug": "synthetic-model",
+    "id": "c0000070-0000-4000-8000-000000000012"
+  }
+]

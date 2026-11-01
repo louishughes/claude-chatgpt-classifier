@@ -109,6 +109,27 @@ def build_parser() -> argparse.ArgumentParser:
     find.add_argument("--role", help="only messages by this speaker, e.g. user or assistant")
     find.add_argument("--chat", help="only this chat (a conv_ ID)")
     find.set_defaults(handler=_history_find)
+
+    repeats = history_commands.add_parser(
+        "repeats",
+        help="requests you made again, reworded, in other chats (no AI)",
+        description="Group your own messages that ask much the same thing in two or more "
+        "chats, most chats first. Local word matching, no model: rewording is found, "
+        "synonyms are not. Each member shows its date, chat title and IDs.",
+    )
+    repeats.add_argument(
+        "--min-chats", type=int, default=2, help="only groups spanning this many chats (2)"
+    )
+    repeats.add_argument("--since", help="only messages on or after this date (YYYY-MM-DD)")
+    repeats.add_argument("--until", help="only messages on or before this date (YYYY-MM-DD)")
+    repeats.add_argument(
+        "--project", help="only messages in chats labelled with this approved project or term ID"
+    )
+    repeats.add_argument(
+        "--taxonomy", help="the published vocabulary version for --project (default newest)"
+    )
+    repeats.add_argument("--limit", type=int, default=20, help="at most this many groups (20)")
+    repeats.set_defaults(handler=_history_repeats)
     return parser
 
 
@@ -241,6 +262,102 @@ def _shorten(text: str) -> str:
     return flat if len(flat) <= SNIPPET_CHARS else flat[: SNIPPET_CHARS - 1] + "…"
 
 
+def _history_repeats(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """Group the requests you made again in other chats (RCL-002)."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.recall.repeats import (
+        MATCH_THRESHOLD,
+        REPEATS_VERSION,
+        find_repeats,
+        load_requests,
+    )
+    from knowledge_engine.retrieval.filters import (
+        BadFilterDate,
+        UnknownFilterTerm,
+        build_filters,
+    )
+
+    name = "history repeats"
+    if args.min_chats < 2:
+        return CommandResult(
+            name, ExitCode.USAGE, message="--min-chats must be 2 or more", error_code="usage"
+        )
+    if args.limit <= 0:
+        return CommandResult(
+            name, ExitCode.USAGE, message="--limit must be 1 or more", error_code="usage"
+        )
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            name, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            try:
+                filters = build_filters(
+                    session,
+                    since=args.since,
+                    until=args.until,
+                    term=args.project,
+                    taxonomy=args.taxonomy,
+                )
+            except BadFilterDate as error:
+                return CommandResult(
+                    name, ExitCode.USAGE, message=str(error), error_code="bad_filter"
+                )
+            except UnknownFilterTerm as error:
+                return CommandResult(
+                    name, ExitCode.USAGE, message=str(error), error_code="unknown_term"
+                )
+            requests = load_requests(session, filters)
+    finally:
+        engine.dispose()
+    report = find_repeats(requests, min_chats=args.min_chats)
+    shown = report.groups[: args.limit]
+    groups = [
+        {
+            "chats": group.chats,
+            "weakest_match": group.weakest,
+            "first_date": _date(group.members[0].created),
+            "last_date": _date(group.members[-1].created),
+            "members": [
+                {
+                    "conversation_id": m.conversation_id,
+                    "title": m.title,
+                    "native_node_id": m.native_node_id,
+                    "revision_id": m.revision_id,
+                    "date": _date(m.created),
+                    "snippet": _shorten(m.text),
+                }
+                for m in group.members
+            ],
+        }
+        for group in shown
+    ]
+    chats = len({m.conversation_id for g in shown for m in g.members})
+    message = (
+        f"{len(report.groups)} repeated request(s)"
+        + (f", showing {len(shown)}" if len(shown) < len(report.groups) else "")
+        + f"; compared {report.checked} of your messages, {report.too_short} too short"
+    )
+    return CommandResult(
+        name,
+        data={
+            "version": REPEATS_VERSION,
+            "threshold": MATCH_THRESHOLD,
+            "checked": report.checked,
+            "too_short": report.too_short,
+            "groups_found": len(report.groups),
+            "chats_in_shown_groups": chats,
+            "groups": groups,
+        },
+        message=message,
+    )
+
+
 # ---------------------------------------------------------------- output
 
 
@@ -253,6 +370,8 @@ def as_text(result: CommandResult) -> str:
     Returns:
         The text to print.
     """
+    if result.exit_code is ExitCode.OK and "groups" in result.data:
+        return _repeats_text(result)
     if result.exit_code is not ExitCode.OK or "hits" not in result.data:
         return result.as_text()
     lines = [result.message]
@@ -265,6 +384,21 @@ def as_text(result: CommandResult) -> str:
     for doc in result.data.get("document_hits", []):
         lines.append(f"note  {doc['name']}  {doc['locator']}")
         lines.append(f"    {doc['snippet']}")
+    return "\n".join(lines)
+
+
+def _repeats_text(result: CommandResult) -> str:
+    lines = [result.message]
+    for number, group in enumerate(result.data["groups"], start=1):
+        span = group["first_date"] or "no date"
+        if group["last_date"] and group["last_date"] != group["first_date"]:
+            span += f" to {group['last_date']}"
+        lines.append(f"{number}. asked in {group['chats']} chats, {span}")
+        for member in group["members"]:
+            date = member["date"] or "no date"
+            title = member["title"] or "(untitled chat)"
+            lines.append(f"    {date}  {title}  {member['conversation_id']}")
+            lines.append(f"        {member['snippet']}")
     return "\n".join(lines)
 
 

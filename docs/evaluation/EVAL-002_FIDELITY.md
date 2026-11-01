@@ -2,7 +2,7 @@
 
 # Import fidelity (eval-002-v1)
 
-**PASS**: 18 ok, 6 warned. A `silent_drop` (a node missing with nothing in the report saying so) fails the run.
+**PASS**: 19 ok, 6 warned. A `silent_drop` (a node missing with nothing in the report saying so) fails the run.
 
 | Export | Layout | Chats (files / stored) | Nodes (files / stored) | Dropped | Off-path nodes kept | Missing images | Raw-only parts | Warnings | Verdict |
 |---|---|---|---|---|---|---|---|---|---|
@@ -24,6 +24,7 @@
 | no_children | official | 1 / 1 | 5 / 5 | 0 | 1 of 1 | 0 | 0 | none | ok |
 | reexport_v1 | official | 4 / 4 | 16 / 16 | 0 | 0 of 0 | 0 | 0 | none | ok |
 | reexport_v2 | official | 4 / 4 | 18 / 18 | 0 | 1 of 1 | 0 | 0 | none | ok |
+| repeat_requests | official | 12 / 12 | 64 / 64 | 0 | 2 of 2 | 0 | 0 | none | ok |
 | repeated_image | split | 2 / 2 | 8 / 8 | 0 | 0 of 0 | 0 | 0 | format_lacks_account_id 1 | warned |
 | same_title_different_chat | split | 2 / 2 | 8 / 8 | 0 | 0 of 0 | 0 | 0 | format_lacks_account_id 1 | warned |
 | search_terms | official | 2 / 2 | 14 / 14 | 0 | 0 of 0 | 0 | 0 | none | ok |
@@ -33,7 +34,7 @@
 
 ## Totals
 
-- Nodes: 380 of 380 stored (0 dropped).
-- Branch retention: 13 of 13 off-path message nodes kept.
+- Nodes: 444 of 444 stored (0 dropped).
+- Branch retention: 15 of 15 off-path message nodes kept.
 - Missing images: 5 occurrence(s), each recorded with its state.
 - Unknown payload: 0 part(s) kept only as raw JSON; content types seen: code, execution_output, multimodal_text, text.
