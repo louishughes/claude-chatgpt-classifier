@@ -1595,6 +1595,203 @@ def _supersession_cases() -> list[Case]:
     ]
 
 
+def _repeat_cases() -> list[Case]:
+    """RCL-002: the same request asked again, reworded, in other chats."""
+    prefix = "c0000070-0000-4000-8000-0000000000"
+    chats = [
+        _chat(
+            f"{prefix}01",
+            "Synthetic farming save",
+            90,
+            [
+                (
+                    "Synthetic: how should I structure the save system for my farming game?",
+                    "Synthetic: one save file per farm, versioned.",
+                ),
+                ("Synthetic: continue", "Synthetic: continuing."),
+            ],
+        ),
+        _chat(
+            f"{prefix}02",
+            "Synthetic farming shop",
+            95,
+            [
+                (
+                    "Synthetic: how should I price the items in my farming game shop?",
+                    "Synthetic: start from the time each item takes to grow.",
+                ),
+                (
+                    "Synthetic: what's a good way to structure save data for the farming game?",
+                    "Synthetic: keep a version number in every save.",
+                ),
+            ],
+        ),
+        _chat(
+            f"{prefix}03",
+            "Synthetic save design",
+            100,
+            [
+                (
+                    "Synthetic: help me design the save system structure for my farming game.",
+                    "Synthetic: here is a layout for the save system.",
+                )
+            ],
+        ),
+        _chat(
+            f"{prefix}04",
+            "Synthetic station design",
+            91,
+            [
+                (
+                    "Synthetic: write a full game design document for the space station game.",
+                    "Synthetic: here is the design document.",
+                ),
+                ("Synthetic: thanks", "Synthetic: you're welcome."),
+            ],
+        ),
+        _chat(
+            f"{prefix}05",
+            "Synthetic station doc",
+            101,
+            [
+                (
+                    "Synthetic: create a complete game design document for the space station game.",
+                    "Synthetic: here is a complete design document.",
+                ),
+                (
+                    "Synthetic: draw a logo for the space station game.",
+                    "Synthetic: here is a logo idea.",
+                ),
+            ],
+        ),
+        _chat(
+            f"{prefix}06",
+            "Synthetic haggis tickets",
+            92,
+            [
+                (
+                    "Synthetic: break the haggis prototype into implementation tickets with "
+                    "acceptance tests.",
+                    "Synthetic: here are the tickets.",
+                )
+            ],
+        ),
+        _chat(
+            f"{prefix}07",
+            "Synthetic haggis plan",
+            102,
+            [
+                (
+                    "Synthetic: split the haggis prototype into implementation tickets, each "
+                    "with acceptance tests.",
+                    "Synthetic: here is the split.",
+                ),
+                (
+                    "Synthetic: Unity crashes when I open the status effect window.",
+                    "Synthetic: check the editor log first.",
+                ),
+            ],
+        ),
+        _chat(
+            f"{prefix}08",
+            "Synthetic modifiers",
+            93,
+            [
+                (
+                    "Synthetic: how do I stack status effect speed modifiers in Unity?",
+                    "Synthetic: multiply them, then clamp.",
+                )
+            ],
+        ),
+        _chat(
+            f"{prefix}09",
+            "Synthetic modifiers again",
+            103,
+            [
+                (
+                    "Synthetic: what's the best way to stack speed modifiers from status "
+                    "effects in Unity?",
+                    "Synthetic: multiply the modifiers.",
+                ),
+                ("Synthetic: continue", "Synthetic: continuing."),
+            ],
+        ),
+        _chat(
+            f"{prefix}10",
+            "Synthetic CV",
+            94,
+            [
+                (
+                    "Synthetic: rewrite my CV summary for a junior Python developer role.",
+                    "Synthetic: here is a new CV summary.",
+                )
+            ],
+        ),
+        _chat(
+            f"{prefix}11",
+            "Synthetic CV again",
+            104,
+            [
+                (
+                    "Synthetic: improve the summary on my CV for junior Python developer roles.",
+                    "Synthetic: here is an improved summary.",
+                ),
+                (
+                    "Synthetic: write a cover letter for a junior Python developer role.",
+                    "Synthetic: here is a cover letter.",
+                ),
+            ],
+        ),
+    ]
+    # One chat where the user edited their own request: two sibling
+    # branches inside the same chat. That is a revision, not a repeat.
+    edited = ConversationBuilder(f"{prefix}12", "Synthetic river poem", BASE_EPOCH + 86_400 * 96)
+    system = edited.add(f"{prefix}12-sys", edited.root, "system", [""])
+    first = edited.add(
+        f"{prefix}12-u0", system, "user", ["Synthetic: write a short poem about rivers in spring."]
+    )
+    edited.add(f"{prefix}12-a0", first, "assistant", ["Synthetic: a poem."])
+    second = edited.add(
+        f"{prefix}12-u0b",
+        system,
+        "user",
+        ["Synthetic: write a little poem about rivers in the spring."],
+    )
+    edited.add(f"{prefix}12-a0b", second, "assistant", ["Synthetic: another poem."])
+    chats.append(edited)
+
+    def node(chat: int, name: str) -> str:
+        return f"{prefix}{chat:02d}-{name}"
+
+    return [
+        Case(
+            "repeat_requests",
+            "RCL-002: five requests each asked again, reworded, in other chats; look-alike "
+            "requests that share words but ask something else; one-word messages repeated "
+            "everywhere; and a request edited inside one chat, which is not a repeat.",
+            "official",
+            [chat.native() for chat in chats],
+            expected={
+                "conversations": 12,
+                # Each group: the native node IDs of its members, sorted.
+                "groups": [
+                    sorted([node(1, "u0"), node(2, "u1"), node(3, "u0")]),
+                    sorted([node(4, "u0"), node(5, "u0")]),
+                    sorted([node(6, "u0"), node(7, "u0")]),
+                    sorted([node(8, "u0"), node(9, "u0")]),
+                    sorted([node(10, "u0"), node(11, "u0")]),
+                ],
+                # Share words with a group but ask for something else.
+                "never_grouped": [node(2, "u0"), node(5, "u1"), node(7, "u1"), node(11, "u1")],
+                # Too short to say anything ("continue", "thanks").
+                "too_short": [node(1, "u1"), node(4, "u1"), node(9, "u1")],
+                # An edit inside one chat, not a repeat across chats.
+                "same_chat_edit": [node(12, "u0"), node(12, "u0b")],
+            },
+        )
+    ]
+
+
 def all_cases() -> list[Case]:
     """Return every fixed fixture case, in a stable order."""
     return [
@@ -1612,6 +1809,7 @@ def all_cases() -> list[Case]:
         *_action_entity_cases(),
         *_long_chat_cases(),
         *_supersession_cases(),
+        *_repeat_cases(),
     ]
 
 

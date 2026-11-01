@@ -149,7 +149,7 @@ CI (`.github/workflows/ci.yml`) runs exactly these two commands, on Linux and Wi
 
 Installing a release, upgrading (`ke db upgrade` backs up first) and rolling back are in `docs/runbooks/UPGRADE_AND_ROLLBACK.md`, and what each version changed is in `CHANGELOG.md`. `.github/workflows/release.yml` runs `python -m knowledge_engine.devtools.release_check` nightly. It installs the built wheel on a clean virtual environment, then upgrades and rolls back.
 
-To ask your own history a question, use `recall`, the read-only companion to `ke` (RCL-001): `recall history find "words"` finds messages by their words (`--meaning` matches by meaning), and shows each hit's date, speaker, chat title and IDs. Add `--json` for one JSON object (for scripts and AI agents).
+To ask your own history a question, use `recall`, the read-only companion to `ke` (RCL-001): `recall history find "words"` finds messages by their words (`--meaning` matches by meaning), and shows each hit's date, speaker, chat title and IDs. `recall history repeats` lists the requests you made again, reworded, in other chats (local word matching, no AI; RCL-002). Add `--json` for one JSON object (for scripts and AI agents).
 
 Programs can read the same data as JSON with `ke api` (install the `server` extra first); see `docs/api/API.md`. A PostgreSQL proof of concept (the `postgres` extra) is described in `docs/operations/POSTGRES_POC.md`; SQLite stays the default.
 
