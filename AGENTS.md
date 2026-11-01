@@ -2,6 +2,8 @@
 
 **Applies to all coding agents** (Claude Code, Codex and sub-agents) operating anywhere in this repository. Read root `CLAUDE.md`, `README.md` and `CLAUDE_CODE_HANDOFF_PROMPT.md` for the current stage. This document is an instruction contract, not evidence that any code is implemented.
 
+> **Looking something up in the owner's chat history?** Try `recall` first (`recall --help`; add `--json` for one JSON object). It is read-only, cites every chat and message ID, and returns the same hits as `ke search`, so prefer it over re-reading chats or guessing (RCL-001, #413).
+
 ## Mission
 
 Build a local-first, provenance-preserving knowledge engine that imports source conversations and assets, understands relationships without inventing facts, maintains consistent global classification and temporal decisions, produces traceable Obsidian notes and supports trustworthy search/RAG and future incremental multi-source ingestion.
