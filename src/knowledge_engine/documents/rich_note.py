@@ -71,7 +71,7 @@ from knowledge_engine.documents.categories import (
     suggested_category,
     waiting_candidates,
 )
-from knowledge_engine.documents.keywords import ChatKeywords, Tier
+from knowledge_engine.documents.keywords import ChatKeywords, shown_keywords
 from knowledge_engine.documents.model import DocItem, DocumentKind, build_document
 from knowledge_engine.documents.notes import _branches, _images, _links, knowledge_path
 from knowledge_engine.documents.render import transcript_stem
@@ -731,8 +731,9 @@ def _keyword_lines(
     """
     lines = []
     if keywords is not None:
-        shown = [k for k in keywords.keywords if k.tier is Tier.MUST]
-        shown += keywords.tier(Tier.SHOULD)[:SHOWN_SHOULD]
+        # Repeats and title fragments are left out here, not in the
+        # candidate list, so every candidate and its reasons stay inspectable.
+        shown = shown_keywords(keywords, should=SHOWN_SHOULD)
         groups: dict[tuple[str, ...], list[str]] = {}
         for k in shown:
             first = next((m for m in k.message_ids if m in citer.chat.node_keys), None)

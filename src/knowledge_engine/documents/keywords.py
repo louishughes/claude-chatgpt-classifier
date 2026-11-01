@@ -50,7 +50,7 @@ import math
 import re
 from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from sqlalchemy.orm import Session
@@ -62,7 +62,9 @@ from knowledge_engine.taxonomy.discovery import STOP_WORDS
 from knowledge_engine.taxonomy.registry import Dimension, TaxonomySnapshot, normalise_alias
 from knowledge_engine.taxonomy.review import OPEN, Operation, proposals, propose
 
-KEYWORDS_VERSION = "note-007-v2"  # v2: the profile is never counted (NOTE-036)
+# v2: the profile is never counted (NOTE-036). v3: more chat filler words, and
+# each candidate records how often it was said, for ``shown_keywords``.
+KEYWORDS_VERSION = "note-007-v3"
 SHOULD_COUNT = 20
 MAX_KEYWORDS = 50
 # A phrase in more than this share of chats is not specific to any one,
@@ -86,6 +88,9 @@ FILLER = frozenset(
     let lets know think going look looks looking help idea ideas example
     examples here's there's it's that's i'm i've you're don't can't won't
     one two first next new also may might every each many few
+    prefer prefers preferred want wants wanted need needs needed choose
+    choosing choice choices option options answer answers reply replies
+    please thanks thank
     """.split()
 )
 # Title words that say nothing about what a chat is about.
@@ -146,6 +151,7 @@ class KeywordCandidate:
         specificity: How rare it is across chats (higher is rarer).
         variants: Other spellings in the chat that were read as this term.
         term_id: The approved taxonomy term, when it names one.
+        count: How many times the chat says it (0 for a title-only word).
     """
 
     term: str
@@ -156,6 +162,7 @@ class KeywordCandidate:
     specificity: float
     variants: tuple[str, ...] = ()
     term_id: str | None = None
+    count: int = 0
 
 
 @dataclass(frozen=True)
@@ -282,6 +289,7 @@ def _rank(
                 old.specificity,
                 old.variants,
                 old.term_id,
+                old.count,
             )
             return
         kept[phrase] = KeywordCandidate(
@@ -293,6 +301,7 @@ def _rank(
             specificity=round(specificity(phrase), 4),
             variants=variants,
             term_id=term_id,
+            count=seen.count if seen else 0,
         )
 
     # Must: the title's words, then named things, then approved terms.
@@ -359,6 +368,84 @@ def _rank(
         excluded=tuple(other_gone + setup_gone),
         topics=tuple(_topics(chat.topics, resolver)),
     )
+
+
+_TITLE_ONLY = "in the title"
+_NAMED = "a named thing"
+
+
+def shown_keywords(result: ChatKeywords, *, should: int) -> list[KeywordCandidate]:
+    """The keywords worth showing in a note: no repeats, no title fragments.
+
+    ``keyword_candidates`` keeps every candidate with its reasons, so the
+    full list can always be inspected. A reader, though, wants each idea
+    once. This picks from the must tier and the best ``should`` should-tier
+    candidates, in rank order, and leaves out three kinds of repeat:
+
+    1. **The same word again**: a case or plural variant of a keyword
+       already shown ("Cedar boards" after "cedar boards", "board" after
+       "boards").
+    2. **A word only ever said inside a longer keyword**: "boards" when
+       every time it was said it was part of "cedar boards". A word that is
+       also said on its own ("cedar" in "cedar resists rot") stays, because
+       it is a subject in its own right.
+    3. **A title word the chat never repeats**: "raised" from a title
+       "raised bed" that no message says again. The title is already the
+       note's heading, so the fragment adds nothing.
+
+    An approved taxonomy term is never left out, and a word that isn't a
+    named thing or an approved term is shown in lower case, so "Timber"
+    (a term) and "pine" (a word) don't look like different kinds of thing
+    by accident.
+    """
+    pool = [k for k in result.keywords if k.tier is Tier.MUST]
+    pool += result.tier(Tier.SHOULD)
+    phrases = [k for k in pool if " " in k.term]
+    shown: list[KeywordCandidate] = []
+    seen_keys: set[str] = set()
+    should_shown = 0
+    for k in pool:
+        if k.tier is Tier.SHOULD and should_shown >= should:
+            break
+        key = _plain_key(k.term)
+        if key in seen_keys:
+            continue  # rule 1
+        if k.term_id is None:
+            if k.reasons == (_TITLE_ONLY,) and k.count < 2:
+                continue  # rule 3
+            if " " not in k.term and _inside_longer(k, key, phrases):
+                continue  # rule 2
+        seen_keys.add(key)
+        should_shown += k.tier is Tier.SHOULD
+        named = k.term_id is not None or any(r.startswith(_NAMED) for r in k.reasons)
+        shown.append(k if named else replace(k, term=k.term.casefold()))
+    return shown
+
+
+def _plain_key(term: str) -> str:
+    """A term compared without case or a simple plural ending ("Boards" -> "board")."""
+    return " ".join(_singular(w) for w in term.casefold().split())
+
+
+def _singular(word: str) -> str:
+    # A deliberately small rule: enough to join "board"/"boards" and
+    # "strategies"/"strategy" without guessing at irregular English plurals.
+    if len(word) > 4 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
+def _inside_longer(word: KeywordCandidate, key: str, phrases: Sequence[KeywordCandidate]) -> bool:
+    """True if every time the chat says ``word`` it is inside a longer keyword.
+
+    Counts are compared because the candidates don't keep where each
+    mention was: if the longer phrases containing the word were said at
+    least as often as the word itself, the word never stood alone.
+    """
+    containing = [p for p in phrases if key in _plain_key(p.term).split()]
+    return bool(containing) and word.count <= sum(p.count for p in containing)
 
 
 def _covered(content: Mapping[str, _Phrase]) -> dict[str, set[int]]:
