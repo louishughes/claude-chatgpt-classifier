@@ -282,7 +282,7 @@ def show_project(session: Session, project: ProjectRow) -> ProjectView:
             record_type=doc_item.record_type,
             status=doc_item.status,
             assertion=doc_item.assertion,
-            quotes=tuple(_quote(session, ref, chat_of) for ref in refs[:MAX_QUOTES]),
+            quotes=tuple(check_quote(session, ref, chat_of) for ref in refs[:MAX_QUOTES]),
             more_quotes=max(0, len(refs) - MAX_QUOTES),
             superseded_by=doc_item.superseded_by,
             conflicts_with=doc_item.conflicts_with,
@@ -331,8 +331,17 @@ def show_project(session: Session, project: ProjectRow) -> ProjectView:
     )
 
 
-def _quote(session: Session, ref: EvidenceRef, chat_of: dict[str, str]) -> Quote:
-    """Re-check one evidence reference and return it as a Quote."""
+def check_quote(session: Session, ref: EvidenceRef, chat_of: dict[str, str]) -> Quote:
+    """Re-check one evidence reference against the stored text and return it as a Quote.
+
+    Args:
+        session: A read session.
+        ref: The record's evidence reference.
+        chat_of: Revision ID -> chat, for a quote that fails to resolve.
+
+    Returns:
+        The quote, or a Quote with ``text=None`` and the reason it failed.
+    """
     found = resolve(session, ref.revision_id, ref.start, ref.end, ref.quote_sha256, actor=ref.actor)
     if not isinstance(found, Citation):
         return Quote(

@@ -7,6 +7,8 @@ Usage::
     recall --json history find "port 8080" --mode exact
     recall history repeats
     recall projects show "Haggis game"
+    recall decisions history "Haggis game"
+    recall decisions conflicts "Haggis game"
 
 **Why it reuses ``ke``'s search instead of its own.** ``recall history
 find`` calls the very same functions as ``ke search`` (word search,
@@ -35,7 +37,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, NoReturn
@@ -147,6 +149,32 @@ def build_parser() -> argparse.ArgumentParser:
     )
     show.add_argument("name", help="the project's name, an alias, or its proj_ ID")
     show.set_defaults(handler=_projects_show)
+
+    decisions = groups.add_parser("decisions", help="how a project's decisions moved")
+    decision_commands = decisions.add_subparsers(
+        dest="action", metavar="ACTION", parser_class=_Parser
+    )
+    history_cmd = decision_commands.add_parser(
+        "history",
+        help="a project's decisions by subject, each step oldest first",
+        description="Group a project's decisions by subject and show each step oldest "
+        "first: suggested, accepted, rejected, clarified, revised, replaced, contradicted. "
+        "Every step quotes its message. Withdrawn steps stay, marked revoked. Nothing is "
+        "called replaced unless the chats said so explicitly.",
+    )
+    history_cmd.add_argument("name", help="the project's name, an alias, or its proj_ ID")
+    history_cmd.set_defaults(handler=_decisions_history)
+    conflicts_cmd = decision_commands.add_parser(
+        "conflicts",
+        help="a project's decisions that still disagree",
+        description="List pairs of a project's records that disagree and that nobody has "
+        "settled yet, both sides quoted. A conflict is never shown as a replacement.",
+    )
+    conflicts_cmd.add_argument("name", help="the project's name, an alias, or its proj_ ID")
+    conflicts_cmd.add_argument(
+        "--all", action="store_true", help="also show conflicts already dismissed or resolved"
+    )
+    conflicts_cmd.set_defaults(handler=_decisions_conflicts)
     return parser
 
 
@@ -469,6 +497,127 @@ def _projects_show(settings: Settings, args: argparse.Namespace) -> CommandResul
     return CommandResult(name, data=data, message=message)
 
 
+def _on_project(
+    settings: Settings, command: str, name: str, work: Callable[[Any, Any], CommandResult]
+) -> CommandResult:
+    """Open the archive, find the one project ``name`` means, and run ``work`` on it."""
+    from sqlalchemy.orm import Session
+
+    from knowledge_engine.infrastructure.db import create_sqlite_engine, database_path
+    from knowledge_engine.recall.projects import ProjectLookupError, find_project
+
+    db = database_path(settings)
+    if not db.exists():
+        return CommandResult(
+            command, ExitCode.ERROR, message="no imports yet", error_code="no_imports"
+        )
+    engine = create_sqlite_engine(db)
+    try:
+        with Session(engine) as session:
+            try:
+                project = find_project(session, name)
+            except ProjectLookupError as error:
+                data: dict[str, Any] = {}
+                if error.matches:
+                    data["matches"] = [
+                        {"project_id": pid, "name": label} for pid, label in error.matches
+                    ]
+                return CommandResult(
+                    command, ExitCode.USAGE, data=data, message=str(error), error_code=error.code
+                )
+            return work(session, project)
+    finally:
+        engine.dispose()
+
+
+def _record_json(record: Any) -> dict[str, Any]:
+    return {
+        "record_id": record.record_id,
+        "record_type": record.record_type,
+        "status": record.status,
+        "assertion": record.assertion,
+        "date": _date(record.first_time),
+        "quotes": [
+            {
+                "conversation_id": q.conversation_id,
+                "native_node_id": q.native_node_id,
+                "date": _date(q.created),
+                "actor": q.actor,
+                "text": q.text,
+                "problem": q.problem,
+            }
+            for q in record.quotes
+        ],
+    }
+
+
+def _decisions_history(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """A project's decisions by subject, steps oldest first (RCL-004)."""
+    from knowledge_engine.recall.decisions import DECISIONS_VERSION, decision_history
+
+    def work(session: Any, project: Any) -> CommandResult:
+        subjects = decision_history(session, project)
+        data = {
+            "version": DECISIONS_VERSION,
+            "project_id": project.project_id,
+            "name": project.name,
+            "subjects": [
+                {
+                    "records": [_record_json(r) for r in subject.records],
+                    "steps": [
+                        {
+                            "event_id": step.event_id,
+                            "label": step.label,
+                            "date": _date(step.happened_at),
+                            "from_record": step.from_record,
+                            "to_record": step.to_record,
+                            "actor": step.actor,
+                            "revoked": step.revoked_by is not None,
+                            "revoked_by": step.revoked_by,
+                            "revoked_note": step.revoked_note,
+                        }
+                        for step in subject.steps
+                    ],
+                }
+                for subject in subjects
+            ],
+        }
+        steps = sum(len(s.steps) for s in subjects)
+        message = f"{project.name}: {len(subjects)} subject(s), {steps} step(s), oldest first"
+        return CommandResult("decisions history", data=data, message=message)
+
+    return _on_project(settings, "decisions history", args.name, work)
+
+
+def _decisions_conflicts(settings: Settings, args: argparse.Namespace) -> CommandResult:
+    """A project's records that still disagree (RCL-004)."""
+    from knowledge_engine.recall.decisions import DECISIONS_VERSION, decision_conflicts
+
+    def work(session: Any, project: Any) -> CommandResult:
+        found = decision_conflicts(session, project, include_settled=args.all)
+        data = {
+            "version": DECISIONS_VERSION,
+            "project_id": project.project_id,
+            "name": project.name,
+            "conflicts": [
+                {
+                    "conflict_id": c.conflict_id,
+                    "state": c.state,
+                    "kinds": list(c.kinds),
+                    "records": [_record_json(r) for r in c.records],
+                }
+                for c in found
+            ],
+        }
+        open_count = sum(c.state == "unresolved" for c in found)
+        message = f"{project.name}: {open_count} unresolved conflict(s)"
+        if args.all:
+            message += f", {len(found) - open_count} settled"
+        return CommandResult("decisions conflicts", data=data, message=message)
+
+    return _on_project(settings, "decisions conflicts", args.name, work)
+
+
 # ---------------------------------------------------------------- output
 
 # Section headings for `recall projects show`, in the order they print.
@@ -494,6 +643,10 @@ def as_text(result: CommandResult) -> str:
         return _repeats_text(result)
     if result.exit_code is ExitCode.OK and "sections" in result.data:
         return _project_text(result)
+    if result.exit_code is ExitCode.OK and "subjects" in result.data:
+        return _history_text(result)
+    if result.exit_code is ExitCode.OK and "conflicts" in result.data:
+        return _conflicts_text(result)
     if result.data.get("matches"):
         lines = [result.as_text()]
         lines += [f"    {m['project_id']}  {m['name']}" for m in result.data["matches"]]
@@ -595,6 +748,63 @@ def _entry_lines(entry: dict[str, Any], labels: dict[str, str]) -> list[str]:
     if entry["more_quotes"]:
         lines.append(f"      and {entry['more_quotes']} more quote(s)")
     return lines
+
+
+def _record_lines(record: dict[str, Any], label: str, indent: str = "    ") -> list[str]:
+    lines = [
+        f"{indent}{label} {record['status']} {record['record_type']}: "
+        f"{_shorten(record['assertion'])}"
+    ]
+    for q in record["quotes"]:
+        where = f"{q['date'] or 'no date'}  {q['conversation_id']}  message {q['native_node_id']}"
+        if q["text"] is None:
+            lines.append(f"{indent}    {where}: quote not shown ({q['problem']})")
+        else:
+            lines.append(f'{indent}    {where} ({q["actor"]}): "{_shorten(q["text"])}"')
+    return lines
+
+
+def _history_text(result: CommandResult) -> str:
+    lines = [result.message]
+    for number, subject in enumerate(result.data["subjects"], start=1):
+        # Records are named by letter within their subject, so a step can
+        # say "B replaced A" instead of printing two krec_ IDs.
+        letters = {
+            r["record_id"]: chr(ord("A") + i) if i < 26 else str(i + 1)
+            for i, r in enumerate(subject["records"])
+        }
+        lines += ["", f"{number}. {_shorten(subject['records'][0]['assertion'])}"]
+        for record in subject["records"]:
+            lines += _record_lines(record, letters[record["record_id"]] + ".")
+        for step in subject["steps"]:
+            source = letters.get(step["from_record"] or "", "elsewhere")
+            target = letters.get(step["to_record"] or "", "")
+            if step["label"] == "suggested":
+                what = f"{source} suggested"
+            elif target:
+                what = f"{source} {step['label']} {target}"
+            else:
+                what = f"{source} {step['label']}"
+            line = f"    {step['date'] or 'no date'}  {what}"
+            if step["revoked"]:
+                line += f"  [revoked by {step['revoked_by']}: {step['revoked_note'] or ''}]"
+            lines.append(line)
+    return "\n".join(lines)
+
+
+def _conflicts_text(result: CommandResult) -> str:
+    lines = [result.message]
+    for number, conflict in enumerate(result.data["conflicts"], start=1):
+        kinds = ", ".join(conflict["kinds"]) or "conflict"
+        settled = (
+            "unresolved: nothing says which holds"
+            if conflict["state"] == "unresolved"
+            else conflict["state"]
+        )
+        lines += ["", f"{number}. {kinds} ({settled})"]
+        for letter, record in zip("AB", conflict["records"], strict=True):
+            lines += _record_lines(record, letter + ".")
+    return "\n".join(lines)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
