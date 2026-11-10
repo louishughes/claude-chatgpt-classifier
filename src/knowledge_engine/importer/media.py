@@ -34,7 +34,7 @@ import zipfile
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path, PurePosixPath
 
 from sqlalchemy import (
@@ -52,7 +52,7 @@ from knowledge_engine.domain.enums import AssetAvailability, SourceSystem
 from knowledge_engine.domain.ids import asset_occurrence_id, media_asset_id, sha256_hex
 from knowledge_engine.graph.nodes import AssetPointer, canonical_json
 from knowledge_engine.importer.archive import BlobStore, BlobTooLargeError, StoredBlob, hash_file
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 from knowledge_engine.ingestion.inventory import sniff_media
 from knowledge_engine.ingestion.source import MediaFile
 
@@ -60,10 +60,6 @@ from knowledge_engine.ingestion.source import MediaFile
 # can put large metadata blocks before the frame header.
 _HEADER_BYTES = 256 * 1024
 _AVAILABILITY_VALUES = ",".join(f"'{state.value}'" for state in AssetAvailability)
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 class MediaBlobRow(Base):
@@ -86,7 +82,7 @@ class MediaBlobRow(Base):
     width: Mapped[int | None] = mapped_column(Integer, default=None)
     height: Mapped[int | None] = mapped_column(Integer, default=None)
     first_import_id: Mapped[str] = mapped_column(ForeignKey("import_batches.import_id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class MediaAssetRow(Base):
@@ -156,7 +152,7 @@ class DerivedMediaArtifactRow(Base):
     kind: Mapped[str] = mapped_column(String(30))
     generator_version: Mapped[str] = mapped_column(String(40))
     location: Mapped[str | None] = mapped_column(Text, default=None)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 @dataclass

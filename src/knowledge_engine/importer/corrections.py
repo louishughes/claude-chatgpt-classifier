@@ -41,18 +41,14 @@ import json
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import DateTime, Integer, String, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from knowledge_engine.importer.records import MessageNodeRow, MessageRevisionRow
-from knowledge_engine.infrastructure.db import Base
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
+from knowledge_engine.infrastructure.db import Base, utc_now
 
 
 class OverrideKind(StrEnum):
@@ -84,7 +80,7 @@ class OverrideAnchorRow(Base):
     conversation_id: Mapped[str] = mapped_column(String(40), index=True)
     node_key: Mapped[str] = mapped_column(String(40), index=True)
     revision_id: Mapped[str] = mapped_column(String(40))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 # Created by migration 0027. Kept here so tests that build the schema

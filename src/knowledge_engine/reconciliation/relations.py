@@ -61,7 +61,7 @@ import re
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Text, select
@@ -71,7 +71,7 @@ from knowledge_engine.extraction.records import KnowledgeRecord, RecordType, Tru
 from knowledge_engine.extraction.store import KnowledgeRecordRow
 from knowledge_engine.importer.media import AssetOccurrenceRow
 from knowledge_engine.importer.records import MessageNodeRow, MessageRevisionRow
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 from knowledge_engine.reconciliation.equivalence import compare, content_words
 
 DETECTOR_VERSION = "rec-002-v1"
@@ -102,10 +102,6 @@ REQUESTS = frozenset(
 )
 
 
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
-
-
 class RecordLinkRow(Base):
     """A typed link between two knowledge records."""
 
@@ -126,7 +122,7 @@ class RecordLinkRow(Base):
     detector: Mapped[str] = mapped_column(String(40))
     evidence_json: Mapped[str] = mapped_column(Text)
     state: Mapped[str] = mapped_column(String(10), default=LinkState.CANDIDATE.value)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class RecordLinkReviewRow(Base):
@@ -140,7 +136,7 @@ class RecordLinkReviewRow(Base):
     to_state: Mapped[str] = mapped_column(String(10))
     reviewer: Mapped[str] = mapped_column(String(100))
     note: Mapped[str | None] = mapped_column(Text, default=None)
-    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 # Created by migration 0023. Kept here so tests that build the schema

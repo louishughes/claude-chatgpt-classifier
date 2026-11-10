@@ -35,7 +35,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Iterable, Sequence
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 
 from pydantic import ValidationError
@@ -51,14 +51,10 @@ from knowledge_engine.extraction.records import (
     Trust,
     advance,
 )
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 
 VALIDATOR = "validator"
 _CURRENT = (Trust.SUPPORTED.value, Trust.CONFIRMED.value)
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 class KnowledgeRecordRow(Base):
@@ -72,8 +68,8 @@ class KnowledgeRecordRow(Base):
     scope_id: Mapped[str | None] = mapped_column(String(60), index=True, default=None)
     trust: Mapped[str] = mapped_column(String(20), index=True)
     record_json: Mapped[str] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class KnowledgeRecordEventRow(Base):
@@ -88,7 +84,7 @@ class KnowledgeRecordEventRow(Base):
     actor: Mapped[str] = mapped_column(String(100))
     note: Mapped[str | None] = mapped_column(Text, default=None)
     problems_json: Mapped[str] = mapped_column(Text, default="[]")
-    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class Decision(StrEnum):
@@ -264,7 +260,7 @@ def _save(
     assert row is not None
     row.trust = after.trust.value
     row.record_json = after.model_dump_json()
-    row.updated_at = _utc_now()
+    row.updated_at = utc_now()
     _log(session, after.record_id, before.trust, after.trust, actor, note, problems)
     session.flush()
     return after

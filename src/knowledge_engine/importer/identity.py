@@ -45,7 +45,7 @@ Talking points:
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
@@ -63,7 +63,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 from knowledge_engine.domain.enums import SourceSystem
 from knowledge_engine.domain.ids import conversation_id, sha256_hex
 from knowledge_engine.graph.nodes import canonical_json
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 
 
 class CandidateReason(StrEnum):
@@ -97,10 +97,6 @@ class CandidateDecidedError(ValueError):
 CONTENT_ID_PREFIX = "content-sha256:"
 
 
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
-
-
 class IdentityCandidateRow(Base):
     """One conversation whose identity is ``review_required``."""
 
@@ -127,7 +123,7 @@ class IdentityCandidateRow(Base):
     source_index: Mapped[int | None] = mapped_column(Integer, default=None)
     status: Mapped[str] = mapped_column(String(20), default="review_required")
     first_import_id: Mapped[str] = mapped_column(ForeignKey("import_batches.import_id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     # IMP-009: the decision. All three stay None until someone reviews it.
     decided_by: Mapped[str | None] = mapped_column(String(100), default=None)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
@@ -299,7 +295,7 @@ def decide(
     if row.status != CandidateStatus.REVIEW_REQUIRED.value:
         raise CandidateDecidedError(f"candidate already {row.status}")
     row.decided_by = reviewer
-    row.decided_at = _utc_now()
+    row.decided_at = utc_now()
     if action is CandidateAction.ACCEPT:
         row.status = CandidateStatus.ACCEPTED.value
         row.assigned_conversation_id = conversation_id(

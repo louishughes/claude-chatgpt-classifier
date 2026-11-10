@@ -23,6 +23,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -49,6 +50,25 @@ NAMING_CONVENTION = {
 # waiting for the other.
 _BEGIN_MODE_OPTION = "ke_begin_mode"
 _BEGIN_MODES = frozenset({"DEFERRED", "IMMEDIATE"})
+
+
+def utc_now() -> datetime:
+    """The current time in UTC: the default for every ``created_at``-style column.
+
+    One shared function instead of a private copy in each module, so every
+    table stamps its rows the same way.
+    """
+    return datetime.now(UTC)
+
+
+def as_utc(moment: datetime) -> datetime:
+    """``moment`` with its UTC time zone put back.
+
+    SQLite has no time zone type, so a column written as UTC comes back
+    "naive" (without a zone). Comparing a naive time with an aware one
+    raises ``TypeError``, so code that compares stored times calls this first.
+    """
+    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
 
 
 class Base(DeclarativeBase):

@@ -41,7 +41,7 @@ import re
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 from itertools import combinations
 
@@ -50,7 +50,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from knowledge_engine.extraction.records import KnowledgeRecord, Scope, Trust
 from knowledge_engine.extraction.store import KnowledgeRecordRow
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 
 DETECTOR_VERSION = "rec-001-v1"
 THRESHOLD = 0.6
@@ -95,10 +95,6 @@ class State(StrEnum):
     REJECTED = "rejected"
 
 
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
-
-
 class RecordEquivalenceRow(Base):
     """A proposed pair of records that may state the same claim."""
 
@@ -117,7 +113,7 @@ class RecordEquivalenceRow(Base):
     differences_json: Mapped[str] = mapped_column(Text, default="[]")
     detector: Mapped[str] = mapped_column(String(40))
     state: Mapped[str] = mapped_column(String(10), default=State.PROPOSED.value)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class RecordEquivalenceReviewRow(Base):
@@ -131,7 +127,7 @@ class RecordEquivalenceReviewRow(Base):
     to_state: Mapped[str] = mapped_column(String(10))
     reviewer: Mapped[str] = mapped_column(String(100))
     note: Mapped[str | None] = mapped_column(Text, default=None)
-    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 # Created by migration 0022. Kept here so tests that build the schema

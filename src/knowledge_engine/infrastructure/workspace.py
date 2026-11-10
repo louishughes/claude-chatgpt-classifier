@@ -16,16 +16,12 @@ Talking points:
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import DateTime, String, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
-from knowledge_engine.infrastructure.db import Base
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
+from knowledge_engine.infrastructure.db import Base, utc_now
 
 
 class WorkspaceRow(Base):
@@ -42,7 +38,7 @@ class WorkspaceRow(Base):
 
     workspace_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     name: Mapped[str] = mapped_column(String(100), unique=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class WorkspaceRepo:

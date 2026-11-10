@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Protocol
 
@@ -48,7 +48,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 from knowledge_engine.domain.enums import TranscriptStatus
 from knowledge_engine.domain.ids import transcript_acquisition_id, transcript_snapshot_id
 from knowledge_engine.importer.archive import BlobStore
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 from knowledge_engine.infrastructure.jobs import DEFAULT_MAX_ATTEMPTS
 from knowledge_engine.ingestion.transcripts import (
     TranscriptDocument,
@@ -64,10 +64,6 @@ _STATUSES = ",".join(f"'{s.value}'" for s in TranscriptStatus)
 # Answers that won't change by asking again: recorded, never retried.
 _FINAL = {TranscriptStatus.UNAVAILABLE, TranscriptStatus.PERMISSION_REQUIRED}
 _TEMPORARY = {TranscriptStatus.RATE_LIMITED, TranscriptStatus.FAILED}
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 class TranscriptAcquisitionRow(Base):
@@ -91,7 +87,7 @@ class TranscriptAcquisitionRow(Base):
         ForeignKey("transcript_snapshots.transcript_id"), default=None
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utc_now, onupdate=_utc_now
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
 
 
@@ -111,7 +107,7 @@ class TranscriptSnapshotRow(Base):
     provenance_json: Mapped[str] = mapped_column(Text)
     parser_version: Mapped[str] = mapped_column(String(20))
     warnings_json: Mapped[str] = mapped_column(Text, default="{}")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class TranscriptCueRow(Base):
@@ -270,7 +266,7 @@ def request_transcript(
                 **answer.detail,
                 "method": method,
                 "source_url": answer.source_url,
-                "retrieved_at": _utc_now().isoformat(),
+                "retrieved_at": utc_now().isoformat(),
             }
             snapshot = _store(session, settings, video_id, answer.data, document, provenance)
             return _settle(session, video_id, method, TranscriptStatus.SUCCEEDED, snapshot=snapshot)
@@ -308,7 +304,7 @@ def _store(
     BlobStore(
         settings.workspace_root / "archive", max_bytes=settings.limits.max_source_file_bytes
     ).put_bytes(data)
-    provenance = {**provenance, "added_at": _utc_now().isoformat()}
+    provenance = {**provenance, "added_at": utc_now().isoformat()}
     snapshot = TranscriptSnapshotRow(
         transcript_id=key,
         video_id=video_id,

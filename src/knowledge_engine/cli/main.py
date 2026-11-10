@@ -6,16 +6,14 @@ scripts and tests can rely on its exact shape. Exit codes are a closed list
 (``ExitCode``), so a script can tell "you typed it wrong" from "the config is
 invalid" from "not built yet" without reading messages.
 
-A command that isn't built yet exits with ``NOT_IMPLEMENTED`` and names
-its ticket, so the interface can be tried and tested early.
+Every command is built now. Exit code ``NOT_IMPLEMENTED`` (4) stays in the
+list, unused, so the numbers scripts already rely on never shift.
 Nothing here prints raw-folder paths, conversation text or secrets: ``status``
 shows counts and labels only.
 
 Talking points:
     - "My CLI has a contract: text for people, sorted JSON for scripts, and a
       fixed table of exit codes."
-    - "Unbuilt commands exist as honest placeholders that say so and exit with
-      their own code."
 """
 
 from __future__ import annotations
@@ -23,7 +21,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from enum import IntEnum
 from pathlib import Path
@@ -4460,19 +4458,6 @@ def _eval_semantic(settings: Settings, args: argparse.Namespace) -> CommandResul
             error_code="failed",
         )
     return CommandResult("eval semantic", data=data, message="Semantic smoke test passed")
-
-
-def _not_built(name: str, ticket: str) -> Callable[[Settings, argparse.Namespace], CommandResult]:
-    def handler(_settings: Settings, _args: argparse.Namespace) -> CommandResult:
-        return CommandResult(
-            name,
-            ExitCode.NOT_IMPLEMENTED,
-            data={"ticket": ticket},
-            message=f"`ke {name}` is not built yet ({ticket}).",
-            error_code="not_implemented",
-        )
-
-    return handler
 
 
 def build_parser() -> argparse.ArgumentParser:

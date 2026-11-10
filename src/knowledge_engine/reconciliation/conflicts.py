@@ -42,7 +42,7 @@ import json
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, Text, select
@@ -51,7 +51,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 from knowledge_engine.domain.enums import Role
 from knowledge_engine.extraction.records import KnowledgeRecord, RecordType, Trust
 from knowledge_engine.extraction.store import KnowledgeRecordRow
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 from knowledge_engine.reconciliation.equivalence import THRESHOLD, content_words, differences
 from knowledge_engine.reconciliation.relations import Placed, place
 
@@ -78,10 +78,6 @@ class ConflictState(StrEnum):
     RESOLVED = "resolved"
 
 
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
-
-
 class RecordConflictRow(Base):
     """Two records that cannot both hold, as far as the detector can tell."""
 
@@ -99,7 +95,7 @@ class RecordConflictRow(Base):
     evidence_json: Mapped[str] = mapped_column(Text)
     detector: Mapped[str] = mapped_column(String(40))
     state: Mapped[str] = mapped_column(String(10), default=ConflictState.UNRESOLVED.value)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class RecordConflictReviewRow(Base):
@@ -113,7 +109,7 @@ class RecordConflictReviewRow(Base):
     to_state: Mapped[str] = mapped_column(String(10))
     reviewer: Mapped[str] = mapped_column(String(100))
     note: Mapped[str] = mapped_column(Text)
-    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 # Created by migration 0024. Kept here so tests that build the schema

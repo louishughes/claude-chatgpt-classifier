@@ -24,14 +24,14 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from urllib.parse import parse_qs, urlsplit
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from knowledge_engine.domain.enums import TranscriptStatus
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 
 _ID_RE = re.compile(r"^[A-Za-z0-9_-]{11}$")
 _PLAYLIST_RE = re.compile(r"^[A-Za-z0-9_-]{2,64}$")
@@ -39,10 +39,6 @@ _DURATION_RE = re.compile(r"^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$")
 _VIDEO_HOSTS = {"youtube.com", "m.youtube.com", "music.youtube.com", "youtube-nocookie.com"}
 _PATH_FORMS = ("shorts", "live", "embed", "v", "e")
 _STATUSES = ",".join(f"'{s.value}'" for s in TranscriptStatus)
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 @dataclass(frozen=True)
@@ -115,7 +111,7 @@ class YouTubeVideoRow(Base):
         String(20), default=TranscriptStatus.NOT_REQUESTED.value
     )
     first_import_id: Mapped[str] = mapped_column(ForeignKey("import_batches.import_id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class YouTubeMentionRow(Base):
