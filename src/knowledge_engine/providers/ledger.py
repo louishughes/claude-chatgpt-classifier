@@ -61,7 +61,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 from knowledge_engine.infrastructure.logs import EventLog, null_log
 from knowledge_engine.orchestration.limits import RunBudget, estimate_tokens, estimated_tokens
 from knowledge_engine.providers.base import (
@@ -84,10 +84,6 @@ TIMEOUT = "timeout"
 # A request is sent at most this many times when the *provider* fails
 # (not the model): the first try and two retries (LEG-003).
 MAX_TRANSIENT_FAILURES = 3
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 class ModelRequestRow(Base):
@@ -115,8 +111,8 @@ class ModelRequestRow(Base):
     # from ``last_error`` so a retry never erases the repair context (LEG-003).
     transient_failures: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     last_transient: Mapped[str | None] = mapped_column(String(40), default=None)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class ModelOutputRow(Base):
@@ -133,7 +129,7 @@ class ModelOutputRow(Base):
     served_model: Mapped[str | None] = mapped_column(String(100), default=None)
     session_ref: Mapped[str | None] = mapped_column(String(200), default=None)
     output_json: Mapped[str] = mapped_column(Text)
-    stored_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    stored_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 def repair_id(stage_key: str) -> str:
@@ -180,7 +176,7 @@ class ModelStageRunner:
     egress: EgressPolicy
     log: EventLog = field(default_factory=null_log)
     budget: RunBudget | None = None
-    clock: Callable[[], datetime] = _utc_now
+    clock: Callable[[], datetime] = utc_now
 
     def _event(self, event: str, request: ModelRequest, **fields: int | str | None) -> None:
         self.log.emit(
@@ -384,7 +380,7 @@ class ModelStageRunner:
             else:
                 row.state = REVIEW_REQUIRED
                 row.last_error = result.error
-                row.updated_at = _utc_now()
+                row.updated_at = utc_now()
                 report.review_required.append(original.request_id)
                 self._event("model.review_required", original, attempts=row.attempts)
         if resend:
@@ -495,7 +491,7 @@ class ModelStageRunner:
             )
         )
         row.state = DONE
-        row.updated_at = _utc_now()
+        row.updated_at = utc_now()
 
 
 def _provider_limit(provider: StructuredModelProvider) -> int | None:

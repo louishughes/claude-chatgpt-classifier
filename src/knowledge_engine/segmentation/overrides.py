@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import CheckConstraint, DateTime, Integer, String, Text, select
@@ -46,7 +46,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from knowledge_engine.classification.store import ClassificationRow
 from knowledge_engine.extraction.runner import ExtractionRunRow
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 from knowledge_engine.rendering.transcript import StoredConversation
 from knowledge_engine.segmentation.segmenter import (
     Segment,
@@ -65,10 +65,6 @@ class Action(StrEnum):
     CLEAR = "clear"
 
 
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
-
-
 class SegmentOverrideRow(Base):
     """One reviewer decision about a segment boundary. Append-only."""
 
@@ -81,7 +77,7 @@ class SegmentOverrideRow(Base):
     action: Mapped[str] = mapped_column(String(8))
     reviewer: Mapped[str] = mapped_column(String(100))
     note: Mapped[str | None] = mapped_column(Text, default=None)
-    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 # Created by migration 0021. Kept here so tests that build the schema

@@ -35,7 +35,7 @@ import secrets
 import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
@@ -51,7 +51,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 
 SNAPSHOT_FORMAT = "taxonomy-snapshot-v1"
 _VERSION_RE = re.compile(r"^[a-z][a-z0-9.-]{0,39}$")
@@ -78,10 +78,6 @@ class TermStatus(StrEnum):
 
 def _values(enum: type[StrEnum]) -> str:
     return ",".join(f"'{member.value}'" for member in enum)
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 def new_id(prefix: str) -> str:
@@ -125,7 +121,7 @@ class TaxonomyTermRow(Base):
     merged_into: Mapped[str | None] = mapped_column(
         ForeignKey("taxonomy_terms.term_id"), default=None
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class TaxonomyAliasRow(Base):
@@ -151,7 +147,7 @@ class TaxonomyVersionRow(Base):
     snapshot_json: Mapped[str] = mapped_column(Text)
     author: Mapped[str] = mapped_column(String(100))
     note: Mapped[str | None] = mapped_column(Text, default=None)
-    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class TaxonomyProposalRow(Base):
@@ -178,7 +174,7 @@ class TaxonomyProposalRow(Base):
     decision_note: Mapped[str | None] = mapped_column(Text, default=None)
     result_id: Mapped[str | None] = mapped_column(String(40), default=None)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class ProjectRow(Base):
@@ -197,7 +193,7 @@ class ProjectRow(Base):
     description: Mapped[str | None] = mapped_column(Text, default=None)
     status: Mapped[str] = mapped_column(String(12), default=TermStatus.PROPOSED.value)
     merged_into: Mapped[str | None] = mapped_column(ForeignKey("projects.project_id"), default=None)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class ProjectAliasRow(Base):

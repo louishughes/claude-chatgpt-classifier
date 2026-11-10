@@ -31,7 +31,7 @@ import hashlib
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, String, func, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
@@ -45,12 +45,8 @@ from knowledge_engine.documents.model import (
 )
 from knowledge_engine.extraction.records import KnowledgeRecord
 from knowledge_engine.extraction.store import KnowledgeRecordRow
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 from knowledge_engine.reconciliation.relations import place
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 class DocumentBuildRow(Base):
@@ -70,7 +66,7 @@ class DocumentBuildRow(Base):
     content_hash: Mapped[str] = mapped_column(String(64))
     builder_version: Mapped[str] = mapped_column(String(40))
     record_count: Mapped[int] = mapped_column(Integer)
-    built_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    built_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class DocumentDependencyRow(Base):

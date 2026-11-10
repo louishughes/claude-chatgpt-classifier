@@ -35,7 +35,7 @@ import hashlib
 import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -54,7 +54,7 @@ from knowledge_engine.extraction.records import (
 from knowledge_engine.extraction.store import add_candidates, gate
 from knowledge_engine.extraction.text import ExtractionMessage, exchanges_of, quote
 from knowledge_engine.graph.offsets import find_quote
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 from knowledge_engine.infrastructure.logs import EventLog, null_log
 from knowledge_engine.orchestration.limits import Deadline
 from knowledge_engine.orchestration.stage_keys import stage_key
@@ -67,10 +67,6 @@ MAX_ATTEMPTS = 3
 DONE = "done"
 PENDING = "pending"
 FAILED = "failed"
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 class ExtractionRunRow(Base):
@@ -86,7 +82,7 @@ class ExtractionRunRow(Base):
     error: Mapped[str | None] = mapped_column(String(100), default=None)
     record_ids_json: Mapped[str] = mapped_column(Text, default="[]")
     versions_json: Mapped[str] = mapped_column(Text)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class PendingAnswer(Exception):
@@ -263,7 +259,7 @@ def _one(
         row.attempts += 1
         row.state = FAILED
         row.error = type(error).__name__  # never the message: it may quote private text
-        row.updated_at = _utc_now()
+        row.updated_at = utc_now()
         session.flush()
         report.failed.append(row.stage_key)
         return
@@ -272,7 +268,7 @@ def _one(
     row.state = DONE
     row.error = None
     row.record_ids_json = json.dumps([r.record_id for r in records])
-    row.updated_at = _utc_now()
+    row.updated_at = utc_now()
     session.flush()
     report.done.append(row.stage_key)
     report.records += len(records)

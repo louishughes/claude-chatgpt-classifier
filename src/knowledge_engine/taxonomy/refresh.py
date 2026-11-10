@@ -46,7 +46,7 @@ import json
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import DateTime, Integer, String, Text, func, select
@@ -69,7 +69,7 @@ from knowledge_engine.classification.store import (
 )
 from knowledge_engine.importer.ledger import ImportBatchRow
 from knowledge_engine.importer.records import ConversationRow
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, as_utc, utc_now
 from knowledge_engine.orchestration.stage_keys import stage_key
 from knowledge_engine.rendering.transcript import StoredConversation
 from knowledge_engine.segmentation.inventory import SegmentText
@@ -102,10 +102,6 @@ UNLABELLED = "unlabelled"
 NEW_CHAT = "new_chat"
 
 
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
-
-
 class RefreshPackRow(Base):
     """A refresh pack that was handed to a proposer session.
 
@@ -122,7 +118,7 @@ class RefreshPackRow(Base):
     queued: Mapped[int] = mapped_column(Integer)
     sampled: Mapped[int] = mapped_column(Integer)
     imports_json: Mapped[str] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 # ---------------------------------------------------------------- the queue
@@ -159,7 +155,7 @@ def _seen_imports(session: Session) -> set[str] | None:
     return {
         row.import_id
         for row in session.scalars(select(ImportBatchRow))
-        if _aware(row.started_at) <= _aware(first)
+        if as_utc(row.started_at) <= as_utc(first)
     }
 
 
@@ -175,11 +171,6 @@ def _new_chats(session: Session) -> set[str]:
             )
         )
     )
-
-
-def _aware(value: datetime) -> datetime:
-    # SQLite returns naive datetimes; they were written in UTC.
-    return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
 def _labelled_segments(session: Session, version: str) -> set[str]:

@@ -30,22 +30,18 @@ import re
 import secrets
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, Integer, String, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from knowledge_engine.access.policy import AccountKind, Permission, Role, allows, may_hold
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 from knowledge_engine.infrastructure.workspace import WorkspaceRepo, WorkspaceRow
 
 NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
 TOKEN_PREFIX = "ke_"
 _ACCOUNT_ID = re.compile(r"^[0-9a-f]{32}$")
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 class AccessError(ValueError):
@@ -60,7 +56,7 @@ class AccountRow(Base):
     account_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     name: Mapped[str] = mapped_column(String(64), unique=True)
     kind: Mapped[str] = mapped_column(String(16))  # AccountKind
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     disabled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
@@ -72,7 +68,7 @@ class AccountTokenRow(Base):
     token_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     account_id: Mapped[str] = mapped_column(String(32), index=True)
     token_sha256: Mapped[str] = mapped_column(String(64), unique=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
@@ -85,7 +81,7 @@ class MembershipRow(Base):
     account_id: Mapped[str] = mapped_column(String(32), primary_key=True)
     role: Mapped[str] = mapped_column(String(16))  # Role
     granted_by: Mapped[str] = mapped_column(String(64))
-    granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    granted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class AuthzEventRow(Base):
@@ -94,7 +90,7 @@ class AuthzEventRow(Base):
     __tablename__ = "authz_events"
 
     event_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     # The account's random ID, never its name, so deleting the account leaves
     # the log pseudonymous (PROD-004); "" when there was no valid token.
     account: Mapped[str] = mapped_column(String(64))
@@ -181,7 +177,7 @@ def revoke_tokens(session: Session, name: str) -> int:
         )
     ).all()
     for row in live:
-        row.revoked_at = _utc_now()
+        row.revoked_at = utc_now()
     session.flush()
     return len(live)
 
@@ -190,7 +186,7 @@ def disable_account(session: Session, name: str) -> None:
     """Stop an account from logging in at all (its tokens are revoked too)."""
     account = get_account(session, name)
     revoke_tokens(session, name)
-    account.disabled_at = account.disabled_at or _utc_now()
+    account.disabled_at = account.disabled_at or utc_now()
     session.flush()
 
 
@@ -255,7 +251,7 @@ def grant(session: Session, name: str, workspace: str, role: Role, by: str) -> M
     if row is None:
         row = MembershipRow(workspace_id=workspace_id, account_id=account.account_id)
         session.add(row)
-    row.role, row.granted_by, row.granted_at = role.value, by, _utc_now()
+    row.role, row.granted_by, row.granted_at = role.value, by, utc_now()
     resource = f"grant {account.account_id} {role.value}"
     _log(session, by, workspace_id, Permission.MANAGE, resource, True, "ok")
     return row

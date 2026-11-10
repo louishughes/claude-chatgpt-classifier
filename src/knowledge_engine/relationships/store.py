@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
@@ -49,7 +49,7 @@ from knowledge_engine.domain.ids import relationship_id
 # and a command that loads only this module (`ke related suggest`) would
 # otherwise fail to build the table metadata (NoReferencedTableError).
 from knowledge_engine.importer import ledger as _ledger  # noqa: F401
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 
 
 class RelationKind(StrEnum):
@@ -92,10 +92,6 @@ def _values(enum: type[StrEnum]) -> str:
     return ",".join(f"'{member.value}'" for member in enum)
 
 
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
-
-
 class ConversationRelationshipRow(Base):
     """One proposed link from one conversation to another."""
 
@@ -129,7 +125,7 @@ class ConversationRelationshipRow(Base):
     first_import_id: Mapped[str | None] = mapped_column(
         ForeignKey("import_batches.import_id"), default=None
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class RelationshipReviewRow(Base):
@@ -147,7 +143,7 @@ class RelationshipReviewRow(Base):
     to_state: Mapped[str] = mapped_column(String(12))
     reviewer: Mapped[str] = mapped_column(String(100))
     note: Mapped[str | None] = mapped_column(Text, default=None)
-    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 # Created by migration 0013. Kept here so tests that build the schema

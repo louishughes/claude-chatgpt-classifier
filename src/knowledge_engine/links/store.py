@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Iterable
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
@@ -32,15 +32,11 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from knowledge_engine.domain.ids import link_occurrence_id, link_target_id
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 from knowledge_engine.links.extract import CITATION_METADATA, MESSAGE_TEXT, FoundLink
 from knowledge_engine.links.youtube import parse_youtube, record_mention
 
 _ORIGINS = f"'{MESSAGE_TEXT}','{CITATION_METADATA}'"
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 class LinkTargetRow(Base):
@@ -55,7 +51,7 @@ class LinkTargetRow(Base):
     # social_profile when they recognise a URL.
     kind: Mapped[str] = mapped_column(String(30), default="web")
     first_import_id: Mapped[str] = mapped_column(ForeignKey("import_batches.import_id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class LinkOccurrenceRow(Base):

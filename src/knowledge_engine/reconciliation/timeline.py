@@ -47,7 +47,7 @@ import hashlib
 import json
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, String, Text, select
@@ -55,7 +55,7 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from knowledge_engine.extraction.records import KnowledgeRecord, RecordType, Trust
 from knowledge_engine.extraction.store import KnowledgeRecordRow
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 from knowledge_engine.reconciliation.conflicts import ConflictState, RecordConflictRow
 from knowledge_engine.reconciliation.relations import Placed, place
 
@@ -78,10 +78,6 @@ class Transition(StrEnum):
 
 OFFERS = frozenset({RecordType.PROPOSAL, RecordType.RECOMMENDATION})
 CHOICES = frozenset({RecordType.DECISION, RecordType.REQUIREMENT})
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 _PREDICATES = ",".join(f"'{t.value}'" for t in Transition)
@@ -109,7 +105,7 @@ class DecisionEventRow(Base):
     actor: Mapped[str] = mapped_column(String(100))
     evidence_json: Mapped[str] = mapped_column(Text, default="{}")
     note: Mapped[str | None] = mapped_column(Text, default=None)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 # Created by migration 0025. Kept here so tests that build the schema

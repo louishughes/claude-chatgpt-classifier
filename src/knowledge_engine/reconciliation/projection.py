@@ -42,7 +42,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import select
@@ -50,6 +50,7 @@ from sqlalchemy.orm import Session
 
 from knowledge_engine.extraction.records import KnowledgeRecord, RecordType, Trust
 from knowledge_engine.extraction.store import KnowledgeRecordEventRow, KnowledgeRecordRow
+from knowledge_engine.infrastructure.db import as_utc
 from knowledge_engine.reconciliation.conflicts import (
     ConflictState,
     RecordConflictReviewRow,
@@ -127,13 +128,8 @@ class Projection:
         return [e.record_id for e in self.entries if e.status is status]
 
 
-def _aware(moment: datetime) -> datetime:
-    # SQLite hands timezone-aware columns back naive; they were stored in UTC.
-    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
-
-
 def _known(moment: datetime, known_at: datetime | None) -> bool:
-    return known_at is None or _aware(moment) <= _aware(known_at)
+    return known_at is None or as_utc(moment) <= as_utc(known_at)
 
 
 def _trust_at(session: Session, record_id: str, known_at: datetime | None) -> Trust | None:

@@ -36,7 +36,7 @@ import json
 import time
 from collections import Counter
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -68,6 +68,7 @@ from knowledge_engine.infrastructure.db import (
     SessionFactory,
     create_sqlite_engine,
     database_path,
+    utc_now,
 )
 from knowledge_engine.infrastructure.migrations import upgrade_to_head
 from knowledge_engine.infrastructure.upgrade import require_current
@@ -104,10 +105,6 @@ class DocumentChangedError(RuntimeError):
     """The file changed while it was being read, so nothing was stored."""
 
 
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
-
-
 class DocumentRow(Base):
     """One imported note or text file, by where it lives."""
 
@@ -126,7 +123,7 @@ class DocumentRow(Base):
     current_revision_id: Mapped[str] = mapped_column(String(40))
     first_import_id: Mapped[str] = mapped_column(ForeignKey("import_batches.import_id"))
     last_import_id: Mapped[str] = mapped_column(ForeignKey("import_batches.import_id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class DocumentRevisionRow(Base):
@@ -145,7 +142,7 @@ class DocumentRevisionRow(Base):
     # Parser warning codes (never content), as a JSON list.
     warnings_json: Mapped[str] = mapped_column(Text, default="[]")
     first_import_id: Mapped[str] = mapped_column(ForeignKey("import_batches.import_id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class DocumentBlockRow(Base):

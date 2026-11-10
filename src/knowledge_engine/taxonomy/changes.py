@@ -31,18 +31,14 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 from knowledge_engine.taxonomy.registry import TaxonomySnapshot
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 class TaxonomyChangeRow(Base):
@@ -55,7 +51,7 @@ class TaxonomyChangeRow(Base):
     added_json: Mapped[str] = mapped_column(Text)
     removed_json: Mapped[str] = mapped_column(Text)
     changed_json: Mapped[str] = mapped_column(Text)
-    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class StageInvalidationRow(Base):
@@ -69,7 +65,7 @@ class StageInvalidationRow(Base):
     from_version: Mapped[str] = mapped_column(String(40))
     to_version: Mapped[str] = mapped_column(String(40))
     cited_ids_json: Mapped[str] = mapped_column(Text)
-    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 @dataclass(frozen=True)

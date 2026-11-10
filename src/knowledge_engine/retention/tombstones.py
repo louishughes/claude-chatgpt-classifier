@@ -23,17 +23,13 @@ Talking points:
 from __future__ import annotations
 
 import hashlib
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import StrEnum
 
 from sqlalchemy import DateTime, Integer, String, Text, UniqueConstraint, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
-from knowledge_engine.infrastructure.db import Base
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
+from knowledge_engine.infrastructure.db import Base, utc_now
 
 
 class TombstoneKind(StrEnum):
@@ -56,7 +52,7 @@ class PurgeEventRow(Base):
     status: Mapped[str] = mapped_column(String(16))  # "purged", then "verified" or "residual"
     counts_json: Mapped[str] = mapped_column(Text)
     verification_json: Mapped[str] = mapped_column(Text, default="{}")
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class PurgeTombstoneRow(Base):
@@ -69,7 +65,7 @@ class PurgeTombstoneRow(Base):
     kind: Mapped[str] = mapped_column(String(16))
     key_sha256: Mapped[str] = mapped_column(String(64))
     purge_id: Mapped[str] = mapped_column(String(40), index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 # Created by migration 0028: the audit log outlives what it describes.

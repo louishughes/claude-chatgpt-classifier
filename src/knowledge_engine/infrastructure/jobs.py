@@ -22,21 +22,17 @@ from __future__ import annotations
 import json
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, Literal
 
 from sqlalchemy import CheckConstraint, DateTime, Integer, String, Text, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from knowledge_engine.domain.enums import JobState, check_transition
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 
 ErrorKind = Literal["transient", "permanent", "semantic"]
 DEFAULT_MAX_ATTEMPTS = 3  # owner guardrail: 3 attempts in total for transient errors
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 class JobRow(Base):
@@ -77,9 +73,9 @@ class JobRow(Base):
     result_json: Mapped[str | None] = mapped_column(Text, default=None)
     last_error: Mapped[str | None] = mapped_column(String(500), default=None)
     checkpoint_json: Mapped[str | None] = mapped_column(Text, default=None)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=_utc_now, onupdate=_utc_now
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
     )
 
 

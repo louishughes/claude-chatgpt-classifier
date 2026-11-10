@@ -40,7 +40,7 @@ import hashlib
 import json
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
@@ -62,15 +62,11 @@ from knowledge_engine.classification.classifier import (
     SegmentClassification,
 )
 from knowledge_engine.classification.schema import PROJECTS_FIELD, Rank, assignments
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, as_utc, utc_now
 from knowledge_engine.taxonomy.registry import Dimension, TaxonomySnapshot
 
 FIELDS = tuple(d.value for d in Dimension) + (PROJECTS_FIELD,)
 _STATES = (DONE, PENDING, REVIEW_REQUIRED)
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 class ClassificationRow(Base):
@@ -94,8 +90,8 @@ class ClassificationRow(Base):
     problems_json: Mapped[str] = mapped_column(Text, default="[]")
     provider_id: Mapped[str | None] = mapped_column(String(40), default=None)
     served_model: Mapped[str | None] = mapped_column(String(100), default=None)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class ClassificationLabelRow(Base):
@@ -129,7 +125,7 @@ class ClassificationReviewRow(Base):
     secondary_json: Mapped[str] = mapped_column(Text, default="[]")
     reviewer: Mapped[str] = mapped_column(String(100))
     note: Mapped[str | None] = mapped_column(Text, default=None)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class ReviewInputError(ValueError):
@@ -183,7 +179,7 @@ def save(
             row.problems_json = json.dumps(list(result.problems))
             if result.method == "model":
                 row.provider_id, row.served_model = provider_id, served_model
-            row.updated_at = _utc_now()
+            row.updated_at = utc_now()
             if result.answer is not None:
                 for name, item in assignments(result.answer):
                     session.add(
@@ -344,7 +340,7 @@ def review_queue(session: Session, taxonomy_version: str) -> list[Classification
             f
             for f in flagged
             if (r := _latest_review(session, row.segment_id, f)) is not None
-            and _aware(r.created_at) >= _aware(row.updated_at)
+            and as_utc(r.created_at) >= as_utc(row.updated_at)
         }
         if not flagged or decided != flagged:
             queue.append(row)
@@ -363,11 +359,6 @@ def flagged_fields(row: ClassificationRow) -> set[str]:
         else:
             return set(FIELDS)
     return fields
-
-
-def _aware(value: datetime) -> datetime:
-    # SQLite returns naive datetimes; they were written in UTC.
-    return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
 def _allowed(snapshot: TaxonomySnapshot, field: str) -> tuple[str, ...]:

@@ -22,7 +22,7 @@ Talking points:
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
@@ -35,11 +35,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from knowledge_engine.infrastructure.db import Base
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
+from knowledge_engine.infrastructure.db import Base, utc_now
 
 
 class ConversationRow(Base):
@@ -104,7 +100,7 @@ class MessageRevisionRow(Base):
     content_json: Mapped[str] = mapped_column(Text)
     first_snapshot_id: Mapped[str] = mapped_column(ForeignKey("source_snapshots.snapshot_id"))
     first_import_id: Mapped[str] = mapped_column(ForeignKey("import_batches.import_id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class GraphEdgeRow(Base):

@@ -52,15 +52,11 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from knowledge_engine.domain.ids import account_mention_id, social_account_id
 from knowledge_engine.importer.records import MessageRevisionRow
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 from knowledge_engine.links.extract import CITATION_METADATA, MESSAGE_TEXT
 from knowledge_engine.links.social import AMBIGUOUS, RESOLVED, FoundAccount
 
 _STATUSES = "'confirmed','probable','ambiguous','rejected'"
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 class SocialAccountRow(Base):
@@ -81,7 +77,7 @@ class SocialAccountRow(Base):
     profile_url: Mapped[str | None] = mapped_column(Text, default=None)
     identity_status: Mapped[str] = mapped_column(String(12), default="probable")
     first_import_id: Mapped[str] = mapped_column(ForeignKey("import_batches.import_id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class AccountAliasRow(Base):
@@ -166,7 +162,7 @@ class AccountReviewRow(Base):
     to_state: Mapped[str] = mapped_column(String(12))
     reviewer: Mapped[str] = mapped_column(String(100))
     note: Mapped[str | None] = mapped_column(Text, default=None)
-    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 # Created by migration 0034. Kept here so tests that build the schema

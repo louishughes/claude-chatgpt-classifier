@@ -48,12 +48,8 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 from knowledge_engine.domain.enums import ImportBatchStatus, check_transition
 from knowledge_engine.domain.ids import snapshot_id
 from knowledge_engine.importer.archive import BlobStore, StorageMode, StoredBlob, remove_stored
-from knowledge_engine.infrastructure.db import Base
+from knowledge_engine.infrastructure.db import Base, utc_now
 from knowledge_engine.retention.tombstones import TombstoneKind, is_purged
-
-
-def _utc_now() -> datetime:
-    return datetime.now(UTC)
 
 
 class ImportBatchRow(Base):
@@ -89,7 +85,7 @@ class ImportBatchRow(Base):
     format_id: Mapped[str] = mapped_column(String(40))
     versions_json: Mapped[str] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), index=True)
-    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
     tree_hash_before: Mapped[str] = mapped_column(String(64))
     tree_hash_after: Mapped[str | None] = mapped_column(String(64), default=None)
@@ -120,7 +116,7 @@ class SourceSnapshotRow(Base):
     storage_mode: Mapped[str] = mapped_column(String(10))
     storage_ref: Mapped[str] = mapped_column(Text)
     first_import_id: Mapped[str] = mapped_column(ForeignKey("import_batches.import_id"))
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 
 class ImportBatchFileRow(Base):
@@ -213,7 +209,7 @@ class ImportLedger:
         times strictly increasing. ``start`` holds the write lock, so no other
         batch can be started between this read and the insert.
         """
-        now = _utc_now()
+        now = utc_now()
         newest = self._session.scalar(select(func.max(ImportBatchRow.started_at)))
         if newest is None:
             return now
@@ -233,7 +229,7 @@ class ImportLedger:
         ).all()
         for batch in stale:
             self._move(batch, ImportBatchStatus.ABANDONED)
-            batch.finished_at = _utc_now()
+            batch.finished_at = utc_now()
         self._session.flush()
         return len(stale)
 
@@ -342,7 +338,7 @@ class ImportLedger:
             InvalidTransitionError: If the batch isn't running.
         """
         self._move(batch, status)
-        batch.finished_at = _utc_now()
+        batch.finished_at = utc_now()
         batch.counts_json = json.dumps(counts, sort_keys=True)
         batch.warnings_json = json.dumps(warnings, sort_keys=True)
         batch.tree_hash_after = tree_hash
