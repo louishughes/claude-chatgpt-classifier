@@ -3569,3 +3569,29 @@ Talking points:
 - "Changing a prompt changes its version, so nothing cached from the old prompt sneaks through."
 
 **Next exact task:** the PC re-run and re-score with knowledge-v2 and digest-v4.
+
+## 2026-11-09 to 2026-11-13
+
+### 2026-11-09 20:54 UTC to 2026-11-13 07:10 UTC: an independent model checks the knowledge engine handoff
+
+**What.** Another agent wrote a PRD, six sub-tickets (CLAUDE-01..06) and a handoff for "complete the exported conversation note". They live outside this repo, on Louis's P: drive. Louis asked for Fable 5.2, a different model from the one that wrote them, to check every factual claim against what this repo does today. Each claim got one of four verdicts: true now, true only in the 28 Oct gold-40 v4 run, false, or can't be verified. No code, tests, spec or gold data were changed. The report is kept outside the repo, in the project's files (`reviews/PRD_CLAIMS_CHECK_2026-11-10.md`), and it gives counts and paths only.
+
+**Results.** Of 34 claims, 19 are true now, 3 are true only in the old run, 6 are false and 6 can't be verified here. The main findings:
+- "`tags: []` in all 40 gold notes" is true, and current code still does it. Front-matter tags only come from segment labels. The `ke digest run --vault` route also never passes the taxonomy into keyword resolution, so even an approved term shows as a "candidate". The handoff doesn't name that bug.
+- The handoff's first step, "embed the transcript in the knowledge note", reverses an owner-approved decision (D8 in the rich-notes gap analysis: keep the transcript separate). It would also mean changing existing tests and the NOTE-011 rubric checks, which needs Louis's approval.
+- Keyword noise is half fixed. NOTE-036 and NOTE-040 removed profile names and repeats after the gold run. A generic verb, an HTTP error phrase and a URL fragment still get through on a synthetic fixture.
+- The cross-part reconciliation the handoff calls "existing" was added after the gold run (NOTE-032..039). So the gold run's open-question and status defects are old-run only, and CLAUDE-05 mostly repeats merged work.
+- "60 focused offline tests" gives no command. One 10-file selection gives exactly 60, and they pass.
+
+**Challenges.**
+- The documents were on a different drive, so the session had to ask for read access to two P: folders.
+- The handoff wasn't next to the PRD as expected. The PRD's own link pointed to `docs/handoffs/` two levels up.
+- Fable hit its 5-hour usage limit mid-check. It was resumed from where it stopped once the limit reset, rather than restarted.
+- The session's worker restarted twice, which delayed the write-up by a few days.
+
+**Decisions.** Louis chose a different model to do the checking, so no model marks its own homework. That follows the project rule that agents never judge their own output.
+
+Talking points:
+- "I had a second AI model fact-check the first one's plan against the real code. A third of its claims were stale or wrong."
+- "The plan's step one would have quietly undone a design decision I'd already made. Checking against recorded decisions caught it."
+- "Checking 'true now' against 'true in an old run' matters: half the bugs the plan described had already been fixed."
